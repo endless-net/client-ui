@@ -103,6 +103,7 @@ func buildWindowsClientMSI(t *testing.T, root, clientExe, trayExe, outputDir, ve
 		"--version", version,
 		"--client-exe", clientExe,
 		"--tray-exe", trayExe,
+		"--icon-file", filepath.Join(root, "assets", "endlessnet", "favicon.ico"),
 		"--msi", msi,
 	)
 	render.Dir = root

@@ -18,7 +18,6 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 	for _, want := range []string{
 		`<Package Name="EndlessNet Client"`,
 		`xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util"`,
-		`xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"`,
 		`Version="1.2.3"`,
 		`UpgradeCode="{9f7a7362-64c3-4b3a-9a58-7c8fc90779e1}"`,
 		`<MajorUpgrade`,
@@ -26,18 +25,26 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`Property Id="ENDLESSNET_REMOVE_STATE_ROOT" Secure="yes" Value="C:\ProgramData\EndlessNet"`,
 		`Name="endlessnet-client.exe"`,
 		`Name="endlessnet-tray.exe"`,
-		`ui:WixUI Id="WixUI_Minimal"`,
+		`Name="endlessnet.ico"`,
+		`UI Id="EndlessNetInstallerUI"`,
+		`DialogRef Id="WelcomeDlg"`,
+		`DialogRef Id="VerifyReadyDlg"`,
+		`DialogRef Id="ExitDialog"`,
+		`UIRef Id="WixUI_Common"`,
 		`WIXUI_EXITDIALOGOPTIONALCHECKBOX`,
 		`WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch EndlessNet now"`,
-		`WixShellExecTarget" Value="[#TrayExeFile]"`,
 		`CustomAction Id="LaunchEndlessNetTray"`,
-		`BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"`,
+		`FileRef="TrayExeFile"`,
+		`ExeCommand="--show-window"`,
 		`Publish Dialog="ExitDialog" Control="Finish"`,
 		`Directory Id="ApplicationProgramsFolder" Name="EndlessNet"`,
 		`Shortcut Id="EndlessNetTrayShortcut"`,
+		`Arguments="--show-window"`,
+		`Icon="EndlessNetTrayIcon"`,
 		`RemoveFolder Id="RemoveEndlessNetProgramMenuFolder"`,
 		`Component Id="ClientExecutable" Guid="*" Bitness="always64"`,
 		`Component Id="TrayExecutable" Guid="*" Bitness="always64"`,
+		`Component Id="TrayIcon" Guid="*" Bitness="always64"`,
 		`Component Id="DeepLinkProtocol" Guid="*" Bitness="always64"`,
 		`Software\Microsoft\Windows\CurrentVersion\Run`,
 		`Component Id="DeepLinkProtocol"`,
@@ -74,6 +81,17 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 			t.Fatalf("WiX source missing %q:\n%s", want, artifacts.WixSource)
 		}
 	}
+	for _, forbidden := range []string{
+		`WixUI_Minimal`,
+		`LicenseAgreementDlg`,
+		`WixUILicenseRtf`,
+		`Lorem ipsum`,
+		`WixShellExecTarget`,
+	} {
+		if strings.Contains(artifacts.WixSource, forbidden) {
+			t.Fatalf("WiX source contains forbidden placeholder/license marker %q:\n%s", forbidden, artifacts.WixSource)
+		}
+	}
 	for _, want := range []string{
 		"WiX Toolset wix.exe is required",
 		"wix.exe",
@@ -82,6 +100,7 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		"WixToolset.UI.wixext",
 		"ClientExe",
 		"TrayExe",
+		"IconFile",
 		"ENDLESSNET_CODESIGN_THUMBPRINT",
 		"SignTool",
 	} {

@@ -16,6 +16,7 @@ type WindowsInstallerOptions struct {
 	UpgradeCode    string
 	ClientExe      string
 	TrayExe        string
+	IconFile       string
 	OutputName     string
 	ServiceOptions WindowsServiceOptions
 }
@@ -35,6 +36,7 @@ func DefaultWindowsInstallerOptions() WindowsInstallerOptions {
 		UpgradeCode:    "9f7a7362-64c3-4b3a-9a58-7c8fc90779e1",
 		ClientExe:      `C:\Program Files\EndlessNet\endlessnet-client.exe`,
 		TrayExe:        `C:\Program Files\EndlessNet\endlessnet-tray.exe`,
+		IconFile:       filepath.Join("assets", "endlessnet", "favicon.ico"),
 		OutputName:     "EndlessNet.Client.msi",
 		ServiceOptions: DefaultWindowsServiceOptions(),
 	}
@@ -97,6 +99,9 @@ func normalizeWindowsInstallerOptions(opts WindowsInstallerOptions) WindowsInsta
 	if strings.TrimSpace(opts.TrayExe) == "" {
 		opts.TrayExe = defaults.TrayExe
 	}
+	if strings.TrimSpace(opts.IconFile) == "" {
+		opts.IconFile = defaults.IconFile
+	}
 	if strings.TrimSpace(opts.OutputName) == "" {
 		opts.OutputName = defaults.OutputName
 	}
@@ -112,6 +117,7 @@ func validateWindowsInstallerOptions(opts WindowsInstallerOptions) error {
 		"upgrade code": opts.UpgradeCode,
 		"client exe":   opts.ClientExe,
 		"tray exe":     opts.TrayExe,
+		"icon file":    opts.IconFile,
 		"output name":  opts.OutputName,
 		"service name": opts.ServiceOptions.ServiceName,
 		"display name": opts.ServiceOptions.DisplayName,
@@ -141,7 +147,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 	serviceArgs := windowsServiceAgentArgs(opts.ServiceOptions)
 	stateRoot := windowsParentPath(opts.ServiceOptions.ConfigPath)
 	return fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package Name="%s" Manufacturer="%s" Version="%s" UpgradeCode="{%s}" Scope="perMachine">
     <SummaryInformation Description="%s installer" Manufacturer="%s" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of EndlessNet Client is already installed." />
@@ -149,13 +155,31 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     <Property Id="ENDLESSNET_REMOVE_STATE_ROOT" Secure="yes" Value="%s" />
     <MediaTemplate EmbedCab="yes" />
     <UI Id="EndlessNetInstallerUI">
-      <ui:WixUI Id="WixUI_Minimal" />
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+      <Property Id="WixUI_Mode" Value="Minimal" />
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+      <DialogRef Id="WelcomeDlg" />
+      <DialogRef Id="VerifyReadyDlg" />
+      <DialogRef Id="ExitDialog" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="NOT Installed" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Condition="NOT Installed" />
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchEndlessNetTray" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
     </UI>
+    <UIRef Id="WixUI_Common" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch EndlessNet now" />
-    <Property Id="WixShellExecTarget" Value="[#TrayExeFile]" />
-    <CustomAction Id="LaunchEndlessNetTray" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixShellExec" Impersonate="yes" />
+    <CustomAction Id="LaunchEndlessNetTray" FileRef="TrayExeFile" ExeCommand="--show-window" Execute="immediate" Return="asyncNoWait" Impersonate="yes" />
+    <Icon Id="EndlessNetTrayIcon" SourceFile="$(var.IconFile)" />
     <Feature Id="ProductFeature" Title="%s" Level="1">
       <ComponentGroupRef Id="EndlessNetClientComponents" />
     </Feature>
@@ -179,8 +203,11 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       </Component>
       <Component Id="TrayExecutable" Guid="*" Bitness="always64">
         <File Id="TrayExeFile" Source="$(var.TrayExe)" Name="endlessnet-tray.exe" KeyPath="yes" />
-        <Shortcut Id="EndlessNetTrayShortcut" Directory="ApplicationProgramsFolder" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet-tray.exe" WorkingDirectory="INSTALLFOLDER" />
+        <Shortcut Id="EndlessNetTrayShortcut" Directory="ApplicationProgramsFolder" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet-tray.exe" Arguments="--show-window" WorkingDirectory="INSTALLFOLDER" Icon="EndlessNetTrayIcon" />
         <RemoveFolder Id="RemoveEndlessNetProgramMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+      </Component>
+      <Component Id="TrayIcon" Guid="*" Bitness="always64">
+        <File Id="TrayIconFile" Source="$(var.IconFile)" Name="endlessnet.ico" KeyPath="yes" />
       </Component>
       <Component Id="TrayAutostart" Guid="*" Bitness="always64">
         <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet Tray" Value="&quot;[INSTALLFOLDER]endlessnet-tray.exe&quot;" Type="string" KeyPath="yes" />
@@ -236,6 +263,7 @@ func renderWindowsInstallerBuildScript(opts WindowsInstallerOptions) string {
 	return fmt.Sprintf(`param(
   [string]$ClientExe = %s,
   [string]$TrayExe = %s,
+  [string]$IconFile = %s,
   [string]$Output = %s,
   [string]$Version = %s,
   [string]$SignTool = $env:SIGNTOOL_EXE,
@@ -246,7 +274,7 @@ $ErrorActionPreference = "Stop"
 $utilExtension = "WixToolset.Util.wixext"
 $uiExtension = "WixToolset.UI.wixext"
 
-foreach ($path in @($ClientExe, $TrayExe)) {
+foreach ($path in @($ClientExe, $TrayExe, $IconFile)) {
   if (-not (Test-Path -LiteralPath $path)) {
     throw "Required MSI input missing: $path"
   }
@@ -264,6 +292,7 @@ $wixArgs = @(
   "-ext", $uiExtension,
   "-d", "ClientExe=$ClientExe",
   "-d", "TrayExe=$TrayExe",
+  "-d", "IconFile=$IconFile",
   "-d", "ProductVersion=$Version",
   "-o", $Output,
   (Join-Path $PSScriptRoot "EndlessNet.Client.wxs")
@@ -283,6 +312,7 @@ if ($SignTool.Trim() -ne "" -and $CertificateThumbprint.Trim() -ne "") {
 `,
 		quotePowerShellSingle(opts.ClientExe),
 		quotePowerShellSingle(opts.TrayExe),
+		quotePowerShellSingle(opts.IconFile),
 		quotePowerShellSingle(opts.OutputName),
 		quotePowerShellSingle(opts.Version),
 	)
