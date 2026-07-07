@@ -43,6 +43,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	assertWindowsPathExists(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-client.exe"))
 	assertWindowsPathExists(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-tray.exe"))
 	assertWindowsTrayAutostart(t)
+	assertWindowsStartMenuShortcut(t)
 	assertWindowsDeepLinkProtocol(t)
 
 	stateRoot := filepath.Join(os.Getenv("ProgramData"), "EndlessNet")
@@ -57,6 +58,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	assertWindowsServiceAuto(t, "endlessnet-client")
 	assertWindowsServiceFailurePolicy(t, "endlessnet-client")
 	assertWindowsTrayAutostart(t)
+	assertWindowsStartMenuShortcut(t)
 	assertWindowsDeepLinkProtocol(t)
 	assertWindowsProgramDataACL(t, stateRoot)
 	if raw, err := os.ReadFile(sentinel); err != nil || !strings.Contains(string(raw), "node_msi_e2e") {
@@ -69,6 +71,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	}
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-client.exe"))
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-tray.exe"))
+	assertWindowsStartMenuShortcutRemoved(t)
 	assertWindowsDeepLinkProtocolRemoved(t)
 	if _, err := os.Stat(sentinel); err != nil {
 		t.Fatalf("default MSI uninstall removed preserved state %s: %v", sentinel, err)
@@ -84,6 +87,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	}
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-client.exe"))
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-tray.exe"))
+	assertWindowsStartMenuShortcutRemoved(t)
 	assertWindowsPathMissing(t, stateRoot)
 }
 
@@ -216,6 +220,38 @@ func assertWindowsTrayAutostart(t *testing.T) {
 	if !strings.Contains(strings.ToLower(string(out)), strings.ToLower(want)) {
 		t.Fatalf("tray autostart = %q, want %s", out, want)
 	}
+}
+
+func assertWindowsStartMenuShortcut(t *testing.T) {
+	t.Helper()
+	for _, path := range windowsStartMenuShortcutPaths() {
+		if _, err := os.Stat(path); err == nil {
+			return
+		}
+	}
+	t.Fatalf("EndlessNet Start Menu shortcut is missing; checked %s", strings.Join(windowsStartMenuShortcutPaths(), ", "))
+}
+
+func assertWindowsStartMenuShortcutRemoved(t *testing.T) {
+	t.Helper()
+	for _, path := range windowsStartMenuShortcutPaths() {
+		if _, err := os.Stat(path); err == nil {
+			t.Fatalf("EndlessNet Start Menu shortcut still exists: %s", path)
+		} else if !os.IsNotExist(err) {
+			t.Fatalf("stat Start Menu shortcut %s: %v", path, err)
+		}
+	}
+}
+
+func windowsStartMenuShortcutPaths() []string {
+	paths := make([]string, 0, 2)
+	if programData := os.Getenv("ProgramData"); programData != "" {
+		paths = append(paths, filepath.Join(programData, "Microsoft", "Windows", "Start Menu", "Programs", "EndlessNet", "EndlessNet.lnk"))
+	}
+	if appData := os.Getenv("APPDATA"); appData != "" {
+		paths = append(paths, filepath.Join(appData, "Microsoft", "Windows", "Start Menu", "Programs", "EndlessNet", "EndlessNet.lnk"))
+	}
+	return paths
 }
 
 func assertWindowsDeepLinkProtocol(t *testing.T) {

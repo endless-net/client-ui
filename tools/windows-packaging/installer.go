@@ -141,16 +141,27 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 	serviceArgs := windowsServiceAgentArgs(opts.ServiceOptions)
 	stateRoot := windowsParentPath(opts.ServiceOptions.ConfigPath)
 	return fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="%s" Manufacturer="%s" Version="%s" UpgradeCode="{%s}" Scope="perMachine">
     <SummaryInformation Description="%s installer" Manufacturer="%s" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of EndlessNet Client is already installed." />
     <Property Id="ENDLESSNET_REMOVE_STATE" Secure="yes" />
     <Property Id="ENDLESSNET_REMOVE_STATE_ROOT" Secure="yes" Value="%s" />
     <MediaTemplate EmbedCab="yes" />
+    <UI Id="EndlessNetInstallerUI">
+      <ui:WixUI Id="WixUI_Minimal" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchEndlessNetTray" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+    </UI>
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch EndlessNet now" />
+    <Property Id="WixShellExecTarget" Value="[#TrayExeFile]" />
+    <CustomAction Id="LaunchEndlessNetTray" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixShellExec" Impersonate="yes" />
     <Feature Id="ProductFeature" Title="%s" Level="1">
       <ComponentGroupRef Id="EndlessNetClientComponents" />
     </Feature>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="EndlessNet" />
+    </StandardDirectory>
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="EndlessNet" />
     </StandardDirectory>
@@ -168,6 +179,8 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       </Component>
       <Component Id="TrayExecutable" Guid="*" Bitness="always64">
         <File Id="TrayExeFile" Source="$(var.TrayExe)" Name="endlessnet-tray.exe" KeyPath="yes" />
+        <Shortcut Id="EndlessNetTrayShortcut" Directory="ApplicationProgramsFolder" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet-tray.exe" WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveEndlessNetProgramMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
       </Component>
       <Component Id="TrayAutostart" Guid="*" Bitness="always64">
         <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet Tray" Value="&quot;[INSTALLFOLDER]endlessnet-tray.exe&quot;" Type="string" KeyPath="yes" />
@@ -231,6 +244,7 @@ func renderWindowsInstallerBuildScript(opts WindowsInstallerOptions) string {
 
 $ErrorActionPreference = "Stop"
 $utilExtension = "WixToolset.Util.wixext"
+$uiExtension = "WixToolset.UI.wixext"
 
 foreach ($path in @($ClientExe, $TrayExe)) {
   if (-not (Test-Path -LiteralPath $path)) {
@@ -240,13 +254,14 @@ foreach ($path in @($ClientExe, $TrayExe)) {
 
 $wix = Get-Command wix.exe -ErrorAction SilentlyContinue
 if (-not $wix) {
-  throw "WiX Toolset v4 wix.exe is required to build EndlessNet.Client.msi"
+  throw "WiX Toolset wix.exe is required to build EndlessNet.Client.msi"
 }
 
 $wixArgs = @(
   "build",
   "-arch", "x64",
   "-ext", $utilExtension,
+  "-ext", $uiExtension,
   "-d", "ClientExe=$ClientExe",
   "-d", "TrayExe=$TrayExe",
   "-d", "ProductVersion=$Version",

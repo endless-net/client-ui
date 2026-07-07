@@ -18,6 +18,7 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 	for _, want := range []string{
 		`<Package Name="EndlessNet Client"`,
 		`xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util"`,
+		`xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"`,
 		`Version="1.2.3"`,
 		`UpgradeCode="{9f7a7362-64c3-4b3a-9a58-7c8fc90779e1}"`,
 		`<MajorUpgrade`,
@@ -25,6 +26,16 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`Property Id="ENDLESSNET_REMOVE_STATE_ROOT" Secure="yes" Value="C:\ProgramData\EndlessNet"`,
 		`Name="endlessnet-client.exe"`,
 		`Name="endlessnet-tray.exe"`,
+		`ui:WixUI Id="WixUI_Minimal"`,
+		`WIXUI_EXITDIALOGOPTIONALCHECKBOX`,
+		`WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch EndlessNet now"`,
+		`WixShellExecTarget" Value="[#TrayExeFile]"`,
+		`CustomAction Id="LaunchEndlessNetTray"`,
+		`BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"`,
+		`Publish Dialog="ExitDialog" Control="Finish"`,
+		`Directory Id="ApplicationProgramsFolder" Name="EndlessNet"`,
+		`Shortcut Id="EndlessNetTrayShortcut"`,
+		`RemoveFolder Id="RemoveEndlessNetProgramMenuFolder"`,
 		`Component Id="ClientExecutable" Guid="*" Bitness="always64"`,
 		`Component Id="TrayExecutable" Guid="*" Bitness="always64"`,
 		`Component Id="DeepLinkProtocol" Guid="*" Bitness="always64"`,
@@ -64,10 +75,11 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"WiX Toolset v4 wix.exe is required",
+		"WiX Toolset wix.exe is required",
 		"wix.exe",
 		`"-arch", "x64"`,
 		"WixToolset.Util.wixext",
+		"WixToolset.UI.wixext",
 		"ClientExe",
 		"TrayExe",
 		"ENDLESSNET_CODESIGN_THUMBPRINT",
