@@ -179,6 +179,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     <UIRef Id="WixUI_Common" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch EndlessNet now" />
+    <util:CloseApplication Id="CloseEndlessNetTray" Target="endlessnet-tray.exe" CloseMessage="yes" ElevatedCloseMessage="yes" TerminateProcess="1" RebootPrompt="no" Timeout="5" />
     <CustomAction Id="LaunchEndlessNetTray" FileRef="TrayExeFile" ExeCommand="--show-window" Execute="immediate" Return="asyncNoWait" Impersonate="yes" />
     <Icon Id="EndlessNetTrayIcon" SourceFile="$(var.IconFile)" />
     <Feature Id="ProductFeature" Title="%s" Level="1">
