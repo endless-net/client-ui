@@ -180,7 +180,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch EndlessNet now" />
     <util:CloseApplication Id="CloseEndlessNetTray" Target="endlessnet-tray.exe" CloseMessage="yes" ElevatedCloseMessage="yes" TerminateProcess="1" RebootPrompt="no" Timeout="5" />
-    <CustomAction Id="LaunchEndlessNetTray" FileRef="TrayExeFile" ExeCommand="--show-window" Execute="immediate" Return="asyncNoWait" Impersonate="yes" />
+    <CustomAction Id="LaunchEndlessNetTray" FileRef="TrayExeFile" ExeCommand="--show-window --debug --debug-log-dir %s" Execute="immediate" Return="asyncNoWait" Impersonate="yes" />
     <Icon Id="EndlessNetTrayIcon" SourceFile="$(var.IconFile)" />
     <Feature Id="ProductFeature" Title="%s" Level="1">
       <ComponentGroupRef Id="EndlessNetClientComponents" />
@@ -205,21 +205,21 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       </Component>
       <Component Id="TrayExecutable" Guid="*" Bitness="always64">
         <File Id="TrayExeFile" Source="$(var.TrayExe)" Name="endlessnet-tray.exe" KeyPath="yes" />
-        <Shortcut Id="EndlessNetTrayShortcut" Directory="ApplicationProgramsFolder" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet-tray.exe" Arguments="--show-window" WorkingDirectory="INSTALLFOLDER" Icon="EndlessNetTrayIcon" />
+        <Shortcut Id="EndlessNetTrayShortcut" Directory="ApplicationProgramsFolder" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet-tray.exe" Arguments="--show-window --debug --debug-log-dir %s" WorkingDirectory="INSTALLFOLDER" Icon="EndlessNetTrayIcon" />
         <RemoveFolder Id="RemoveEndlessNetProgramMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
       </Component>
       <Component Id="TrayIcon" Guid="*" Bitness="always64">
         <File Id="TrayIconFile" Source="$(var.IconFile)" Name="endlessnet.ico" KeyPath="yes" />
       </Component>
       <Component Id="TrayAutostart" Guid="*" Bitness="always64">
-        <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet Tray" Value="&quot;[INSTALLFOLDER]endlessnet-tray.exe&quot;" Type="string" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet Tray" Value="&quot;[INSTALLFOLDER]endlessnet-tray.exe&quot; --debug --debug-log-dir %s" Type="string" KeyPath="yes" />
       </Component>
       <Component Id="DeepLinkProtocol" Guid="*" Bitness="always64">
         <RegistryKey Root="HKLM" Key="Software\Classes\endlessnet">
           <RegistryValue Value="URL:EndlessNet Enrollment" Type="string" KeyPath="yes" />
           <RegistryValue Name="URL Protocol" Value="" Type="string" />
           <RegistryKey Key="shell\open\command">
-            <RegistryValue Value="&quot;[INSTALLFOLDER]endlessnet-tray.exe&quot; --enroll &quot;%%1&quot;" Type="string" />
+            <RegistryValue Value="&quot;[INSTALLFOLDER]endlessnet-tray.exe&quot; --debug --debug-log-dir %s --enroll &quot;%%1&quot;" Type="string" />
           </RegistryKey>
         </RegistryKey>
       </Component>
@@ -251,12 +251,16 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 		xmlAttrEscape(opts.ProductName),
 		xmlAttrEscape(opts.Manufacturer),
 		xmlAttrEscape(stateRoot),
+		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
 		xmlAttrEscape(opts.ProductName),
 		xmlAttrEscape(opts.ServiceOptions.ServiceName),
 		xmlAttrEscape(opts.ServiceOptions.DisplayName),
 		xmlAttrEscape(opts.ServiceOptions.Description),
 		xmlAttrEscape(strings.Join(serviceArgs, " ")),
 		xmlAttrEscape(opts.ServiceOptions.ServiceName),
+		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
+		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
+		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
 		xmlAttrEscape(opts.ServiceOptions.EventLogSource),
 	)
 }
@@ -335,6 +339,9 @@ func windowsServiceAgentArgs(opts WindowsServiceOptions) []string {
 		"--reconnect-jitter", fmt.Sprintf("%g", opts.ReconnectJitter),
 		"--ipc-pipe", opts.IPCPipe,
 		"--event-log-source", opts.EventLogSource,
+	}
+	if opts.Debug {
+		args = append(args, "--debug", "--debug-log-dir", opts.DebugLogDir)
 	}
 	if opts.ApplyWireGuard {
 		args = append(args, "--apply-wireguard", "--wireguard-windows", opts.WireGuardWindowsPath)
