@@ -22,7 +22,7 @@ if ([string]::IsNullOrWhiteSpace($Msi)) {
 $Msi = [System.IO.Path]::GetFullPath($Msi)
 
 if ([string]::IsNullOrWhiteSpace($IconFile)) {
-    $IconFile = Join-Path $repoRoot "assets\endlessnet\favicon.ico"
+    $IconFile = Join-Path $repoRoot "assets\endlessnet\tray.ico"
 }
 $IconFile = [System.IO.Path]::GetFullPath($IconFile)
 if (-not (Test-Path -LiteralPath $IconFile)) {

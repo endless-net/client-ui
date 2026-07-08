@@ -36,7 +36,7 @@ func DefaultWindowsInstallerOptions() WindowsInstallerOptions {
 		UpgradeCode:    "9f7a7362-64c3-4b3a-9a58-7c8fc90779e1",
 		ClientExe:      `C:\Program Files\EndlessNet\endlessnet-client.exe`,
 		TrayExe:        `C:\Program Files\EndlessNet\endlessnet-tray.exe`,
-		IconFile:       filepath.Join("assets", "endlessnet", "favicon.ico"),
+		IconFile:       filepath.Join("assets", "endlessnet", "tray.ico"),
 		OutputName:     "EndlessNet.Client.msi",
 		ServiceOptions: DefaultWindowsServiceOptions(),
 	}
