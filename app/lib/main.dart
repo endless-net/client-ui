@@ -10,6 +10,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:win32/win32.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'service_contract.dart';
+
 const _appTitle = 'EndlessNet Tray';
 const _appVersion = String.fromEnvironment(
   'ENDLESSNET_VERSION',
@@ -554,12 +556,14 @@ class EndlessNetController extends ChangeNotifier
   Timer? _showSignalTimer;
   DateTime? _lastShowSignalWrite;
 
-  String get state => valueText(
-    statusPayload?['state'] ?? statusPayload?['control_state'],
+  ServiceStatus get serviceStatus => ServiceStatus(statusPayload);
+  String get state => serviceStatus.state(
     fallback: errorText == null ? 'Loading...' : 'Service unavailable',
   );
-  bool get connected => state.toLowerCase() == 'connected';
-  bool get deviceEnrolled => isDeviceEnrolled(statusPayload);
+  bool get connected => serviceStatus.connected;
+  bool get deviceEnrolled => serviceStatus.deviceEnrolled;
+  bool get canConnect => deviceEnrolled && !connected;
+  bool get canDisconnect => deviceEnrolled && connected;
   bool get showConnectThisDevice => statusPayload != null && !deviceEnrolled;
 
   Future<void> initialize() async {
@@ -745,8 +749,9 @@ class EndlessNetController extends ChangeNotifier
             items: [
               if (showConnectThisDevice)
                 MenuItem(key: 'connect-device', label: 'Connect this device'),
-              MenuItem(key: 'connect', label: 'Connect'),
-              MenuItem(key: 'disconnect', label: 'Disconnect'),
+              if (canConnect) MenuItem(key: 'connect', label: 'Connect'),
+              if (canDisconnect)
+                MenuItem(key: 'disconnect', label: 'Disconnect'),
               MenuItem.separator(),
               MenuItem(key: 'copy-diagnostics', label: 'Copy diagnostics'),
               MenuItem(key: 'recent-logs', label: 'Recent logs'),
@@ -945,23 +950,24 @@ class HomeScreen extends StatelessWidget {
                       icon: const Icon(Icons.link),
                       label: const Text('Connect this device'),
                     ),
-                  OutlinedButton.icon(
-                    onPressed: controller.busy
-                        ? null
-                        : () => controller.runAction(
-                            () => controller.connected
-                                ? controller.bridge.disconnect()
-                                : controller.bridge.connect(),
-                          ),
-                    icon: Icon(
-                      controller.connected
-                          ? Icons.link_off
-                          : Icons.power_settings_new,
+                  if (controller.deviceEnrolled)
+                    OutlinedButton.icon(
+                      onPressed: controller.busy
+                          ? null
+                          : () => controller.runAction(
+                              () => controller.connected
+                                  ? controller.bridge.disconnect()
+                                  : controller.bridge.connect(),
+                            ),
+                      icon: Icon(
+                        controller.connected
+                            ? Icons.link_off
+                            : Icons.power_settings_new,
+                      ),
+                      label: Text(
+                        controller.connected ? 'Disconnect' : 'Connect',
+                      ),
                     ),
-                    label: Text(
-                      controller.connected ? 'Disconnect' : 'Connect',
-                    ),
-                  ),
                   OutlinedButton.icon(
                     onPressed: controller.busy
                         ? null
@@ -1299,19 +1305,7 @@ List<String> peerLabels(Map<String, dynamic>? payload) {
 }
 
 bool isDeviceEnrolled(Map<String, dynamic>? payload) {
-  if (payload == null) {
-    return false;
-  }
-  final markers = [
-    payload['account_id'],
-    payload['node_id'],
-    payload['network_id'],
-    payload['overlay_ip'],
-    nestedValue(payload, 'agent', 'node_id'),
-    nestedValue(payload, 'agent', 'network_id'),
-    nestedValue(payload, 'agent', 'overlay_ip'),
-  ];
-  return markers.any((value) => valueText(value, fallback: '').isNotEmpty);
+  return ServiceStatus(payload).deviceEnrolled;
 }
 
 Object? nestedValue(Map<String, dynamic>? payload, String key, String nested) {

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:endlessnet_tray/main.dart';
+import 'package:endlessnet_tray/service_contract.dart';
 
 void main() {
   test('parseEnrollment accepts EndlessNet deep links', () {
@@ -40,10 +41,10 @@ void main() {
 
   test('isDeviceEnrolled detects enrolled status markers', () {
     expect(isDeviceEnrolled(null), isFalse);
-    expect(isDeviceEnrolled({'state': 'NeedsEnrollment'}), isFalse);
+    expect(isDeviceEnrolled({'state': ServiceState.needsEnrollment}), isFalse);
     expect(
       isDeviceEnrolled({
-        'state': 'Connected',
+        'state': ServiceState.connected,
         'account_id': 'acc_123',
         'agent': {'node_id': 'nod_123'},
       }),
@@ -51,10 +52,38 @@ void main() {
     );
     expect(
       isDeviceEnrolled({
-        'state': 'Disconnected',
+        'state': ServiceState.disconnected,
         'agent': {'network_id': 'net_123', 'overlay_ip': '100.64.0.2'},
       }),
       isTrue,
     );
+  });
+
+  test('ServiceStatus exposes the service UI contract', () {
+    final connected = ServiceStatus({
+      'state': ServiceState.connected,
+      'node_id': 'node-1',
+    });
+    expect(connected.connected, isTrue);
+    expect(connected.deviceEnrolled, isTrue);
+    expect(connected.userDisconnected, isFalse);
+
+    final disconnected = ServiceStatus({
+      'state': ServiceState.disconnected,
+      'control_state': ControlState.disconnected,
+      'user_disconnected': true,
+      'node_id': 'node-1',
+    });
+    expect(disconnected.connected, isFalse);
+    expect(disconnected.deviceEnrolled, isTrue);
+    expect(disconnected.userDisconnected, isTrue);
+
+    final needsEnrollment = ServiceStatus({
+      'state': ServiceState.needsEnrollment,
+      'control_state': ControlState.notRegistered,
+      'node_id': 'stale-node-id',
+    });
+    expect(needsEnrollment.needsEnrollment, isTrue);
+    expect(needsEnrollment.deviceEnrolled, isFalse);
   });
 }
