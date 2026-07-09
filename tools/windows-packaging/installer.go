@@ -191,12 +191,15 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     <Feature Id="ProductFeature" Title="%s" Level="1">
       <ComponentGroupRef Id="EndlessNetClientComponents" />
       <ComponentGroupRef Id="EndlessNetTrayBundleFiles" />
+      <ComponentGroupRef Id="EndlessNetTrayDataFiles" />
     </Feature>
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ApplicationProgramsFolder" Name="EndlessNet" />
     </StandardDirectory>
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="EndlessNet" />
+      <Directory Id="INSTALLFOLDER" Name="EndlessNet">
+        <Directory Id="TrayDataFolder" Name="data" />
+      </Directory>
     </StandardDirectory>
     <StandardDirectory Id="CommonAppDataFolder">
       <Directory Id="ENDLESSNETPROGRAMDATA" Name="EndlessNet" />
@@ -251,6 +254,8 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     <ComponentGroup Id="EndlessNetTrayBundleFiles" Directory="INSTALLFOLDER">
       <Files Include="$(var.TrayBundleDir)\*.dll" />
       <Files Include="$(var.TrayBundleDir)\native_assets.json" />
+    </ComponentGroup>
+    <ComponentGroup Id="EndlessNetTrayDataFiles" Directory="TrayDataFolder">
       <Files Include="$(var.TrayBundleDir)\data\**" />
     </ComponentGroup>
   </Package>
