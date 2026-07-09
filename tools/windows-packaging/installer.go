@@ -186,6 +186,10 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch EndlessNet now" />
     <util:CloseApplication Id="CloseEndlessNetTray" Target="endlessnet-tray.exe" CloseMessage="yes" ElevatedCloseMessage="yes" TerminateProcess="1" RebootPrompt="no" Timeout="5" />
+    <CustomAction Id="KillEndlessNetTray" Directory="SystemFolder" ExeCommand="&quot;[SystemFolder]taskkill.exe&quot; /F /IM endlessnet-tray.exe /T" Execute="immediate" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="KillEndlessNetTray" Before="InstallValidate" />
+    </InstallExecuteSequence>
     <CustomAction Id="LaunchEndlessNetTray" FileRef="TrayExeFile" ExeCommand="--show-window --debug --debug-log-dir %s" Execute="immediate" Return="asyncNoWait" Impersonate="yes" />
     <Icon Id="EndlessNetTrayIcon" SourceFile="$(var.IconFile)" />
     <Feature Id="ProductFeature" Title="%s" Level="1">
@@ -193,6 +197,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       <ComponentGroupRef Id="EndlessNetTrayBundleFiles" />
       <ComponentGroupRef Id="EndlessNetTrayDataFiles" />
     </Feature>
+    <StandardDirectory Id="SystemFolder" />
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ApplicationProgramsFolder" Name="EndlessNet" />
     </StandardDirectory>

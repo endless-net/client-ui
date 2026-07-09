@@ -542,11 +542,13 @@ class EndlessNetController extends ChangeNotifier
     required this.config,
     required this.bridge,
     required this.logger,
+    this.desktopIntegrationEnabled = true,
   });
 
   final AppConfig config;
   final EndlessNetClientBridge bridge;
   final AppLogger logger;
+  final bool desktopIntegrationEnabled;
 
   Map<String, dynamic>? statusPayload;
   String? errorText;
@@ -567,6 +569,10 @@ class EndlessNetController extends ChangeNotifier
   bool get showConnectThisDevice => statusPayload != null && !deviceEnrolled;
 
   Future<void> initialize() async {
+    if (!desktopIntegrationEnabled) {
+      await refreshStatus();
+      return;
+    }
     trayManager.addListener(this);
     windowManager.addListener(this);
     await trayManager.setIcon('assets/icons/tray.ico');
@@ -688,6 +694,9 @@ class EndlessNetController extends ChangeNotifier
   }
 
   Future<void> _updateTray() async {
+    if (!desktopIntegrationEnabled) {
+      return;
+    }
     await trayManager.setToolTip('EndlessNet: $state');
     await trayManager.setContextMenu(_buildTrayMenu());
   }
@@ -767,6 +776,9 @@ class EndlessNetController extends ChangeNotifier
   }
 
   Future<void> showWindow() async {
+    if (!desktopIntegrationEnabled) {
+      return;
+    }
     await windowManager.show();
     await windowManager.focus();
   }
@@ -832,6 +844,10 @@ class EndlessNetController extends ChangeNotifier
     quitting = true;
     _refreshTimer?.cancel();
     _showSignalTimer?.cancel();
+    if (!desktopIntegrationEnabled) {
+      await logger.close();
+      return;
+    }
     trayManager.removeListener(this);
     windowManager.removeListener(this);
     await trayManager.destroy();

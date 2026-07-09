@@ -1,5 +1,6 @@
 class ServiceIPCPath {
   static const status = '/status';
+  static const events = '/events';
   static const enroll = '/enroll';
   static const connect = '/connect';
   static const disconnect = '/disconnect';
@@ -22,11 +23,18 @@ class ServiceState {
 }
 
 class ControlState {
+  static const connecting = 'connecting';
+  static const updating = 'updating';
+  static const syncing = 'syncing';
+  static const needsApproval = 'needs_approval';
+  static const approvalRequired = 'approval_required';
+  static const pendingApproval = 'pending_approval';
+  static const degraded = 'degraded';
+  static const offlineCache = 'offline_cache';
   static const disconnected = 'disconnected';
   static const notRegistered = 'not_registered';
   static const ready = 'ready';
   static const registered = 'registered';
-  static const degraded = 'degraded';
   static const error = 'error';
   static const cacheInvalid = 'cache_invalid';
 }
