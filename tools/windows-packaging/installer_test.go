@@ -21,6 +21,7 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`Version="1.2.3"`,
 		`UpgradeCode="{9f7a7362-64c3-4b3a-9a58-7c8fc90779e1}"`,
 		`<MajorUpgrade`,
+		`AllowSameVersionUpgrades="yes"`,
 		`Property Id="ENDLESSNET_REMOVE_STATE" Secure="yes"`,
 		`Property Id="ENDLESSNET_REMOVE_STATE_ROOT" Secure="yes" Value="C:\ProgramData\EndlessNet"`,
 		`Name="endlessnet-client.exe"`,

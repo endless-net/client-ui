@@ -150,7 +150,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package Name="%s" Manufacturer="%s" Version="%s" UpgradeCode="{%s}" Scope="perMachine">
     <SummaryInformation Description="%s installer" Manufacturer="%s" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of EndlessNet Client is already installed." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of EndlessNet Client is already installed." />
     <Property Id="ENDLESSNET_REMOVE_STATE" Secure="yes" />
     <Property Id="ENDLESSNET_REMOVE_STATE_ROOT" Secure="yes" Value="%s" />
     <MediaTemplate EmbedCab="yes" />
