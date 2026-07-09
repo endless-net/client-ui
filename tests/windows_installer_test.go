@@ -28,7 +28,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	root := repoRoot(t)
 	tmp := t.TempDir()
 	clientExe := buildBinary(t, root, tmp, "endlessnet-client", "./cmd/endlessnet-client")
-	trayExe := buildBinary(t, root, tmp, "endlessnet-tray", "./cmd/endlessnet-tray")
+	trayExe := clientExe
 
 	msiV1 := buildWindowsClientMSI(t, root, clientExe, trayExe, filepath.Join(tmp, "msi-v1"), "1.2.3")
 	msiV2 := buildWindowsClientMSI(t, root, clientExe, trayExe, filepath.Join(tmp, "msi-v2"), "1.2.4")
@@ -97,12 +97,14 @@ func buildWindowsClientMSI(t *testing.T, root, clientExe, trayExe, outputDir, ve
 		t.Fatal(err)
 	}
 	msi := filepath.Join(outputDir, "EndlessNet.Client."+version+".msi")
+	trayBundleDir := prepareWindowsTrayBundleFixture(t, outputDir)
 	render := exec.Command(clientExe,
 		"installer", "render-windows-msi",
 		"--output-dir", outputDir,
 		"--version", version,
 		"--client-exe", clientExe,
 		"--tray-exe", trayExe,
+		"--tray-bundle-dir", trayBundleDir,
 		"--icon-file", filepath.Join(root, "assets", "endlessnet", "tray.ico"),
 		"--msi", msi,
 	)
@@ -116,6 +118,27 @@ func buildWindowsClientMSI(t *testing.T, root, clientExe, trayExe, outputDir, ve
 		t.Fatalf("build Windows MSI %s: %v\n%s", version, err, out)
 	}
 	return msi
+}
+
+func prepareWindowsTrayBundleFixture(t *testing.T, parent string) string {
+	t.Helper()
+	bundle := filepath.Join(parent, "tray-bundle")
+	for _, path := range []string{
+		filepath.Join(bundle, "flutter_windows.dll"),
+		filepath.Join(bundle, "tray_manager_plugin.dll"),
+		filepath.Join(bundle, "native_assets.json"),
+		filepath.Join(bundle, "data", "icudtl.dat"),
+		filepath.Join(bundle, "data", "app.so"),
+		filepath.Join(bundle, "data", "flutter_assets", "AssetManifest.json"),
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("fixture"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return bundle
 }
 
 func installMSI(t *testing.T, msi string) {

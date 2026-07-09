@@ -16,6 +16,7 @@ type WindowsInstallerOptions struct {
 	UpgradeCode    string
 	ClientExe      string
 	TrayExe        string
+	TrayBundleDir  string
 	IconFile       string
 	OutputName     string
 	ServiceOptions WindowsServiceOptions
@@ -36,6 +37,7 @@ func DefaultWindowsInstallerOptions() WindowsInstallerOptions {
 		UpgradeCode:    "9f7a7362-64c3-4b3a-9a58-7c8fc90779e1",
 		ClientExe:      `C:\Program Files\EndlessNet\endlessnet-client.exe`,
 		TrayExe:        `C:\Program Files\EndlessNet\endlessnet-tray.exe`,
+		TrayBundleDir:  `C:\Program Files\EndlessNet`,
 		IconFile:       filepath.Join("assets", "endlessnet", "tray.ico"),
 		OutputName:     "EndlessNet.Client.msi",
 		ServiceOptions: DefaultWindowsServiceOptions(),
@@ -99,6 +101,9 @@ func normalizeWindowsInstallerOptions(opts WindowsInstallerOptions) WindowsInsta
 	if strings.TrimSpace(opts.TrayExe) == "" {
 		opts.TrayExe = defaults.TrayExe
 	}
+	if strings.TrimSpace(opts.TrayBundleDir) == "" {
+		opts.TrayBundleDir = firstNonEmptyInstallerString(windowsParentPath(opts.TrayExe), defaults.TrayBundleDir)
+	}
 	if strings.TrimSpace(opts.IconFile) == "" {
 		opts.IconFile = defaults.IconFile
 	}
@@ -117,6 +122,7 @@ func validateWindowsInstallerOptions(opts WindowsInstallerOptions) error {
 		"upgrade code": opts.UpgradeCode,
 		"client exe":   opts.ClientExe,
 		"tray exe":     opts.TrayExe,
+		"tray bundle":  opts.TrayBundleDir,
 		"icon file":    opts.IconFile,
 		"output name":  opts.OutputName,
 		"service name": opts.ServiceOptions.ServiceName,
@@ -184,6 +190,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     <Icon Id="EndlessNetTrayIcon" SourceFile="$(var.IconFile)" />
     <Feature Id="ProductFeature" Title="%s" Level="1">
       <ComponentGroupRef Id="EndlessNetClientComponents" />
+      <ComponentGroupRef Id="EndlessNetTrayBundleFiles" />
     </Feature>
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ApplicationProgramsFolder" Name="EndlessNet" />
@@ -241,6 +248,11 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
         <util:RemoveFolderEx Id="RemoveEndlessNetStateRoot" On="uninstall" Property="ENDLESSNET_REMOVE_STATE_ROOT" Condition="ENDLESSNET_REMOVE_STATE=&quot;1&quot;" />
       </Component>
     </ComponentGroup>
+    <ComponentGroup Id="EndlessNetTrayBundleFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.TrayBundleDir)\*.dll" />
+      <Files Include="$(var.TrayBundleDir)\native_assets.json" />
+      <Files Include="$(var.TrayBundleDir)\data\**" />
+    </ComponentGroup>
   </Package>
 </Wix>
 `,
@@ -269,6 +281,7 @@ func renderWindowsInstallerBuildScript(opts WindowsInstallerOptions) string {
 	return fmt.Sprintf(`param(
   [string]$ClientExe = %s,
   [string]$TrayExe = %s,
+  [string]$TrayBundleDir = %s,
   [string]$IconFile = %s,
   [string]$Output = %s,
   [string]$Version = %s,
@@ -285,6 +298,12 @@ foreach ($path in @($ClientExe, $TrayExe, $IconFile)) {
     throw "Required MSI input missing: $path"
   }
 }
+if ([string]::IsNullOrWhiteSpace($TrayBundleDir)) {
+  $TrayBundleDir = Split-Path -Parent $TrayExe
+}
+if (-not (Test-Path -LiteralPath $TrayBundleDir)) {
+  throw "Required MSI tray bundle directory missing: $TrayBundleDir"
+}
 
 $wix = Get-Command wix.exe -ErrorAction SilentlyContinue
 if (-not $wix) {
@@ -298,6 +317,7 @@ $wixArgs = @(
   "-ext", $uiExtension,
   "-d", "ClientExe=$ClientExe",
   "-d", "TrayExe=$TrayExe",
+  "-d", "TrayBundleDir=$TrayBundleDir",
   "-d", "IconFile=$IconFile",
   "-d", "ProductVersion=$Version",
   "-o", $Output,
@@ -318,6 +338,7 @@ if ($SignTool.Trim() -ne "" -and $CertificateThumbprint.Trim() -ne "") {
 `,
 		quotePowerShellSingle(opts.ClientExe),
 		quotePowerShellSingle(opts.TrayExe),
+		quotePowerShellSingle(opts.TrayBundleDir),
 		quotePowerShellSingle(opts.IconFile),
 		quotePowerShellSingle(opts.OutputName),
 		quotePowerShellSingle(opts.Version),
@@ -370,6 +391,15 @@ func windowsParentPath(value string) string {
 		return ""
 	}
 	return value[:idx]
+}
+
+func firstNonEmptyInstallerString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func xmlAttrEscape(value string) string {
