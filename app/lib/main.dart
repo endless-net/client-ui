@@ -559,6 +559,8 @@ class EndlessNetController extends ChangeNotifier
     fallback: errorText == null ? 'Loading...' : 'Service unavailable',
   );
   bool get connected => state.toLowerCase() == 'connected';
+  bool get deviceEnrolled => isDeviceEnrolled(statusPayload);
+  bool get showConnectThisDevice => statusPayload != null && !deviceEnrolled;
 
   Future<void> initialize() async {
     trayManager.addListener(this);
@@ -741,7 +743,8 @@ class EndlessNetController extends ChangeNotifier
           label: 'Preferences',
           submenu: Menu(
             items: [
-              MenuItem(key: 'connect-device', label: 'Connect this device'),
+              if (showConnectThisDevice)
+                MenuItem(key: 'connect-device', label: 'Connect this device'),
               MenuItem(key: 'connect', label: 'Connect'),
               MenuItem(key: 'disconnect', label: 'Disconnect'),
               MenuItem.separator(),
@@ -934,13 +937,14 @@ class HomeScreen extends StatelessWidget {
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  FilledButton.icon(
-                    onPressed: controller.busy
-                        ? null
-                        : controller.openConnectURL,
-                    icon: const Icon(Icons.link),
-                    label: const Text('Connect this device'),
-                  ),
+                  if (controller.showConnectThisDevice)
+                    FilledButton.icon(
+                      onPressed: controller.busy
+                          ? null
+                          : controller.openConnectURL,
+                      icon: const Icon(Icons.link),
+                      label: const Text('Connect this device'),
+                    ),
                   OutlinedButton.icon(
                     onPressed: controller.busy
                         ? null
@@ -1292,6 +1296,22 @@ List<String> peerLabels(Map<String, dynamic>? payload) {
       })
       .where((line) => line.trim().isNotEmpty)
       .toList();
+}
+
+bool isDeviceEnrolled(Map<String, dynamic>? payload) {
+  if (payload == null) {
+    return false;
+  }
+  final markers = [
+    payload['account_id'],
+    payload['node_id'],
+    payload['network_id'],
+    payload['overlay_ip'],
+    nestedValue(payload, 'agent', 'node_id'),
+    nestedValue(payload, 'agent', 'network_id'),
+    nestedValue(payload, 'agent', 'overlay_ip'),
+  ];
+  return markers.any((value) => valueText(value, fallback: '').isNotEmpty);
 }
 
 Object? nestedValue(Map<String, dynamic>? payload, String key, String nested) {

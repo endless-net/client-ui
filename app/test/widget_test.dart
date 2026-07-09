@@ -37,4 +37,24 @@ void main() {
     expect(redacted, isNot(contains('bearer-secret')));
     expect(redacted, isNot(contains('enj_secret')));
   });
+
+  test('isDeviceEnrolled detects enrolled status markers', () {
+    expect(isDeviceEnrolled(null), isFalse);
+    expect(isDeviceEnrolled({'state': 'NeedsEnrollment'}), isFalse);
+    expect(
+      isDeviceEnrolled({
+        'state': 'Connected',
+        'account_id': 'acc_123',
+        'agent': {'node_id': 'nod_123'},
+      }),
+      isTrue,
+    );
+    expect(
+      isDeviceEnrolled({
+        'state': 'Disconnected',
+        'agent': {'network_id': 'net_123', 'overlay_ip': '100.64.0.2'},
+      }),
+      isTrue,
+    );
+  });
 }
