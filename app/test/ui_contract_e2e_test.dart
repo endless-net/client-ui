@@ -7,9 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('tray UI contract constants mirror the OpenAPI enum/path surface', () {
-    final contractPath = Platform.environment['ENDLESSNET_IPC_OPENAPI'];
-    expect(contractPath, isNotNull);
-    final openAPI = File(contractPath!).readAsStringSync();
+    final contract = _ipcContractFile();
+    final openAPI = contract.readAsStringSync();
 
     expect(openAPI, contains('title: EndlessNet Client Local Service IPC'));
     for (final path in const [
@@ -114,6 +113,34 @@ void main() {
       expect(find.text('Disconnect'), findsOneWidget);
     },
   );
+}
+
+File _ipcContractFile() {
+  final configured = Platform.environment['ENDLESSNET_IPC_OPENAPI']?.trim();
+  if (configured != null && configured.isNotEmpty) {
+    final file = File(configured);
+    if (!file.existsSync()) {
+      throw StateError('ENDLESSNET_IPC_OPENAPI does not exist: $configured');
+    }
+    return file;
+  }
+
+  var current = Directory.current.absolute;
+  while (true) {
+    final candidate = File(
+      '${current.path}${Platform.pathSeparator}docs${Platform.pathSeparator}windows-client-ipc.openapi.yaml',
+    );
+    if (candidate.existsSync()) {
+      return candidate;
+    }
+    final parent = current.parent;
+    if (parent.path == current.path) {
+      throw StateError(
+        'docs/windows-client-ipc.openapi.yaml was not found above ${Directory.current.path}',
+      );
+    }
+    current = parent;
+  }
 }
 
 class ContractFakeBridge extends EndlessNetClientBridge {
