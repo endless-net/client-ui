@@ -22,6 +22,9 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`UpgradeCode="{9f7a7362-64c3-4b3a-9a58-7c8fc90779e1}"`,
 		`<MajorUpgrade`,
 		`AllowSameVersionUpgrades="yes"`,
+		`<util:ExitEarlyWithSuccess />`,
+		`SetProperty Id="NEWERVERSIONDETECTED" Value="1" Before="FindRelatedProducts" Sequence="execute"`,
+		`Condition="Installed AND NOT REMOVE~=&quot;ALL&quot; AND NOT REINSTALL"`,
 		`Property Id="ENDLESSNET_REMOVE_STATE" Secure="yes"`,
 		`Property Id="ENDLESSNET_REMOVE_STATE_ROOT" Secure="yes" Value="C:\ProgramData\EndlessNet"`,
 		`Name="endlessnet-client.exe"`,
@@ -42,6 +45,7 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`Publish Dialog="ExitDialog" Control="Finish" Event="DoAction"`,
 		`Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return"`,
 		`util:CloseApplication Id="CloseEndlessNetTray"`,
+		`Condition="NOT Installed OR REMOVE~=&quot;ALL&quot; OR REINSTALL"`,
 		`Target="endlessnet-tray.exe"`,
 		`TerminateProcess="1"`,
 		`CustomAction Id="KillEndlessNetTray"`,
@@ -100,6 +104,9 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		if !strings.Contains(artifacts.WixSource, want) {
 			t.Fatalf("WiX source missing %q:\n%s", want, artifacts.WixSource)
 		}
+	}
+	if got := strings.Count(artifacts.WixSource, `Condition="NOT Installed OR REMOVE~=&quot;ALL&quot; OR REINSTALL"`); got != 2 {
+		t.Fatalf("tray shutdown lifecycle condition count = %d, want 2:\n%s", got, artifacts.WixSource)
 	}
 	for _, forbidden := range []string{
 		`WixUI_Minimal`,

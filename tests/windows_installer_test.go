@@ -65,6 +65,26 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 		t.Fatalf("MSI upgrade did not preserve client state: raw=%q err=%v", raw, err)
 	}
 
+	// Browsers rename duplicate downloads. Re-running the already installed
+	// package from that renamed path must stay a successful no-op maintenance
+	// operation and must not invoke deferred tray shutdown/source repair.
+	renameDir := filepath.Join(tmp, "renamed-rerun")
+	if err := os.MkdirAll(renameDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	renamedMSI := filepath.Join(renameDir, "EndlessNet.Client (1).msi")
+	copyWindowsMSIFixture(t, msiV2, renamedMSI)
+	installMSI(t, renamedMSI)
+	assertWindowsServiceAuto(t, "endlessnet-client")
+	if raw, err := os.ReadFile(sentinel); err != nil || !strings.Contains(string(raw), "node_msi_e2e") {
+		t.Fatalf("renamed MSI maintenance did not preserve client state: raw=%q err=%v", raw, err)
+	}
+	repairMSI(t, msiV2)
+	assertWindowsServiceAuto(t, "endlessnet-client")
+	if raw, err := os.ReadFile(sentinel); err != nil || !strings.Contains(string(raw), "node_msi_e2e") {
+		t.Fatalf("forced MSI repair did not preserve client state: raw=%q err=%v", raw, err)
+	}
+
 	uninstallMSI(t, msiV2)
 	if windowsServiceExists("endlessnet-client") {
 		t.Fatal("endlessnet-client service still exists after MSI uninstall")
@@ -141,9 +161,25 @@ func prepareWindowsTrayBundleFixture(t *testing.T, parent string) string {
 	return bundle
 }
 
+func copyWindowsMSIFixture(t *testing.T, source, destination string) {
+	t.Helper()
+	raw, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(destination, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func installMSI(t *testing.T, msi string) {
 	t.Helper()
 	runMSI(t, "install", msi, "/i", msi, "/qn", "/norestart")
+}
+
+func repairMSI(t *testing.T, msi string) {
+	t.Helper()
+	runMSI(t, "repair", msi, "/i", msi, "/qn", "/norestart", "REINSTALL=ALL", "REINSTALLMODE=vomus")
 }
 
 func uninstallMSI(t *testing.T, msi string) {

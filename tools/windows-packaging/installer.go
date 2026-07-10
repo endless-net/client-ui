@@ -152,11 +152,21 @@ func validateWindowsInstallerOptions(opts WindowsInstallerOptions) error {
 func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 	serviceArgs := windowsServiceAgentArgs(opts.ServiceOptions)
 	stateRoot := windowsParentPath(opts.ServiceOptions.ConfigPath)
+	// Windows Installer requires a maintenance source with the registered MSI
+	// package name. Browsers commonly rename duplicate downloads, so an ordinary
+	// second /i must return success before source validation instead of failing
+	// with 1603. Explicit REINSTALL remains a real repair operation.
+	const idempotentInstallCondition = `Installed AND NOT REMOVE~=&quot;ALL&quot; AND NOT REINSTALL`
+	// Initial installs/major upgrades have no Installed property. Explicit
+	// uninstall and forced repair still need the tray to be closed.
+	const trayShutdownCondition = `NOT Installed OR REMOVE~=&quot;ALL&quot; OR REINSTALL`
 	return fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package Name="%s" Manufacturer="%s" Version="%s" UpgradeCode="{%s}" Scope="perMachine">
     <SummaryInformation Description="%s installer" Manufacturer="%s" />
     <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of EndlessNet Client is already installed." />
+    <util:ExitEarlyWithSuccess />
+    <SetProperty Id="NEWERVERSIONDETECTED" Value="1" Before="FindRelatedProducts" Sequence="execute" Condition="%s" />
     <Property Id="ENDLESSNET_REMOVE_STATE" Secure="yes" />
     <Property Id="ENDLESSNET_REMOVE_STATE_ROOT" Secure="yes" Value="%s" />
     <MediaTemplate EmbedCab="yes" />
@@ -185,10 +195,10 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     <UIRef Id="WixUI_Common" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch EndlessNet now" />
-    <util:CloseApplication Id="CloseEndlessNetTray" Target="endlessnet-tray.exe" CloseMessage="yes" ElevatedCloseMessage="yes" TerminateProcess="1" RebootPrompt="no" Timeout="5" />
+    <util:CloseApplication Id="CloseEndlessNetTray" Target="endlessnet-tray.exe" Condition="%s" CloseMessage="yes" ElevatedCloseMessage="yes" TerminateProcess="1" RebootPrompt="no" Timeout="5" />
     <CustomAction Id="KillEndlessNetTray" Directory="SystemFolder" ExeCommand="&quot;[SystemFolder]taskkill.exe&quot; /F /IM endlessnet-tray.exe /T" Execute="immediate" Return="ignore" />
     <InstallExecuteSequence>
-      <Custom Action="KillEndlessNetTray" Before="InstallValidate" />
+      <Custom Action="KillEndlessNetTray" Before="InstallValidate" Condition="%s" />
     </InstallExecuteSequence>
     <CustomAction Id="LaunchEndlessNetTray" FileRef="TrayExeFile" ExeCommand="--show-window --debug --debug-log-dir %s" Execute="immediate" Return="asyncNoWait" Impersonate="yes" />
     <Icon Id="EndlessNetTrayIcon" SourceFile="$(var.IconFile)" />
@@ -272,7 +282,10 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 		xmlAttrEscape(opts.UpgradeCode),
 		xmlAttrEscape(opts.ProductName),
 		xmlAttrEscape(opts.Manufacturer),
+		idempotentInstallCondition,
 		xmlAttrEscape(stateRoot),
+		trayShutdownCondition,
+		trayShutdownCondition,
 		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
 		xmlAttrEscape(opts.ProductName),
 		xmlAttrEscape(opts.ServiceOptions.ServiceName),
