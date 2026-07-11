@@ -570,9 +570,11 @@ class EndlessNetController extends ChangeNotifier
   DateTime? _lastShowSignalWrite;
 
   ServiceStatus get serviceStatus => ServiceStatus(statusPayload);
-  String get state => serviceStatus.state(
-    fallback: errorText == null ? 'Loading...' : 'Service unavailable',
-  );
+  String get state => serverIdentityChanged
+      ? 'Server identity changed'
+      : serviceStatus.state(
+          fallback: errorText == null ? 'Loading...' : 'Service unavailable',
+        );
   bool get connected => serviceStatus.connected;
   bool get serverIdentityChanged => serviceStatus.serverIdentityChanged;
   bool get deviceEnrolled => serviceStatus.deviceEnrolled;

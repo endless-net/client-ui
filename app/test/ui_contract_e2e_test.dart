@@ -37,6 +37,7 @@ void main() {
       ServiceState.error,
       ServiceState.needsEnrollment,
       ServiceState.needsApproval,
+      ServiceState.serverIdentityChanged,
     ]) {
       expect(openAPI, contains('        - $state'));
     }
@@ -56,6 +57,7 @@ void main() {
       ControlState.error,
       ControlState.notRegistered,
       ControlState.disconnected,
+      ControlState.serverIdentityChanged,
     ]) {
       expect(openAPI, contains('        - $state'));
     }
@@ -138,7 +140,7 @@ void main() {
     await tester.tap(find.widgetWithText(OutlinedButton, 'Connect'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Server identity changed'), findsOneWidget);
+    expect(find.text('Server identity changed'), findsAtLeast(2));
     expect(find.textContaining('ed25519:new'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Trust and connect'));
     await tester.pumpAndSettle();

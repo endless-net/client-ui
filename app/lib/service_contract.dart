@@ -22,6 +22,7 @@ class ServiceState {
   static const error = 'Error';
   static const needsEnrollment = 'NeedsEnrollment';
   static const needsApproval = 'NeedsApproval';
+  static const serverIdentityChanged = 'ServerIdentityChanged';
 }
 
 class ControlState {
@@ -39,6 +40,7 @@ class ControlState {
   static const registered = 'registered';
   static const error = 'error';
   static const cacheInvalid = 'cache_invalid';
+  static const serverIdentityChanged = 'server_identity_changed';
 }
 
 class ConnectionIntentState {
@@ -61,7 +63,12 @@ class ServiceStatus {
       _valueText(_nestedValue(payload, 'agent', 'last_error'), '');
 
   bool get serverIdentityChanged =>
-      lastError.toLowerCase().contains('server map signing key changed');
+      lastError.toLowerCase().contains('server map signing key changed') ||
+      _sameState(state(fallback: ''), ServiceState.serverIdentityChanged) ||
+      _sameState(
+        _valueText(payload?['control_state'], ''),
+        ControlState.serverIdentityChanged,
+      );
 
   bool get needsEnrollment =>
       _sameState(state(fallback: ''), ServiceState.needsEnrollment) ||
