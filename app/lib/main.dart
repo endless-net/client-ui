@@ -31,8 +31,8 @@ const _appTarget = String.fromEnvironment(
 );
 const _defaultPipe = r'\\.\pipe\endlessnet-service';
 const _defaultDebugLogDir = r'~\.endlessnet\logs';
-const _defaultAdminURL = 'https://endlessnet.ru/admin/';
-const _defaultConnectURL = 'https://endlessnet.ru/admin/connect/windows';
+const _defaultAdminURL = 'https://admin.endlessnet.ru/';
+const _defaultConnectURL = 'https://admin.endlessnet.ru/connect/windows/';
 const _showSignalPath = r'~\.endlessnet\endlessnet-tray.show';
 
 RandomAccessFile? _instanceLock;

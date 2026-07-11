@@ -6,6 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('default links target the deployed admin console', () {
+    final config = AppConfig.parse(const []);
+
+    expect(config.adminURL, 'https://admin.endlessnet.ru/');
+    expect(config.connectURL, 'https://admin.endlessnet.ru/connect/windows/');
+  });
+
   test('tray UI contract constants mirror the OpenAPI enum/path surface', () {
     final contract = _ipcContractFile();
     final openAPI = contract.readAsStringSync();
@@ -84,9 +91,9 @@ void main() {
           '--ipc-pipe',
           r'\\.\pipe\endlessnet-ui-e2e',
           '--connect-url',
-          'https://endlessnet.ru/admin/connect/windows',
+          'https://admin.endlessnet.ru/connect/windows/',
           '--admin-url',
-          'https://endlessnet.ru/admin/',
+          'https://admin.endlessnet.ru/',
         ]),
         bridge: bridge,
         logger: AppLogger('', enabled: false),
