@@ -16,6 +16,18 @@ void main() {
     expect(request.mode, 'server');
   });
 
+  test('parseEnrollment accepts no-token interactive EndlessNet deep links', () {
+    final request = parseEnrollment(
+      'endlessnet://enroll?server=https%3A%2F%2Fapi.example.test&mode=server',
+      '',
+      'workstation',
+    );
+
+    expect(request.token, '');
+    expect(request.server, 'https://api.example.test');
+    expect(request.mode, 'server');
+  });
+
   test('parseEnrollment extracts pasted token text', () {
     final request = parseEnrollment(
       'connect with enr_pasted_secret now',

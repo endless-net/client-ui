@@ -98,12 +98,22 @@ Future<void> _runEnrollmentAndExit(
       config.server,
       config.mode,
     );
-    await bridge.enroll(request);
+    final payload = await bridge.enroll(request);
     logger.info('deep-link enrollment completed');
-    await showMessageBox(
-      'EndlessNet enrollment',
-      'Device enrollment completed.',
-    );
+    final approvalURL = payload['approval_url']?.toString().trim() ??
+        payload['enrollment_approval_url']?.toString().trim() ??
+        '';
+    if (approvalURL.isNotEmpty) {
+      await showMessageBox(
+        'EndlessNet enrollment',
+        'Approve this device in the admin console:\n$approvalURL',
+      );
+    } else {
+      await showMessageBox(
+        'EndlessNet enrollment',
+        'Device enrollment completed.',
+      );
+    }
   } catch (err, stack) {
     logger.error('deep-link enrollment failed', err, stack);
     await showMessageBox('EndlessNet enrollment', safeErrorText(err));
@@ -397,8 +407,12 @@ EnrollmentRequest parseEnrollment(
   var token = '';
   var server = defaultServer.trim();
   var mode = defaultMode.trim().isEmpty ? 'workstation' : defaultMode.trim();
+  var isEnrollmentLink = false;
   final uri = Uri.tryParse(trimmed);
   if (uri != null && uri.scheme.isNotEmpty) {
+    isEnrollmentLink =
+        uri.scheme.toLowerCase() == 'endlessnet' &&
+        uri.host.toLowerCase() == 'enroll';
     token =
         uri.queryParameters['token'] ??
         uri.queryParameters['enroll_token'] ??
@@ -414,7 +428,7 @@ EnrollmentRequest parseEnrollment(
         ).firstMatch(trimmed)?.group(0) ??
         '';
   }
-  if (token.trim().isEmpty) {
+  if (token.trim().isEmpty && !isEnrollmentLink) {
     throw StateError('Enrollment token is required.');
   }
   return EnrollmentRequest(
@@ -459,23 +473,25 @@ class EndlessNetClientBridge {
   }
 
   Future<Map<String, dynamic>> enroll(EnrollmentRequest request) {
+    final token = request.token.trim();
     final args = [
       'service',
       'enroll',
       '--json',
       '--ipc-pipe',
       config.pipe,
-      '--join-token-file',
-      '-',
       '--mode',
       request.mode,
       '--timeout',
       '2m',
     ];
+    if (token.isNotEmpty) {
+      args.addAll(['--join-token-file', '-']);
+    }
     if (request.server.trim().isNotEmpty) {
       args.addAll(['--server', request.server.trim()]);
     }
-    return _runJSON(args, stdinText: request.token);
+    return _runJSON(args, stdinText: token.isEmpty ? null : token);
   }
 
   Future<Map<String, dynamic>> _serviceJSON(List<String> serviceArgs) {
