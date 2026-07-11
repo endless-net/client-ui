@@ -85,5 +85,12 @@ void main() {
     });
     expect(needsEnrollment.needsEnrollment, isTrue);
     expect(needsEnrollment.deviceEnrolled, isFalse);
+
+    final identityChanged = ServiceStatus({
+      'state': ServiceState.degraded,
+      'node_id': 'node-1',
+      'agent': {'last_error': 'server map signing key changed'},
+    });
+    expect(identityChanged.serverIdentityChanged, isTrue);
   });
 }

@@ -437,6 +437,17 @@ class EndlessNetClientBridge {
 
   Future<Map<String, dynamic>> status() => _serviceJSON(['status']);
   Future<Map<String, dynamic>> connect() => _serviceJSON(['connect']);
+  Future<Map<String, dynamic>> serverIdentity() =>
+      _serviceJSON(['server-identity']);
+  Future<Map<String, dynamic>> trustServer(String confirmedKeyID) =>
+      _serviceJSON([
+        'trust-server',
+        '--yes',
+        '--confirmed-key-id',
+        confirmedKeyID,
+        '--timeout',
+        '2m',
+      ]);
   Future<Map<String, dynamic>> disconnect() => _serviceJSON(['disconnect']);
   Future<Map<String, dynamic>> logout() => _serviceJSON(['logout']);
   Future<Map<String, dynamic>> networks() => _serviceJSON(['networks']);
@@ -563,6 +574,7 @@ class EndlessNetController extends ChangeNotifier
     fallback: errorText == null ? 'Loading...' : 'Service unavailable',
   );
   bool get connected => serviceStatus.connected;
+  bool get serverIdentityChanged => serviceStatus.serverIdentityChanged;
   bool get deviceEnrolled => serviceStatus.deviceEnrolled;
   bool get canConnect => deviceEnrolled && !connected;
   bool get canDisconnect => deviceEnrolled && connected;
@@ -624,7 +636,11 @@ class EndlessNetController extends ChangeNotifier
       case 'open':
         showWindow();
       case 'connect':
-        runAction(() => bridge.connect());
+        if (serverIdentityChanged) {
+          showWindow();
+        } else {
+          runAction(() => bridge.connect());
+        }
       case 'disconnect':
         runAction(() => bridge.disconnect());
       case 'connect-device':
@@ -685,6 +701,45 @@ class EndlessNetController extends ChangeNotifier
     } catch (err, stack) {
       errorText = safeErrorText(err);
       logger.error('action failed', err, stack);
+      await showMessageBox('EndlessNet', errorText!);
+    } finally {
+      busy = false;
+      await _updateTray();
+      notifyListeners();
+    }
+  }
+
+  Future<void> connect(BuildContext context) async {
+    if (!serverIdentityChanged) {
+      await runAction(() => bridge.connect());
+      return;
+    }
+    busy = true;
+    notifyListeners();
+    try {
+      final identity = await bridge.serverIdentity();
+      final announcedKeyID = valueText(identity['announced_key_id']);
+      if (announcedKeyID.isEmpty) {
+        throw StateError('The server did not announce a signing key ID.');
+      }
+      busy = false;
+      notifyListeners();
+      if (!context.mounted) {
+        return;
+      }
+      final confirmed = await showServerIdentityChangeDialog(
+        context,
+        serverURL: valueText(identity['server_url'], fallback: 'server'),
+        trustedKeyID: valueText(identity['trusted_key_id']),
+        announcedKeyID: announcedKeyID,
+      );
+      if (!confirmed) {
+        return;
+      }
+      await runAction(() => bridge.trustServer(announcedKeyID));
+    } catch (err, stack) {
+      errorText = safeErrorText(err);
+      logger.error('server identity recovery failed', err, stack);
       await showMessageBox('EndlessNet', errorText!);
     } finally {
       busy = false;
@@ -970,11 +1025,11 @@ class HomeScreen extends StatelessWidget {
                     OutlinedButton.icon(
                       onPressed: controller.busy
                           ? null
-                          : () => controller.runAction(
-                              () => controller.connected
-                                  ? controller.bridge.disconnect()
-                                  : controller.bridge.connect(),
-                            ),
+                          : () => controller.connected
+                                ? controller.runAction(
+                                    () => controller.bridge.disconnect(),
+                                  )
+                                : controller.connect(context),
                       icon: Icon(
                         controller.connected
                             ? Icons.link_off
@@ -1219,6 +1274,52 @@ Future<void> showMessageBox(String title, String message) async {
       ],
     ),
   );
+}
+
+Future<bool> showServerIdentityChangeDialog(
+  BuildContext context, {
+  required String serverURL,
+  required String trustedKeyID,
+  required String announcedKeyID,
+}) async {
+  return await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Server identity changed'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'The signing identity for $serverURL differs from the identity previously trusted by this device.',
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Only continue if this server key change is expected.',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                SelectableText('Previously trusted:\n$trustedKeyID'),
+                const SizedBox(height: 8),
+                SelectableText('Now announced:\n$announcedKeyID'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Trust and connect'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
 }
 
 final navigatorKey = GlobalKey<NavigatorState>();

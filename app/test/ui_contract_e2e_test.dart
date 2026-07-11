@@ -16,6 +16,8 @@ void main() {
       ServiceIPCPath.events,
       ServiceIPCPath.enroll,
       ServiceIPCPath.connect,
+      ServiceIPCPath.serverIdentity,
+      ServiceIPCPath.trustServer,
       ServiceIPCPath.disconnect,
       ServiceIPCPath.logout,
       ServiceIPCPath.networks,
@@ -113,6 +115,40 @@ void main() {
       expect(find.text('Disconnect'), findsOneWidget);
     },
   );
+
+  testWidgets('tray explicitly confirms server identity recovery', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final bridge = ContractFakeBridge(identityChanged: true);
+    final controller = EndlessNetController(
+      config: AppConfig.parse(const []),
+      bridge: bridge,
+      logger: AppLogger('', enabled: false),
+      desktopIntegrationEnabled: false,
+    );
+    controller.statusPayload = bridge.statusPayload;
+
+    await tester.pumpWidget(EndlessNetApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Connect'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Server identity changed'), findsOneWidget);
+    expect(find.textContaining('ed25519:new'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Trust and connect'));
+    await tester.pumpAndSettle();
+
+    expect(
+      bridge.calls,
+      containsAllInOrder(['server-identity', 'trust-server']),
+    );
+    expect(find.text(ServiceState.connected), findsOneWidget);
+  });
 }
 
 File _ipcContractFile() {
@@ -144,11 +180,24 @@ File _ipcContractFile() {
 }
 
 class ContractFakeBridge extends EndlessNetClientBridge {
-  ContractFakeBridge()
+  ContractFakeBridge({bool identityChanged = false})
     : super(
         config: AppConfig.parse(const []),
         logger: AppLogger('', enabled: false),
+      ) {
+    if (identityChanged) {
+      statusPayload = _contractStatus(
+        state: ServiceState.degraded,
+        controlState: ControlState.degraded,
+        desiredState: ConnectionIntentState.connected,
+        userDisconnected: false,
       );
+      statusPayload['agent'] = {
+        ...statusPayload['agent'] as Map<String, dynamic>,
+        'last_error': 'server map signing key changed',
+      };
+    }
+  }
 
   final calls = <String>[];
 
@@ -167,6 +216,29 @@ class ContractFakeBridge extends EndlessNetClientBridge {
   @override
   Future<Map<String, dynamic>> connect() async {
     calls.add('connect');
+    statusPayload = _contractStatus(
+      state: ServiceState.connected,
+      desiredState: ConnectionIntentState.connected,
+      userDisconnected: false,
+    );
+    return statusPayload;
+  }
+
+  @override
+  Future<Map<String, dynamic>> serverIdentity() async {
+    calls.add('server-identity');
+    return {
+      'server_url': 'https://api.endlessnet.ru',
+      'trusted_key_id': 'ed25519:old',
+      'announced_key_id': 'ed25519:new',
+      'changed': true,
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> trustServer(String confirmedKeyID) async {
+    calls.add('trust-server');
+    expect(confirmedKeyID, 'ed25519:new');
     statusPayload = _contractStatus(
       state: ServiceState.connected,
       desiredState: ConnectionIntentState.connected,

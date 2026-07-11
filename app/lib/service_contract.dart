@@ -3,6 +3,8 @@ class ServiceIPCPath {
   static const events = '/events';
   static const enroll = '/enroll';
   static const connect = '/connect';
+  static const serverIdentity = '/server-identity';
+  static const trustServer = '/server-identity/trust';
   static const disconnect = '/disconnect';
   static const logout = '/logout';
   static const networks = '/networks';
@@ -54,6 +56,12 @@ class ServiceStatus {
   }
 
   bool get connected => _sameState(state(fallback: ''), ServiceState.connected);
+
+  String get lastError =>
+      _valueText(_nestedValue(payload, 'agent', 'last_error'), '');
+
+  bool get serverIdentityChanged =>
+      lastError.toLowerCase().contains('server map signing key changed');
 
   bool get needsEnrollment =>
       _sameState(state(fallback: ''), ServiceState.needsEnrollment) ||
