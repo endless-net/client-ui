@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "name": "enrollment-approval",
+  "initial_status": {
+    "state": "NeedsEnrollment",
+    "control_state": "not_registered",
+    "desired_state": "connected",
+    "account_id": null,
+    "node_id": null,
+    "network_id": null,
+    "network_name": null,
+    "overlay_ip": null,
+    "agent": null,
+    "cached_map_present": false,
+    "cached_map_valid": false,
+    "node_credential_present": false,
+    "private_key_present": false,
+    "peer_count": 0
+  },
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/enroll",
+      "repeat_last": true,
+      "responses": [
+        {
+          "body": {
+            "ok": true,
+            "state": "NeedsApproval",
+            "enrollment_pending": true,
+            "enrollment_request_id": "ner_emulator",
+            "approval_url": "https://admin.example.test/?enrollment_request=ner_emulator"
+          },
+          "status_patch": {
+            "state": "NeedsApproval",
+            "control_state": "pending_approval",
+            "enrollment_request_id": "ner_emulator",
+            "approval_url": "https://admin.example.test/?enrollment_request=ner_emulator"
+          }
+        },
+        {
+          "body": {
+            "ok": true,
+            "state": "Connected",
+            "enrolled": true,
+            "node_id": "node_emulator",
+            "network_id": "net_primary"
+          },
+          "status_patch": {
+            "state": "Connected",
+            "control_state": "ready",
+            "account_id": "acc_emulator",
+            "node_id": "node_emulator",
+            "network_id": "net_primary",
+            "network_name": "primary",
+            "overlay_ip": "100.64.0.10",
+            "cached_map_present": true,
+            "cached_map_valid": true,
+            "node_credential_present": true,
+            "private_key_present": true
+          }
+        }
+      ]
+    }
+  ]
+}
