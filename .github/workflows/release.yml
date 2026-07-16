@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: windows-2025
+    runs-on: windows-2022
     environment: release
     timeout-minutes: 90
     env:
