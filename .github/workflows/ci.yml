@@ -41,6 +41,7 @@ jobs:
         working-directory: app
         run: flutter build windows --release
       - name: Build non-release core fixture
+        if: github.event_name == 'pull_request'
         shell: pwsh
         run: >-
           go build
@@ -48,6 +49,7 @@ jobs:
           -o "$env:RUNNER_TEMP/endlessnet-client.exe"
           ./tools/windows-packaging/cmd/core-fixture
       - name: Build unsigned packaging-smoke MSI
+        if: github.event_name == 'pull_request'
         shell: pwsh
         run: >-
           ./scripts/build-windows-client-msi.ps1
@@ -63,6 +65,7 @@ jobs:
             throw "PR MSI must be unsigned"
           }
       - name: Upload private unsigned MSI
+        if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v6
         with:
           name: unsigned-msi-packaging-smoke
