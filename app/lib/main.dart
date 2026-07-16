@@ -12,7 +12,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'service_contract.dart';
 
-const _appTitle = 'EndlessNet Tray';
+const _appTitle = 'EndlessNet';
 const _appVersion = String.fromEnvironment(
   'ENDLESSNET_VERSION',
   defaultValue: 'dev',
@@ -34,6 +34,8 @@ const _defaultDebugLogDir = r'~\.endlessnet\logs';
 const _defaultAdminURL = 'https://admin.endlessnet.ru/';
 const _defaultConnectURL = 'https://admin.endlessnet.ru/connect/windows/';
 const _showSignalPath = r'~\.endlessnet\endlessnet-tray.show';
+const _defaultEnrollmentPollInterval = Duration(seconds: 2);
+const _defaultEnrollmentPollTimeout = Duration(minutes: 10);
 
 RandomAccessFile? _instanceLock;
 
@@ -100,14 +102,15 @@ Future<void> _runEnrollmentAndExit(
     );
     final payload = await bridge.enroll(request);
     logger.info('deep-link enrollment completed');
-    final approvalURL = payload['approval_url']?.toString().trim() ??
-        payload['enrollment_approval_url']?.toString().trim() ??
-        '';
+    final approvalURL = enrollmentApprovalURL(payload);
     if (approvalURL.isNotEmpty) {
-      await showMessageBox(
-        'EndlessNet enrollment',
-        'Approve this device in the admin console:\n$approvalURL',
-      );
+      final opened = await launchExternalURL(Uri.parse(approvalURL));
+      if (!opened) {
+        throw StateError(
+          'Windows could not open the device connection page in your default browser.',
+        );
+      }
+      logger.info('deep-link device connection page opened');
     } else {
       await showMessageBox(
         'EndlessNet enrollment',
@@ -570,12 +573,21 @@ class EndlessNetController extends ChangeNotifier
     required this.bridge,
     required this.logger,
     this.desktopIntegrationEnabled = true,
-  });
+    Future<bool> Function(Uri uri)? externalURLLauncher,
+    Future<void> Function(String title, String message)? messagePresenter,
+    this.enrollmentPollInterval = _defaultEnrollmentPollInterval,
+    this.enrollmentPollTimeout = _defaultEnrollmentPollTimeout,
+  }) : externalURLLauncher = externalURLLauncher ?? launchExternalURL,
+       messagePresenter = messagePresenter ?? showMessageBox;
 
   final AppConfig config;
   final EndlessNetClientBridge bridge;
   final AppLogger logger;
   final bool desktopIntegrationEnabled;
+  final Future<bool> Function(Uri uri) externalURLLauncher;
+  final Future<void> Function(String title, String message) messagePresenter;
+  final Duration enrollmentPollInterval;
+  final Duration enrollmentPollTimeout;
 
   Map<String, dynamic>? statusPayload;
   String? errorText;
@@ -583,6 +595,10 @@ class EndlessNetController extends ChangeNotifier
   bool quitting = false;
   Timer? _refreshTimer;
   Timer? _showSignalTimer;
+  Timer? _enrollmentPollTimer;
+  EnrollmentRequest? _pendingEnrollmentRequest;
+  DateTime? _enrollmentPollingStartedAt;
+  bool _enrollmentPollInFlight = false;
   DateTime? _lastShowSignalWrite;
 
   ServiceStatus get serviceStatus => ServiceStatus(statusPayload);
@@ -662,7 +678,7 @@ class EndlessNetController extends ChangeNotifier
       case 'disconnect':
         runAction(() => bridge.disconnect());
       case 'connect-device':
-        openConnectURL();
+        connectDevice();
       case 'open-admin':
         openAdminURL();
       case 'status':
@@ -698,6 +714,11 @@ class EndlessNetController extends ChangeNotifier
       final payload = await bridge.status();
       statusPayload = payload;
       errorText = null;
+      if (isEnrollmentPending(payload)) {
+        _startEnrollmentPolling(_defaultEnrollmentRequest());
+      } else if (ServiceStatus(payload).deviceEnrolled) {
+        _stopEnrollmentPolling();
+      }
       logger.info('status refreshed state=$state');
     } catch (err, stack) {
       errorText = safeErrorText(err);
@@ -856,18 +877,150 @@ class EndlessNetController extends ChangeNotifier
     await windowManager.focus();
   }
 
-  Future<void> openConnectURL() async {
-    await launchUrl(
-      Uri.parse(config.connectURL),
-      mode: LaunchMode.externalApplication,
-    );
+  Future<void> connectDevice() async {
+    busy = true;
+    errorText = null;
+    notifyListeners();
+    final request = _defaultEnrollmentRequest();
+    try {
+      final payload = await bridge.enroll(request);
+      statusPayload = payload;
+      if (isEnrollmentPending(payload)) {
+        final connectionURL = enrollmentApprovalURL(payload);
+        if (connectionURL.isEmpty) {
+          throw StateError(
+            'The service did not provide a device connection URL.',
+          );
+        }
+        await _launchExternalURL(
+          connectionURL,
+          pageName: 'device connection page',
+        );
+        _startEnrollmentPolling(request);
+        logger.info('device enrollment request created and opened');
+      } else if (ServiceStatus(payload).deviceEnrolled) {
+        _stopEnrollmentPolling();
+        logger.info('device enrollment completed immediately');
+      } else {
+        throw StateError('The service did not start device enrollment.');
+      }
+    } catch (err, stack) {
+      errorText = safeErrorText(err);
+      logger.error('device enrollment failed', err, stack);
+      await messagePresenter('EndlessNet', errorText!);
+    } finally {
+      busy = false;
+      await _updateTray();
+      notifyListeners();
+    }
   }
 
   Future<void> openAdminURL() async {
-    await launchUrl(
-      Uri.parse(config.adminURL),
-      mode: LaunchMode.externalApplication,
+    await _openExternalURL(config.adminURL, pageName: 'admin console');
+  }
+
+  Future<void> _openExternalURL(
+    String rawURL, {
+    required String pageName,
+  }) async {
+    busy = true;
+    errorText = null;
+    notifyListeners();
+    try {
+      await _launchExternalURL(rawURL, pageName: pageName);
+      logger.info('external URL opened page=$pageName');
+    } catch (err, stack) {
+      errorText = safeErrorText(err);
+      logger.error('external URL launch failed page=$pageName', err, stack);
+      await messagePresenter('EndlessNet', errorText!);
+    } finally {
+      busy = false;
+      await _updateTray();
+      notifyListeners();
+    }
+  }
+
+  Future<void> _launchExternalURL(
+    String rawURL, {
+    required String pageName,
+  }) async {
+    final opened = await externalURLLauncher(Uri.parse(rawURL));
+    if (!opened) {
+      throw StateError(
+        'Windows could not open the $pageName in your default browser.',
+      );
+    }
+  }
+
+  EnrollmentRequest _defaultEnrollmentRequest() {
+    return EnrollmentRequest(
+      token: '',
+      server: config.server,
+      mode: config.mode,
     );
+  }
+
+  void _startEnrollmentPolling(EnrollmentRequest request) {
+    _pendingEnrollmentRequest = request;
+    _enrollmentPollingStartedAt ??= DateTime.now();
+    _enrollmentPollTimer ??= Timer.periodic(
+      enrollmentPollInterval,
+      (_) => _pollEnrollment(),
+    );
+  }
+
+  void _stopEnrollmentPolling() {
+    _enrollmentPollTimer?.cancel();
+    _enrollmentPollTimer = null;
+    _pendingEnrollmentRequest = null;
+    _enrollmentPollingStartedAt = null;
+  }
+
+  Future<void> _pollEnrollment() async {
+    if (_enrollmentPollInFlight || quitting) {
+      return;
+    }
+    final request = _pendingEnrollmentRequest;
+    if (request == null) {
+      _stopEnrollmentPolling();
+      return;
+    }
+    final startedAt = _enrollmentPollingStartedAt;
+    if (startedAt != null &&
+        DateTime.now().difference(startedAt) >= enrollmentPollTimeout) {
+      _stopEnrollmentPolling();
+      errorText = 'Device connection timed out. Try Connect this device again.';
+      logger.error(
+        'device enrollment polling timed out',
+        StateError(errorText!),
+        StackTrace.current,
+      );
+      await _updateTray();
+      notifyListeners();
+      return;
+    }
+
+    _enrollmentPollInFlight = true;
+    try {
+      final payload = await bridge.enroll(request);
+      statusPayload = payload;
+      errorText = null;
+      if (!isEnrollmentPending(payload)) {
+        _stopEnrollmentPolling();
+        if (ServiceStatus(payload).deviceEnrolled) {
+          logger.info('device enrollment polling completed');
+        } else {
+          errorText = 'Device enrollment did not complete.';
+        }
+      }
+    } catch (err, stack) {
+      errorText = safeErrorText(err);
+      logger.error('device enrollment polling failed', err, stack);
+    } finally {
+      _enrollmentPollInFlight = false;
+      await _updateTray();
+      notifyListeners();
+    }
   }
 
   Future<void> showStatusDialog() async {
@@ -910,6 +1063,7 @@ class EndlessNetController extends ChangeNotifier
   }
 
   Future<void> logout() async {
+    _stopEnrollmentPolling();
     await runAction(() => bridge.logout());
   }
 
@@ -917,6 +1071,7 @@ class EndlessNetController extends ChangeNotifier
     quitting = true;
     _refreshTimer?.cancel();
     _showSignalTimer?.cancel();
+    _stopEnrollmentPolling();
     if (!desktopIntegrationEnabled) {
       await logger.close();
       return;
@@ -1035,7 +1190,7 @@ class HomeScreen extends StatelessWidget {
                     FilledButton.icon(
                       onPressed: controller.busy
                           ? null
-                          : controller.openConnectURL,
+                          : controller.connectDevice,
                       icon: const Icon(Icons.link),
                       label: const Text('Connect this device'),
                     ),
@@ -1443,6 +1598,31 @@ bool isDeviceEnrolled(Map<String, dynamic>? payload) {
   return ServiceStatus(payload).deviceEnrolled;
 }
 
+bool isEnrollmentPending(Map<String, dynamic>? payload) {
+  if (payload == null) {
+    return false;
+  }
+  if (payload['enrollment_pending'] == true) {
+    return true;
+  }
+  final state = valueText(payload['state'], fallback: '').toLowerCase();
+  final controlState = valueText(
+    payload['control_state'],
+    fallback: '',
+  ).toLowerCase();
+  return state == ServiceState.needsApproval.toLowerCase() ||
+      controlState == ControlState.needsApproval ||
+      controlState == ControlState.approvalRequired ||
+      controlState == ControlState.pendingApproval;
+}
+
+String enrollmentApprovalURL(Map<String, dynamic>? payload) {
+  return firstNonEmpty(
+    valueText(payload?['approval_url'], fallback: ''),
+    valueText(payload?['enrollment_approval_url'], fallback: ''),
+  );
+}
+
 Object? nestedValue(Map<String, dynamic>? payload, String key, String nested) {
   final child = payload?[key];
   if (child is Map) {
@@ -1496,3 +1676,6 @@ Object redactDiagnostics(Object? value) {
 String safeErrorText(Object err) {
   return redactText(err.toString().replaceFirst('Bad state: ', '').trim());
 }
+
+Future<bool> launchExternalURL(Uri uri) =>
+    launchUrl(uri, mode: LaunchMode.externalApplication);

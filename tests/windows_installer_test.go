@@ -272,7 +272,7 @@ func assertWindowsPathMissing(t *testing.T, path string) {
 
 func assertWindowsTrayAutostart(t *testing.T) {
 	t.Helper()
-	out, err := exec.Command("powershell.exe", "-NoProfile", "-Command", `(Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'EndlessNet Tray').'EndlessNet Tray'`).CombinedOutput()
+	out, err := exec.Command("powershell.exe", "-NoProfile", "-Command", `(Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'EndlessNet').EndlessNet`).CombinedOutput()
 	if err != nil {
 		t.Fatalf("query tray autostart: %v\n%s", err, out)
 	}

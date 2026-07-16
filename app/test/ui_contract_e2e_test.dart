@@ -125,6 +125,78 @@ void main() {
     },
   );
 
+  testWidgets('Connect this device creates and opens an enrollment request', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final launchRequests = <Uri>[];
+    final messages = <String>[];
+    final bridge = ContractFakeBridge();
+    bridge.statusPayload = {'state': ServiceState.needsEnrollment};
+    bridge.enrollmentPayloads.addAll([
+      {
+        'state': ServiceState.needsApproval,
+        'control_state': ControlState.pendingApproval,
+        'enrollment_pending': true,
+        'enrollment_request_id': 'ner_ui_connect',
+        'approval_url':
+            'https://admin.endlessnet.ru/?enrollment_request=ner_ui_connect',
+      },
+      _contractStatus(
+        state: ServiceState.connected,
+        desiredState: ConnectionIntentState.connected,
+        userDisconnected: false,
+      ),
+    ]);
+    final controller = EndlessNetController(
+      config: AppConfig.parse(const [
+        '--connect-url',
+        'https://admin.endlessnet.ru/connect/windows/',
+      ]),
+      bridge: bridge,
+      logger: AppLogger('', enabled: false),
+      desktopIntegrationEnabled: false,
+      externalURLLauncher: (uri) async {
+        launchRequests.add(uri);
+        return true;
+      },
+      messagePresenter: (title, message) async {
+        messages.add('$title: $message');
+      },
+      enrollmentPollInterval: const Duration(milliseconds: 10),
+    );
+    addTearDown(controller.exitApp);
+    controller.statusPayload = {'state': ServiceState.needsEnrollment};
+
+    await tester.pumpWidget(EndlessNetApp(controller: controller));
+    await tester.pumpAndSettle();
+    expect(find.text('Connect this device'), findsOneWidget);
+    await tester.tap(find.text('Connect this device'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(launchRequests, [
+      Uri.parse(
+        'https://admin.endlessnet.ru/?enrollment_request=ner_ui_connect',
+      ),
+    ]);
+    expect(messages, isEmpty);
+    expect(bridge.enrollmentRequests, hasLength(1));
+    expect(bridge.enrollmentRequests.single.token, isEmpty);
+    expect(bridge.enrollmentRequests.single.mode, 'workstation');
+
+    await tester.pump(const Duration(milliseconds: 11));
+    await tester.pumpAndSettle();
+
+    expect(bridge.calls.where((call) => call == 'enroll'), hasLength(2));
+    expect(find.text(ServiceState.connected), findsOneWidget);
+    expect(find.text('Disconnect'), findsOneWidget);
+  });
+
   testWidgets('tray explicitly confirms server identity recovery', (
     tester,
   ) async {
@@ -209,6 +281,8 @@ class ContractFakeBridge extends EndlessNetClientBridge {
   }
 
   final calls = <String>[];
+  final enrollmentPayloads = <Map<String, dynamic>>[];
+  final enrollmentRequests = <EnrollmentRequest>[];
 
   Map<String, dynamic> statusPayload = _contractStatus(
     state: ServiceState.connected,
@@ -230,6 +304,16 @@ class ContractFakeBridge extends EndlessNetClientBridge {
       desiredState: ConnectionIntentState.connected,
       userDisconnected: false,
     );
+    return statusPayload;
+  }
+
+  @override
+  Future<Map<String, dynamic>> enroll(EnrollmentRequest request) async {
+    calls.add('enroll');
+    enrollmentRequests.add(request);
+    if (enrollmentPayloads.isNotEmpty) {
+      statusPayload = enrollmentPayloads.removeAt(0);
+    }
     return statusPayload;
   }
 

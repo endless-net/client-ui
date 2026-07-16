@@ -237,7 +237,8 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
         <File Id="TrayIconFile" Source="$(var.IconFile)" Name="endlessnet.ico" KeyPath="yes" />
       </Component>
       <Component Id="TrayAutostart" Guid="*" Bitness="always64">
-        <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet Tray" Value="&quot;[INSTALLFOLDER]endlessnet-tray.exe&quot; --debug --debug-log-dir %s" Type="string" KeyPath="yes" />
+        <RemoveRegistryValue Id="RemoveLegacyEndlessNetTrayAutostart" Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet Tray" />
+        <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet" Value="&quot;[INSTALLFOLDER]endlessnet-tray.exe&quot; --debug --debug-log-dir %s" Type="string" KeyPath="yes" />
       </Component>
       <Component Id="DeepLinkProtocol" Guid="*" Bitness="always64">
         <RegistryKey Root="HKLM" Key="Software\Classes\endlessnet">
