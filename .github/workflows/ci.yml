@@ -29,10 +29,18 @@ jobs:
           dotnet tool install --global wix --version 5.0.0
           wix extension add --global WixToolset.Util.wixext/5.0.0
           wix extension add --global WixToolset.UI.wixext/5.0.0
-      - name: Test packaging tool
-        run: go test ./tools/windows-packaging/...
+      - name: Test Go tools
+        run: go test ./tools/...
+      - name: Build service emulator
+        shell: pwsh
+        run: >-
+          go build
+          -o "$env:RUNNER_TEMP/endlessnet-service-emulator.exe"
+          ./tools/service-emulator/cmd/endlessnet-service-emulator
       - name: Analyze and test Flutter UI
         working-directory: app
+        env:
+          ENDLESSNET_SERVICE_EMULATOR: ${{ runner.temp }}\endlessnet-service-emulator.exe
         run: |
           flutter pub get
           flutter analyze

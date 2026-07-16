@@ -15,6 +15,18 @@ flutter test
 Pop-Location
 ```
 
+Run the UI component and IPC end-to-end suite against a hermetic named-pipe
+service emulator:
+
+```powershell
+.\scripts\test-ui-with-service-emulator.ps1
+```
+
+The emulator implements the checked-in OpenAPI surface, supports deterministic
+state transitions and fault injection, and records a redacted JSONL request
+journal. See [`tools/service-emulator/README.md`](tools/service-emulator/README.md)
+for manual UI testing and custom scenarios.
+
 Build an unsigned validation MSI from a previously verified Go-core artifact:
 
 ```powershell

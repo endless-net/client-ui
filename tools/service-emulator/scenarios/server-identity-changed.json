@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "server-identity-changed",
+  "initial_status": {
+    "state": "ServerIdentityChanged",
+    "control_state": "server_identity_changed",
+    "agent": {
+      "last_error": "server map signing key changed"
+    }
+  },
+  "server_identity": {
+    "trusted_key_id": "ed25519:old",
+    "announced_key_id": "ed25519:new",
+    "changed": true
+  }
+}

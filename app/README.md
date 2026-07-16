@@ -1,16 +1,21 @@
-# endlessnet_tray
+# EndlessNet tray UI
 
-A new Flutter project.
+This Flutter Windows application communicates directly with the protected
+EndlessNet service named pipe using the versioned local HTTP contract.
 
-## Getting Started
+Run ordinary UI tests from this directory:
 
-This project is a starting point for a Flutter application.
+```powershell
+flutter analyze
+flutter test
+```
 
-A few resources to get you started if this is your first Flutter project:
+The repository-level service emulator exercises the real IPC bridge and UI
+callbacks without installing or launching the runtime service:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```powershell
+..\scripts\test-ui-with-service-emulator.ps1
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+See [`../tools/service-emulator/README.md`](../tools/service-emulator/README.md)
+for scenarios, fault injection, and manual desktop testing.

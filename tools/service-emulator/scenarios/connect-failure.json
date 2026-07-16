@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "name": "connect-failure",
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/connect",
+      "repeat_last": true,
+      "responses": [
+        {
+          "expect_body": {},
+          "status": 503,
+          "delay_ms": 750,
+          "body": {
+            "ok": false,
+            "error_code": "connect_failed",
+            "error": "emulated control plane outage"
+          },
+          "status_patch": {
+            "state": "Degraded",
+            "control_state": "offline_cache"
+          }
+        }
+      ]
+    }
+  ]
+}
