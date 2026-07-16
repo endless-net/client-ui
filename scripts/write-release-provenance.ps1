@@ -17,6 +17,11 @@ $build = Get-Content -LiteralPath $BuildOutput -Raw | ConvertFrom-Json
 if ($core.version -ne $build.version -or $core.target -ne $build.target) {
     throw "core and UI build metadata do not describe the same release"
 }
+if ($build.wintun.version -ne "0.14.1" -or
+    $build.wintun.archive_sha256 -notmatch '^[0-9a-f]{64}$' -or
+    $build.wintun.sha256 -notmatch '^[0-9a-f]{64}$') {
+    throw "build metadata does not contain verified Wintun provenance"
+}
 
 $provenance = [ordered]@{
     schema_version = 1
@@ -39,6 +44,11 @@ $provenance = [ordered]@{
         client = [ordered]@{
             unsigned_sha256 = $build.client.unsigned_sha256
             signed_sha256 = $build.client.signed_sha256
+        }
+        wintun = [ordered]@{
+            version = $build.wintun.version
+            archive_sha256 = $build.wintun.archive_sha256
+            sha256 = $build.wintun.sha256
         }
         tray = [ordered]@{
             unsigned_sha256 = $build.tray.unsigned_sha256

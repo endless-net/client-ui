@@ -34,6 +34,7 @@ func renderMSI(args []string) error {
 	outputDir := fs.String("output-dir", "", "directory for WiX source and build script")
 	version := fs.String("version", "", "MSI product version")
 	clientExe := fs.String("client-exe", "", "path to the verified Go client executable")
+	wintunDLL := fs.String("wintun-dll", "", "path to the verified official Wintun DLL")
 	trayExe := fs.String("tray-exe", "", "path to the Flutter tray executable")
 	trayBundleDir := fs.String("tray-bundle-dir", "", "path to the Flutter Windows release bundle")
 	iconFile := fs.String("icon-file", defaults.IconFile, "path to the application icon")
@@ -45,6 +46,7 @@ func renderMSI(args []string) error {
 		"output-dir":      *outputDir,
 		"version":         *version,
 		"client-exe":      *clientExe,
+		"wintun-dll":      *wintunDLL,
 		"tray-exe":        *trayExe,
 		"tray-bundle-dir": *trayBundleDir,
 		"msi":             *msi,
@@ -59,6 +61,7 @@ func renderMSI(args []string) error {
 		Version:        *version,
 		UpgradeCode:    defaults.UpgradeCode,
 		ClientExe:      *clientExe,
+		WintunDLL:      *wintunDLL,
 		TrayExe:        *trayExe,
 		TrayBundleDir:  *trayBundleDir,
 		IconFile:       *iconFile,

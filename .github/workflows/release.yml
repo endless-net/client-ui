@@ -141,6 +141,7 @@ jobs:
         run: |
           $paths = @(
             "$env:RUNNER_TEMP/release/endlessnet-client.exe",
+            "$env:RUNNER_TEMP/release/wintun.dll",
             "$env:RUNNER_TEMP/release/tray/endlessnet-tray.exe",
             "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:VERSION.msi"
           )
@@ -216,6 +217,7 @@ jobs:
             "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:VERSION.msi" `
             "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:VERSION.msi.sha256" `
             "$env:RUNNER_TEMP/release/endlessnet-client.exe" `
+            "$env:RUNNER_TEMP/release/wintun.dll" `
             "$env:RUNNER_TEMP/release/endlessnet-tray_windows_amd64.zip" `
             "$env:RUNNER_TEMP/release/winget-manifests.zip" `
             "$env:RUNNER_TEMP/release/release-provenance.json"

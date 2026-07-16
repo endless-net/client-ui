@@ -15,6 +15,7 @@ type WindowsInstallerOptions struct {
 	Version        string
 	UpgradeCode    string
 	ClientExe      string
+	WintunDLL      string
 	TrayExe        string
 	TrayBundleDir  string
 	IconFile       string
@@ -36,6 +37,7 @@ func DefaultWindowsInstallerOptions() WindowsInstallerOptions {
 		Version:        "0.0.0",
 		UpgradeCode:    "9f7a7362-64c3-4b3a-9a58-7c8fc90779e1",
 		ClientExe:      `C:\Program Files\EndlessNet\endlessnet-client.exe`,
+		WintunDLL:      `C:\Program Files\EndlessNet\wintun.dll`,
 		TrayExe:        `C:\Program Files\EndlessNet\endlessnet-tray.exe`,
 		TrayBundleDir:  `C:\Program Files\EndlessNet`,
 		IconFile:       filepath.Join("app", "assets", "icons", "tray.ico"),
@@ -98,6 +100,9 @@ func normalizeWindowsInstallerOptions(opts WindowsInstallerOptions) WindowsInsta
 	if strings.TrimSpace(opts.ClientExe) == "" {
 		opts.ClientExe = defaults.ClientExe
 	}
+	if strings.TrimSpace(opts.WintunDLL) == "" {
+		opts.WintunDLL = defaults.WintunDLL
+	}
 	if strings.TrimSpace(opts.TrayExe) == "" {
 		opts.TrayExe = defaults.TrayExe
 	}
@@ -121,6 +126,7 @@ func validateWindowsInstallerOptions(opts WindowsInstallerOptions) error {
 		"version":      opts.Version,
 		"upgrade code": opts.UpgradeCode,
 		"client exe":   opts.ClientExe,
+		"wintun dll":   opts.WintunDLL,
 		"tray exe":     opts.TrayExe,
 		"tray bundle":  opts.TrayBundleDir,
 		"icon file":    opts.IconFile,
@@ -228,6 +234,9 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
         <ServiceControl Id="EndlessNetServiceControl" Name="%s" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
         <RegistryValue Root="HKLM" Key="Software\EndlessNet\Client" Name="Installed" Type="integer" Value="1" />
       </Component>
+      <Component Id="WintunLibrary" Guid="*" Bitness="always64">
+        <File Id="WintunDllFile" Source="$(var.WintunDll)" Name="wintun.dll" KeyPath="yes" />
+      </Component>
       <Component Id="TrayExecutable" Guid="*" Bitness="always64">
         <File Id="TrayExeFile" Source="$(var.TrayExe)" Name="endlessnet-tray.exe" KeyPath="yes" />
         <Shortcut Id="EndlessNetTrayShortcut" Directory="ApplicationProgramsFolder" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet-tray.exe" Arguments="--show-window --debug --debug-log-dir %s" WorkingDirectory="INSTALLFOLDER" Icon="EndlessNetTrayIcon" />
@@ -304,6 +313,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 func renderWindowsInstallerBuildScript(opts WindowsInstallerOptions) string {
 	return fmt.Sprintf(`param(
   [string]$ClientExe = %s,
+  [string]$WintunDll = %s,
   [string]$TrayExe = %s,
   [string]$TrayBundleDir = %s,
   [string]$IconFile = %s,
@@ -317,7 +327,7 @@ $ErrorActionPreference = "Stop"
 $utilExtension = "WixToolset.Util.wixext"
 $uiExtension = "WixToolset.UI.wixext"
 
-foreach ($path in @($ClientExe, $TrayExe, $IconFile)) {
+foreach ($path in @($ClientExe, $WintunDll, $TrayExe, $IconFile)) {
   if (-not (Test-Path -LiteralPath $path)) {
     throw "Required MSI input missing: $path"
   }
@@ -340,6 +350,7 @@ $wixArgs = @(
   "-ext", $utilExtension,
   "-ext", $uiExtension,
   "-d", "ClientExe=$ClientExe",
+  "-d", "WintunDll=$WintunDll",
   "-d", "TrayExe=$TrayExe",
   "-d", "TrayBundleDir=$TrayBundleDir",
   "-d", "IconFile=$IconFile",
@@ -361,6 +372,7 @@ if ($SignTool.Trim() -ne "" -and $CertificateThumbprint.Trim() -ne "") {
 }
 `,
 		quotePowerShellSingle(opts.ClientExe),
+		quotePowerShellSingle(opts.WintunDLL),
 		quotePowerShellSingle(opts.TrayExe),
 		quotePowerShellSingle(opts.TrayBundleDir),
 		quotePowerShellSingle(opts.IconFile),
