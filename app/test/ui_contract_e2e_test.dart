@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:endlessnet_tray/main.dart';
-import 'package:endlessnet_tray/service_contract.dart';
+import 'package:endlessnet/main.dart';
+import 'package:endlessnet/service_contract.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -13,7 +13,7 @@ void main() {
     expect(config.connectURL, 'https://admin.endlessnet.ru/connect/windows/');
   });
 
-  test('tray UI contract constants mirror the OpenAPI enum/path surface', () {
+  test('UI contract constants mirror the OpenAPI enum/path surface', () {
     final contract = _ipcContractFile();
     final openAPI = contract.readAsStringSync();
 
@@ -77,53 +77,52 @@ void main() {
     }
   });
 
-  testWidgets(
-    'tray UI drives service commands through an OpenAPI-shaped fake',
-    (tester) async {
-      tester.view.physicalSize = const Size(1000, 720);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets('UI drives service commands through an OpenAPI-shaped fake', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-      final bridge = ContractFakeBridge();
-      final controller = EndlessNetController(
-        config: AppConfig.parse(const [
-          '--ipc-pipe',
-          r'\\.\pipe\endlessnet-ui-e2e',
-          '--connect-url',
-          'https://admin.endlessnet.ru/connect/windows/',
-          '--admin-url',
-          'https://admin.endlessnet.ru/',
-        ]),
-        bridge: bridge,
-        logger: AppLogger('', enabled: false),
-        desktopIntegrationEnabled: false,
-      );
-      controller.statusPayload = bridge.statusPayload;
+    final bridge = ContractFakeBridge();
+    final controller = EndlessNetController(
+      config: AppConfig.parse(const [
+        '--ipc-pipe',
+        r'\\.\pipe\endlessnet-ui-e2e',
+        '--connect-url',
+        'https://admin.endlessnet.ru/connect/windows/',
+        '--admin-url',
+        'https://admin.endlessnet.ru/',
+      ]),
+      bridge: bridge,
+      logger: AppLogger('', enabled: false),
+      desktopIntegrationEnabled: false,
+    );
+    controller.statusPayload = bridge.statusPayload;
 
-      await tester.pumpWidget(EndlessNetApp(controller: controller));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(EndlessNetApp(controller: controller));
+    await tester.pumpAndSettle();
 
-      expect(find.text('EndlessNet'), findsOneWidget);
-      expect(find.text(ServiceState.connected), findsOneWidget);
-      expect(find.text('100.64.0.42'), findsOneWidget);
-      expect(find.text('prod'), findsOneWidget);
-      expect(find.text('peer-a - direct'), findsOneWidget);
-      expect(find.text('Disconnect'), findsOneWidget);
+    expect(find.text('EndlessNet'), findsOneWidget);
+    expect(find.text(ServiceState.connected), findsOneWidget);
+    expect(find.text('100.64.0.42'), findsOneWidget);
+    expect(find.text('prod'), findsOneWidget);
+    expect(find.text('peer-a - direct'), findsOneWidget);
+    expect(find.text('Disconnect'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Disconnect'));
-      await tester.pumpAndSettle();
-      expect(bridge.calls, contains('disconnect'));
-      expect(find.text(ServiceState.disconnected), findsOneWidget);
-      expect(find.text('Connect'), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Disconnect'));
+    await tester.pumpAndSettle();
+    expect(bridge.calls, contains('disconnect'));
+    expect(find.text(ServiceState.disconnected), findsOneWidget);
+    expect(find.text('Connect'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Connect'));
-      await tester.pumpAndSettle();
-      expect(bridge.calls, contains('connect'));
-      expect(find.text(ServiceState.connected), findsOneWidget);
-      expect(find.text('Disconnect'), findsOneWidget);
-    },
-  );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Connect'));
+    await tester.pumpAndSettle();
+    expect(bridge.calls, contains('connect'));
+    expect(find.text(ServiceState.connected), findsOneWidget);
+    expect(find.text('Disconnect'), findsOneWidget);
+  });
 
   testWidgets('Connect this device creates and opens an enrollment request', (
     tester,
@@ -197,7 +196,7 @@ void main() {
     expect(find.text('Disconnect'), findsOneWidget);
   });
 
-  testWidgets('tray explicitly confirms server identity recovery', (
+  testWidgets('UI explicitly confirms server identity recovery', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1000, 720);

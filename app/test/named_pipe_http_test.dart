@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:endlessnet_tray/named_pipe_http.dart';
-import 'package:endlessnet_tray/main.dart';
-import 'package:endlessnet_tray/service_contract.dart';
+import 'package:endlessnet/named_pipe_http.dart';
+import 'package:endlessnet/main.dart';
+import 'package:endlessnet/service_contract.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -61,7 +61,7 @@ void main() {
     );
   });
 
-  test('tray bridge maps UI actions directly to service IPC', () async {
+  test('app bridge maps UI actions directly to service IPC', () async {
     final ipc = _RecordingNamedPipeHttpClient();
     final bridge = EndlessNetClientBridge(
       config: AppConfig.parse(const []),

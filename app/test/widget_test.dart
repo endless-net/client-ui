@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:endlessnet_tray/main.dart';
-import 'package:endlessnet_tray/service_contract.dart';
+import 'package:endlessnet/main.dart';
+import 'package:endlessnet/service_contract.dart';
 
 void main() {
   test('parseEnrollment accepts EndlessNet deep links', () {
@@ -16,17 +16,20 @@ void main() {
     expect(request.mode, 'server');
   });
 
-  test('parseEnrollment accepts no-token interactive EndlessNet deep links', () {
-    final request = parseEnrollment(
-      'endlessnet://enroll?server=https%3A%2F%2Fapi.example.test&mode=server',
-      '',
-      'workstation',
-    );
+  test(
+    'parseEnrollment accepts no-token interactive EndlessNet deep links',
+    () {
+      final request = parseEnrollment(
+        'endlessnet://enroll?server=https%3A%2F%2Fapi.example.test&mode=server',
+        '',
+        'workstation',
+      );
 
-    expect(request.token, '');
-    expect(request.server, 'https://api.example.test');
-    expect(request.mode, 'server');
-  });
+      expect(request.token, '');
+      expect(request.server, 'https://api.example.test');
+      expect(request.mode, 'server');
+    },
+  );
 
   test('parseEnrollment extracts pasted token text', () {
     final request = parseEnrollment(

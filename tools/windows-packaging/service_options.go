@@ -19,7 +19,6 @@ type WindowsServiceOptions struct {
 	DisplayName        string
 	Description        string
 	BinaryPath         string
-	TrayPath           string
 	ConfigPath         string
 	WGConfigPath       string
 	StatePath          string
@@ -43,7 +42,6 @@ func DefaultWindowsServiceOptions() WindowsServiceOptions {
 		DisplayName:        "EndlessNet Client",
 		Description:        "EndlessNet client agent",
 		BinaryPath:         `C:\Program Files\EndlessNet\endlessnet-client.exe`,
-		TrayPath:           `C:\Program Files\EndlessNet\endlessnet-tray.exe`,
 		ConfigPath:         `C:\ProgramData\EndlessNet\client.json`,
 		WGConfigPath:       `C:\ProgramData\EndlessNet\endlessnet.conf`,
 		StatePath:          `C:\ProgramData\EndlessNet\agent-state.json`,
@@ -71,7 +69,6 @@ func normalizeWindowsServiceOptions(opts WindowsServiceOptions) WindowsServiceOp
 		{&opts.DisplayName, defaults.DisplayName},
 		{&opts.Description, defaults.Description},
 		{&opts.BinaryPath, defaults.BinaryPath},
-		{&opts.TrayPath, defaults.TrayPath},
 		{&opts.ConfigPath, defaults.ConfigPath},
 		{&opts.WGConfigPath, defaults.WGConfigPath},
 		{&opts.StatePath, defaults.StatePath},

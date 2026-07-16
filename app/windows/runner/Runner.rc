@@ -92,9 +92,9 @@ BEGIN
             VALUE "CompanyName", "UNNG" "\0"
             VALUE "FileDescription", "EndlessNet Windows desktop client" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "endlessnet-tray" "\0"
+            VALUE "InternalName", "endlessnet" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 UNNG. All rights reserved." "\0"
-            VALUE "OriginalFilename", "endlessnet-tray.exe" "\0"
+            VALUE "OriginalFilename", "endlessnet.exe" "\0"
             VALUE "ProductName", "EndlessNet" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END

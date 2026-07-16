@@ -1,16 +1,16 @@
 import 'dart:io';
 
-import 'package:endlessnet_tray/named_pipe_http.dart';
-import 'package:endlessnet_tray/service_contract.dart';
+import 'package:endlessnet/named_pipe_http.dart';
+import 'package:endlessnet/service_contract.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  final live = Platform.environment['ENDLESSNET_TRAY_LIVE_PIPE_TEST'] == '1';
+  final live = Platform.environment['ENDLESSNET_LIVE_PIPE_TEST'] == '1';
 
   test(
-    'tray talks directly to the installed EndlessNet named pipe',
+    'app talks directly to the installed EndlessNet named pipe',
     () async {
-      final pipe = Platform.environment['ENDLESSNET_TRAY_PIPE']?.trim();
+      final pipe = Platform.environment['ENDLESSNET_PIPE']?.trim();
       final client = NamedPipeHttpClient(
         pipePath: pipe == null || pipe.isEmpty
             ? r'\\.\pipe\endlessnet-service'
@@ -24,6 +24,6 @@ void main() {
       expect(status['ipc_version'], 1);
       expect(status['state'], isNotEmpty);
     },
-    skip: live ? false : 'set ENDLESSNET_TRAY_LIVE_PIPE_TEST=1',
+    skip: live ? false : 'set ENDLESSNET_LIVE_PIPE_TEST=1',
   );
 }

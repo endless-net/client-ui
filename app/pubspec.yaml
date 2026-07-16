@@ -1,5 +1,5 @@
-name: endlessnet_tray
-description: "EndlessNet Windows desktop tray client."
+name: endlessnet
+description: "EndlessNet Windows desktop client."
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
@@ -59,8 +59,8 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/icons/tray.ico
-    - assets/icons/tray.png
+    - assets/icons/endlessnet.ico
+    - assets/icons/endlessnet.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

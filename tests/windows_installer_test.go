@@ -60,8 +60,8 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	assertWindowsServiceFailurePolicy(t, "endlessnet-client")
 	assertWindowsPathExists(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-client.exe"))
 	assertWindowsPathExists(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "wintun.dll"))
-	assertWindowsPathExists(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-tray.exe"))
-	assertWindowsTrayAutostart(t)
+	assertWindowsPathExists(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet.exe"))
+	assertWindowsAutostart(t)
 	assertWindowsStartMenuShortcut(t)
 	assertWindowsDeepLinkProtocol(t)
 
@@ -78,7 +78,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	}
 	assertWindowsServiceAuto(t, "endlessnet-client")
 	assertWindowsServiceFailurePolicy(t, "endlessnet-client")
-	assertWindowsTrayAutostart(t)
+	assertWindowsAutostart(t)
 	assertWindowsStartMenuShortcut(t)
 	assertWindowsDeepLinkProtocol(t)
 	assertWindowsProgramDataACL(t, stateRoot)
@@ -88,7 +88,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 
 	// Browsers rename duplicate downloads. Re-running the already installed
 	// package from that renamed path must stay a successful no-op maintenance
-	// operation and must not invoke deferred tray shutdown/source repair.
+	// operation and must not invoke deferred app shutdown/source repair.
 	renameDir := filepath.Join(tmp, "renamed-rerun")
 	if err := os.MkdirAll(renameDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -112,7 +112,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	}
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-client.exe"))
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "wintun.dll"))
-	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-tray.exe"))
+	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet.exe"))
 	assertWindowsStartMenuShortcutRemoved(t)
 	assertWindowsDeepLinkProtocolRemoved(t)
 	if _, err := os.Stat(sentinel); err != nil {
@@ -129,7 +129,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	}
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-client.exe"))
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "wintun.dll"))
-	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-tray.exe"))
+	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet.exe"))
 	assertWindowsStartMenuShortcutRemoved(t)
 	assertWindowsPathMissing(t, stateRoot)
 }
@@ -243,15 +243,15 @@ func assertWindowsPathMissing(t *testing.T, path string) {
 	}
 }
 
-func assertWindowsTrayAutostart(t *testing.T) {
+func assertWindowsAutostart(t *testing.T) {
 	t.Helper()
 	out, err := exec.Command("powershell.exe", "-NoProfile", "-Command", `(Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'EndlessNet').EndlessNet`).CombinedOutput()
 	if err != nil {
-		t.Fatalf("query tray autostart: %v\n%s", err, out)
+		t.Fatalf("query app autostart: %v\n%s", err, out)
 	}
-	want := filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-tray.exe")
+	want := filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet.exe")
 	if !strings.Contains(strings.ToLower(string(out)), strings.ToLower(want)) {
-		t.Fatalf("tray autostart = %q, want %s", out, want)
+		t.Fatalf("app autostart = %q, want %s", out, want)
 	}
 }
 
@@ -311,7 +311,7 @@ if ($urlProtocol -ne '') {
   Write-Error "URL Protocol marker = $urlProtocol"
   exit 1
 }
-if ($command -notmatch 'endlessnet-tray\.exe' -or $command -notmatch '--enroll' -or $command -notmatch '%1') {
+if ($command -notmatch 'endlessnet\.exe' -or $command -notmatch '--enroll' -or $command -notmatch '%1') {
   Write-Error "protocol command = $command"
   exit 1
 }

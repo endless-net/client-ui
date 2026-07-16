@@ -50,9 +50,9 @@ $provenance = [ordered]@{
             archive_sha256 = $build.wintun.archive_sha256
             sha256 = $build.wintun.sha256
         }
-        tray = [ordered]@{
-            unsigned_sha256 = $build.tray.unsigned_sha256
-            signed_sha256 = $build.tray.signed_sha256
+        app = [ordered]@{
+            unsigned_sha256 = $build.app.unsigned_sha256
+            signed_sha256 = $build.app.signed_sha256
         }
         msi = [ordered]@{
             unsigned_sha256 = $build.msi.unsigned_sha256

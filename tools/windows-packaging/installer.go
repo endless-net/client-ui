@@ -16,8 +16,8 @@ type WindowsInstallerOptions struct {
 	UpgradeCode    string
 	ClientExe      string
 	WintunDLL      string
-	TrayExe        string
-	TrayBundleDir  string
+	AppExe         string
+	AppBundleDir   string
 	IconFile       string
 	OutputName     string
 	ServiceOptions WindowsServiceOptions
@@ -38,9 +38,9 @@ func DefaultWindowsInstallerOptions() WindowsInstallerOptions {
 		UpgradeCode:    "9f7a7362-64c3-4b3a-9a58-7c8fc90779e1",
 		ClientExe:      `C:\Program Files\EndlessNet\endlessnet-client.exe`,
 		WintunDLL:      `C:\Program Files\EndlessNet\wintun.dll`,
-		TrayExe:        `C:\Program Files\EndlessNet\endlessnet-tray.exe`,
-		TrayBundleDir:  `C:\Program Files\EndlessNet`,
-		IconFile:       filepath.Join("app", "assets", "icons", "tray.ico"),
+		AppExe:         `C:\Program Files\EndlessNet\endlessnet.exe`,
+		AppBundleDir:   `C:\Program Files\EndlessNet`,
+		IconFile:       filepath.Join("app", "assets", "icons", "endlessnet.ico"),
 		OutputName:     "EndlessNet.Client.msi",
 		ServiceOptions: DefaultWindowsServiceOptions(),
 	}
@@ -103,11 +103,11 @@ func normalizeWindowsInstallerOptions(opts WindowsInstallerOptions) WindowsInsta
 	if strings.TrimSpace(opts.WintunDLL) == "" {
 		opts.WintunDLL = defaults.WintunDLL
 	}
-	if strings.TrimSpace(opts.TrayExe) == "" {
-		opts.TrayExe = defaults.TrayExe
+	if strings.TrimSpace(opts.AppExe) == "" {
+		opts.AppExe = defaults.AppExe
 	}
-	if strings.TrimSpace(opts.TrayBundleDir) == "" {
-		opts.TrayBundleDir = firstNonEmptyInstallerString(windowsParentPath(opts.TrayExe), defaults.TrayBundleDir)
+	if strings.TrimSpace(opts.AppBundleDir) == "" {
+		opts.AppBundleDir = firstNonEmptyInstallerString(windowsParentPath(opts.AppExe), defaults.AppBundleDir)
 	}
 	if strings.TrimSpace(opts.IconFile) == "" {
 		opts.IconFile = defaults.IconFile
@@ -127,8 +127,8 @@ func validateWindowsInstallerOptions(opts WindowsInstallerOptions) error {
 		"upgrade code": opts.UpgradeCode,
 		"client exe":   opts.ClientExe,
 		"wintun dll":   opts.WintunDLL,
-		"tray exe":     opts.TrayExe,
-		"tray bundle":  opts.TrayBundleDir,
+		"app exe":      opts.AppExe,
+		"app bundle":   opts.AppBundleDir,
 		"icon file":    opts.IconFile,
 		"output name":  opts.OutputName,
 		"service name": opts.ServiceOptions.ServiceName,
@@ -164,8 +164,8 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 	// with 1603. Explicit REINSTALL remains a real repair operation.
 	const idempotentInstallCondition = `Installed AND NOT REMOVE~=&quot;ALL&quot; AND NOT REINSTALL`
 	// Initial installs/major upgrades have no Installed property. Explicit
-	// uninstall and forced repair still need the tray to be closed.
-	const trayShutdownCondition = `NOT Installed OR REMOVE~=&quot;ALL&quot; OR REINSTALL`
+	// uninstall and forced repair still need the desktop app to be closed.
+	const appShutdownCondition = `NOT Installed OR REMOVE~=&quot;ALL&quot; OR REINSTALL`
 	return fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package Name="%s" Manufacturer="%s" Version="%s" UpgradeCode="{%s}" Scope="perMachine">
@@ -195,23 +195,23 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       <DialogRef Id="ExitDialog" />
       <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="NOT Installed" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Condition="NOT Installed" />
-      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchEndlessNetTray" Order="1" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchEndlessNetApp" Order="1" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
       <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="2" Condition="1" />
     </UI>
     <UIRef Id="WixUI_Common" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch EndlessNet now" />
-    <util:CloseApplication Id="CloseEndlessNetTray" Target="endlessnet-tray.exe" Condition="%s" CloseMessage="yes" ElevatedCloseMessage="yes" TerminateProcess="1" RebootPrompt="no" Timeout="5" />
-    <CustomAction Id="KillEndlessNetTray" Directory="SystemFolder" ExeCommand="&quot;[SystemFolder]taskkill.exe&quot; /F /IM endlessnet-tray.exe /T" Execute="immediate" Return="ignore" />
+    <util:CloseApplication Id="CloseEndlessNetApp" Target="endlessnet.exe" Condition="%s" CloseMessage="yes" ElevatedCloseMessage="yes" TerminateProcess="1" RebootPrompt="no" Timeout="5" />
+    <CustomAction Id="KillEndlessNetApp" Directory="SystemFolder" ExeCommand="&quot;[SystemFolder]taskkill.exe&quot; /F /IM endlessnet.exe /T" Execute="immediate" Return="ignore" />
     <InstallExecuteSequence>
-      <Custom Action="KillEndlessNetTray" Before="InstallValidate" Condition="%s" />
+      <Custom Action="KillEndlessNetApp" Before="InstallValidate" Condition="%s" />
     </InstallExecuteSequence>
-    <CustomAction Id="LaunchEndlessNetTray" FileRef="TrayExeFile" ExeCommand="--show-window --debug --debug-log-dir %s" Execute="immediate" Return="asyncNoWait" Impersonate="yes" />
-    <Icon Id="EndlessNetTrayIcon" SourceFile="$(var.IconFile)" />
+    <CustomAction Id="LaunchEndlessNetApp" FileRef="AppExeFile" ExeCommand="--show-window --debug --debug-log-dir %s" Execute="immediate" Return="asyncNoWait" Impersonate="yes" />
+    <Icon Id="EndlessNetIcon" SourceFile="$(var.IconFile)" />
     <Feature Id="ProductFeature" Title="%s" Level="1">
       <ComponentGroupRef Id="EndlessNetClientComponents" />
-      <ComponentGroupRef Id="EndlessNetTrayBundleFiles" />
-      <ComponentGroupRef Id="EndlessNetTrayDataFiles" />
+      <ComponentGroupRef Id="EndlessNetAppBundleFiles" />
+      <ComponentGroupRef Id="EndlessNetAppDataFiles" />
     </Feature>
     <StandardDirectory Id="SystemFolder" />
     <StandardDirectory Id="ProgramMenuFolder">
@@ -219,7 +219,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     </StandardDirectory>
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="EndlessNet">
-        <Directory Id="TrayDataFolder" Name="data" />
+        <Directory Id="AppDataFolder" Name="data" />
       </Directory>
     </StandardDirectory>
     <StandardDirectory Id="CommonAppDataFolder">
@@ -237,24 +237,24 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       <Component Id="WintunLibrary" Guid="*" Bitness="always64">
         <File Id="WintunDllFile" Source="$(var.WintunDll)" Name="wintun.dll" KeyPath="yes" />
       </Component>
-      <Component Id="TrayExecutable" Guid="*" Bitness="always64">
-        <File Id="TrayExeFile" Source="$(var.TrayExe)" Name="endlessnet-tray.exe" KeyPath="yes" />
-        <Shortcut Id="EndlessNetTrayShortcut" Directory="ApplicationProgramsFolder" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet-tray.exe" Arguments="--show-window --debug --debug-log-dir %s" WorkingDirectory="INSTALLFOLDER" Icon="EndlessNetTrayIcon" />
+      <Component Id="AppExecutable" Guid="*" Bitness="always64">
+        <File Id="AppExeFile" Source="$(var.AppExe)" Name="endlessnet.exe" KeyPath="yes" />
+        <Shortcut Id="EndlessNetShortcut" Directory="ApplicationProgramsFolder" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet.exe" Arguments="--show-window --debug --debug-log-dir %s" WorkingDirectory="INSTALLFOLDER" Icon="EndlessNetIcon" />
         <RemoveFolder Id="RemoveEndlessNetProgramMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
       </Component>
-      <Component Id="TrayIcon" Guid="*" Bitness="always64">
-        <File Id="TrayIconFile" Source="$(var.IconFile)" Name="endlessnet.ico" KeyPath="yes" />
+      <Component Id="AppIcon" Guid="*" Bitness="always64">
+        <File Id="AppIconFile" Source="$(var.IconFile)" Name="endlessnet.ico" KeyPath="yes" />
       </Component>
-      <Component Id="TrayAutostart" Guid="*" Bitness="always64">
-        <RemoveRegistryValue Id="RemoveLegacyEndlessNetTrayAutostart" Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet Tray" />
-        <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet" Value="&quot;[INSTALLFOLDER]endlessnet-tray.exe&quot; --debug --debug-log-dir %s" Type="string" KeyPath="yes" />
+      <Component Id="AppAutostart" Guid="*" Bitness="always64">
+        <RemoveRegistryValue Id="RemoveLegacyAutostartName" Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet Tray" />
+        <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet" Value="&quot;[INSTALLFOLDER]endlessnet.exe&quot; --debug --debug-log-dir %s" Type="string" KeyPath="yes" />
       </Component>
       <Component Id="DeepLinkProtocol" Guid="*" Bitness="always64">
         <RegistryKey Root="HKLM" Key="Software\Classes\endlessnet">
           <RegistryValue Value="URL:EndlessNet Enrollment" Type="string" KeyPath="yes" />
           <RegistryValue Name="URL Protocol" Value="" Type="string" />
           <RegistryKey Key="shell\open\command">
-            <RegistryValue Value="&quot;[INSTALLFOLDER]endlessnet-tray.exe&quot; --debug --debug-log-dir %s --enroll &quot;%%1&quot;" Type="string" />
+            <RegistryValue Value="&quot;[INSTALLFOLDER]endlessnet.exe&quot; --debug --debug-log-dir %s --enroll &quot;%%1&quot;" Type="string" />
           </RegistryKey>
         </RegistryKey>
       </Component>
@@ -276,12 +276,12 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
         <util:RemoveFolderEx Id="RemoveEndlessNetStateRoot" On="uninstall" Property="ENDLESSNET_REMOVE_STATE_ROOT" Condition="ENDLESSNET_REMOVE_STATE=&quot;1&quot;" />
       </Component>
     </ComponentGroup>
-    <ComponentGroup Id="EndlessNetTrayBundleFiles" Directory="INSTALLFOLDER">
-      <Files Include="$(var.TrayBundleDir)\*.dll" />
-      <Files Include="$(var.TrayBundleDir)\native_assets.json" />
+    <ComponentGroup Id="EndlessNetAppBundleFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.AppBundleDir)\*.dll" />
+      <Files Include="$(var.AppBundleDir)\native_assets.json" />
     </ComponentGroup>
-    <ComponentGroup Id="EndlessNetTrayDataFiles" Directory="TrayDataFolder">
-      <Files Include="$(var.TrayBundleDir)\data\**" />
+    <ComponentGroup Id="EndlessNetAppDataFiles" Directory="AppDataFolder">
+      <Files Include="$(var.AppBundleDir)\data\**" />
     </ComponentGroup>
   </Package>
 </Wix>
@@ -294,8 +294,8 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 		xmlAttrEscape(opts.Manufacturer),
 		idempotentInstallCondition,
 		xmlAttrEscape(stateRoot),
-		trayShutdownCondition,
-		trayShutdownCondition,
+		appShutdownCondition,
+		appShutdownCondition,
 		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
 		xmlAttrEscape(opts.ProductName),
 		xmlAttrEscape(opts.ServiceOptions.ServiceName),
@@ -314,8 +314,8 @@ func renderWindowsInstallerBuildScript(opts WindowsInstallerOptions) string {
 	return fmt.Sprintf(`param(
   [string]$ClientExe = %s,
   [string]$WintunDll = %s,
-  [string]$TrayExe = %s,
-  [string]$TrayBundleDir = %s,
+  [string]$AppExe = %s,
+  [string]$AppBundleDir = %s,
   [string]$IconFile = %s,
   [string]$Output = %s,
   [string]$Version = %s,
@@ -327,16 +327,16 @@ $ErrorActionPreference = "Stop"
 $utilExtension = "WixToolset.Util.wixext"
 $uiExtension = "WixToolset.UI.wixext"
 
-foreach ($path in @($ClientExe, $WintunDll, $TrayExe, $IconFile)) {
+foreach ($path in @($ClientExe, $WintunDll, $AppExe, $IconFile)) {
   if (-not (Test-Path -LiteralPath $path)) {
     throw "Required MSI input missing: $path"
   }
 }
-if ([string]::IsNullOrWhiteSpace($TrayBundleDir)) {
-  $TrayBundleDir = Split-Path -Parent $TrayExe
+if ([string]::IsNullOrWhiteSpace($AppBundleDir)) {
+  $AppBundleDir = Split-Path -Parent $AppExe
 }
-if (-not (Test-Path -LiteralPath $TrayBundleDir)) {
-  throw "Required MSI tray bundle directory missing: $TrayBundleDir"
+if (-not (Test-Path -LiteralPath $AppBundleDir)) {
+  throw "Required MSI app bundle directory missing: $AppBundleDir"
 }
 
 $wix = Get-Command wix.exe -ErrorAction SilentlyContinue
@@ -351,8 +351,8 @@ $wixArgs = @(
   "-ext", $uiExtension,
   "-d", "ClientExe=$ClientExe",
   "-d", "WintunDll=$WintunDll",
-  "-d", "TrayExe=$TrayExe",
-  "-d", "TrayBundleDir=$TrayBundleDir",
+  "-d", "AppExe=$AppExe",
+  "-d", "AppBundleDir=$AppBundleDir",
   "-d", "IconFile=$IconFile",
   "-d", "ProductVersion=$Version",
   "-o", $Output,
@@ -373,8 +373,8 @@ if ($SignTool.Trim() -ne "" -and $CertificateThumbprint.Trim() -ne "") {
 `,
 		quotePowerShellSingle(opts.ClientExe),
 		quotePowerShellSingle(opts.WintunDLL),
-		quotePowerShellSingle(opts.TrayExe),
-		quotePowerShellSingle(opts.TrayBundleDir),
+		quotePowerShellSingle(opts.AppExe),
+		quotePowerShellSingle(opts.AppBundleDir),
 		quotePowerShellSingle(opts.IconFile),
 		quotePowerShellSingle(opts.OutputName),
 		quotePowerShellSingle(opts.Version),

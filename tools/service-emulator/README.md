@@ -1,6 +1,6 @@
 # EndlessNet service emulator
 
-The emulator is a standalone test process for the Windows tray UI. It serves
+The emulator is a standalone test process for the Windows desktop UI. It serves
 the checked-in v1 HTTP contract directly over a local Windows named pipe and
 does not start the Go runtime client, read runtime state, or expose a TCP port.
 

@@ -34,7 +34,7 @@ const _defaultPipe = r'\\.\pipe\endlessnet-service';
 const _defaultDebugLogDir = r'~\.endlessnet\logs';
 const _defaultAdminURL = 'https://admin.endlessnet.ru/';
 const _defaultConnectURL = 'https://admin.endlessnet.ru/connect/windows/';
-const _showSignalPath = r'~\.endlessnet\endlessnet-tray.show';
+const _showSignalPath = r'~\.endlessnet\endlessnet.show';
 const _defaultEnrollmentPollInterval = Duration(seconds: 2);
 const _defaultEnrollmentPollTimeout = Duration(minutes: 10);
 
@@ -84,7 +84,7 @@ Future<void> main(List<String> args) async {
 }
 
 String versionText() {
-  return 'endlessnet-tray $_appVersion\n'
+  return 'endlessnet $_appVersion\n'
       'commit: $_appCommit\n'
       'built: $_appBuildDate\n'
       'target: $_appTarget\n';
@@ -266,7 +266,7 @@ class AppLogger {
     final directory = Directory(path);
     await directory.create(recursive: true);
     final file = File(
-      '${directory.path}${Platform.pathSeparator}endlessnet-tray-flutter.log',
+      '${directory.path}${Platform.pathSeparator}endlessnet.log',
     );
     if (await file.exists() && await file.length() > 10 * 1024 * 1024) {
       final rotated = File('${file.path}.1');
@@ -349,7 +349,7 @@ Future<bool> acquireSingleInstanceLock(AppLogger logger) async {
     final lockDir = Directory(resolveUserPath(r'~\.endlessnet'));
     await lockDir.create(recursive: true);
     final file = File(
-      '${lockDir.path}${Platform.pathSeparator}endlessnet-tray.lock',
+      '${lockDir.path}${Platform.pathSeparator}endlessnet.lock',
     );
     _instanceLock = await file.open(mode: FileMode.write);
     _instanceLock!.lockSync(FileLock.exclusive);
@@ -574,7 +574,7 @@ class EndlessNetController extends ChangeNotifier
     }
     trayManager.addListener(this);
     windowManager.addListener(this);
-    await trayManager.setIcon('assets/icons/tray.ico');
+    await trayManager.setIcon('assets/icons/endlessnet.ico');
     await trayManager.setToolTip('EndlessNet: starting');
     await _setupWindow();
     _lastShowSignalWrite = await showSignalWriteTime();
@@ -1109,7 +1109,11 @@ class HomeScreen extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Image.asset('assets/icons/tray.png', width: 36, height: 36),
+                  Image.asset(
+                    'assets/icons/endlessnet.png',
+                    width: 36,
+                    height: 36,
+                  ),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Column(

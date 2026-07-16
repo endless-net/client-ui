@@ -40,7 +40,7 @@ func TestRenderWindowsWingetArtifacts(t *testing.T) {
 		"Scope: machine",
 		"UpgradeBehavior: install",
 		"- endlessnet-client",
-		"- endlessnet-tray",
+		"- endlessnet",
 		"- endlessnet",
 		"InstallerUrl: 'https://endlessnet.ru/downloads/EndlessNet.Client.1.2.3.msi'",
 		"InstallerSha256: '" + strings.Repeat("A", 64) + "'",

@@ -1,6 +1,6 @@
 # EndlessNet Client UI
 
-This repository owns the Flutter Windows tray application and the complete
+This repository owns the Flutter Windows desktop application and the complete
 Windows distribution pipeline for EndlessNet Client. The Go runtime client and
 the versioned local IPC producer contract remain in
 [`unng-lab/endlessnet`](https://github.com/unng-lab/endlessnet).

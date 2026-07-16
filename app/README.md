@@ -1,4 +1,4 @@
-# EndlessNet tray UI
+# EndlessNet UI
 
 This Flutter Windows application communicates directly with the protected
 EndlessNet service named pipe using the versioned local HTTP contract.

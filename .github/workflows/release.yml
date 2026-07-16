@@ -142,7 +142,7 @@ jobs:
           $paths = @(
             "$env:RUNNER_TEMP/release/endlessnet-client.exe",
             "$env:RUNNER_TEMP/release/wintun.dll",
-            "$env:RUNNER_TEMP/release/tray/endlessnet-tray.exe",
+            "$env:RUNNER_TEMP/release/app/endlessnet.exe",
             "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:VERSION.msi"
           )
           foreach ($path in $paths) {
@@ -183,7 +183,7 @@ jobs:
           $install = Start-Process msiexec.exe -ArgumentList @('/i', $msi, '/qn', '/norestart') -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw "MSI install failed with $($install.ExitCode)" }
           try {
-            $env:ENDLESSNET_TRAY_LIVE_PIPE_TEST = "1"
+            $env:ENDLESSNET_LIVE_PIPE_TEST = "1"
             Push-Location app
             try { flutter test test/named_pipe_live_test.dart } finally { Pop-Location }
           } finally {
@@ -195,7 +195,7 @@ jobs:
         if: steps.idempotency.outputs.noop != 'true'
         shell: pwsh
         run: |
-          Compress-Archive -Path "$env:RUNNER_TEMP/release/tray/*" -DestinationPath "$env:RUNNER_TEMP/release/endlessnet-tray_windows_amd64.zip"
+          Compress-Archive -Path "$env:RUNNER_TEMP/release/app/*" -DestinationPath "$env:RUNNER_TEMP/release/endlessnet_windows_amd64.zip"
           Compress-Archive -Path "$env:RUNNER_TEMP/release/winget/*" -DestinationPath "$env:RUNNER_TEMP/release/winget-manifests.zip"
           ./scripts/write-release-provenance.ps1 `
             -CoreManifest "$env:RUNNER_TEMP/client-core/client-core-manifest.json" `
@@ -218,7 +218,7 @@ jobs:
             "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:VERSION.msi.sha256" `
             "$env:RUNNER_TEMP/release/endlessnet-client.exe" `
             "$env:RUNNER_TEMP/release/wintun.dll" `
-            "$env:RUNNER_TEMP/release/endlessnet-tray_windows_amd64.zip" `
+            "$env:RUNNER_TEMP/release/endlessnet_windows_amd64.zip" `
             "$env:RUNNER_TEMP/release/winget-manifests.zip" `
             "$env:RUNNER_TEMP/release/release-provenance.json"
 

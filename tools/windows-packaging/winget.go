@@ -218,7 +218,7 @@ func renderWindowsWingetInstallerManifest(opts WindowsWingetOptions) string {
 		"UpgradeBehavior: install",
 		"Commands:",
 		"- endlessnet-client",
-		"- endlessnet-tray",
+		"- endlessnet",
 		"Protocols:",
 		"- endlessnet",
 		"Installers:",

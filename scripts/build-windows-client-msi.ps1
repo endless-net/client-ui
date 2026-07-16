@@ -28,7 +28,7 @@ if ([string]::IsNullOrWhiteSpace($Msi)) {
 $Msi = [System.IO.Path]::GetFullPath($Msi)
 
 if ([string]::IsNullOrWhiteSpace($IconFile)) {
-    $IconFile = Join-Path $repoRoot "app\assets\icons\tray.ico"
+    $IconFile = Join-Path $repoRoot "app\assets\icons\endlessnet.ico"
 }
 $IconFile = [System.IO.Path]::GetFullPath($IconFile)
 if (-not (Test-Path -LiteralPath $IconFile)) {
@@ -74,8 +74,8 @@ $buildDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
 $packagedClientExe = Join-Path $OutputDir "endlessnet-client.exe"
 $packagedWintunDll = Join-Path $OutputDir "wintun.dll"
-$trayBundleDir = Join-Path $OutputDir "tray"
-$trayExe = Join-Path $trayBundleDir "endlessnet-tray.exe"
+$appBundleDir = Join-Path $OutputDir "app"
+$appExe = Join-Path $appBundleDir "endlessnet.exe"
 $renderDir = Join-Path $OutputDir "installer"
 $wingetDir = Join-Path $OutputDir "winget"
 
@@ -91,24 +91,24 @@ try {
         --dart-define "ENDLESSNET_BUILD_DATE=$buildDate" `
         --dart-define "ENDLESSNET_TARGET=windows/amd64"
     if ($LASTEXITCODE -ne 0) {
-        throw "endlessnet-tray Flutter build failed with exit code $LASTEXITCODE"
+        throw "EndlessNet Flutter build failed with exit code $LASTEXITCODE"
     }
 } finally {
     Pop-Location
 }
 $flutterReleaseDir = Join-Path $flutterApp "build\windows\x64\runner\Release"
-if (-not (Test-Path -LiteralPath (Join-Path $flutterReleaseDir "endlessnet-tray.exe"))) {
-    throw "endlessnet-tray Flutter release artifact is missing from $flutterReleaseDir"
+if (-not (Test-Path -LiteralPath (Join-Path $flutterReleaseDir "endlessnet.exe"))) {
+    throw "EndlessNet Flutter release artifact is missing from $flutterReleaseDir"
 }
-if (Test-Path -LiteralPath $trayBundleDir) {
-    Remove-Item -LiteralPath $trayBundleDir -Recurse -Force
+if (Test-Path -LiteralPath $appBundleDir) {
+    Remove-Item -LiteralPath $appBundleDir -Recurse -Force
 }
-New-Item -ItemType Directory -Path $trayBundleDir -Force | Out-Null
-Copy-Item -Path (Join-Path $flutterReleaseDir "*") -Destination $trayBundleDir -Recurse -Force
+New-Item -ItemType Directory -Path $appBundleDir -Force | Out-Null
+Copy-Item -Path (Join-Path $flutterReleaseDir "*") -Destination $appBundleDir -Recurse -Force
 
 $unsignedClientHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $packagedClientExe).Hash.ToLowerInvariant()
 $wintunHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $packagedWintunDll).Hash.ToLowerInvariant()
-$unsignedTrayHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $trayExe).Hash.ToLowerInvariant()
+$unsignedAppHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $appExe).Hash.ToLowerInvariant()
 
 function Invoke-EndlessNetSign([string]$Path) {
     if (-not $Sign) {
@@ -128,9 +128,9 @@ function Invoke-EndlessNetSign([string]$Path) {
 }
 
 Invoke-EndlessNetSign $packagedClientExe
-Invoke-EndlessNetSign $trayExe
+Invoke-EndlessNetSign $appExe
 $signedClientHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $packagedClientExe).Hash.ToLowerInvariant()
-$signedTrayHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $trayExe).Hash.ToLowerInvariant()
+$signedAppHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $appExe).Hash.ToLowerInvariant()
 
 Push-Location $repoRoot
 try {
@@ -139,8 +139,8 @@ try {
         --version $Version `
         --client-exe $packagedClientExe `
         --wintun-dll $packagedWintunDll `
-        --tray-exe $trayExe `
-        --tray-bundle-dir $trayBundleDir `
+        --app-exe $appExe `
+        --app-bundle-dir $appBundleDir `
         --icon-file $IconFile `
         --msi $Msi
     if ($LASTEXITCODE -ne 0) {
@@ -203,11 +203,11 @@ $buildOutput = [ordered]@{
         archive_sha256 = $wintunArchiveSHA256
         sha256 = $wintunHash
     }
-    tray = [ordered]@{
-        path = $trayExe
-        bundle_dir = $trayBundleDir
-        unsigned_sha256 = $unsignedTrayHash
-        signed_sha256 = $signedTrayHash
+    app = [ordered]@{
+        path = $appExe
+        bundle_dir = $appBundleDir
+        unsigned_sha256 = $unsignedAppHash
+        signed_sha256 = $signedAppHash
     }
     msi = [ordered]@{
         path = $Msi
@@ -225,7 +225,7 @@ Write-Host "SHA256=$hash"
 Write-Host "Checksum=$checksumFile"
 Write-Host "ClientExe=$packagedClientExe"
 Write-Host "WintunDll=$packagedWintunDll"
-Write-Host "TrayExe=$trayExe"
-Write-Host "TrayBundleDir=$trayBundleDir"
+Write-Host "AppExe=$appExe"
+Write-Host "AppBundleDir=$appBundleDir"
 Write-Host "WingetDir=$wingetDir"
 Write-Host "BuildOutput=$buildOutputPath"

@@ -35,21 +35,21 @@ func renderMSI(args []string) error {
 	version := fs.String("version", "", "MSI product version")
 	clientExe := fs.String("client-exe", "", "path to the verified Go client executable")
 	wintunDLL := fs.String("wintun-dll", "", "path to the verified official Wintun DLL")
-	trayExe := fs.String("tray-exe", "", "path to the Flutter tray executable")
-	trayBundleDir := fs.String("tray-bundle-dir", "", "path to the Flutter Windows release bundle")
+	appExe := fs.String("app-exe", "", "path to the Flutter application executable")
+	appBundleDir := fs.String("app-bundle-dir", "", "path to the Flutter Windows release bundle")
 	iconFile := fs.String("icon-file", defaults.IconFile, "path to the application icon")
 	msi := fs.String("msi", "", "final MSI output path")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	for name, value := range map[string]string{
-		"output-dir":      *outputDir,
-		"version":         *version,
-		"client-exe":      *clientExe,
-		"wintun-dll":      *wintunDLL,
-		"tray-exe":        *trayExe,
-		"tray-bundle-dir": *trayBundleDir,
-		"msi":             *msi,
+		"output-dir":     *outputDir,
+		"version":        *version,
+		"client-exe":     *clientExe,
+		"wintun-dll":     *wintunDLL,
+		"app-exe":        *appExe,
+		"app-bundle-dir": *appBundleDir,
+		"msi":            *msi,
 	} {
 		if strings.TrimSpace(value) == "" {
 			return fmt.Errorf("--%s is required", name)
@@ -62,8 +62,8 @@ func renderMSI(args []string) error {
 		UpgradeCode:    defaults.UpgradeCode,
 		ClientExe:      *clientExe,
 		WintunDLL:      *wintunDLL,
-		TrayExe:        *trayExe,
-		TrayBundleDir:  *trayBundleDir,
+		AppExe:         *appExe,
+		AppBundleDir:   *appBundleDir,
 		IconFile:       *iconFile,
 		OutputName:     *msi,
 		ServiceOptions: packaging.DefaultWindowsServiceOptions(),
