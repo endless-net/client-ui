@@ -60,6 +60,14 @@ jobs:
           flutter-version: 3.38.1
           cache: true
 
+      - name: Install pinned WiX Toolset
+        if: steps.idempotency.outputs.noop != 'true'
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 7.0.0
+          wix extension add --global WixToolset.Util.wixext/7.0.0
+          wix extension add --global WixToolset.UI.wixext/7.0.0
+
       - name: Test sources
         if: steps.idempotency.outputs.noop != 'true'
         shell: pwsh

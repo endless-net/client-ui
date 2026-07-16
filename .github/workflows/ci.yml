@@ -23,6 +23,12 @@ jobs:
           channel: stable
           flutter-version: 3.38.1
           cache: true
+      - name: Install pinned WiX Toolset
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 7.0.0
+          wix extension add --global WixToolset.Util.wixext/7.0.0
+          wix extension add --global WixToolset.UI.wixext/7.0.0
       - name: Test packaging tool
         run: go test ./tools/windows-packaging/...
       - name: Analyze and test Flutter UI
