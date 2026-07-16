@@ -64,9 +64,9 @@ jobs:
         if: steps.idempotency.outputs.noop != 'true'
         shell: pwsh
         run: |
-          dotnet tool install --global wix --version 7.0.0
-          wix extension add --global WixToolset.Util.wixext/7.0.0
-          wix extension add --global WixToolset.UI.wixext/7.0.0
+          dotnet tool install --global wix --version 5.0.0
+          wix extension add --global WixToolset.Util.wixext/5.0.0
+          wix extension add --global WixToolset.UI.wixext/5.0.0
 
       - name: Test sources
         if: steps.idempotency.outputs.noop != 'true'
