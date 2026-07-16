@@ -3,6 +3,7 @@ param(
     [string]$Version,
     [Parameter(Mandatory = $true)]
     [string]$ClientExe,
+    [string]$WintunDll = "",
     [string]$OutputDir = "",
     [string]$Msi = "",
     [string]$IconFile = "",
@@ -38,6 +39,31 @@ $ClientExe = [System.IO.Path]::GetFullPath($ClientExe)
 if (-not (Test-Path -LiteralPath $ClientExe)) {
     throw "Verified EndlessNet Go client is missing: $ClientExe"
 }
+
+$wintunVersion = "0.14.1"
+$wintunArchiveSHA256 = "07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51"
+if ([string]::IsNullOrWhiteSpace($WintunDll)) {
+    $wintunArchive = Join-Path $OutputDir "wintun-$wintunVersion.zip"
+    $wintunExtractDir = Join-Path $OutputDir "wintun-$wintunVersion"
+    Invoke-WebRequest -Uri "https://www.wintun.net/builds/wintun-$wintunVersion.zip" -OutFile $wintunArchive
+    $actualArchiveHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $wintunArchive).Hash.ToLowerInvariant()
+    if ($actualArchiveHash -ne $wintunArchiveSHA256) {
+        throw "Official Wintun archive SHA-256 mismatch: got $actualArchiveHash"
+    }
+    if (Test-Path -LiteralPath $wintunExtractDir) {
+        Remove-Item -LiteralPath $wintunExtractDir -Recurse -Force
+    }
+    Expand-Archive -LiteralPath $wintunArchive -DestinationPath $wintunExtractDir -Force
+    $WintunDll = Join-Path $wintunExtractDir "wintun\bin\amd64\wintun.dll"
+}
+$WintunDll = [System.IO.Path]::GetFullPath($WintunDll)
+if (-not (Test-Path -LiteralPath $WintunDll)) {
+    throw "Verified Wintun DLL is missing: $WintunDll"
+}
+$wintunSignature = Get-AuthenticodeSignature -LiteralPath $WintunDll
+if ($wintunSignature.Status -ne "Valid") {
+    throw "Official Wintun Authenticode verification failed: $($wintunSignature.Status)"
+}
 $clientVersion = (& $ClientExe version 2>&1 | Out-String)
 if ($LASTEXITCODE -ne 0 -or $clientVersion -notmatch "endlessnet-client\s+$([regex]::Escape($Version))(\s|$)") {
     throw "Go client version does not match requested release $Version"
@@ -47,12 +73,14 @@ $commit = (& git -C $repoRoot rev-parse HEAD).Trim()
 $buildDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
 $packagedClientExe = Join-Path $OutputDir "endlessnet-client.exe"
+$packagedWintunDll = Join-Path $OutputDir "wintun.dll"
 $trayBundleDir = Join-Path $OutputDir "tray"
 $trayExe = Join-Path $trayBundleDir "endlessnet-tray.exe"
 $renderDir = Join-Path $OutputDir "installer"
 $wingetDir = Join-Path $OutputDir "winget"
 
 Copy-Item -LiteralPath $ClientExe -Destination $packagedClientExe -Force
+Copy-Item -LiteralPath $WintunDll -Destination $packagedWintunDll -Force
 
 $flutterApp = Join-Path $repoRoot "app"
 Push-Location $flutterApp
@@ -79,6 +107,7 @@ New-Item -ItemType Directory -Path $trayBundleDir -Force | Out-Null
 Copy-Item -Path (Join-Path $flutterReleaseDir "*") -Destination $trayBundleDir -Recurse -Force
 
 $unsignedClientHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $packagedClientExe).Hash.ToLowerInvariant()
+$wintunHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $packagedWintunDll).Hash.ToLowerInvariant()
 $unsignedTrayHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $trayExe).Hash.ToLowerInvariant()
 
 function Invoke-EndlessNetSign([string]$Path) {
@@ -109,6 +138,7 @@ try {
         --output-dir $renderDir `
         --version $Version `
         --client-exe $packagedClientExe `
+        --wintun-dll $packagedWintunDll `
         --tray-exe $trayExe `
         --tray-bundle-dir $trayBundleDir `
         --icon-file $IconFile `
@@ -167,6 +197,12 @@ $buildOutput = [ordered]@{
         unsigned_sha256 = $unsignedClientHash
         signed_sha256 = $signedClientHash
     }
+    wintun = [ordered]@{
+        version = $wintunVersion
+        path = $packagedWintunDll
+        archive_sha256 = $wintunArchiveSHA256
+        sha256 = $wintunHash
+    }
     tray = [ordered]@{
         path = $trayExe
         bundle_dir = $trayBundleDir
@@ -188,6 +224,7 @@ Write-Host "MSI=$Msi"
 Write-Host "SHA256=$hash"
 Write-Host "Checksum=$checksumFile"
 Write-Host "ClientExe=$packagedClientExe"
+Write-Host "WintunDll=$packagedWintunDll"
 Write-Host "TrayExe=$trayExe"
 Write-Host "TrayBundleDir=$trayBundleDir"
 Write-Host "WingetDir=$wingetDir"

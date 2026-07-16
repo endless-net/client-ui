@@ -13,10 +13,13 @@ func TestWindowsPackagingServiceContractIsStable(t *testing.T) {
 		`"--windows-service"`,
 		`"--ipc-pipe" "\\.\pipe\endlessnet-service"`,
 		`"--config" "C:\ProgramData\EndlessNet\client.json"`,
-		`"--apply-wireguard"`,
+		`"--userspace-wireguard"`,
 	} {
 		if !strings.Contains(args, want) {
 			t.Fatalf("service arguments missing %q: %s", want, args)
 		}
+	}
+	if strings.Contains(args, "--listen-port") || strings.Contains(args, "--apply-wireguard") {
+		t.Fatalf("default service arguments contain fixed/native WireGuard flags: %s", args)
 	}
 }

@@ -59,6 +59,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	assertWindowsServiceAuto(t, "endlessnet-client")
 	assertWindowsServiceFailurePolicy(t, "endlessnet-client")
 	assertWindowsPathExists(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-client.exe"))
+	assertWindowsPathExists(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "wintun.dll"))
 	assertWindowsPathExists(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-tray.exe"))
 	assertWindowsTrayAutostart(t)
 	assertWindowsStartMenuShortcut(t)
@@ -110,6 +111,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 		t.Fatal("endlessnet-client service still exists after MSI uninstall")
 	}
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-client.exe"))
+	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "wintun.dll"))
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-tray.exe"))
 	assertWindowsStartMenuShortcutRemoved(t)
 	assertWindowsDeepLinkProtocolRemoved(t)
@@ -126,6 +128,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 		t.Fatal("endlessnet-client service still exists after remove-state MSI uninstall")
 	}
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-client.exe"))
+	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "wintun.dll"))
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-tray.exe"))
 	assertWindowsStartMenuShortcutRemoved(t)
 	assertWindowsPathMissing(t, stateRoot)
