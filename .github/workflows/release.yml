@@ -14,6 +14,7 @@ concurrency:
 jobs:
   release:
     runs-on: windows-2025
+    environment: release
     timeout-minutes: 90
     env:
       VERSION: ${{ github.event.client_payload.version }}
