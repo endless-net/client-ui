@@ -245,7 +245,7 @@ File _ipcContractFile() {
   var current = Directory.current.absolute;
   while (true) {
     final candidate = File(
-      '${current.path}${Platform.pathSeparator}docs${Platform.pathSeparator}windows-client-ipc.openapi.yaml',
+      '${current.path}${Platform.pathSeparator}contracts${Platform.pathSeparator}upstream${Platform.pathSeparator}windows-client-ipc.openapi.yaml',
     );
     if (candidate.existsSync()) {
       return candidate;
@@ -253,7 +253,7 @@ File _ipcContractFile() {
     final parent = current.parent;
     if (parent.path == current.path) {
       throw StateError(
-        'docs/windows-client-ipc.openapi.yaml was not found above ${Directory.current.path}',
+        'contracts/upstream/windows-client-ipc.openapi.yaml was not found above ${Directory.current.path}',
       );
     }
     current = parent;

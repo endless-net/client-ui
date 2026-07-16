@@ -1,4 +1,4 @@
-package client
+package packaging
 
 import (
 	"os"

@@ -25,18 +25,36 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 		t.Fatal("endlessnet-client service already exists; refusing to mutate an existing installation without ENDLESSNET_E2E_WINDOWS_ALLOW_EXISTING=1")
 	}
 
-	root := repoRoot(t)
 	tmp := t.TempDir()
-	clientExe := buildBinary(t, root, tmp, "endlessnet-client", "./cmd/endlessnet-client")
-	trayExe := clientExe
-
-	msiV1 := buildWindowsClientMSI(t, root, clientExe, trayExe, filepath.Join(tmp, "msi-v1"), "1.2.3")
-	msiV2 := buildWindowsClientMSI(t, root, clientExe, trayExe, filepath.Join(tmp, "msi-v2"), "1.2.4")
-
-	installMSI(t, msiV1)
+	msi := strings.TrimSpace(os.Getenv("ENDLESSNET_E2E_WINDOWS_MSI_PATH"))
+	if msi == "" {
+		t.Fatal("ENDLESSNET_E2E_WINDOWS_MSI_PATH must point to the signed release candidate")
+	}
+	msi, err := filepath.Abs(msi)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(msi); err != nil {
+		t.Fatalf("release candidate MSI is unavailable: %v", err)
+	}
+	previousMSI := strings.TrimSpace(os.Getenv("ENDLESSNET_E2E_WINDOWS_PREVIOUS_MSI_PATH"))
+	if previousMSI != "" {
+		previousMSI, err = filepath.Abs(previousMSI)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(previousMSI); err != nil {
+			t.Fatalf("previous MSI is unavailable: %v", err)
+		}
+		installMSI(t, previousMSI)
+	} else {
+		installMSI(t, msi)
+	}
 	t.Cleanup(func() {
-		_ = exec.Command("msiexec.exe", "/x", msiV2, "/qn", "/norestart").Run()
-		_ = exec.Command("msiexec.exe", "/x", msiV1, "/qn", "/norestart").Run()
+		_ = exec.Command("msiexec.exe", "/x", msi, "/qn", "/norestart").Run()
+		if previousMSI != "" {
+			_ = exec.Command("msiexec.exe", "/x", previousMSI, "/qn", "/norestart").Run()
+		}
 	})
 	assertWindowsServiceAuto(t, "endlessnet-client")
 	assertWindowsServiceFailurePolicy(t, "endlessnet-client")
@@ -54,7 +72,9 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	installMSI(t, msiV2)
+	if previousMSI != "" {
+		installMSI(t, msi)
+	}
 	assertWindowsServiceAuto(t, "endlessnet-client")
 	assertWindowsServiceFailurePolicy(t, "endlessnet-client")
 	assertWindowsTrayAutostart(t)
@@ -73,19 +93,19 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 		t.Fatal(err)
 	}
 	renamedMSI := filepath.Join(renameDir, "EndlessNet.Client (1).msi")
-	copyWindowsMSIFixture(t, msiV2, renamedMSI)
+	copyWindowsMSIFixture(t, msi, renamedMSI)
 	installMSI(t, renamedMSI)
 	assertWindowsServiceAuto(t, "endlessnet-client")
 	if raw, err := os.ReadFile(sentinel); err != nil || !strings.Contains(string(raw), "node_msi_e2e") {
 		t.Fatalf("renamed MSI maintenance did not preserve client state: raw=%q err=%v", raw, err)
 	}
-	repairMSI(t, msiV2)
+	repairMSI(t, msi)
 	assertWindowsServiceAuto(t, "endlessnet-client")
 	if raw, err := os.ReadFile(sentinel); err != nil || !strings.Contains(string(raw), "node_msi_e2e") {
 		t.Fatalf("forced MSI repair did not preserve client state: raw=%q err=%v", raw, err)
 	}
 
-	uninstallMSI(t, msiV2)
+	uninstallMSI(t, msi)
 	if windowsServiceExists("endlessnet-client") {
 		t.Fatal("endlessnet-client service still exists after MSI uninstall")
 	}
@@ -97,11 +117,11 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 		t.Fatalf("default MSI uninstall removed preserved state %s: %v", sentinel, err)
 	}
 
-	installMSI(t, msiV2)
+	installMSI(t, msi)
 	if err := os.WriteFile(sentinel, []byte(`{"node_id":"node_remove_state_e2e"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	uninstallMSIRemoveState(t, msiV2)
+	uninstallMSIRemoveState(t, msi)
 	if windowsServiceExists("endlessnet-client") {
 		t.Fatal("endlessnet-client service still exists after remove-state MSI uninstall")
 	}
@@ -109,56 +129,6 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	assertWindowsPathMissing(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-tray.exe"))
 	assertWindowsStartMenuShortcutRemoved(t)
 	assertWindowsPathMissing(t, stateRoot)
-}
-
-func buildWindowsClientMSI(t *testing.T, root, clientExe, trayExe, outputDir, version string) string {
-	t.Helper()
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	msi := filepath.Join(outputDir, "EndlessNet.Client."+version+".msi")
-	trayBundleDir := prepareWindowsTrayBundleFixture(t, outputDir)
-	render := exec.Command(clientExe,
-		"installer", "render-windows-msi",
-		"--output-dir", outputDir,
-		"--version", version,
-		"--client-exe", clientExe,
-		"--tray-exe", trayExe,
-		"--tray-bundle-dir", trayBundleDir,
-		"--icon-file", filepath.Join(root, "assets", "endlessnet", "tray.ico"),
-		"--msi", msi,
-	)
-	render.Dir = root
-	if out, err := render.CombinedOutput(); err != nil {
-		t.Fatalf("render Windows MSI %s: %v\n%s", version, err, out)
-	}
-	build := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(outputDir, "build-msi.ps1"))
-	build.Dir = outputDir
-	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build Windows MSI %s: %v\n%s", version, err, out)
-	}
-	return msi
-}
-
-func prepareWindowsTrayBundleFixture(t *testing.T, parent string) string {
-	t.Helper()
-	bundle := filepath.Join(parent, "tray-bundle")
-	for _, path := range []string{
-		filepath.Join(bundle, "flutter_windows.dll"),
-		filepath.Join(bundle, "tray_manager_plugin.dll"),
-		filepath.Join(bundle, "native_assets.json"),
-		filepath.Join(bundle, "data", "icudtl.dat"),
-		filepath.Join(bundle, "data", "app.so"),
-		filepath.Join(bundle, "data", "flutter_assets", "AssetManifest.json"),
-	} {
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte("fixture"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return bundle
 }
 
 func copyWindowsMSIFixture(t *testing.T, source, destination string) {

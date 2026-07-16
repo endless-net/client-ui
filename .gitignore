@@ -1,0 +1,20 @@
+# Generated builds and local state
+/dist/
+/.artifacts/
+*.log
+
+# Go
+*.exe
+*.test
+
+# Flutter
+/app/.dart_tool/
+/app/build/
+/app/.flutter-plugins-dependencies
+/app/windows/flutter/ephemeral/
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,67 @@
+name: Client UI CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.38.1
+          cache: true
+      - name: Test packaging tool
+        run: go test ./tools/windows-packaging/...
+      - name: Analyze and test Flutter UI
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Build Windows release
+        working-directory: app
+        run: flutter build windows --release
+      - name: Build non-release core fixture
+        shell: pwsh
+        run: >-
+          go build
+          -ldflags "-X main.version=0.0.0"
+          -o "$env:RUNNER_TEMP/endlessnet-client.exe"
+          ./tools/windows-packaging/cmd/core-fixture
+      - name: Build unsigned packaging-smoke MSI
+        shell: pwsh
+        run: >-
+          ./scripts/build-windows-client-msi.ps1
+          -Version 0.0.0
+          -ClientExe "$env:RUNNER_TEMP/endlessnet-client.exe"
+          -OutputDir "$env:RUNNER_TEMP/windows-client-msi"
+      - name: Reject accidental signatures in PR artifact
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          $msi = Get-Item "$env:RUNNER_TEMP/windows-client-msi/EndlessNet.Client.0.0.0.msi"
+          if ((Get-AuthenticodeSignature -LiteralPath $msi.FullName).Status -ne "NotSigned") {
+            throw "PR MSI must be unsigned"
+          }
+      - name: Upload private unsigned MSI
+        uses: actions/upload-artifact@v6
+        with:
+          name: unsigned-msi-packaging-smoke
+          path: |
+            ${{ runner.temp }}/windows-client-msi/EndlessNet.Client.0.0.0.msi
+            ${{ runner.temp }}/windows-client-msi/EndlessNet.Client.0.0.0.msi.sha256
+          if-no-files-found: error
+          retention-days: 7

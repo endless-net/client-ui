@@ -1,4 +1,4 @@
-package client
+package packaging
 
 import (
 	"encoding/xml"
@@ -38,7 +38,7 @@ func DefaultWindowsInstallerOptions() WindowsInstallerOptions {
 		ClientExe:      `C:\Program Files\EndlessNet\endlessnet-client.exe`,
 		TrayExe:        `C:\Program Files\EndlessNet\endlessnet-tray.exe`,
 		TrayBundleDir:  `C:\Program Files\EndlessNet`,
-		IconFile:       filepath.Join("assets", "endlessnet", "tray.ico"),
+		IconFile:       filepath.Join("app", "assets", "icons", "tray.ico"),
 		OutputName:     "EndlessNet.Client.msi",
 		ServiceOptions: DefaultWindowsServiceOptions(),
 	}
@@ -367,42 +367,6 @@ if ($SignTool.Trim() -ne "" -and $CertificateThumbprint.Trim() -ne "") {
 		quotePowerShellSingle(opts.OutputName),
 		quotePowerShellSingle(opts.Version),
 	)
-}
-
-func windowsServiceAgentArgs(opts WindowsServiceOptions) []string {
-	args := []string{
-		"agent",
-		"--windows-service",
-		"--config", opts.ConfigPath,
-		"--output", opts.WGConfigPath,
-		"--state-output", opts.StatePath,
-		"--diagnostics-dir", opts.DiagnosticsDir,
-		"--interval", opts.Interval.String(),
-		"--timeout", opts.Timeout.String(),
-		"--stun-timeout", opts.STUNTimeout.String(),
-		"--reconnect-max-delay", opts.ReconnectMaxDelay.String(),
-		"--reconnect-jitter", fmt.Sprintf("%g", opts.ReconnectJitter),
-		"--ipc-pipe", opts.IPCPipe,
-		"--event-log-source", opts.EventLogSource,
-	}
-	if opts.Debug {
-		args = append(args, "--debug", "--debug-log-dir", opts.DebugLogDir)
-	}
-	if opts.ApplyWireGuard {
-		args = append(args, "--apply-wireguard", "--wireguard-windows", opts.WireGuardWindowsPath)
-	}
-	if opts.ListenPort > 0 {
-		args = append(args, "--listen-port", fmt.Sprintf("%d", opts.ListenPort))
-	}
-	return quoteWindowsServiceArguments(args)
-}
-
-func quoteWindowsServiceArguments(args []string) []string {
-	out := make([]string, 0, len(args))
-	for _, arg := range args {
-		out = append(out, `"`+strings.ReplaceAll(arg, `"`, `\"`)+`"`)
-	}
-	return out
 }
 
 func windowsParentPath(value string) string {
