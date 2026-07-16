@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:win32/win32.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'named_pipe_http.dart';
 import 'service_contract.dart';
 
 const _appTitle = 'EndlessNet';
@@ -442,127 +443,79 @@ EnrollmentRequest parseEnrollment(
 }
 
 class EndlessNetClientBridge {
-  EndlessNetClientBridge({required this.config, required this.logger});
+  EndlessNetClientBridge({
+    required this.config,
+    required this.logger,
+    NamedPipeHttpClient? ipc,
+  }) : _ipc =
+           ipc ??
+           NamedPipeHttpClient(
+             pipePath: config.pipe,
+             timeout: const Duration(seconds: 8),
+           );
 
   final AppConfig config;
   final AppLogger logger;
+  final NamedPipeHttpClient _ipc;
 
-  String get clientExe {
-    final dir = File(Platform.resolvedExecutable).parent.path;
-    return '$dir${Platform.pathSeparator}endlessnet-client.exe';
-  }
-
-  Future<Map<String, dynamic>> status() => _serviceJSON(['status']);
-  Future<Map<String, dynamic>> connect() => _serviceJSON(['connect']);
+  Future<Map<String, dynamic>> status() =>
+      _request('GET', ServiceIPCPath.status);
+  Future<Map<String, dynamic>> connect() =>
+      _request('POST', ServiceIPCPath.connect, body: {});
   Future<Map<String, dynamic>> serverIdentity() =>
-      _serviceJSON(['server-identity']);
-  Future<Map<String, dynamic>> trustServer(String confirmedKeyID) =>
-      _serviceJSON([
-        'trust-server',
-        '--yes',
-        '--confirmed-key-id',
-        confirmedKeyID,
-        '--timeout',
-        '2m',
-      ]);
-  Future<Map<String, dynamic>> disconnect() => _serviceJSON(['disconnect']);
-  Future<Map<String, dynamic>> logout() => _serviceJSON(['logout']);
-  Future<Map<String, dynamic>> networks() => _serviceJSON(['networks']);
-  Future<Map<String, dynamic>> diagnostics() => _serviceJSON(['diagnostics']);
-  Future<Map<String, dynamic>> recentLogs() => _serviceJSON(['logs-recent']);
+      _request('GET', ServiceIPCPath.serverIdentity);
+  Future<Map<String, dynamic>> trustServer(String confirmedKeyID) => _request(
+    'POST',
+    ServiceIPCPath.trustServer,
+    body: {'confirmed': true, 'confirmed_key_id': confirmedKeyID},
+  );
+  Future<Map<String, dynamic>> disconnect() =>
+      _request('POST', ServiceIPCPath.disconnect, body: {});
+  Future<Map<String, dynamic>> logout() =>
+      _request('POST', ServiceIPCPath.logout, body: {});
+  Future<Map<String, dynamic>> networks() =>
+      _request('GET', ServiceIPCPath.networks);
+  Future<Map<String, dynamic>> diagnostics() =>
+      _request('GET', ServiceIPCPath.diagnostics);
+  Future<Map<String, dynamic>> recentLogs() =>
+      _request('GET', ServiceIPCPath.recentLogs);
 
   Future<Map<String, dynamic>> selectNetwork(String networkID) {
-    return _serviceJSON(['select-network', '--network-id', networkID]);
+    return _request(
+      'POST',
+      ServiceIPCPath.selectNetwork,
+      body: {'network_id': networkID},
+    );
   }
 
   Future<Map<String, dynamic>> enroll(EnrollmentRequest request) {
-    final token = request.token.trim();
-    final args = [
-      'service',
-      'enroll',
-      '--json',
-      '--ipc-pipe',
-      config.pipe,
-      '--mode',
-      request.mode,
-      '--timeout',
-      '2m',
-    ];
-    if (token.isNotEmpty) {
-      args.addAll(['--join-token-file', '-']);
-    }
-    if (request.server.trim().isNotEmpty) {
-      args.addAll(['--server', request.server.trim()]);
-    }
-    return _runJSON(args, stdinText: token.isEmpty ? null : token);
+    return _request(
+      'POST',
+      ServiceIPCPath.enroll,
+      body: {
+        'join_token': request.token.trim(),
+        'server_url': request.server.trim(),
+        'mode': request.mode,
+      },
+      timeout: const Duration(minutes: 2),
+    );
   }
 
-  Future<Map<String, dynamic>> _serviceJSON(List<String> serviceArgs) {
-    return _runJSON([
-      'service',
-      ...serviceArgs,
-      '--ipc-pipe',
-      config.pipe,
-      '--timeout',
-      '8s',
-    ]);
-  }
-
-  Future<Map<String, dynamic>> _runJSON(
-    List<String> args, {
-    String? stdinText,
+  Future<Map<String, dynamic>> _request(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    Duration? timeout,
   }) async {
-    final exe = clientExe;
-    logger.info('running endlessnet-client ${redactArgs(args).join(' ')}');
-    if (!await File(exe).exists()) {
-      throw StateError(
-        'endlessnet-client.exe is missing next to the desktop app.',
-      );
-    }
-    final process = await Process.start(
-      exe,
-      args,
-      mode: ProcessStartMode.normal,
+    logger.info('service IPC $method $path');
+    final payload = await _ipc.request(
+      method,
+      path,
+      body: body,
+      requestTimeout: timeout,
     );
-    if (stdinText != null) {
-      process.stdin.write(stdinText);
-    }
-    await process.stdin.close();
-    final stdoutFuture = process.stdout.transform(utf8.decoder).join();
-    final stderrFuture = process.stderr.transform(utf8.decoder).join();
-    final code = await process.exitCode;
-    final out = await stdoutFuture;
-    final err = await stderrFuture;
-    logger.info(
-      'endlessnet-client exit=$code stdout=${out.trim().length} stderr=${err.trim().length}',
-    );
-    if (code != 0) {
-      throw StateError(
-        firstNonEmpty(
-          _jsonError(out),
-          err.trim(),
-          out.trim(),
-          'endlessnet-client failed with exit code $code',
-        ),
-      );
-    }
-    final decoded = jsonDecode(out.trim().isEmpty ? '{}' : out);
-    if (decoded is Map<String, dynamic>) {
-      return decoded;
-    }
-    throw StateError('endlessnet-client returned non-object JSON.');
-  }
-
-  String _jsonError(String text) {
-    try {
-      final decoded = jsonDecode(text);
-      if (decoded is Map && decoded['error'] != null) {
-        return decoded['error'].toString();
-      }
-    } catch (_) {
-      return '';
-    }
-    return '';
+    logger.info('service IPC $method $path completed');
+    return payload;
   }
 }
 
