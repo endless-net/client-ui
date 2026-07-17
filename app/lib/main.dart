@@ -994,15 +994,47 @@ class EndlessNetController extends ChangeNotifier
   Future<void> copyDiagnostics() async {
     try {
       final payload = await bridge.diagnostics();
-      final text = const JsonEncoder.withIndent(
-        '  ',
-      ).convert(redactDiagnostics(payload));
-      await Clipboard.setData(ClipboardData(text: text));
+      await copyDiagnosticsPayload(payload);
       await showMessageBox('EndlessNet diagnostics', 'Diagnostics copied.');
     } catch (err, stack) {
       logger.error('copy diagnostics failed', err, stack);
       await showMessageBox('EndlessNet diagnostics', safeErrorText(err));
     }
+  }
+
+  Future<void> copyDiagnosticsPayload(Map<String, dynamic> payload) async {
+    final text = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(redactDiagnostics(payload));
+    await Clipboard.setData(ClipboardData(text: text));
+  }
+
+  Future<void> showDiagnosticsDialog(BuildContext context) async {
+    busy = true;
+    errorText = null;
+    notifyListeners();
+    Map<String, dynamic>? payload;
+    try {
+      payload = await bridge.diagnostics();
+      logger.info('diagnostics loaded');
+    } catch (err, stack) {
+      errorText = safeErrorText(err);
+      logger.error('diagnostics failed', err, stack);
+      await messagePresenter('EndlessNet diagnostics', errorText!);
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+    if (payload == null || !context.mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => DiagnosticsDialog(
+        payload: payload!,
+        onCopy: () => copyDiagnosticsPayload(payload!),
+      ),
+    );
   }
 
   Future<void> showRecentLogsDialog() async {
@@ -1099,6 +1131,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = controller.statusPayload;
+    final agent = controller.serviceStatus.agent;
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FB),
       body: SafeArea(
@@ -1177,6 +1210,13 @@ class HomeScreen extends StatelessWidget {
                     label: const Text('Status'),
                   ),
                   OutlinedButton.icon(
+                    onPressed: controller.busy
+                        ? null
+                        : () => controller.showDiagnosticsDialog(context),
+                    icon: const Icon(Icons.monitor_heart_outlined),
+                    label: const Text('Diagnostics'),
+                  ),
+                  OutlinedButton.icon(
                     onPressed: controller.busy ? null : controller.openAdminURL,
                     icon: const Icon(Icons.open_in_browser),
                     label: const Text('Admin console'),
@@ -1192,55 +1232,62 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 22),
               Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: InfoPanel(
-                        title: 'This device',
-                        children: [
-                          InfoRow(
-                            label: 'Hostname',
-                            value: valueText(
-                              status?['hostname'] ??
-                                  nestedValue(status, 'agent', 'hostname'),
+                child: SingleChildScrollView(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: InfoPanel(
+                          title: 'This device',
+                          children: [
+                            InfoRow(
+                              label: 'Hostname',
+                              value: valueText(
+                                status?['hostname'] ??
+                                    nestedValue(status, 'agent', 'hostname'),
+                              ),
                             ),
-                          ),
-                          InfoRow(
-                            label: 'Overlay IP',
-                            value: valueText(
-                              status?['overlay_ip'] ??
-                                  nestedValue(status, 'agent', 'overlay_ip'),
+                            InfoRow(
+                              label: 'Overlay IP',
+                              value: valueText(
+                                status?['overlay_ip'] ??
+                                    nestedValue(status, 'agent', 'overlay_ip'),
+                              ),
                             ),
-                          ),
-                          InfoRow(
-                            label: 'Network',
-                            value: networkLabel(status),
-                          ),
-                          InfoRow(
-                            label: 'Map revision',
-                            value: valueText(status?['map_revision']),
-                          ),
-                          InfoRow(
-                            label: 'Peers',
-                            value: valueText(status?['peer_count']),
-                          ),
-                        ],
+                            InfoRow(
+                              label: 'Network',
+                              value: networkLabel(status),
+                            ),
+                            InfoRow(
+                              label: 'Map revision',
+                              value: valueText(status?['map_revision']),
+                            ),
+                            InfoRow(label: 'Engine', value: 'WireGuard Go'),
+                            InfoRow(
+                              label: 'Paths',
+                              value: selectedPathsLabel(agent),
+                            ),
+                            InfoRow(
+                              label: 'Discovery',
+                              value: discoveryHealthLabel(agent),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: InfoPanel(
-                        title: 'Network devices',
-                        children: [
-                          for (final peer in peerLabels(status))
-                            InfoRow(label: '', value: peer),
-                          if (peerLabels(status).isEmpty)
-                            const Text('No peer devices.'),
-                        ],
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: InfoPanel(
+                          title: 'Network devices',
+                          children: [
+                            for (final peer in peerLabels(status))
+                              InfoRow(label: '', value: peer),
+                            if (peerLabels(status).isEmpty)
+                              const Text('No peer devices.'),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               Row(
@@ -1380,6 +1427,177 @@ class InfoRow extends StatelessWidget {
   }
 }
 
+class DiagnosticsDialog extends StatelessWidget {
+  const DiagnosticsDialog({
+    super.key,
+    required this.payload,
+    required this.onCopy,
+  });
+
+  final Map<String, dynamic> payload;
+  final Future<void> Function() onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final diagnostics = ServiceDiagnostics(payload);
+    final stun = diagnostics.stun;
+    final paths = diagnostics.paths;
+    final window = MediaQuery.sizeOf(context);
+    final dialogWidth = (window.width - 96).clamp(320.0, 700.0).toDouble();
+    final dialogHeight = (window.height - 180).clamp(240.0, 500.0).toDouble();
+    return AlertDialog(
+      title: const Text('Connectivity diagnostics'),
+      content: SizedBox(
+        width: dialogWidth,
+        height: dialogHeight,
+        child: ListView(
+          children: [
+            InfoPanel(
+              title: 'Network discovery',
+              children: [
+                InfoRow(
+                  label: 'Generated',
+                  value: valueText(diagnostics.generatedAt),
+                ),
+                InfoRow(
+                  label: 'NAT',
+                  value: stun.present
+                      ? stunClassificationLabel(stun.classification)
+                      : 'Not reported by the service',
+                ),
+                InfoRow(label: 'STUN', value: stunHealthLabel(stun)),
+                InfoRow(
+                  label: 'Mapped IPs',
+                  value: stun.mappedAddresses.isEmpty
+                      ? '-'
+                      : stun.mappedAddresses.join(', '),
+                ),
+                InfoRow(
+                  label: 'Port map',
+                  value: portMappingSummary(stun.portMappings),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text('Peer paths', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            if (paths.isEmpty)
+              const Text('No peer path diagnostics are available.'),
+            for (final path in paths) PeerPathDiagnosticsTile(path: path),
+            const SizedBox(height: 16),
+            Text(
+              'STUN endpoints',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            if (stun.results.isEmpty)
+              const Text('No STUN endpoint results are available.'),
+            for (final result in stun.results)
+              DiagnosticsLine(
+                title: firstNonEmpty(result.id, result.address, 'STUN'),
+                value: stunResultLabel(result),
+              ),
+            if (stun.portMappings.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Port mappings',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              for (final mapping in stun.portMappings)
+                DiagnosticsLine(
+                  title: portMappingProtocolLabel(mapping.protocol),
+                  value: portMappingLabel(mapping),
+                ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton.icon(
+          onPressed: () async {
+            await onCopy();
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Diagnostics copied.')),
+              );
+            }
+          },
+          icon: const Icon(Icons.copy),
+          label: const Text('Copy redacted JSON'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
+class PeerPathDiagnosticsTile extends StatelessWidget {
+  const PeerPathDiagnosticsTile({super.key, required this.path});
+
+  final PeerPathStatus path;
+
+  @override
+  Widget build(BuildContext context) {
+    final endpoint = path.selectedEndpoint.isEmpty
+        ? ''
+        : ' via ${path.selectedEndpoint}';
+    final candidates = path.candidates.isEmpty
+        ? <PathCandidateStatus>[path.direct]
+        : path.candidates;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ExpansionTile(
+        title: Text(valueText(path.displayName, fallback: 'Unknown peer')),
+        subtitle: Text(
+          'Selected: ${selectedPathLabel(path.selectedPath)}$endpoint',
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (path.selectionReason.isNotEmpty)
+            DiagnosticsLine(title: 'Selection', value: path.selectionReason),
+          for (final candidate in candidates)
+            DiagnosticsLine(
+              title: candidateTitle(candidate),
+              value: candidateHealthLabel(candidate),
+            ),
+          if (path.relay.hasData)
+            DiagnosticsLine(
+              title: 'Relay',
+              value: candidateHealthLabel(path.relay),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class DiagnosticsLine extends StatelessWidget {
+  const DiagnosticsLine({super.key, required this.title, required this.value});
+
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 2),
+          Text(value, style: const TextStyle(color: Color(0xFF52647A))),
+        ],
+      ),
+    );
+  }
+}
+
 Future<void> showMessageBox(String title, String message) async {
   final context = navigatorKey.currentContext;
   if (context == null) {
@@ -1466,6 +1684,7 @@ void showNativeMessageBox(String title, String message) {
 }
 
 String statusSummary(Map<String, dynamic>? payload) {
+  final agent = ServiceStatus(payload).agent;
   return [
     'State: ${valueText(payload?['state'])}',
     'Account: ${valueText(payload?['account_id'])}',
@@ -1474,6 +1693,8 @@ String statusSummary(Map<String, dynamic>? payload) {
     'Hostname: ${valueText(payload?['hostname'])}',
     'Map revision: ${valueText(payload?['map_revision'])}',
     'Peers: ${valueText(payload?['peer_count'])}',
+    'Paths: ${selectedPathsLabel(agent)}',
+    'Discovery: ${discoveryHealthLabel(agent)}',
     'Last sync: ${valueText(nestedValue(payload, 'agent', 'generated_at'))}',
   ].join('\n');
 }
@@ -1528,27 +1749,214 @@ String networkLabel(Map<String, dynamic>? payload) {
 }
 
 List<String> peerLabels(Map<String, dynamic>? payload) {
-  final peers = nestedValue(payload, 'agent', 'peers');
-  if (peers is! List) {
-    return const [];
-  }
-  return peers
+  return ServiceStatus(payload).peerPaths
       .take(20)
       .map((peer) {
-        if (peer is! Map) {
-          return '$peer';
-        }
-        final name = firstNonEmpty(
-          '${peer['hostname'] ?? ''}',
-          '${peer['peer_id'] ?? ''}',
-        );
-        final path = valueText(peer['selected_path'], fallback: 'offline');
-        return path == 'none' || path == 'offline'
-            ? '$name - offline'
-            : '$name - $path';
+        final name = valueText(peer.displayName, fallback: 'Unknown peer');
+        return '$name - ${selectedPathLabel(peer.selectedPath)}';
       })
       .where((line) => line.trim().isNotEmpty)
       .toList();
+}
+
+String selectedPathsLabel(ServiceAgentStatus agent) {
+  if (!agent.present) {
+    return 'Waiting for agent state';
+  }
+  final labels = <String>[];
+  for (final path in const ['direct', 'relay', 'none']) {
+    final count = agent.selectedPathCounts[path] ?? 0;
+    if (count > 0) {
+      labels.add('$count ${selectedPathLabel(path).toLowerCase()}');
+    }
+  }
+  final known = const {'direct', 'relay', 'none'};
+  for (final entry in agent.selectedPathCounts.entries) {
+    if (!known.contains(entry.key) && entry.value > 0) {
+      labels.add('${entry.value} ${entry.key}');
+    }
+  }
+  return labels.isEmpty ? 'No peer paths' : labels.join(' · ');
+}
+
+String discoveryHealthLabel(ServiceAgentStatus agent) {
+  if (!agent.present) {
+    return 'Waiting for agent state';
+  }
+  final stun = switch (agent.stunOK) {
+    true => 'STUN reachable',
+    false => 'STUN unavailable',
+    null => 'STUN pending',
+  };
+  final relay = switch (agent.relayOK) {
+    true => 'relay available',
+    false => 'relay unavailable',
+    null => 'relay pending',
+  };
+  return '$stun · $relay';
+}
+
+String selectedPathLabel(String path) {
+  switch (path.trim().toLowerCase()) {
+    case 'direct':
+      return 'Direct';
+    case 'relay':
+      return 'Relay';
+    case 'none':
+    case 'offline':
+    case '':
+      return 'Offline';
+    default:
+      return path.trim();
+  }
+}
+
+String candidateTitle(PathCandidateStatus candidate) {
+  switch (candidate.tier.trim().toLowerCase()) {
+    case 'lan_direct':
+      return 'Local candidate';
+    case 'public_direct':
+      return 'Public candidate';
+    case 'punched_udp':
+      return 'Mapped candidate';
+    case 'relay':
+      return 'Relay';
+  }
+  return candidate.type.toLowerCase() == 'relay' ? 'Relay' : 'Direct candidate';
+}
+
+String candidateHealthLabel(PathCandidateStatus candidate) {
+  final parts = <String>[candidateStateLabel(candidate.state)];
+  if (candidate.endpoint.isNotEmpty) {
+    parts.add(candidate.endpoint);
+  }
+  final rtt = candidate.rttMS;
+  if (rtt != null && rtt > 0) {
+    parts.add('${rtt.toStringAsFixed(rtt >= 10 ? 0 : 1)} ms');
+  }
+  if (candidate.consecutiveFailures > 0) {
+    parts.add(
+      '${candidate.consecutiveFailures} consecutive '
+      '${candidate.consecutiveFailures == 1 ? 'failure' : 'failures'}',
+    );
+  }
+  if (candidate.reason.isNotEmpty) {
+    parts.add(candidate.reason);
+  }
+  return parts.where((part) => part.trim().isNotEmpty).join(' · ');
+}
+
+String candidateStateLabel(String state) {
+  switch (state.trim().toLowerCase()) {
+    case 'reachable':
+      return 'Reachable';
+    case 'untested':
+      return 'Testing';
+    case 'degraded':
+      return 'Degraded';
+    case 'failed':
+      return 'Failed';
+    case 'missing':
+      return 'Unavailable';
+    case '':
+      return 'Unknown';
+    default:
+      return state.trim();
+  }
+}
+
+String stunClassificationLabel(String classification) {
+  switch (classification.trim().toLowerCase()) {
+    case 'consistent_mapping':
+      return 'Stable mapped address';
+    case 'varying_mapping':
+      return 'Mapping varies by STUN server';
+    case 'unreachable':
+      return 'STUN unavailable';
+    case 'no_endpoints':
+      return 'No STUN endpoints';
+    case '':
+      return 'Unknown';
+    default:
+      return classification.replaceAll('_', ' ');
+  }
+}
+
+String stunHealthLabel(STUNDiagnostics stun) {
+  if (!stun.present) {
+    return 'Not reported by the service';
+  }
+  final summary = '${stun.reachableEndpoints}/${stun.totalEndpoints} reachable';
+  if (stun.error.isNotEmpty) {
+    return '$summary · ${stun.error}';
+  }
+  return summary;
+}
+
+String stunResultLabel(STUNResult result) {
+  final parts = <String>[];
+  parts.add(result.reachable ? 'Reachable' : 'Failed');
+  if (result.address.isNotEmpty) {
+    parts.add(result.address);
+  }
+  if (result.mappedAddress.isNotEmpty) {
+    parts.add('mapped ${result.mappedAddress}');
+  }
+  final duration = result.durationNanoseconds;
+  if (duration != null && duration > 0) {
+    final milliseconds = duration / 1000000;
+    parts.add('${milliseconds.toStringAsFixed(milliseconds >= 10 ? 0 : 1)} ms');
+  }
+  if (result.error.isNotEmpty) {
+    parts.add(result.error);
+  }
+  return parts.join(' · ');
+}
+
+String portMappingSummary(List<PortMappingStatus> mappings) {
+  if (mappings.isEmpty) {
+    return 'No PCP/NAT-PMP result';
+  }
+  final active = mappings.where((mapping) => mapping.ok).toList();
+  if (active.isEmpty) {
+    return 'No active mapping';
+  }
+  return active
+      .map(
+        (mapping) =>
+            '${portMappingProtocolLabel(mapping.protocol)} ${valueText(mapping.mappedEndpoint)}',
+      )
+      .join(' · ');
+}
+
+String portMappingProtocolLabel(String protocol) {
+  switch (protocol.trim().toLowerCase()) {
+    case 'pcp':
+      return 'PCP';
+    case 'nat_pmp':
+    case 'nat-pmp':
+      return 'NAT-PMP';
+    default:
+      return protocol.trim().isEmpty ? 'Port mapping' : protocol.toUpperCase();
+  }
+}
+
+String portMappingLabel(PortMappingStatus mapping) {
+  if (!mapping.ok) {
+    return firstNonEmpty(
+      mapping.error,
+      mapping.gateway.isEmpty ? '' : 'Gateway ${mapping.gateway}',
+      'Unavailable',
+    );
+  }
+  final parts = <String>[valueText(mapping.mappedEndpoint, fallback: 'Mapped')];
+  if (mapping.lifetimeSeconds > 0) {
+    parts.add('${mapping.lifetimeSeconds}s lease');
+  }
+  if (mapping.gateway.isNotEmpty) {
+    parts.add('gateway ${mapping.gateway}');
+  }
+  return parts.join(' · ');
 }
 
 bool isDeviceEnrolled(Map<String, dynamic>? payload) {

@@ -44,6 +44,7 @@ type Scenario struct {
 	SchemaVersion  int              `json:"schema_version"`
 	Name           string           `json:"name"`
 	InitialStatus  map[string]any   `json:"initial_status"`
+	Diagnostics    map[string]any   `json:"diagnostics"`
 	Networks       []map[string]any `json:"networks"`
 	ServerIdentity map[string]any   `json:"server_identity"`
 	Logs           []map[string]any `json:"logs"`
@@ -132,14 +133,75 @@ func DefaultScenario() Scenario {
 			"node_credential_present": true,
 			"private_key_present":     true,
 			"agent": map[string]any{
-				"node_id":    "node_emulator",
-				"network_id": "net_primary",
-				"overlay_ip": "100.64.0.10",
+				"state_present":        true,
+				"generated_at":         "2026-01-01T00:00:00Z",
+				"node_id":              "node_emulator",
+				"network_id":           "net_primary",
+				"overlay_ip":           "100.64.0.10",
+				"stun_ok":              true,
+				"relay_ok":             true,
+				"selected_path_counts": map[string]any{"direct": 1},
 				"peers": []any{
 					map[string]any{
-						"peer_id":       "node_peer_a",
-						"hostname":      "peer-a",
-						"selected_path": "direct",
+						"peer_id":           "node_peer_a",
+						"hostname":          "peer-a",
+						"selected_path":     "direct",
+						"selected_endpoint": "192.168.1.20:51820",
+						"direct": map[string]any{
+							"type": "direct", "tier": "lan_direct", "state": "reachable",
+							"endpoint": "192.168.1.20:51820", "rtt_ms": 4.2,
+						},
+						"relay": map[string]any{
+							"type": "relay", "tier": "relay", "state": "reachable",
+							"endpoint": "relay.example.test:443", "protocol": "tcp",
+						},
+					},
+				},
+			},
+		},
+		Diagnostics: map[string]any{
+			"agent_state": map[string]any{
+				"generated_at": "2026-01-01T00:00:00Z",
+				"stun": map[string]any{
+					"ok": true,
+					"results": []any{
+						map[string]any{
+							"id": "stun-primary", "addr": "stun.example.test:3478",
+							"reachable": true, "mapped_address": "198.51.100.10:51820",
+							"duration": 12000000,
+						},
+					},
+					"nat": map[string]any{
+						"classification": "consistent_mapping", "total_endpoints": 1,
+						"reachable_endpoints": 1, "mapped_addresses": []any{"198.51.100.10:51820"},
+					},
+					"port_mappings": []any{
+						map[string]any{
+							"protocol": "pcp", "gateway": "192.168.1.1:5351", "ok": true,
+							"internal_port": 51820, "external_port": 51820,
+							"mapped_endpoint": "198.51.100.10:51820", "lifetime_seconds": 120,
+						},
+					},
+				},
+				"paths": []any{
+					map[string]any{
+						"peer_id": "node_peer_a", "hostname": "peer-a", "selected_path": "direct",
+						"selected_endpoint": "192.168.1.20:51820",
+						"selection_reason":  "authenticated direct path selected after successful candidate probe",
+						"candidates": []any{
+							map[string]any{
+								"type": "direct", "tier": "lan_direct", "state": "reachable",
+								"endpoint": "192.168.1.20:51820", "rtt_ms": 4.2,
+							},
+						},
+						"direct": map[string]any{
+							"type": "direct", "tier": "lan_direct", "state": "reachable",
+							"endpoint": "192.168.1.20:51820", "rtt_ms": 4.2,
+						},
+						"relay": map[string]any{
+							"type": "relay", "tier": "relay", "state": "reachable",
+							"endpoint": "relay.example.test:443", "protocol": "tcp",
+						},
 					},
 				},
 			},
@@ -195,6 +257,7 @@ func LoadScenario(r io.Reader) (Scenario, error) {
 		scenario.Name = overlay.Name
 	}
 	mergeMap(scenario.InitialStatus, overlay.InitialStatus)
+	mergeMap(scenario.Diagnostics, overlay.Diagnostics)
 	if overlay.Networks != nil {
 		scenario.Networks = overlay.Networks
 	}
@@ -458,12 +521,14 @@ func (e *Engine) builtin(method string, requestURL *url.URL, body map[string]any
 	case "/network/select":
 		return e.selectNetwork(body)
 	case "/diagnostics":
-		return jsonResult(http.StatusOK, map[string]any{
+		payload := cloneMap(e.scenario.Diagnostics)
+		mergeMap(payload, map[string]any{
 			"generated_at": time.Now().UTC().Format(time.RFC3339Nano),
-			"bundle_path":  `C:\Temp\endlessnet-emulator-diagnostics.zip`,
+			"bundle_path":  `C:\Temp\endlessnet-emulator-diagnostics.json`,
 			"status":       e.status,
 			"recent_logs":  e.scenario.Logs,
 		})
+		return jsonResult(http.StatusOK, payload)
 	case "/logs/recent":
 		return e.logsResult(requestURL.Query())
 	default:

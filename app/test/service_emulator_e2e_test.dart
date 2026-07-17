@@ -53,6 +53,11 @@ void main() {
       final diagnostics = await bridge.diagnostics();
       expect(diagnostics['status'], isA<Map<String, dynamic>>());
       expect(diagnostics['recent_logs'], isNotEmpty);
+      final agentState = diagnostics['agent_state'] as Map<String, dynamic>;
+      expect(agentState['paths'], isNotEmpty);
+      final stun = agentState['stun'] as Map<String, dynamic>;
+      expect(stun['results'], isNotEmpty);
+      expect(stun['port_mappings'], isNotEmpty);
       final logs = await bridge.recentLogs();
       expect(logs['logs'], isNotEmpty);
 

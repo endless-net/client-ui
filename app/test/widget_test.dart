@@ -108,4 +108,90 @@ void main() {
     });
     expect(identityChanged.serverIdentityChanged, isTrue);
   });
+
+  test('ServiceStatus parses selected paths and relay fallback', () {
+    final status = ServiceStatus({
+      'agent': {
+        'state_present': true,
+        'stun_ok': true,
+        'relay_ok': true,
+        'selected_path_counts': {'direct': 1, 'relay': 1},
+        'peers': [
+          {
+            'peer_id': 'peer-direct',
+            'hostname': 'peer-a',
+            'selected_path': 'direct',
+            'selected_endpoint': '192.168.1.20:51820',
+            'candidates': [
+              {
+                'type': 'direct',
+                'tier': 'lan_direct',
+                'state': 'reachable',
+                'endpoint': '192.168.1.20:51820',
+                'rtt_ms': 4.5,
+              },
+            ],
+          },
+          {
+            'peer_id': 'peer-relay',
+            'hostname': 'older-peer',
+            'selected_path': 'relay',
+            'selection_reason':
+                'relay-first path established while direct candidates are probed',
+            'direct': {'type': 'direct', 'state': 'untested'},
+            'relay': {
+              'type': 'relay',
+              'state': 'reachable',
+              'endpoint': 'relay.example.test:443',
+            },
+          },
+        ],
+      },
+    });
+
+    expect(status.peerPaths, hasLength(2));
+    expect(status.peerPaths.first.candidates.single.rttMS, 4.5);
+    expect(status.peerPaths.last.selectedPath, 'relay');
+    expect(selectedPathsLabel(status.agent), '1 direct · 1 relay');
+    expect(peerLabels(status.payload), contains('older-peer - Relay'));
+  });
+
+  test('ServiceDiagnostics parses STUN and PCP/NAT-PMP results', () {
+    final diagnostics = ServiceDiagnostics({
+      'agent_state': {
+        'stun': {
+          'ok': true,
+          'results': [
+            {
+              'id': 'stun-1',
+              'reachable': true,
+              'mapped_address': '198.51.100.10:51820',
+              'duration': 10000000,
+            },
+          ],
+          'nat': {
+            'classification': 'consistent_mapping',
+            'total_endpoints': 1,
+            'reachable_endpoints': 1,
+          },
+          'port_mappings': [
+            {
+              'protocol': 'nat_pmp',
+              'ok': true,
+              'mapped_endpoint': '198.51.100.10:51820',
+              'lifetime_seconds': 120,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(diagnostics.stun.classification, 'consistent_mapping');
+    expect(diagnostics.stun.results.single.reachable, isTrue);
+    expect(diagnostics.stun.portMappings.single.protocol, 'nat_pmp');
+    expect(
+      portMappingSummary(diagnostics.stun.portMappings),
+      'NAT-PMP 198.51.100.10:51820',
+    );
+  });
 }

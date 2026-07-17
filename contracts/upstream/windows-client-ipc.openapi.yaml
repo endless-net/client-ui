@@ -6,7 +6,7 @@ info:
   version: 1.0.0
   description: >
     Versioned local IPC contract between the EndlessNet background service and
-    unprivileged client UI processes. The HTTP shape is transported over a
+    unprivileged local client processes. The HTTP shape is transported over a
     protected local channel; it is not a network listener.
 servers:
   - url: http://endlessnet.local

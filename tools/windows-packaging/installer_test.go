@@ -84,7 +84,6 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`--diagnostics-dir`,
 		`--event-log-source`,
 		`--debug-log-dir`,
-		`--userspace-wireguard`,
 		`<util:ServiceConfig`,
 		`FirstFailureActionType="restart"`,
 		`SecondFailureActionType="restart"`,
@@ -120,6 +119,10 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`EndlessNetTray`,
 		`TrayExe`,
 		`TrayBundleDir`,
+		`--userspace-wireguard`,
+		`--apply-wireguard`,
+		`--apply-wg-quick`,
+		`--wireguard-windows`,
 	} {
 		if strings.Contains(artifacts.WixSource, forbidden) {
 			t.Fatalf("WiX source contains forbidden placeholder/license marker %q:\n%s", forbidden, artifacts.WixSource)

@@ -108,8 +108,28 @@ void main() {
     expect(find.text(ServiceState.connected), findsOneWidget);
     expect(find.text('100.64.0.42'), findsOneWidget);
     expect(find.text('prod'), findsOneWidget);
-    expect(find.text('peer-a - direct'), findsOneWidget);
+    expect(find.text('peer-a - Direct'), findsOneWidget);
     expect(find.text('Disconnect'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Diagnostics'));
+    await tester.pumpAndSettle();
+    expect(find.text('Connectivity diagnostics'), findsOneWidget);
+    expect(find.text('Stable mapped address'), findsOneWidget);
+    expect(find.text('PCP 198.51.100.42:51820'), findsOneWidget);
+    expect(
+      find.text('Selected: Direct via 192.168.1.42:51820'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('peer-a').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Local candidate'), findsOneWidget);
+    expect(
+      find.textContaining('authenticated direct path selected'),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Close'));
+    await tester.pumpAndSettle();
+    expect(bridge.calls, contains('diagnostics'));
 
     await tester.tap(find.widgetWithText(OutlinedButton, 'Disconnect'));
     await tester.pumpAndSettle();
@@ -122,6 +142,37 @@ void main() {
     expect(bridge.calls, contains('connect'));
     expect(find.text(ServiceState.connected), findsOneWidget);
     expect(find.text('Disconnect'), findsOneWidget);
+  });
+
+  testWidgets('connectivity UI fits the minimum desktop window', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(620, 460);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final bridge = ContractFakeBridge();
+    final controller = EndlessNetController(
+      config: AppConfig.parse(const []),
+      bridge: bridge,
+      logger: AppLogger('', enabled: false),
+      desktopIntegrationEnabled: false,
+    );
+    addTearDown(controller.exitApp);
+    controller.statusPayload = bridge.statusPayload;
+
+    await tester.pumpWidget(EndlessNetApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text('EndlessNet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Diagnostics'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Connectivity diagnostics'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Connect this device creates and opens an enrollment request', (
@@ -350,6 +401,83 @@ class ContractFakeBridge extends EndlessNetClientBridge {
     );
     return statusPayload;
   }
+
+  @override
+  Future<Map<String, dynamic>> diagnostics() async {
+    calls.add('diagnostics');
+    return {
+      'ipc_protocol': 'endlessnet-client-ipc',
+      'ipc_version': 1,
+      'ipc_min_supported_version': 1,
+      'generated_at': '2026-07-17T12:00:00Z',
+      'status': statusPayload,
+      'agent_state': {
+        'generated_at': '2026-07-17T12:00:00Z',
+        'stun': {
+          'ok': true,
+          'results': [
+            {
+              'id': 'stun-primary',
+              'addr': 'stun.example.test:3478',
+              'reachable': true,
+              'mapped_address': '198.51.100.42:51820',
+              'duration': 12500000,
+            },
+          ],
+          'nat': {
+            'classification': 'consistent_mapping',
+            'total_endpoints': 1,
+            'reachable_endpoints': 1,
+            'mapped_addresses': ['198.51.100.42:51820'],
+          },
+          'port_mappings': [
+            {
+              'protocol': 'pcp',
+              'gateway': '192.168.1.1:5351',
+              'ok': true,
+              'internal_port': 51820,
+              'external_port': 51820,
+              'mapped_endpoint': '198.51.100.42:51820',
+              'lifetime_seconds': 120,
+            },
+          ],
+        },
+        'paths': [
+          {
+            'peer_id': 'node_peer_a',
+            'hostname': 'peer-a',
+            'selected_path': 'direct',
+            'selected_endpoint': '192.168.1.42:51820',
+            'selection_reason':
+                'authenticated direct path selected after successful candidate probe',
+            'direct': {
+              'type': 'direct',
+              'tier': 'lan_direct',
+              'state': 'reachable',
+              'endpoint': '192.168.1.42:51820',
+              'rtt_ms': 4.2,
+            },
+            'candidates': [
+              {
+                'type': 'direct',
+                'tier': 'lan_direct',
+                'state': 'reachable',
+                'endpoint': '192.168.1.42:51820',
+                'rtt_ms': 4.2,
+              },
+            ],
+            'relay': {
+              'type': 'relay',
+              'tier': 'relay',
+              'state': 'reachable',
+              'endpoint': 'relay.example.test:443',
+              'protocol': 'tcp',
+            },
+          },
+        ],
+      },
+    };
+  }
 }
 
 Map<String, dynamic> _contractStatus({
@@ -387,14 +515,32 @@ Map<String, dynamic> _contractStatus({
     'map_revision': 7,
     'peer_count': 1,
     'agent': {
+      'state_present': true,
       'node_id': 'node_ui_e2e',
       'network_id': 'net_prod',
       'overlay_ip': '100.64.0.42',
+      'stun_ok': true,
+      'relay_ok': true,
+      'selected_path_counts': {'direct': 1},
       'peers': [
         {
           'peer_id': 'node_peer_a',
           'hostname': 'peer-a',
           'selected_path': 'direct',
+          'selected_endpoint': '192.168.1.42:51820',
+          'direct': {
+            'type': 'direct',
+            'tier': 'lan_direct',
+            'state': 'reachable',
+            'endpoint': '192.168.1.42:51820',
+            'rtt_ms': 4.2,
+          },
+          'relay': {
+            'type': 'relay',
+            'tier': 'relay',
+            'state': 'reachable',
+            'endpoint': 'relay.example.test:443',
+          },
         },
       ],
     },

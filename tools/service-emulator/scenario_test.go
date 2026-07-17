@@ -94,8 +94,13 @@ func TestDefaultEngineImplementsContractSurface(t *testing.T) {
 
 	diagnostics := decodeResult(t, engine.Handle(http.MethodGet, "/diagnostics", nil))
 	assertEnvelope(t, diagnostics)
-	if diagnostics["status"] == nil || diagnostics["recent_logs"] == nil {
-		t.Fatal("diagnostics response omitted status or recent_logs")
+	if diagnostics["status"] == nil || diagnostics["recent_logs"] == nil || diagnostics["agent_state"] == nil {
+		t.Fatal("diagnostics response omitted status, recent_logs, or agent_state")
+	}
+	agentState := diagnostics["agent_state"].(map[string]any)
+	stun := agentState["stun"].(map[string]any)
+	if len(stun["port_mappings"].([]any)) != 1 || len(agentState["paths"].([]any)) != 1 {
+		t.Fatalf("diagnostics response omitted v0.2.0 path or port mapping data: %#v", agentState)
 	}
 	logs := decodeResult(t, engine.Handle(http.MethodGet, "/logs/recent?limit=1", nil))
 	assertEnvelope(t, logs)
