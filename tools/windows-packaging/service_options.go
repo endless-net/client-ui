@@ -15,47 +15,45 @@ const (
 // WindowsServiceOptions describes the installed Go service contract consumed
 // by the WiX package. It is build metadata; it is not part of the Flutter app.
 type WindowsServiceOptions struct {
-	ServiceName        string
-	DisplayName        string
-	Description        string
-	BinaryPath         string
-	ConfigPath         string
-	WGConfigPath       string
-	StatePath          string
-	DiagnosticsDir     string
-	IPCPipe            string
-	EventLogSource     string
-	Interval           time.Duration
-	Timeout            time.Duration
-	STUNTimeout        time.Duration
-	ListenPort         int
-	ReconnectMaxDelay  time.Duration
-	ReconnectJitter    float64
-	UserspaceWireGuard bool
-	Debug              bool
-	DebugLogDir        string
+	ServiceName       string
+	DisplayName       string
+	Description       string
+	BinaryPath        string
+	ConfigPath        string
+	WGConfigPath      string
+	StatePath         string
+	DiagnosticsDir    string
+	IPCPipe           string
+	EventLogSource    string
+	Interval          time.Duration
+	Timeout           time.Duration
+	STUNTimeout       time.Duration
+	ListenPort        int
+	ReconnectMaxDelay time.Duration
+	ReconnectJitter   float64
+	Debug             bool
+	DebugLogDir       string
 }
 
 func DefaultWindowsServiceOptions() WindowsServiceOptions {
 	return WindowsServiceOptions{
-		ServiceName:        "endlessnet-client",
-		DisplayName:        "EndlessNet Client",
-		Description:        "EndlessNet client agent",
-		BinaryPath:         `C:\Program Files\EndlessNet\endlessnet-client.exe`,
-		ConfigPath:         `C:\ProgramData\EndlessNet\client.json`,
-		WGConfigPath:       `C:\ProgramData\EndlessNet\endlessnet.conf`,
-		StatePath:          `C:\ProgramData\EndlessNet\agent-state.json`,
-		DiagnosticsDir:     `C:\ProgramData\EndlessNet\Diagnostics`,
-		IPCPipe:            DefaultWindowsServicePipeName,
-		EventLogSource:     DefaultWindowsEventLogSource,
-		Interval:           30 * time.Second,
-		Timeout:            10 * time.Second,
-		STUNTimeout:        2 * time.Second,
-		ReconnectMaxDelay:  5 * time.Minute,
-		ReconnectJitter:    0.2,
-		UserspaceWireGuard: true,
-		Debug:              true,
-		DebugLogDir:        DefaultDebugLogDir,
+		ServiceName:       "endlessnet-client",
+		DisplayName:       "EndlessNet Client",
+		Description:       "EndlessNet client agent",
+		BinaryPath:        `C:\Program Files\EndlessNet\endlessnet-client.exe`,
+		ConfigPath:        `C:\ProgramData\EndlessNet\client.json`,
+		WGConfigPath:      `C:\ProgramData\EndlessNet\endlessnet.conf`,
+		StatePath:         `C:\ProgramData\EndlessNet\agent-state.json`,
+		DiagnosticsDir:    `C:\ProgramData\EndlessNet\Diagnostics`,
+		IPCPipe:           DefaultWindowsServicePipeName,
+		EventLogSource:    DefaultWindowsEventLogSource,
+		Interval:          30 * time.Second,
+		Timeout:           10 * time.Second,
+		STUNTimeout:       2 * time.Second,
+		ReconnectMaxDelay: 5 * time.Minute,
+		ReconnectJitter:   0.2,
+		Debug:             true,
+		DebugLogDir:       DefaultDebugLogDir,
 	}
 }
 
@@ -115,9 +113,6 @@ func windowsServiceAgentArgs(opts WindowsServiceOptions) []string {
 	}
 	if opts.Debug {
 		args = append(args, "--debug", "--debug-log-dir", opts.DebugLogDir)
-	}
-	if opts.UserspaceWireGuard {
-		args = append(args, "--userspace-wireguard")
 	}
 	if opts.ListenPort > 0 {
 		args = append(args, "--listen-port", fmt.Sprintf("%d", opts.ListenPort))

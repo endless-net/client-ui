@@ -64,11 +64,11 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`Component Id="ClientExecutable" Guid="*" Bitness="always64"`,
 		`Component Id="AppExecutable" Guid="*" Bitness="always64"`,
 		`Component Id="AppIcon" Guid="*" Bitness="always64"`,
-		`Directory Id="AppDataFolder" Name="data"`,
+		`Directory Id="EndlessNetAppDataFolder" Name="data"`,
 		`ComponentGroup Id="EndlessNetAppBundleFiles" Directory="INSTALLFOLDER"`,
 		`<Files Include="$(var.AppBundleDir)\*.dll" />`,
 		`<Files Include="$(var.AppBundleDir)\native_assets.json" />`,
-		`ComponentGroup Id="EndlessNetAppDataFiles" Directory="AppDataFolder"`,
+		`ComponentGroup Id="EndlessNetAppDataFiles" Directory="EndlessNetAppDataFolder"`,
 		`<Files Include="$(var.AppBundleDir)\data\**" />`,
 		`Component Id="DeepLinkProtocol" Guid="*" Bitness="always64"`,
 		`Software\Microsoft\Windows\CurrentVersion\Run`,
@@ -84,7 +84,6 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`--diagnostics-dir`,
 		`--event-log-source`,
 		`--debug-log-dir`,
-		`--userspace-wireguard`,
 		`<util:ServiceConfig`,
 		`FirstFailureActionType="restart"`,
 		`SecondFailureActionType="restart"`,
@@ -120,6 +119,11 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`EndlessNetTray`,
 		`TrayExe`,
 		`TrayBundleDir`,
+		`--userspace-wireguard`,
+		`--apply-wireguard`,
+		`--apply-wg-quick`,
+		`--wireguard-windows`,
+		`Directory Id="AppDataFolder"`,
 	} {
 		if strings.Contains(artifacts.WixSource, forbidden) {
 			t.Fatalf("WiX source contains forbidden placeholder/license marker %q:\n%s", forbidden, artifacts.WixSource)

@@ -27,6 +27,25 @@ state transitions and fault injection, and records a redacted JSONL request
 journal. See [`tools/service-emulator/README.md`](tools/service-emulator/README.md)
 for manual UI testing and custom scenarios.
 
+## Backend v0.2.0 integration
+
+The packaged v0.2.0 service runs WireGuard Go as its only tunnel engine. The
+MSI does not pass a backend-selection flag or fix the UDP listen port. Wintun
+remains a required, verified runtime dependency beside `endlessnet-client.exe`.
+
+Peers start on relay, authenticated probes evaluate local, STUN, PCP, and
+NAT-PMP candidates, and the service promotes a reachable direct path using
+latency hysteresis. A failed direct path returns to relay. Mixed-version peers
+remaining on relay is expected compatibility behavior, not by itself an error.
+
+The UI reads selected paths and candidate health from the producer's
+`status.agent` extension and reads the full STUN, port-mapping, and path snapshot
+from `diagnostics.agent_state`. The IPC version remains v1. The current OpenAPI
+contract permits these objects through `additionalProperties` but does not yet
+define their nested schemas; the UI therefore treats absent extension data as
+"not reported" instead of synthesizing it. Formal nested diagnostics schemas
+are a producer-contract follow-up, not a blocker for v0.2.0.
+
 Build an unsigned validation MSI from a previously verified Go-core artifact:
 
 ```powershell
@@ -39,6 +58,10 @@ Production releases are initiated by an immutable `repository_dispatch` from
 the backend release workflow. They sign both executables and the final MSI,
 publish private release provenance, mirror public artifacts through
 `unng-lab/endlessnetfront`, and trigger `unng-lab/endlessnet-system-tests`.
+The owning workflow uses `scripts/resolve-release-idempotency.ps1` to distinguish
+an expected missing release (continue with `noop=false`) from real GitHub CLI or
+API failures. Existing releases are no-ops only when their provenance names the
+same immutable core manifest.
 
 ## Release configuration
 

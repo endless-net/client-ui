@@ -11,7 +11,8 @@ The built-in stateful model implements every path in
 - connect, disconnect, logout, and enrollment transitions;
 - server identity inspection and explicit trust recovery;
 - network listing and selection;
-- redacted diagnostics and recent logs.
+- redacted diagnostics with v0.2.0 path, STUN, and port-mapping fixtures, plus
+  recent logs.
 
 ## Quick start
 
@@ -65,6 +66,7 @@ Top-level fields:
 | `schema_version` | Required; currently `1`. |
 | `name` | Human-readable scenario name. |
 | `initial_status` | Recursive overlay on the initial status. A `null` value removes a field. |
+| `diagnostics` | Recursive overlay on the built-in `agent_state` diagnostics fixture. |
 | `networks` | Replaces the built-in network list. |
 | `server_identity` | Recursive overlay on the signing identity response. |
 | `logs` | Replaces redacted recent log entries. |
