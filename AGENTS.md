@@ -2,8 +2,9 @@
 
 - This repository owns the EndlessNet Flutter desktop UI, Windows packaging,
   code signing, WinGet manifests, and Windows client releases.
-- The Go runtime client and the producer IPC contract remain in
-  `unng-lab/endlessnet`; never copy backend runtime source into this repository.
+- The Go runtime client and the producer IPC contract are owned by
+  `unng-lab/endlessnet-client`; never copy client-core runtime source into this
+  repository.
 - Runtime UI communication must use the protected local named pipe directly.
   Do not launch `endlessnet-client.exe` as an IPC adapter and do not read the
   backend's private state files.

@@ -6,7 +6,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Version,
     [Parameter(Mandatory = $true)]
-    [string]$BackendCommit,
+    [string]$ClientCommit,
     [Parameter(Mandatory = $true)]
     [string]$OutputDir,
     [Parameter(Mandatory = $true)]
@@ -18,8 +18,8 @@ $ErrorActionPreference = "Stop"
 if ($ManifestSHA256 -notmatch '^[a-fA-F0-9]{64}$') {
     throw "manifest_sha256 must be a 64-character hexadecimal digest"
 }
-if ($BackendCommit -notmatch '^[a-fA-F0-9]{40}$') {
-    throw "backend_commit must be a full Git commit SHA"
+if ($ClientCommit -notmatch '^[a-fA-F0-9]{40}$') {
+    throw "client_commit must be a full Git commit SHA"
 }
 if ($Version -notmatch '^\d+\.\d+\.\d+$') {
     throw "version must be a release version without a v prefix"
@@ -30,14 +30,14 @@ New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 $manifestPath = Join-Path $OutputDir "client-core-manifest.json"
 $tag = "v$Version"
 $manifestAsset = "endlessnet-client_windows_amd64.manifest.json"
-$expectedManifestUrl = "https://github.com/unng-lab/endlessnet/releases/download/$tag/$manifestAsset"
+$expectedManifestUrl = "https://github.com/unng-lab/endlessnet-client/releases/download/$tag/$manifestAsset"
 if ($ManifestUrl -ne $expectedManifestUrl) {
-    throw "client core manifest URL is not the immutable backend release path"
+    throw "client core manifest URL is not the immutable client release path"
 }
 $savedGitHubToken = $env:GH_TOKEN
 try {
     $env:GH_TOKEN = $GitHubToken
-    & gh release download $tag --repo unng-lab/endlessnet --pattern $manifestAsset --dir $OutputDir --clobber
+    & gh release download $tag --repo unng-lab/endlessnet-client --pattern $manifestAsset --dir $OutputDir --clobber
     if ($LASTEXITCODE -ne 0) { throw "failed to download the client core manifest" }
     Move-Item -LiteralPath (Join-Path $OutputDir $manifestAsset) -Destination $manifestPath -Force
 } finally {
@@ -50,11 +50,11 @@ if ($actualManifestSHA256 -ne $ManifestSHA256.ToLowerInvariant()) {
 }
 
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.schema_version -ne 1 -or $manifest.repository -ne "unng-lab/endlessnet") {
+if ($manifest.schema_version -ne 1 -or $manifest.repository -ne "unng-lab/endlessnet-client") {
     throw "unsupported client core manifest producer or schema"
 }
-if ($manifest.version -ne $Version -or $manifest.commit -ne $BackendCommit.ToLowerInvariant()) {
-    throw "client core manifest version or backend commit mismatch"
+if ($manifest.version -ne $Version -or $manifest.commit -ne $ClientCommit.ToLowerInvariant()) {
+    throw "client core manifest version or client commit mismatch"
 }
 if ($manifest.target -ne "windows/amd64" -or $manifest.ipc_version -ne "v1") {
     throw "client core manifest target or IPC version mismatch"
@@ -62,10 +62,10 @@ if ($manifest.target -ne "windows/amd64" -or $manifest.ipc_version -ne "v1") {
 if ($manifest.artifacts.client.sha256 -notmatch '^[a-fA-F0-9]{64}$') {
     throw "client core manifest has an invalid executable digest"
 }
-$expectedClientUrl = "https://github.com/unng-lab/endlessnet/releases/download/$tag/endlessnet-client_windows_amd64.exe"
-$expectedContractUrl = "https://github.com/unng-lab/endlessnet/releases/download/$tag/windows-client-ipc.openapi.yaml"
+$expectedClientUrl = "https://github.com/unng-lab/endlessnet-client/releases/download/$tag/endlessnet-client_windows_amd64.exe"
+$expectedContractUrl = "https://github.com/unng-lab/endlessnet-client/releases/download/$tag/windows-client-ipc.openapi.yaml"
 if ($manifest.artifacts.client.url -ne $expectedClientUrl -or $manifest.artifacts.ipc_contract.url -ne $expectedContractUrl) {
-    throw "client core artifacts do not use immutable backend release paths"
+    throw "client core artifacts do not use immutable client release paths"
 }
 
 $clientPath = Join-Path $OutputDir "endlessnet-client_windows_amd64.exe"
@@ -73,7 +73,7 @@ $contractPath = Join-Path $OutputDir "windows-client-ipc.openapi.yaml"
 $savedGitHubToken = $env:GH_TOKEN
 try {
     $env:GH_TOKEN = $GitHubToken
-    & gh release download $tag --repo unng-lab/endlessnet --pattern "endlessnet-client_windows_amd64.exe" --pattern "windows-client-ipc.openapi.yaml" --dir $OutputDir --clobber
+    & gh release download $tag --repo unng-lab/endlessnet-client --pattern "endlessnet-client_windows_amd64.exe" --pattern "windows-client-ipc.openapi.yaml" --dir $OutputDir --clobber
     if ($LASTEXITCODE -ne 0) { throw "failed to download client core artifacts" }
 } finally {
     $env:GH_TOKEN = $savedGitHubToken

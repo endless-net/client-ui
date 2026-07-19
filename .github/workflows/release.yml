@@ -2,7 +2,7 @@ name: Release Windows client
 
 on:
   repository_dispatch:
-    types: [backend-client-core-published]
+    types: [client-core-published]
 
 permissions:
   contents: write
@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 90
     env:
       VERSION: ${{ github.event.client_payload.version }}
-      BACKEND_COMMIT: ${{ github.event.client_payload.backend_commit }}
+      CLIENT_COMMIT: ${{ github.event.client_payload.client_commit }}
       CORE_MANIFEST_URL: ${{ github.event.client_payload.manifest_url }}
       CORE_MANIFEST_SHA256: ${{ github.event.client_payload.manifest_sha256 }}
       GH_TOKEN: ${{ github.token }}
@@ -31,7 +31,7 @@ jobs:
         run: >-
           ./scripts/resolve-release-idempotency.ps1
           -Version $env:VERSION
-          -BackendCommit $env:BACKEND_COMMIT
+          -ClientCommit $env:CLIENT_COMMIT
           -CoreManifestSHA256 $env:CORE_MANIFEST_SHA256
 
       - uses: actions/setup-go@v6
@@ -71,16 +71,16 @@ jobs:
       - name: Resolve immutable Go core
         if: steps.idempotency.outputs.noop != 'true'
         env:
-          BACKEND_RELEASE_TOKEN: ${{ secrets.BACKEND_RELEASE_TOKEN }}
+          CLIENT_CORE_RELEASE_TOKEN: ${{ secrets.CLIENT_CORE_RELEASE_TOKEN }}
         shell: pwsh
         run: >-
           ./scripts/resolve-client-core.ps1
           -ManifestUrl $env:CORE_MANIFEST_URL
           -ManifestSHA256 $env:CORE_MANIFEST_SHA256
           -Version $env:VERSION
-          -BackendCommit $env:BACKEND_COMMIT
+          -ClientCommit $env:CLIENT_COMMIT
           -OutputDir "$env:RUNNER_TEMP/client-core"
-          -GitHubToken $env:BACKEND_RELEASE_TOKEN
+          -GitHubToken $env:CLIENT_CORE_RELEASE_TOKEN
 
       - name: Test UI against released IPC contract
         if: steps.idempotency.outputs.noop != 'true'
@@ -199,7 +199,7 @@ jobs:
             --repo unng-lab/endlessnet-client-ui `
             --target $env:GITHUB_SHA `
             --title "EndlessNet Client $tag" `
-            --notes "Automated signed Windows client release from backend $env:BACKEND_COMMIT." `
+            --notes "Automated signed Windows client release from client core $env:CLIENT_COMMIT." `
             "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:VERSION.msi" `
             "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:VERSION.msi.sha256" `
             "$env:RUNNER_TEMP/release/endlessnet-client.exe" `
@@ -224,7 +224,7 @@ jobs:
               version = $env:VERSION
               tag = "v$env:VERSION"
               ui_commit = $env:GITHUB_SHA
-              backend_commit = $env:BACKEND_COMMIT
+              client_commit = $env:CLIENT_COMMIT
               release_repository = "unng-lab/endlessnet-client-ui"
               msi_asset = [IO.Path]::GetFileName($msi)
               msi_sha256 = (Get-FileHash -Algorithm SHA256 $msi).Hash.ToLowerInvariant()
