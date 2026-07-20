@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Version,
     [Parameter(Mandatory = $true)]
-    [string]$BackendCommit,
+    [string]$ClientCommit,
     [Parameter(Mandatory = $true)]
     [string]$CoreManifestSHA256,
     [string]$Repository = "unng-lab/endlessnet-client-ui",
@@ -17,8 +17,8 @@ $ErrorActionPreference = "Stop"
 if ($Version -notmatch '^\d+\.\d+\.\d+$') {
     throw "invalid release version"
 }
-if ($BackendCommit -notmatch '^[a-fA-F0-9]{40}$') {
-    throw "backend commit must be a full SHA"
+if ($ClientCommit -notmatch '^[a-fA-F0-9]{40}$') {
+    throw "client commit must be a full SHA"
 }
 if ($CoreManifestSHA256 -notmatch '^[a-fA-F0-9]{64}$') {
     throw "manifest digest is invalid"
@@ -98,7 +98,7 @@ if (-not (Test-Path -LiteralPath $provenancePath -PathType Leaf)) {
     throw "release $tag exists without provenance"
 }
 $existing = Get-Content -LiteralPath $provenancePath -Raw | ConvertFrom-Json
-if ($existing.backend.manifest_sha256 -ne $CoreManifestSHA256.ToLowerInvariant()) {
+if ($existing.client_core.manifest_sha256 -ne $CoreManifestSHA256.ToLowerInvariant()) {
     throw "release $tag already exists for a different core manifest"
 }
 
