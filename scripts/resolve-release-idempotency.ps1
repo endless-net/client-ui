@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Version,
+    [string]$UIVersion,
+    [Parameter(Mandatory = $true)]
+    [string]$CoreVersion,
     [Parameter(Mandatory = $true)]
     [string]$ClientCommit,
     [Parameter(Mandatory = $true)]
@@ -14,8 +16,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if ($Version -notmatch '^\d+\.\d+\.\d+$') {
-    throw "invalid release version"
+if ($UIVersion -notmatch '^\d+\.\d+\.\d+$') {
+    throw "UI version must be a stable SemVer without a v prefix"
+}
+if ($CoreVersion -notmatch '^\d+\.\d+\.\d+$') {
+    throw "client-core version must be a stable SemVer without a v prefix"
 }
 if ($ClientCommit -notmatch '^[a-fA-F0-9]{40}$') {
     throw "client commit must be a full SHA"
@@ -61,7 +66,7 @@ function Write-NoopOutput {
     Write-Output "noop=$value"
 }
 
-$tag = "v$Version"
+$tag = "v$UIVersion"
 $encodedTag = [Uri]::EscapeDataString($tag)
 $lookup = Invoke-GitHubCLI -Arguments @(
     "api",
@@ -98,8 +103,13 @@ if (-not (Test-Path -LiteralPath $provenancePath -PathType Leaf)) {
     throw "release $tag exists without provenance"
 }
 $existing = Get-Content -LiteralPath $provenancePath -Raw | ConvertFrom-Json
-if ($existing.client.manifest_sha256 -ne $CoreManifestSHA256.ToLowerInvariant()) {
-    throw "release $tag already exists for a different core manifest"
+if ($existing.schema_version -ne 2 -or
+    $existing.version -ne $UIVersion -or
+    $existing.ui.version -ne $UIVersion -or
+    $existing.client.version -ne $CoreVersion -or
+    $existing.client.commit -ne $ClientCommit.ToLowerInvariant() -or
+    $existing.client.manifest_sha256 -ne $CoreManifestSHA256.ToLowerInvariant()) {
+    throw "UI release $tag already exists for different client-core inputs; bump app/pubspec.yaml before publishing a new UI release"
 }
 
 Write-NoopOutput -Noop $true

@@ -11,6 +11,11 @@ func TestWindowsReleaseConsumesStrictClientCoreDispatch(t *testing.T) {
 	for _, required := range []string{
 		"types: [client-core-published]",
 		"github.event.client_payload.client_commit",
+		"CORE_VERSION: ${{ github.event.client_payload.version }}",
+		"./scripts/resolve-ui-version.ps1",
+		"-UIVersion $env:UI_VERSION",
+		"-CoreVersion $env:CORE_VERSION",
+		"client_version = $env:CORE_VERSION",
 		"CLIENT_CORE_RELEASE_TOKEN",
 		"client-core/client-ipc-v1.openapi.yaml",
 	} {
@@ -25,6 +30,9 @@ func TestWindowsReleaseConsumesStrictClientCoreDispatch(t *testing.T) {
 		"BACKEND_RELEASE_TOKEN",
 		"CLIENT_RELEASE_TOKEN",
 		"windows-client-ipc.openapi.yaml",
+		"\n      VERSION: ${{ github.event.client_payload.version }}",
+		"$env:VERSION",
+		"EndlessNet.Client.${{ github.event.client_payload.version }}.msi",
 	} {
 		if strings.Contains(workflow, removed) {
 			t.Errorf("release workflow retains legacy value %q", removed)
@@ -35,6 +43,7 @@ func TestWindowsReleaseConsumesStrictClientCoreDispatch(t *testing.T) {
 func TestCoreResolverPinsManifestAndArtifactsToClientRepository(t *testing.T) {
 	resolver := readRepositoryFile(t, "scripts/resolve-client-core.ps1")
 	for _, required := range []string{
+		"[string]$CoreVersion",
 		"[string]$ClientCommit",
 		"unng-lab/endlessnet-client/releases/download/$tag/$manifestAsset",
 		"--repo unng-lab/endlessnet-client",
@@ -48,6 +57,7 @@ func TestCoreResolverPinsManifestAndArtifactsToClientRepository(t *testing.T) {
 		}
 	}
 	for _, removed := range []string{
+		"[string]$Version",
 		"[string]$BackendCommit",
 		"unng-lab/endlessnet/releases/download",
 		"--repo unng-lab/endlessnet ",
@@ -61,6 +71,28 @@ func TestCoreResolverPinsManifestAndArtifactsToClientRepository(t *testing.T) {
 	provenance := readRepositoryFile(t, "scripts/write-release-provenance.ps1")
 	if !strings.Contains(provenance, "client = [ordered]@{") || strings.Contains(provenance, "backend = [ordered]@{") {
 		t.Error("release provenance must identify the client producer without a backend alias")
+	}
+	for _, required := range []string{
+		"version = $build.version",
+		"version = $core.version",
+		"$core.version -ne $build.client.version",
+	} {
+		if !strings.Contains(provenance, required) {
+			t.Errorf("release provenance does not separate UI/core version via %q", required)
+		}
+	}
+
+	build := readRepositoryFile(t, "scripts/build-windows-client-msi.ps1")
+	for _, required := range []string{
+		"[string]$UIVersion",
+		"[string]$CoreVersion",
+		"--version $UIVersion",
+		"ENDLESSNET_VERSION=$UIVersion",
+		"version = $CoreVersion",
+	} {
+		if !strings.Contains(build, required) {
+			t.Errorf("Windows build does not separate UI/core version via %q", required)
+		}
 	}
 }
 

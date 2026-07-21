@@ -43,7 +43,7 @@ if /I "%FAKE_GH_MODE%"=="error" (
 if /I "%FAKE_GH_MODE%"=="existing" (
   if /I "%~1"=="api" (
     echo HTTP/2.0 200 OK
-    echo {"tag_name":"v0.2.0"}
+    echo {"tag_name":"v1.0.0"}
     exit /b 0
   )
   goto existing_download
@@ -65,7 +65,7 @@ goto parse_existing_args
 :write_provenance
 if "!TARGET_DIR!"=="" exit /b 3
 if not exist "!TARGET_DIR!" mkdir "!TARGET_DIR!"
->"!TARGET_DIR!\release-provenance.json" echo {"client":{"manifest_sha256":"%FAKE_MANIFEST_SHA%"}}
+>"!TARGET_DIR!\release-provenance.json" echo {"schema_version":2,"version":"1.0.0","ui":{"version":"1.0.0"},"client":{"version":"0.2.0","commit":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","manifest_sha256":"%FAKE_MANIFEST_SHA%"}}
 exit /b 0
 `
 	if err := os.WriteFile(fakeGH, []byte(fakeBody), 0o600); err != nil {
@@ -138,7 +138,7 @@ exit /b 0
 		if err == nil {
 			t.Fatalf("mismatched provenance unexpectedly succeeded:\n%s", output)
 		}
-		if !strings.Contains(string(output), "different core manifest") {
+		if !strings.Contains(string(output), "bump app/pubspec.yaml") {
 			t.Fatalf("unexpected mismatch failure:\n%s", output)
 		}
 	})
@@ -148,7 +148,8 @@ func releaseIdempotencyCommand(pwsh, script, fakeGH, outputPath, runnerTemp stri
 	return exec.Command(
 		pwsh,
 		"-NoLogo", "-NoProfile", "-File", script,
-		"-Version", "0.2.0",
+		"-UIVersion", "1.0.0",
+		"-CoreVersion", "0.2.0",
 		"-ClientCommit", strings.Repeat("b", 40),
 		"-CoreManifestSHA256", strings.Repeat("a", 64),
 		"-GitHubOutput", outputPath,
