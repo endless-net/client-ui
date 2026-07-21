@@ -219,7 +219,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     </StandardDirectory>
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="EndlessNet">
-        <Directory Id="AppBundleDataFolder" Name="data" />
+		<Directory Id="EndlessNetAppDataFolder" Name="data" />
       </Directory>
     </StandardDirectory>
     <StandardDirectory Id="CommonAppDataFolder">
@@ -280,7 +280,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       <Files Include="$(var.AppBundleDir)\*.dll" />
       <Files Include="$(var.AppBundleDir)\native_assets.json" />
     </ComponentGroup>
-    <ComponentGroup Id="EndlessNetAppDataFiles" Directory="AppBundleDataFolder">
+    <ComponentGroup Id="EndlessNetAppDataFiles" Directory="EndlessNetAppDataFolder">
       <Files Include="$(var.AppBundleDir)\data\**" />
     </ComponentGroup>
   </Package>

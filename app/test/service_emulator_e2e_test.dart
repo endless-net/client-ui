@@ -53,7 +53,11 @@ void main() {
       final diagnostics = await bridge.diagnostics();
       final diagnosticsPayload =
           diagnostics['diagnostics'] as Map<String, dynamic>;
-      expect(diagnosticsPayload['status'], isA<Map<String, dynamic>>());
+      final diagnosticsStatus =
+          diagnosticsPayload['status'] as Map<String, dynamic>;
+      final diagnosticsAgent =
+          diagnosticsStatus['agent'] as Map<String, dynamic>;
+      expect(diagnosticsAgent['peers'], isNotEmpty);
       expect(diagnosticsPayload['recent_logs'], isNotEmpty);
       final bundle = await bridge.diagnosticsBundle(logLimit: 100);
       expect(bundle['path'], isNotEmpty);

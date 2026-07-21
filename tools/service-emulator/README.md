@@ -11,7 +11,8 @@ The built-in stateful model implements every path in
 - connect, disconnect, logout, and enrollment transitions;
 - server identity inspection and explicit trust recovery;
 - network listing and selection;
-- redacted diagnostics snapshots, bounded bundle metadata, and recent logs.
+- redacted diagnostics snapshots with peer-path status, bounded bundle
+  metadata, and recent logs.
 
 ## Quick start
 

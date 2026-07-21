@@ -102,6 +102,11 @@ func TestDefaultEngineImplementsContractSurface(t *testing.T) {
 	if !ok || diagnosticsPayload["status"] == nil || diagnosticsPayload["recent_logs"] == nil {
 		t.Fatal("diagnostics response omitted diagnostics.status or diagnostics.recent_logs")
 	}
+	diagnosticsStatus := diagnosticsPayload["status"].(map[string]any)
+	diagnosticsAgent := diagnosticsStatus["agent"].(map[string]any)
+	if len(diagnosticsAgent["peers"].([]any)) != 1 {
+		t.Fatalf("diagnostics response omitted peer path data: %#v", diagnosticsAgent)
+	}
 	bundle := decodeResult(t, engine.Handle(http.MethodPost, "/diagnostics/bundle", []byte(`{"log_limit":100}`)))
 	assertEnvelope(t, bundle)
 	if bundle["path"] == nil || bundle["size_bytes"] == nil {

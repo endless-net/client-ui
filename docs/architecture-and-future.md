@@ -2,7 +2,7 @@
 
 - Статус: действующая архитектура и ориентиры развития
 - Владелец: `unng-lab/endlessnet-client-ui`
-- Последняя сверка с реализацией: 2026-07-19
+- Последняя сверка с реализацией: 2026-07-21
 
 ## 1. Назначение документа
 
@@ -18,7 +18,7 @@
 Документ отвечает на вопросы «за что отвечает этот репозиторий», «почему
 система устроена именно так» и «что имеет смысл развивать дальше». Детали
 внутренней реализации Go runtime остаются в
-[`unng-lab/endlessnet`](https://github.com/unng-lab/endlessnet).
+[`unng-lab/endlessnet-client`](https://github.com/unng-lab/endlessnet-client).
 
 ## 2. Границы ответственности
 
@@ -42,7 +42,7 @@
 - backend API и административную web-консоль;
 - исходный код `endlessnet-client.exe`.
 
-Go runtime и producer-контракт принадлежат `unng-lab/endlessnet`. UI не должен
+Go runtime и producer-контракт принадлежат `unng-lab/endlessnet-client`. UI не должен
 копировать runtime-код, запускать `endlessnet-client.exe` как IPC-адаптер или
 читать его приватные state-файлы.
 
@@ -270,7 +270,7 @@ runtime-реализацию.
 Статус: принято.
 
 UI, Windows packaging и Windows release automation находятся здесь; Go runtime
-и producer IPC contract — в `unng-lab/endlessnet`.
+и producer IPC contract — в `unng-lab/endlessnet-client`.
 
 Причины: разные циклы изменений, явное владение signing/release поверхностью и
 невозможность случайно связать UI с внутренностями runtime.

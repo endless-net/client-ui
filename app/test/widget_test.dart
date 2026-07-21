@@ -117,4 +117,82 @@ void main() {
     });
     expect(identityChanged.serverIdentityChanged, isTrue);
   });
+
+  test('ServiceStatus parses strict peer path diagnostics', () {
+    final status = ServiceStatus({
+      'agent': {
+        'state_present': true,
+        'stun_ok': true,
+        'relay_ok': true,
+        'selected_path_counts': {'direct': 1, 'relay': 1},
+        'peers': [
+          {
+            'peer_id': 'peer-direct',
+            'hostname': 'peer-a',
+            'selected_path': 'direct',
+            'selected_endpoint': '192.168.1.20:51820',
+            'direct': {
+              'type': 'direct',
+              'state': 'reachable',
+              'endpoint': '192.168.1.20:51820',
+            },
+            'relay': {'type': 'relay', 'state': 'standby'},
+            'candidates': [
+              {
+                'type': 'direct',
+                'tier': 'lan_direct',
+                'state': 'reachable',
+                'endpoint': '192.168.1.20:51820',
+                'rtt_ms': 4.5,
+              },
+            ],
+          },
+          {
+            'peer_id': 'peer-relay',
+            'hostname': 'relay-peer',
+            'selected_path': 'relay',
+            'selection_reason':
+                'relay-first path established while direct candidates are probed',
+            'direct': {'type': 'direct', 'state': 'untested'},
+            'relay': {
+              'type': 'relay',
+              'state': 'reachable',
+              'endpoint': 'relay.example.test:443',
+            },
+          },
+        ],
+      },
+    });
+
+    expect(status.peerPaths, hasLength(2));
+    expect(status.peerPaths.first.candidates.single.rttMS, 4.5);
+    expect(status.peerPaths.last.selectedPath, 'relay');
+    expect(selectedPathsLabel(status.agent), '1 direct · 1 relay');
+    expect(peerLabels(status.payload), contains('relay-peer - Relay'));
+  });
+
+  test('ServiceDiagnostics reads status from the strict response envelope', () {
+    final diagnostics = ServiceDiagnostics({
+      'diagnostics': {
+        'generated_at': '2026-07-21T12:00:00Z',
+        'status': {
+          'state': ServiceState.connected,
+          'agent': {
+            'state_present': true,
+            'stun_ok': true,
+            'relay_ok': true,
+            'selected_path_counts': {'direct': 1},
+            'peers': <Map<String, dynamic>>[],
+          },
+        },
+      },
+    });
+
+    expect(diagnostics.generatedAt, '2026-07-21T12:00:00Z');
+    expect(diagnostics.status.connected, isTrue);
+    expect(
+      discoveryHealthLabel(diagnostics.agent),
+      'STUN reachable · relay available',
+    );
+  });
 }

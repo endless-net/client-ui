@@ -39,6 +39,75 @@ void main() {
     });
     expect(_schemaProperties(openAPI, 'DiagnosticsResponse'), {'diagnostics'});
     expect(_schemaProperties(openAPI, 'LogsRecentResponse'), {'logs'});
+    expect(
+      _schemaProperties(openAPI, 'StatusResponse'),
+      containsAll({
+        'state',
+        'control_state',
+        'desired_state',
+        'user_disconnected',
+        'account_id',
+        'node_id',
+        'hostname',
+        'network_id',
+        'network_name',
+        'approval_url',
+        'overlay_ip',
+        'map_revision',
+        'peer_count',
+        'node_credential_present',
+        'agent',
+      }),
+    );
+    expect(
+      _schemaProperties(openAPI, 'AgentStatus'),
+      containsAll({
+        'state_present',
+        'generated_at',
+        'stun_ok',
+        'relay_ok',
+        'selected_path_counts',
+        'peers',
+      }),
+    );
+    expect(
+      _schemaProperties(openAPI, 'PeerPathStatus'),
+      containsAll({
+        'peer_id',
+        'hostname',
+        'selected_path',
+        'selected_endpoint',
+        'selection_reason',
+        'last_transition_at',
+        'direct',
+        'relay',
+        'candidates',
+      }),
+    );
+    expect(
+      _schemaProperties(openAPI, 'PathCandidateStatus'),
+      containsAll({
+        'type',
+        'tier',
+        'state',
+        'endpoint',
+        'relay_id',
+        'protocol',
+        'rtt_ms',
+        'checked_at',
+        'last_reachable_at',
+        'consecutive_failures',
+        'reason',
+      }),
+    );
+    expect(
+      _schemaProperties(openAPI, 'Diagnostics'),
+      containsAll({'generated_at', 'status'}),
+    );
+    expect(
+      _schemaProperties(openAPI, 'NetworksResponse'),
+      containsAll({'networks', 'selected_network_id'}),
+    );
     for (final header in const [
       ServiceIPCMetadata.protocolHeader,
       ServiceIPCMetadata.versionHeader,
@@ -90,8 +159,28 @@ void main() {
     expect(find.text(ServiceState.connected), findsOneWidget);
     expect(find.text('100.64.0.42'), findsOneWidget);
     expect(find.text('prod'), findsOneWidget);
-    expect(find.text('peer-a - direct'), findsOneWidget);
+    expect(find.text('peer-a - Direct'), findsOneWidget);
     expect(find.text('Disconnect'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Diagnostics'));
+    await tester.pumpAndSettle();
+    expect(find.text('Connectivity diagnostics'), findsOneWidget);
+    expect(find.text('1 direct'), findsWidgets);
+    expect(find.text('STUN reachable · relay available'), findsWidgets);
+    expect(
+      find.text('Selected: Direct via 192.168.1.42:51820'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('peer-a').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Local candidate'), findsOneWidget);
+    expect(
+      find.textContaining('authenticated direct path selected'),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Close'));
+    await tester.pumpAndSettle();
+    expect(bridge.calls, contains('diagnostics'));
 
     await tester.tap(find.widgetWithText(OutlinedButton, 'Disconnect'));
     await tester.pumpAndSettle();
@@ -104,6 +193,37 @@ void main() {
     expect(bridge.calls, contains('connect'));
     expect(find.text(ServiceState.connected), findsOneWidget);
     expect(find.text('Disconnect'), findsOneWidget);
+  });
+
+  testWidgets('connectivity UI fits the minimum desktop window', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(620, 460);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final bridge = ContractFakeBridge();
+    final controller = EndlessNetController(
+      config: AppConfig.parse(const []),
+      bridge: bridge,
+      logger: AppLogger('', enabled: false),
+      desktopIntegrationEnabled: false,
+    );
+    addTearDown(controller.exitApp);
+    controller.statusPayload = bridge.statusPayload;
+
+    await tester.pumpWidget(EndlessNetApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text('EndlessNet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Diagnostics'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Connectivity diagnostics'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Connect this device creates and opens an enrollment request', (
@@ -327,6 +447,48 @@ class ContractFakeBridge extends EndlessNetClientBridge {
     );
     return statusPayload;
   }
+
+  @override
+  Future<Map<String, dynamic>> diagnostics() async {
+    calls.add('diagnostics');
+    return {
+      'ipc_protocol': 'endlessnet-client-ipc',
+      'ipc_version': 1,
+      'ipc_min_supported_version': 1,
+      'diagnostics': {
+        'generated_at': '2026-07-17T12:00:00Z',
+        'client': {
+          'product': 'endlessnet-client',
+          'version': 'ui-e2e',
+          'commit': 'contract',
+          'build_date': '2026-07-09T00:00:00Z',
+          'target_os': 'windows',
+          'target_arch': 'amd64',
+        },
+        'runtime': {
+          'goos': 'windows',
+          'goarch': 'amd64',
+          'go_version': 'go1.25',
+          'os': {'name': 'Windows'},
+        },
+        'status': statusPayload,
+        'last_errors': <String>[],
+        'config': {
+          'map_signing_trust_present': true,
+          'token_present': true,
+          'identity_private_key_present': true,
+          'private_key_present': true,
+          'node_credential_present': true,
+          'device_fingerprint_present': true,
+          'cached_map_present': true,
+        },
+        'recent_logs': <Map<String, dynamic>>[],
+        'interfaces': <Map<String, dynamic>>[],
+        'route_conflict_count': 0,
+        'route_conflicts': <Map<String, dynamic>>[],
+      },
+    };
+  }
 }
 
 Map<String, dynamic> _contractStatus({
@@ -373,13 +535,30 @@ Map<String, dynamic> _contractStatus({
       'node_id': 'node_ui_e2e',
       'network_id': 'net_prod',
       'overlay_ip': '100.64.0.42',
+      'stun_ok': true,
+      'relay_ok': true,
+      'selected_path_counts': {'direct': 1},
       'peers': [
         {
           'peer_id': 'node_peer_a',
           'hostname': 'peer-a',
-          'direct': {'type': 'direct', 'state': 'reachable'},
-          'relay': {'type': 'relay', 'state': 'standby'},
           'selected_path': 'direct',
+          'selected_endpoint': '192.168.1.42:51820',
+          'selection_reason':
+              'authenticated direct path selected after successful candidate probe',
+          'direct': {
+            'type': 'direct',
+            'tier': 'lan_direct',
+            'state': 'reachable',
+            'endpoint': '192.168.1.42:51820',
+            'rtt_ms': 4.2,
+          },
+          'relay': {
+            'type': 'relay',
+            'tier': 'relay',
+            'state': 'reachable',
+            'endpoint': 'relay.example.test:443',
+          },
         },
       ],
     },

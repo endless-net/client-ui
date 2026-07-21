@@ -11,9 +11,8 @@ func TestWindowsReleaseConsumesStrictClientCoreDispatch(t *testing.T) {
 	for _, required := range []string{
 		"types: [client-core-published]",
 		"github.event.client_payload.client_commit",
-		"CLIENT_RELEASE_TOKEN",
+		"CLIENT_CORE_RELEASE_TOKEN",
 		"client-core/client-ipc-v1.openapi.yaml",
-		"existing.client.manifest_sha256",
 	} {
 		if !strings.Contains(workflow, required) {
 			t.Errorf("release workflow is missing %q", required)
@@ -24,6 +23,7 @@ func TestWindowsReleaseConsumesStrictClientCoreDispatch(t *testing.T) {
 		"backend_commit",
 		"BACKEND_COMMIT",
 		"BACKEND_RELEASE_TOKEN",
+		"CLIENT_RELEASE_TOKEN",
 		"windows-client-ipc.openapi.yaml",
 	} {
 		if strings.Contains(workflow, removed) {

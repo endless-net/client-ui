@@ -3,6 +3,14 @@
 This Flutter Windows application communicates directly with the protected
 EndlessNet service named pipe using the versioned local HTTP contract.
 
+The main window summarizes the service-reported direct/relay selection for each
+peer. Connectivity diagnostics show authenticated candidate health, selection
+reasons, STUN reachability, and relay availability from the producer-defined
+`diagnostics.status.agent` schema. Relay is a normal path while direct
+candidates are being evaluated or when no direct candidate is reachable. The UI
+does not consume fields outside `client-ipc-v1.openapi.yaml` and never
+reconstructs diagnostics from private state.
+
 Run ordinary UI tests from this directory:
 
 ```powershell

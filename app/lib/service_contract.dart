@@ -97,6 +97,11 @@ class ServiceStatus {
 
   final Map<String, dynamic>? payload;
 
+  ServiceAgentStatus get agent =>
+      ServiceAgentStatus.fromValue(payload?['agent']);
+
+  List<PeerPathStatus> get peerPaths => agent.peers;
+
   String state({required String fallback}) {
     return _valueText(payload?['state'], fallback);
   }
@@ -132,10 +137,208 @@ class ServiceStatus {
   }
 }
 
+class ServiceAgentStatus {
+  ServiceAgentStatus({
+    required this.present,
+    required this.generatedAt,
+    required this.stunOK,
+    required this.relayOK,
+    required this.selectedPathCounts,
+    required this.peers,
+  });
+
+  factory ServiceAgentStatus.fromValue(Object? value) {
+    final payload = _mapValue(value);
+    final counts = <String, int>{};
+    final rawCounts = _mapValue(payload?['selected_path_counts']);
+    rawCounts?.forEach((key, value) {
+      final count = _intValue(value);
+      if (key.trim().isNotEmpty && count != null) {
+        counts[key.trim().toLowerCase()] = count;
+      }
+    });
+    final peers = _mapList(
+      payload?['peers'],
+    ).map(PeerPathStatus.fromMap).toList(growable: false);
+    if (counts.isEmpty) {
+      for (final peer in peers) {
+        final path = peer.selectedPath.toLowerCase();
+        if (path.isNotEmpty) {
+          counts[path] = (counts[path] ?? 0) + 1;
+        }
+      }
+    }
+    return ServiceAgentStatus(
+      present: payload?['state_present'] == true,
+      generatedAt: _valueText(payload?['generated_at'], ''),
+      stunOK: _boolValue(payload?['stun_ok']),
+      relayOK: _boolValue(payload?['relay_ok']),
+      selectedPathCounts: counts,
+      peers: peers,
+    );
+  }
+
+  final bool present;
+  final String generatedAt;
+  final bool? stunOK;
+  final bool? relayOK;
+  final Map<String, int> selectedPathCounts;
+  final List<PeerPathStatus> peers;
+}
+
+class PeerPathStatus {
+  PeerPathStatus({
+    required this.peerID,
+    required this.hostname,
+    required this.selectedPath,
+    required this.selectedEndpoint,
+    required this.selectionReason,
+    required this.lastTransitionAt,
+    required this.direct,
+    required this.relay,
+    required this.candidates,
+  });
+
+  factory PeerPathStatus.fromMap(Map<String, dynamic> payload) {
+    return PeerPathStatus(
+      peerID: _valueText(payload['peer_id'], ''),
+      hostname: _valueText(payload['hostname'], ''),
+      selectedPath: _valueText(payload['selected_path'], 'none'),
+      selectedEndpoint: _valueText(payload['selected_endpoint'], ''),
+      selectionReason: _valueText(payload['selection_reason'], ''),
+      lastTransitionAt: _valueText(payload['last_transition_at'], ''),
+      direct: PathCandidateStatus.fromValue(payload['direct']),
+      relay: PathCandidateStatus.fromValue(payload['relay']),
+      candidates: _mapList(
+        payload['candidates'],
+      ).map(PathCandidateStatus.fromMap).toList(growable: false),
+    );
+  }
+
+  final String peerID;
+  final String hostname;
+  final String selectedPath;
+  final String selectedEndpoint;
+  final String selectionReason;
+  final String lastTransitionAt;
+  final PathCandidateStatus direct;
+  final PathCandidateStatus relay;
+  final List<PathCandidateStatus> candidates;
+
+  String get displayName => hostname.isNotEmpty ? hostname : peerID;
+}
+
+class PathCandidateStatus {
+  PathCandidateStatus({
+    required this.type,
+    required this.tier,
+    required this.state,
+    required this.endpoint,
+    required this.relayID,
+    required this.protocol,
+    required this.rttMS,
+    required this.checkedAt,
+    required this.lastReachableAt,
+    required this.consecutiveFailures,
+    required this.reason,
+  });
+
+  factory PathCandidateStatus.fromValue(Object? value) {
+    final payload = _mapValue(value);
+    if (payload == null) {
+      return PathCandidateStatus.fromMap(const {});
+    }
+    return PathCandidateStatus.fromMap(payload);
+  }
+
+  factory PathCandidateStatus.fromMap(Map<String, dynamic> payload) {
+    return PathCandidateStatus(
+      type: _valueText(payload['type'], ''),
+      tier: _valueText(payload['tier'], ''),
+      state: _valueText(payload['state'], ''),
+      endpoint: _valueText(payload['endpoint'], ''),
+      relayID: _valueText(payload['relay_id'], ''),
+      protocol: _valueText(payload['protocol'], ''),
+      rttMS: _doubleValue(payload['rtt_ms']),
+      checkedAt: _valueText(payload['checked_at'], ''),
+      lastReachableAt: _valueText(payload['last_reachable_at'], ''),
+      consecutiveFailures: _intValue(payload['consecutive_failures']) ?? 0,
+      reason: _valueText(payload['reason'], ''),
+    );
+  }
+
+  final String type;
+  final String tier;
+  final String state;
+  final String endpoint;
+  final String relayID;
+  final String protocol;
+  final double? rttMS;
+  final String checkedAt;
+  final String lastReachableAt;
+  final int consecutiveFailures;
+  final String reason;
+
+  bool get hasData =>
+      type.isNotEmpty ||
+      state.isNotEmpty ||
+      endpoint.isNotEmpty ||
+      reason.isNotEmpty;
+}
+
+class ServiceDiagnostics {
+  ServiceDiagnostics(this.payload);
+
+  final Map<String, dynamic> payload;
+
+  Map<String, dynamic>? get diagnostics => _mapValue(payload['diagnostics']);
+
+  ServiceStatus get status => ServiceStatus(_mapValue(diagnostics?['status']));
+
+  ServiceAgentStatus get agent => status.agent;
+
+  String get generatedAt => _valueText(diagnostics?['generated_at'], '');
+
+  List<PeerPathStatus> get paths => status.peerPaths;
+}
+
 String _valueText(Object? value, String fallback) {
   final text = value?.toString().trim() ?? '';
   if (text.isEmpty || text == '<nil>' || text == 'null') {
     return fallback;
   }
   return text;
+}
+
+Map<String, dynamic>? _mapValue(Object? value) {
+  if (value is! Map) {
+    return null;
+  }
+  return value.map((key, child) => MapEntry(key.toString(), child));
+}
+
+List<Map<String, dynamic>> _mapList(Object? value) {
+  if (value is! List) {
+    return const [];
+  }
+  return value.map(_mapValue).whereType<Map<String, dynamic>>().toList();
+}
+
+bool? _boolValue(Object? value) => value is bool ? value : null;
+
+int? _intValue(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  return int.tryParse(value?.toString() ?? '');
+}
+
+double? _doubleValue(Object? value) {
+  if (value is num) {
+    return value.toDouble();
+  }
+  return double.tryParse(value?.toString() ?? '');
 }

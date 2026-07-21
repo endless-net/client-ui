@@ -19,8 +19,17 @@ if ($core.version -ne $build.version -or $core.target -ne $build.target) {
 }
 if ($build.wintun.version -ne "0.14.1" -or
     $build.wintun.archive_sha256 -notmatch '^[0-9a-f]{64}$' -or
-    $build.wintun.sha256 -notmatch '^[0-9a-f]{64}$') {
+    $build.wintun.sha256 -notmatch '^[0-9a-f]{64}$' -or
+    $build.wintun.signer_thumbprint -notmatch '^[0-9A-F]{40}$') {
     throw "build metadata does not contain verified Wintun provenance"
+}
+if ($build.signed -ne $true -or
+    $build.signing.mode -notin @("temporary-self-signed", "public-authenticode") -or
+    $build.signing.certificate_thumbprint -notmatch '^[0-9A-F]{40}$') {
+    throw "build metadata does not contain a valid release-signing identity"
+}
+if ($build.signing.mode -eq "temporary-self-signed" -and $build.signing.publicly_trusted -ne $false) {
+    throw "temporary self-signed release metadata must not claim public trust"
 }
 
 $provenance = [ordered]@{
@@ -40,6 +49,12 @@ $provenance = [ordered]@{
         repository = "unng-lab/endlessnet-client-ui"
         commit = $build.ui_commit
     }
+    signing = [ordered]@{
+        mode = $build.signing.mode
+        certificate_thumbprint = $build.signing.certificate_thumbprint
+        publicly_trusted = $build.signing.publicly_trusted
+        smartscreen_reputation = $(if ($build.signing.mode -eq "temporary-self-signed") { "not-provided" } else { "not-asserted" })
+    }
     artifacts = [ordered]@{
         client = [ordered]@{
             unsigned_sha256 = $build.client.unsigned_sha256
@@ -49,6 +64,7 @@ $provenance = [ordered]@{
             version = $build.wintun.version
             archive_sha256 = $build.wintun.archive_sha256
             sha256 = $build.wintun.sha256
+            signer_thumbprint = $build.wintun.signer_thumbprint
         }
         app = [ordered]@{
             unsigned_sha256 = $build.app.unsigned_sha256
