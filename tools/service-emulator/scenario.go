@@ -19,6 +19,9 @@ const (
 	SchemaVersion       = 1
 	IPCProtocol         = "endlessnet-client-ipc"
 	IPCVersion          = 1
+	IPCProtocolHeader   = "X-EndlessNet-IPC-Protocol"
+	IPCVersionHeader    = "X-EndlessNet-IPC-Version"
+	IPCMinVersionHeader = "X-EndlessNet-IPC-Min-Supported-Version"
 	DefaultMaxBodyBytes = 1 << 20
 )
 
@@ -34,6 +37,7 @@ var contractRoutes = map[string]string{
 	"/networks":              http.MethodGet,
 	"/network/select":        http.MethodPost,
 	"/diagnostics":           http.MethodGet,
+	"/diagnostics/bundle":    http.MethodPost,
 	"/logs/recent":           http.MethodGet,
 }
 
@@ -106,6 +110,7 @@ func DefaultScenario() Scenario {
 			"ipc_protocol":              IPCProtocol,
 			"ipc_version":               IPCVersion,
 			"ipc_min_supported_version": IPCVersion,
+			"ipc_negotiated_version":    IPCVersion,
 			"service_version":           "service-emulator",
 			"service_commit":            "test-fixture",
 			"service_build_date":        "2026-01-01T00:00:00Z",
@@ -118,27 +123,34 @@ func DefaultScenario() Scenario {
 				"reason":        "user_connect",
 				"updated_at":    "2026-01-01T00:00:00Z",
 			},
-			"server_url":              "https://api.example.test",
-			"account_id":              "acc_emulator",
-			"node_id":                 "node_emulator",
-			"hostname":                "windows-emulator",
-			"network_id":              "net_primary",
-			"network_name":            "primary",
-			"overlay_ip":              "100.64.0.10",
-			"map_revision":            1,
-			"peer_count":              1,
-			"cached_map_present":      true,
-			"cached_map_valid":        true,
-			"node_credential_present": true,
-			"private_key_present":     true,
+			"control_plane_urls":           []any{"https://api.example.test"},
+			"account_id":                   "acc_emulator",
+			"node_id":                      "node_emulator",
+			"hostname":                     "windows-emulator",
+			"network_id":                   "net_primary",
+			"network_name":                 "primary",
+			"overlay_ip":                   "100.64.0.10",
+			"map_revision":                 1,
+			"peer_count":                   1,
+			"cached_map_present":           true,
+			"cached_map_valid":             true,
+			"map_signing_trust_present":    true,
+			"token_present":                true,
+			"node_credential_present":      true,
+			"device_fingerprint_present":   true,
+			"identity_private_key_present": true,
+			"private_key_present":          true,
 			"agent": map[string]any{
-				"node_id":    "node_emulator",
-				"network_id": "net_primary",
-				"overlay_ip": "100.64.0.10",
+				"state_present": true,
+				"node_id":       "node_emulator",
+				"network_id":    "net_primary",
+				"overlay_ip":    "100.64.0.10",
 				"peers": []any{
 					map[string]any{
 						"peer_id":       "node_peer_a",
 						"hostname":      "peer-a",
+						"direct":        map[string]any{"type": "direct", "state": "reachable"},
+						"relay":         map[string]any{"type": "relay", "state": "standby"},
 						"selected_path": "direct",
 					},
 				},
@@ -159,10 +171,10 @@ func DefaultScenario() Scenario {
 			},
 		},
 		ServerIdentity: map[string]any{
-			"server_url":       "https://api.example.test",
-			"trusted_key_id":   "ed25519:emulator",
-			"announced_key_id": "ed25519:emulator",
-			"changed":          false,
+			"control_plane_url": "https://api.example.test",
+			"trusted_key_id":    "ed25519:emulator",
+			"announced_key_id":  "ed25519:emulator",
+			"changed":           false,
 		},
 		Logs: []map[string]any{
 			{
@@ -241,7 +253,9 @@ func (s Scenario) Validate() error {
 	}
 	for _, key := range []string{
 		"state", "control_state", "desired_state", "cached_map_present",
-		"cached_map_valid", "node_credential_present", "private_key_present",
+		"cached_map_valid", "map_signing_trust_present", "token_present",
+		"node_credential_present", "device_fingerprint_present",
+		"identity_private_key_present", "private_key_present",
 	} {
 		if _, ok := s.InitialStatus[key]; !ok {
 			return fmt.Errorf("initial_status.%s is required by the IPC contract", key)
@@ -431,19 +445,24 @@ func (e *Engine) builtin(method string, requestURL *url.URL, body map[string]any
 			return errorResult(http.StatusBadRequest, "invalid_json", err.Error())
 		}
 		e.setConnectionState("Connected", "ready", "connected", false)
-		return jsonResult(http.StatusOK, e.commandResponse(true))
+		return jsonResult(http.StatusOK, e.connectResponse())
 	case "/disconnect":
 		if err := requireEmptyObject(body); err != nil {
 			return errorResult(http.StatusBadRequest, "invalid_json", err.Error())
 		}
 		e.setConnectionState("Disconnected", "disconnected", "disconnected", true)
-		return jsonResult(http.StatusOK, e.commandResponse(true))
+		return jsonResult(http.StatusOK, map[string]any{
+			"state":             e.status["state"],
+			"desired_state":     e.status["desired_state"],
+			"user_disconnected": e.status["user_disconnected"],
+			"wireguard":         wireGuardApplyResult(true),
+		})
 	case "/logout":
 		if err := requireEmptyObject(body); err != nil {
 			return errorResult(http.StatusBadRequest, "invalid_json", err.Error())
 		}
 		e.logout()
-		return jsonResult(http.StatusOK, e.commandResponse(true))
+		return jsonResult(http.StatusOK, map[string]any{"state": e.status["state"]})
 	case "/enroll":
 		return e.enroll(body)
 	case "/server-identity":
@@ -458,12 +477,9 @@ func (e *Engine) builtin(method string, requestURL *url.URL, body map[string]any
 	case "/network/select":
 		return e.selectNetwork(body)
 	case "/diagnostics":
-		return jsonResult(http.StatusOK, map[string]any{
-			"generated_at": time.Now().UTC().Format(time.RFC3339Nano),
-			"bundle_path":  `C:\Temp\endlessnet-emulator-diagnostics.zip`,
-			"status":       e.status,
-			"recent_logs":  e.scenario.Logs,
-		})
+		return e.diagnosticsResult()
+	case "/diagnostics/bundle":
+		return e.diagnosticsBundleResult(body)
 	case "/logs/recent":
 		return e.logsResult(requestURL.Query())
 	default:
@@ -472,6 +488,9 @@ func (e *Engine) builtin(method string, requestURL *url.URL, body map[string]any
 }
 
 func (e *Engine) enroll(body map[string]any) Result {
+	if err := requireOnlyKeys(body, "enroll_token", "server", "mode", "hostname", "idempotency_key"); err != nil {
+		return errorResult(http.StatusBadRequest, "invalid_json", err.Error())
+	}
 	allowedModes := []string{"workstation", "server", "subnet-router", "interactive"}
 	mode := stringValue(body["mode"])
 	if mode != "" && !slices.Contains(allowedModes, mode) {
@@ -479,23 +498,28 @@ func (e *Engine) enroll(body map[string]any) Result {
 	}
 	e.setConnectionState("Connected", "ready", "connected", false)
 	mergeMap(e.status, map[string]any{
-		"account_id":              "acc_emulator",
-		"node_id":                 "node_emulator",
-		"hostname":                firstNonEmpty(stringValue(body["hostname"]), "windows-emulator"),
-		"network_id":              "net_primary",
-		"network_name":            "primary",
-		"overlay_ip":              "100.64.0.10",
-		"cached_map_present":      true,
-		"cached_map_valid":        true,
-		"node_credential_present": true,
-		"private_key_present":     true,
+		"account_id":                   "acc_emulator",
+		"node_id":                      "node_emulator",
+		"hostname":                     firstNonEmpty(stringValue(body["hostname"]), "windows-emulator"),
+		"network_id":                   "net_primary",
+		"network_name":                 "primary",
+		"overlay_ip":                   "100.64.0.10",
+		"cached_map_present":           true,
+		"cached_map_valid":             true,
+		"map_signing_trust_present":    true,
+		"token_present":                true,
+		"node_credential_present":      true,
+		"device_fingerprint_present":   true,
+		"identity_private_key_present": true,
+		"private_key_present":          true,
 	})
-	result := e.commandResponse(true)
-	result["enrolled"] = true
-	return jsonResult(http.StatusOK, result)
+	return jsonResult(http.StatusOK, e.status)
 }
 
 func (e *Engine) trustServer(body map[string]any) Result {
+	if err := requireOnlyKeys(body, "confirmed", "confirmed_key_id"); err != nil {
+		return errorResult(http.StatusBadRequest, "invalid_json", err.Error())
+	}
 	confirmed, _ := body["confirmed"].(bool)
 	keyID := stringValue(body["confirmed_key_id"])
 	announced := stringValue(e.scenario.ServerIdentity["announced_key_id"])
@@ -505,10 +529,16 @@ func (e *Engine) trustServer(body map[string]any) Result {
 	e.scenario.ServerIdentity["trusted_key_id"] = keyID
 	e.scenario.ServerIdentity["changed"] = false
 	e.setConnectionState("Connected", "ready", "connected", false)
-	return jsonResult(http.StatusOK, e.commandResponse(true))
+	result := e.connectResponse()
+	result["server_identity_updated"] = true
+	result["trusted_key_id"] = keyID
+	return jsonResult(http.StatusOK, result)
 }
 
 func (e *Engine) selectNetwork(body map[string]any) Result {
+	if err := requireOnlyKeys(body, "network_id", "network_name"); err != nil {
+		return errorResult(http.StatusBadRequest, "invalid_json", err.Error())
+	}
 	id := stringValue(body["network_id"])
 	name := stringValue(body["network_name"])
 	if id == "" && name == "" {
@@ -518,12 +548,72 @@ func (e *Engine) selectNetwork(body map[string]any) Result {
 		if (id != "" && stringValue(network["id"]) == id) || (name != "" && stringValue(network["name"]) == name) {
 			e.status["network_id"] = network["id"]
 			e.status["network_name"] = network["name"]
-			result := e.commandResponse(true)
-			result["selected_network_id"] = network["id"]
+			result := map[string]any{
+				"state":               e.status["state"],
+				"desired_state":       e.status["desired_state"],
+				"selected_network_id": network["id"],
+				"selected_network":    network,
+				"node_id":             e.status["node_id"],
+				"map_revision":        e.status["map_revision"],
+			}
 			return jsonResult(http.StatusOK, result)
 		}
 	}
 	return errorResult(http.StatusNotFound, "not_found", "network was not found")
+}
+
+func (e *Engine) diagnosticsResult() Result {
+	return jsonResult(http.StatusOK, map[string]any{
+		"diagnostics": map[string]any{
+			"generated_at": time.Now().UTC().Format(time.RFC3339Nano),
+			"client": map[string]any{
+				"product": "endlessnet-client", "version": "service-emulator",
+				"commit": "test-fixture", "build_date": "2026-01-01T00:00:00Z",
+				"target_os": "windows", "target_arch": "amd64",
+			},
+			"runtime": map[string]any{
+				"goos": "windows", "goarch": "amd64", "go_version": "emulated",
+				"os": map[string]any{"name": "Windows"},
+			},
+			"status":      e.status,
+			"last_errors": []any{},
+			"config": map[string]any{
+				"control_plane_urls":           e.status["control_plane_urls"],
+				"node_id":                      e.status["node_id"],
+				"map_revision":                 e.status["map_revision"],
+				"map_signing_trust_present":    e.status["map_signing_trust_present"],
+				"token_present":                e.status["token_present"],
+				"identity_private_key_present": e.status["identity_private_key_present"],
+				"private_key_present":          e.status["private_key_present"],
+				"node_credential_present":      e.status["node_credential_present"],
+				"device_fingerprint_present":   e.status["device_fingerprint_present"],
+				"cached_map_present":           e.status["cached_map_present"],
+			},
+			"recent_logs":          e.scenario.Logs,
+			"interfaces":           []any{},
+			"route_conflict_count": 0,
+			"route_conflicts":      []any{},
+		},
+	})
+}
+
+func (e *Engine) diagnosticsBundleResult(body map[string]any) Result {
+	if err := requireOnlyKeys(body, "log_limit"); err != nil {
+		return errorResult(http.StatusBadRequest, "invalid_json", err.Error())
+	}
+	if raw, ok := body["log_limit"]; ok {
+		limit, err := strconv.Atoi(stringValue(raw))
+		if err != nil || limit < 1 || limit > 1000 {
+			return errorResult(http.StatusBadRequest, "invalid_json", "log_limit must be between 1 and 1000")
+		}
+	}
+	return jsonResult(http.StatusOK, map[string]any{
+		"path":       `C:\Temp\endlessnet-emulator-diagnostics.zip`,
+		"created_at": "2026-01-01T00:00:00Z",
+		"expires_at": "2026-01-01T01:00:00Z",
+		"size_bytes": 1024,
+		"reused":     false,
+	})
 }
 
 func (e *Engine) logsResult(query url.Values) Result {
@@ -583,20 +673,25 @@ func (e *Engine) logout() {
 		delete(e.status, key)
 	}
 	mergeMap(e.status, map[string]any{
-		"cached_map_present":      false,
-		"cached_map_valid":        false,
-		"node_credential_present": false,
-		"private_key_present":     false,
-		"peer_count":              0,
+		"map_signing_trust_present":    false,
+		"token_present":                false,
+		"cached_map_present":           false,
+		"cached_map_valid":             false,
+		"node_credential_present":      false,
+		"device_fingerprint_present":   false,
+		"identity_private_key_present": false,
+		"private_key_present":          false,
+		"peer_count":                   0,
 	})
 }
 
-func (e *Engine) commandResponse(ok bool) map[string]any {
+func (e *Engine) connectResponse() map[string]any {
 	result := map[string]any{
-		"ok":                ok,
 		"state":             e.status["state"],
+		"control_state":     e.status["control_state"],
 		"desired_state":     e.status["desired_state"],
 		"user_disconnected": e.status["user_disconnected"],
+		"wireguard":         wireGuardApplyResult(true),
 	}
 	for _, key := range []string{"node_id", "network_id", "map_revision"} {
 		if value, present := e.status[key]; present {
@@ -604,6 +699,14 @@ func (e *Engine) commandResponse(ok bool) map[string]any {
 		}
 	}
 	return result
+}
+
+func wireGuardApplyResult(changed bool) map[string]any {
+	return map[string]any{
+		"ok":      true,
+		"method":  "wireguard-go",
+		"changed": changed,
+	}
 }
 
 func (e *Engine) finish(method, target string, requestBody map[string]any, scripted bool, result Result, failure string) Result {
@@ -632,7 +735,6 @@ func jsonResult(status int, payload map[string]any) Result {
 
 func errorResult(status int, code, message string) Result {
 	return jsonResult(status, map[string]any{
-		"ok":         false,
 		"error_code": code,
 		"error":      message,
 	})
@@ -656,6 +758,9 @@ func addEnvelope(payload map[string]any) {
 	}
 	if _, ok := payload["ipc_min_supported_version"]; !ok {
 		payload["ipc_min_supported_version"] = IPCVersion
+	}
+	if _, ok := payload["ipc_negotiated_version"]; !ok {
+		payload["ipc_negotiated_version"] = IPCVersion
 	}
 	if _, ok := payload["service_version"]; !ok {
 		payload["service_version"] = "service-emulator"
@@ -688,6 +793,15 @@ func requireEmptyObject(body map[string]any) error {
 	return nil
 }
 
+func requireOnlyKeys(body map[string]any, allowed ...string) error {
+	for key := range body {
+		if !slices.Contains(allowed, key) {
+			return fmt.Errorf("request body contains unsupported field %q", key)
+		}
+	}
+	return nil
+}
+
 func sameJSONObject(actual []byte, expected json.RawMessage) bool {
 	actualBody, err := decodeRequestBody(actual)
 	if err != nil {
@@ -704,7 +818,7 @@ func sameJSONObject(actual []byte, expected json.RawMessage) bool {
 
 func redactRequest(body map[string]any) map[string]any {
 	redacted := cloneMap(body)
-	for _, key := range []string{"enroll_token", "join_token", "token", "private_key", "authorization"} {
+	for _, key := range []string{"enroll_token", "private_key", "authorization"} {
 		if _, ok := redacted[key]; ok {
 			redacted[key] = "<redacted>"
 		}

@@ -33,7 +33,6 @@ const _appTarget = String.fromEnvironment(
 const _defaultPipe = r'\\.\pipe\endlessnet-service';
 const _defaultDebugLogDir = r'~\.endlessnet\logs';
 const _defaultAdminURL = 'https://admin.endlessnet.ru/';
-const _defaultConnectURL = 'https://admin.endlessnet.ru/connect/windows/';
 const _showSignalPath = r'~\.endlessnet\endlessnet.show';
 const _defaultEnrollmentPollInterval = Duration(seconds: 2);
 const _defaultEnrollmentPollTimeout = Duration(minutes: 10);
@@ -131,7 +130,6 @@ class AppConfig {
   AppConfig({
     required this.pipe,
     required this.adminURL,
-    required this.connectURL,
     required this.server,
     required this.mode,
     required this.enrollText,
@@ -144,7 +142,6 @@ class AppConfig {
 
   final String pipe;
   final String adminURL;
-  final String connectURL;
   final String server;
   final String mode;
   final String enrollText;
@@ -157,7 +154,6 @@ class AppConfig {
   static AppConfig parse(List<String> args) {
     var pipe = _defaultPipe;
     var adminURL = _defaultAdminURL;
-    var connectURL = _defaultConnectURL;
     var server = '';
     var mode = 'workstation';
     var enrollText = '';
@@ -180,8 +176,6 @@ class AppConfig {
         pipe = nextValue();
       } else if (arg == '--admin-url') {
         adminURL = nextValue();
-      } else if (arg == '--connect-url') {
-        connectURL = nextValue();
       } else if (arg == '--server') {
         server = nextValue();
       } else if (arg == '--mode') {
@@ -204,9 +198,6 @@ class AppConfig {
     return AppConfig(
       pipe: pipe.trim().isEmpty ? _defaultPipe : pipe.trim(),
       adminURL: adminURL.trim().isEmpty ? _defaultAdminURL : adminURL.trim(),
-      connectURL: connectURL.trim().isEmpty
-          ? _defaultConnectURL
-          : connectURL.trim(),
       server: server.trim(),
       mode: mode.trim().isEmpty ? 'workstation' : mode.trim(),
       enrollText: enrollText.trim(),
@@ -417,20 +408,13 @@ EnrollmentRequest parseEnrollment(
     isEnrollmentLink =
         uri.scheme.toLowerCase() == 'endlessnet' &&
         uri.host.toLowerCase() == 'enroll';
-    token =
-        uri.queryParameters['token'] ??
-        uri.queryParameters['enroll_token'] ??
-        uri.queryParameters['join_token'] ??
-        '';
+    token = uri.queryParameters['enroll_token'] ?? '';
     server = (uri.queryParameters['server'] ?? server).trim();
     mode = (uri.queryParameters['mode'] ?? mode).trim();
   }
-  if (token.trim().isEmpty) {
+  if (token.trim().isEmpty && !isEnrollmentLink) {
     token =
-        RegExp(
-          r'\b(?:enj|enr|join)_[A-Za-z0-9_-]+\b',
-        ).firstMatch(trimmed)?.group(0) ??
-        '';
+        RegExp(r'\benr_[A-Za-z0-9_-]+\b').firstMatch(trimmed)?.group(0) ?? '';
   }
   if (token.trim().isEmpty && !isEnrollmentLink) {
     throw StateError('Enrollment token is required.');
@@ -477,6 +461,11 @@ class EndlessNetClientBridge {
       _request('GET', ServiceIPCPath.networks);
   Future<Map<String, dynamic>> diagnostics() =>
       _request('GET', ServiceIPCPath.diagnostics);
+  Future<Map<String, dynamic>> diagnosticsBundle({int? logLimit}) => _request(
+    'POST',
+    ServiceIPCPath.diagnosticsBundle,
+    body: {'log_limit': ?logLimit},
+  );
   Future<Map<String, dynamic>> recentLogs() =>
       _request('GET', ServiceIPCPath.recentLogs);
 
@@ -489,12 +478,14 @@ class EndlessNetClientBridge {
   }
 
   Future<Map<String, dynamic>> enroll(EnrollmentRequest request) {
+    final token = request.token.trim();
+    final server = request.server.trim();
     return _request(
       'POST',
       ServiceIPCPath.enroll,
       body: {
-        'join_token': request.token.trim(),
-        'server_url': request.server.trim(),
+        if (token.isNotEmpty) 'enroll_token': token,
+        if (server.isNotEmpty) 'server': server,
         'mode': request.mode,
       },
       timeout: const Duration(minutes: 2),
@@ -687,7 +678,8 @@ class EndlessNetController extends ChangeNotifier
     busy = true;
     notifyListeners();
     try {
-      statusPayload = await action();
+      await action();
+      statusPayload = await bridge.status();
       errorText = null;
       logger.info('action completed state=$state');
     } catch (err, stack) {
@@ -721,7 +713,7 @@ class EndlessNetController extends ChangeNotifier
       }
       final confirmed = await showServerIdentityChangeDialog(
         context,
-        serverURL: valueText(identity['server_url'], fallback: 'server'),
+        serverURL: valueText(identity['control_plane_url'], fallback: 'server'),
         trustedKeyID: valueText(identity['trusted_key_id']),
         announcedKeyID: announcedKeyID,
       );
@@ -1493,13 +1485,18 @@ String networksSummary(Map<String, dynamic>? payload) {
 }
 
 String recentLogsSummary(Map<String, dynamic> payload) {
-  final lines = payload['lines'];
-  if (lines is List && lines.isNotEmpty) {
-    return lines.map((line) => '$line').join('\n');
-  }
   final logs = payload['logs'];
   if (logs is List && logs.isNotEmpty) {
-    return logs.map((line) => '$line').join('\n');
+    return logs
+        .map((entry) {
+          if (entry is! Map) {
+            return '$entry';
+          }
+          return '${valueText(entry['timestamp'], fallback: '')} '
+                  '${valueText(entry['message'], fallback: '')}'
+              .trim();
+        })
+        .join('\n');
   }
   return 'No recent logs.';
 }
@@ -1559,25 +1556,14 @@ bool isEnrollmentPending(Map<String, dynamic>? payload) {
   if (payload == null) {
     return false;
   }
-  if (payload['enrollment_pending'] == true) {
-    return true;
-  }
-  final state = valueText(payload['state'], fallback: '').toLowerCase();
-  final controlState = valueText(
-    payload['control_state'],
-    fallback: '',
-  ).toLowerCase();
-  return state == ServiceState.needsApproval.toLowerCase() ||
-      controlState == ControlState.needsApproval ||
-      controlState == ControlState.approvalRequired ||
-      controlState == ControlState.pendingApproval;
+  return valueText(payload['state'], fallback: '') ==
+          ServiceState.needsApproval ||
+      valueText(payload['control_state'], fallback: '') ==
+          ControlState.pendingApproval;
 }
 
 String enrollmentApprovalURL(Map<String, dynamic>? payload) {
-  return firstNonEmpty(
-    valueText(payload?['approval_url'], fallback: ''),
-    valueText(payload?['enrollment_approval_url'], fallback: ''),
-  );
+  return valueText(payload?['approval_url'], fallback: '');
 }
 
 Object? nestedValue(Map<String, dynamic>? payload, String key, String nested) {

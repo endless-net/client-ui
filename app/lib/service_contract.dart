@@ -10,27 +10,56 @@ class ServiceIPCPath {
   static const networks = '/networks';
   static const selectNetwork = '/network/select';
   static const diagnostics = '/diagnostics';
+  static const diagnosticsBundle = '/diagnostics/bundle';
   static const recentLogs = '/logs/recent';
+
+  static const all = <String>[
+    status,
+    events,
+    enroll,
+    connect,
+    serverIdentity,
+    trustServer,
+    disconnect,
+    logout,
+    networks,
+    selectNetwork,
+    diagnostics,
+    diagnosticsBundle,
+    recentLogs,
+  ];
+}
+
+class ServiceIPCMetadata {
+  static const protocol = 'endlessnet-client-ipc';
+  static const version = 1;
+  static const minimumSupportedVersion = 1;
+  static const protocolHeader = 'X-EndlessNet-IPC-Protocol';
+  static const versionHeader = 'X-EndlessNet-IPC-Version';
+  static const minimumVersionHeader = 'X-EndlessNet-IPC-Min-Supported-Version';
 }
 
 class ServiceState {
   static const connected = 'Connected';
   static const disconnected = 'Disconnected';
-  static const connecting = 'Connecting';
-  static const updating = 'Updating';
   static const degraded = 'Degraded';
   static const error = 'Error';
   static const needsEnrollment = 'NeedsEnrollment';
   static const needsApproval = 'NeedsApproval';
   static const serverIdentityChanged = 'ServerIdentityChanged';
+
+  static const all = <String>[
+    connected,
+    disconnected,
+    degraded,
+    error,
+    needsEnrollment,
+    needsApproval,
+    serverIdentityChanged,
+  ];
 }
 
 class ControlState {
-  static const connecting = 'connecting';
-  static const updating = 'updating';
-  static const syncing = 'syncing';
-  static const needsApproval = 'needs_approval';
-  static const approvalRequired = 'approval_required';
   static const pendingApproval = 'pending_approval';
   static const degraded = 'degraded';
   static const offlineCache = 'offline_cache';
@@ -41,11 +70,26 @@ class ControlState {
   static const error = 'error';
   static const cacheInvalid = 'cache_invalid';
   static const serverIdentityChanged = 'server_identity_changed';
+
+  static const all = <String>[
+    pendingApproval,
+    degraded,
+    offlineCache,
+    ready,
+    registered,
+    cacheInvalid,
+    error,
+    notRegistered,
+    disconnected,
+    serverIdentityChanged,
+  ];
 }
 
 class ConnectionIntentState {
   static const connected = 'connected';
   static const disconnected = 'disconnected';
+
+  static const all = <String>[connected, disconnected];
 }
 
 class ServiceStatus {
@@ -54,69 +98,38 @@ class ServiceStatus {
   final Map<String, dynamic>? payload;
 
   String state({required String fallback}) {
-    return _valueText(payload?['state'] ?? payload?['control_state'], fallback);
+    return _valueText(payload?['state'], fallback);
   }
 
-  bool get connected => _sameState(state(fallback: ''), ServiceState.connected);
-
-  String get lastError =>
-      _valueText(_nestedValue(payload, 'agent', 'last_error'), '');
+  bool get connected => state(fallback: '') == ServiceState.connected;
 
   bool get serverIdentityChanged =>
-      lastError.toLowerCase().contains('server map signing key changed') ||
-      _sameState(state(fallback: ''), ServiceState.serverIdentityChanged) ||
-      _sameState(
-        _valueText(payload?['control_state'], ''),
-        ControlState.serverIdentityChanged,
-      );
+      state(fallback: '') == ServiceState.serverIdentityChanged ||
+      _valueText(payload?['control_state'], '') ==
+          ControlState.serverIdentityChanged;
 
   bool get needsEnrollment =>
-      _sameState(state(fallback: ''), ServiceState.needsEnrollment) ||
-      _sameState(
-        _valueText(payload?['control_state'], ''),
-        ControlState.notRegistered,
-      );
+      state(fallback: '') == ServiceState.needsEnrollment;
 
   bool get userDisconnected =>
       payload?['user_disconnected'] == true ||
-      _sameState(
-        _valueText(payload?['control_state'], ''),
-        ControlState.disconnected,
-      ) ||
-      _sameState(
-        _valueText(
-          _nestedValue(payload, 'connection_intent', 'desired_state'),
-          '',
-        ),
-        ConnectionIntentState.disconnected,
-      );
+      _valueText(payload?['desired_state'], '') ==
+          ConnectionIntentState.disconnected;
 
   bool get deviceEnrolled {
     if (payload == null || needsEnrollment) {
       return false;
     }
-    final markers = [
+    if (payload?['node_credential_present'] == true) {
+      return true;
+    }
+    final identifiers = [
       payload?['account_id'],
       payload?['node_id'],
       payload?['network_id'],
-      payload?['overlay_ip'],
-      _nestedValue(payload, 'agent', 'node_id'),
-      _nestedValue(payload, 'agent', 'network_id'),
-      _nestedValue(payload, 'agent', 'overlay_ip'),
     ];
-    return markers.any((value) => _valueText(value, '').isNotEmpty);
+    return identifiers.any((value) => _valueText(value, '').isNotEmpty);
   }
-}
-
-bool _sameState(String a, String b) =>
-    a.trim().toLowerCase() == b.trim().toLowerCase();
-
-Object? _nestedValue(Map<String, dynamic>? payload, String key, String nested) {
-  final child = payload?[key];
-  if (child is Map) {
-    return child[nested];
-  }
-  return null;
 }
 
 String _valueText(Object? value, String fallback) {

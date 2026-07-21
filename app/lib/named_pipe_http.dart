@@ -7,6 +7,8 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart';
 
+import 'service_contract.dart';
+
 const _maxResponseBytes = 1 << 20;
 const _readBufferSize = 64 * 1024;
 
@@ -39,6 +41,10 @@ class NamedPipeHttpClient {
     final payload = parsed.body.isEmpty
         ? <String, dynamic>{}
         : _decodeObject(parsed.body);
+    validateIPCEnvelope(
+      payload,
+      requireNegotiated: parsed.statusCode >= 200 && parsed.statusCode < 300,
+    );
     if (parsed.statusCode < 200 || parsed.statusCode >= 300) {
       throw StateError(
         _firstNonEmpty([
@@ -69,6 +75,18 @@ Uint8List namedPipeHttpExchange(
       ..write('$method $path HTTP/1.1\r\n')
       ..write('Host: endlessnet.local\r\n')
       ..write('Accept: application/json\r\n')
+      ..write(
+        '${ServiceIPCMetadata.protocolHeader}: '
+        '${ServiceIPCMetadata.protocol}\r\n',
+      )
+      ..write(
+        '${ServiceIPCMetadata.versionHeader}: '
+        '${ServiceIPCMetadata.version}\r\n',
+      )
+      ..write(
+        '${ServiceIPCMetadata.minimumVersionHeader}: '
+        '${ServiceIPCMetadata.minimumSupportedVersion}\r\n',
+      )
       ..write('Connection: close\r\n');
     if (body.isNotEmpty) {
       headers
@@ -332,6 +350,35 @@ Map<String, dynamic> _decodeObject(Uint8List raw) {
     return decoded.map((key, value) => MapEntry(key.toString(), value));
   }
   throw const FormatException('EndlessNet service returned non-object JSON.');
+}
+
+void validateIPCEnvelope(
+  Map<String, dynamic> payload, {
+  required bool requireNegotiated,
+}) {
+  if (payload['ipc_protocol'] != ServiceIPCMetadata.protocol) {
+    throw const FormatException(
+      'EndlessNet service returned an unsupported IPC protocol.',
+    );
+  }
+  if (payload['ipc_version'] != ServiceIPCMetadata.version ||
+      payload['ipc_min_supported_version'] !=
+          ServiceIPCMetadata.minimumSupportedVersion) {
+    throw const FormatException(
+      'EndlessNet service returned an unsupported IPC version range.',
+    );
+  }
+  final negotiated = payload['ipc_negotiated_version'];
+  if (requireNegotiated && negotiated != ServiceIPCMetadata.version) {
+    throw const FormatException(
+      'EndlessNet service did not negotiate the required IPC version.',
+    );
+  }
+  if (negotiated != null && negotiated != ServiceIPCMetadata.version) {
+    throw const FormatException(
+      'EndlessNet service returned an unsupported negotiated IPC version.',
+    );
+  }
 }
 
 String _firstNonEmpty(Iterable<String?> values) {

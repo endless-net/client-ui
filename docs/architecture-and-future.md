@@ -43,7 +43,7 @@
 - исходный код `endlessnet-client.exe`.
 
 Go runtime и producer-контракт принадлежат `unng-lab/endlessnet`. UI не должен
-копировать backend-код, запускать `endlessnet-client.exe` как IPC-адаптер или
+копировать runtime-код, запускать `endlessnet-client.exe` как IPC-адаптер или
 читать его приватные state-файлы.
 
 ## 3. Контекст системы
@@ -120,13 +120,14 @@ UI:
 запроса открывается pipe, отправляется HTTP/1.1 запрос и читается JSON-объект.
 Обычный timeout составляет 8 секунд, enrollment может выполняться до 2 минут.
 
-Клиент ограничивает ответ одним MiB, проверяет HTTP status line, заголовки,
-`Content-Length` или chunked encoding и принимает только JSON object. Работа с
+Клиент отправляет обязательные protocol/current/minimum-version headers,
+ограничивает ответ одним MiB и проверяет negotiated v1 envelope, HTTP status
+line, `Content-Length` или chunked encoding и JSON object. Работа с
 Win32 pipe вынесена в отдельный Dart isolate, чтобы блокирующий системный ввод-
 вывод не останавливал Flutter UI.
 
 Контракт описан в
-[`contracts/upstream/windows-client-ipc.openapi.yaml`](../contracts/upstream/windows-client-ipc.openapi.yaml).
+[`contracts/upstream/client-ipc-v1.openapi.yaml`](../contracts/upstream/client-ipc-v1.openapi.yaml).
 
 | Endpoint | Назначение | Текущее использование UI |
 | --- | --- | --- |
@@ -141,11 +142,13 @@ Win32 pipe вынесена в отдельный Dart isolate, чтобы бл�
 | `GET /networks` | Получить доступные сети | Просмотр списка |
 | `POST /network/select` | Выбрать уже enrolled сеть | Bridge готов, полноценного UI выбора пока нет |
 | `GET /diagnostics` | Получить redacted diagnostics | Копирование в clipboard с дополнительной redaction |
+| `POST /diagnostics/bundle` | Создать bounded redacted bundle | Bridge и эмулятор поддерживают контрактный вызов |
 | `GET /logs/recent` | Получить redacted logs | Просмотр последних записей |
 
 ### 5.3. Enrollment
 
-UI принимает `endlessnet://enroll?...` или токен из командной строки. Токен,
+UI принимает `endlessnet://enroll?enroll_token=...` или `enr_` токен из
+командной строки и отправляет только `enroll_token`, `server` и `mode`. Токен,
 deep link и значения авторизации редактируются до записи в debug log.
 
 Если service завершает enrollment сразу, UI показывает успешное состояние.
@@ -209,8 +212,8 @@ MSI дополнительно:
 
 ```mermaid
 flowchart TD
-    Core["Backend публикует Go core,<br/>IPC contract и immutable manifest"]
-    Dispatch["repository_dispatch<br/>backend-client-core-published"]
+    Core["endlessnet-client публикует Go core,<br/>IPC contract и immutable manifest"]
+    Dispatch["repository_dispatch<br/>client-core-published"]
     Verify["Проверка version, commit,<br/>URL и SHA-256 manifest/artifacts"]
     Contract["UI tests против<br/>опубликованного IPC contract"]
     Build["Сборка Flutter + MSI<br/>с pinned Flutter, WiX и Wintun"]
@@ -223,9 +226,9 @@ flowchart TD
     Core --> Dispatch --> Verify --> Contract --> Build --> Sign --> E2E --> Provenance --> Private --> Mirror
 ```
 
-Релиз инициирует публикация backend core, потому что MSI должен объединить
+Релиз инициирует публикация core из `unng-lab/endlessnet-client`, потому что MSI должен объединить
 совместимые версии Go runtime, IPC-контракта и UI. Workflow принимает только
-immutable release URLs, сверяет полный backend commit, версию и SHA-256 каждого
+immutable release URLs, сверяет полный client commit, версию, имена и SHA-256 каждого
 артефакта. Повторный dispatch той же версии допускается только для того же core
 manifest.
 
@@ -236,7 +239,7 @@ Release secrets доступны только job с environment `release`. Pull
 Перед публикацией workflow:
 
 1. запускает Go и Flutter tests;
-2. тестирует UI против контракта из backend release;
+2. тестирует UI против `client-ipc-v1.openapi.yaml` из client release;
 3. проверяет SHA-256 и исходную Authenticode-подпись `wintun.dll`;
 4. подписывает оба executable и итоговый MSI, затем проверяет все подписи;
 5. тестирует install, repair, upgrade и uninstall;
@@ -273,7 +276,7 @@ UI, Windows packaging и Windows release automation находятся здес�
 невозможность случайно связать UI с внутренностями runtime.
 
 Последствия: release обязан проверять immutable cross-repository artifacts и
-совместимость контрактов. Дублирование backend source запрещено.
+совместимость контрактов. Дублирование runtime source запрещено.
 
 ### ADR-002. UI обращается прямо к protected named pipe
 
@@ -308,7 +311,7 @@ Producer публикует versioned OpenAPI contract; репозиторий �
 копию для разработки и эмулятора, а release повторно тестирует UI против
 контракта, поставленного вместе с конкретным Go core.
 
-Причины: изменения backend и UI можно выпускать независимо, не полагаясь на
+Причины: изменения runtime client и UI можно выпускать независимо, не полагаясь на
 неявное совпадение исходников.
 
 Последствия: checked-in contract нужно синхронизировать осознанно, а breaking
@@ -342,8 +345,9 @@ identity и отправляет подтверждённый announced key ID �
 
 Статус: принято.
 
-Windows release запускается backend dispatch и принимает core только из
-immutable GitHub release path с проверенным manifest и SHA-256.
+Windows release запускается `client-core-published` dispatch и принимает core
+только из immutable GitHub release path `unng-lab/endlessnet-client` с
+проверенными manifest, именами артефактов и SHA-256.
 
 Причины: исключение подмены бинарника между тестированием и упаковкой и
 воспроизводимая связь UI/core.
@@ -387,7 +391,7 @@ injection; релиз дополнительно проверяется прот
 service.
 
 Причины: быстрые детерминированные тесты без приватных runtime-файлов и без
-копирования backend implementation.
+копирования runtime implementation.
 
 Последствия: эмулятор должен следовать OpenAPI surface, но не становиться вторым
 источником бизнес-логики.

@@ -6,12 +6,12 @@ import 'package:endlessnet/service_contract.dart';
 void main() {
   test('parseEnrollment accepts EndlessNet deep links', () {
     final request = parseEnrollment(
-      'endlessnet://enroll?join_token=enj_test_token&server=https%3A%2F%2Fapi.example.test&mode=server',
+      'endlessnet://enroll?enroll_token=enr_test_token&server=https%3A%2F%2Fapi.example.test&mode=server',
       '',
       'workstation',
     );
 
-    expect(request.token, 'enj_test_token');
+    expect(request.token, 'enr_test_token');
     expect(request.server, 'https://api.example.test');
     expect(request.mode, 'server');
   });
@@ -31,6 +31,16 @@ void main() {
     },
   );
 
+  test('parseEnrollment does not accept legacy token query aliases', () {
+    final request = parseEnrollment(
+      'endlessnet://enroll?join_token=enr_legacy&server=https%3A%2F%2Fapi.example.test',
+      '',
+      'workstation',
+    );
+
+    expect(request.token, isEmpty);
+  });
+
   test('parseEnrollment extracts pasted token text', () {
     final request = parseEnrollment(
       'connect with enr_pasted_secret now',
@@ -45,13 +55,13 @@ void main() {
 
   test('redactText removes enrollment tokens and credentials', () {
     final redacted = redactText(
-      'token=enr_secret private_key: abc Bearer bearer-secret endlessnet://enroll?token=enj_secret',
+      'token=enr_secret private_key: abc Bearer bearer-secret endlessnet://enroll?enroll_token=enr_url_secret',
     );
 
     expect(redacted, isNot(contains('enr_secret')));
     expect(redacted, isNot(contains('abc')));
     expect(redacted, isNot(contains('bearer-secret')));
-    expect(redacted, isNot(contains('enj_secret')));
+    expect(redacted, isNot(contains('enr_url_secret')));
   });
 
   test('isDeviceEnrolled detects enrolled status markers', () {
@@ -68,7 +78,7 @@ void main() {
     expect(
       isDeviceEnrolled({
         'state': ServiceState.disconnected,
-        'agent': {'network_id': 'net_123', 'overlay_ip': '100.64.0.2'},
+        'node_credential_present': true,
       }),
       isTrue,
     );
@@ -102,9 +112,8 @@ void main() {
     expect(needsEnrollment.deviceEnrolled, isFalse);
 
     final identityChanged = ServiceStatus({
-      'state': ServiceState.degraded,
+      'state': ServiceState.serverIdentityChanged,
       'node_id': 'node-1',
-      'agent': {'last_error': 'server map signing key changed'},
     });
     expect(identityChanged.serverIdentityChanged, isTrue);
   });

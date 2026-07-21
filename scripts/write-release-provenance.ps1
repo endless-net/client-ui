@@ -28,12 +28,12 @@ $provenance = [ordered]@{
     version = $core.version
     target = $core.target
     ipc_version = $core.ipc_version
-    backend = [ordered]@{
+    client = [ordered]@{
         repository = $core.repository
         commit = $core.commit
         manifest_url = $CoreManifestUrl
         manifest_sha256 = $CoreManifestSHA256.ToLowerInvariant()
-        client_source_sha256 = $core.artifacts.client.sha256
+        executable_sha256 = $core.artifacts.client.sha256
         ipc_contract_sha256 = $core.artifacts.ipc_contract.sha256
     }
     ui = [ordered]@{

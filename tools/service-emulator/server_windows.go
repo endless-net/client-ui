@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -108,6 +109,10 @@ func servePipeConnection(server *Server, handle windows.Handle) {
 		return
 	}
 	defer request.Body.Close()
+	if result := validateIPCRequestHeaders(request.Header); result != nil {
+		writeResult(file, *result)
+		return
+	}
 	if server.RequestStarted != nil {
 		server.RequestStarted()
 	}
@@ -129,6 +134,35 @@ func servePipeConnection(server *Server, handle windows.Handle) {
 		time.Sleep(result.Delay)
 	}
 	writeResult(file, result)
+}
+
+func validateIPCRequestHeaders(headers http.Header) *Result {
+	protocolValues := headers.Values(IPCProtocolHeader)
+	versionValues := headers.Values(IPCVersionHeader)
+	minimumValues := headers.Values(IPCMinVersionHeader)
+	if len(protocolValues) == 0 || len(versionValues) == 0 || len(minimumValues) == 0 {
+		result := errorResult(http.StatusUpgradeRequired, "ipc_version_required", "IPC protocol and version range headers are required")
+		return &result
+	}
+	if len(protocolValues) != 1 || strings.TrimSpace(protocolValues[0]) != IPCProtocol {
+		result := errorResult(http.StatusUpgradeRequired, "ipc_protocol_unsupported", "unsupported IPC protocol")
+		return &result
+	}
+	if len(versionValues) != 1 || len(minimumValues) != 1 {
+		result := errorResult(http.StatusBadRequest, "invalid_ipc_version_range", "IPC version headers must each occur exactly once")
+		return &result
+	}
+	current, currentErr := strconv.Atoi(strings.TrimSpace(versionValues[0]))
+	minimum, minimumErr := strconv.Atoi(strings.TrimSpace(minimumValues[0]))
+	if currentErr != nil || minimumErr != nil || current <= 0 || minimum <= 0 || minimum > current {
+		result := errorResult(http.StatusBadRequest, "invalid_ipc_version_range", "IPC version range is invalid")
+		return &result
+	}
+	if minimum > IPCVersion || current < IPCVersion {
+		result := errorResult(http.StatusUpgradeRequired, "ipc_version_unsupported", "IPC version ranges do not overlap")
+		return &result
+	}
+	return nil
 }
 
 func writeResult(writer io.Writer, result Result) {

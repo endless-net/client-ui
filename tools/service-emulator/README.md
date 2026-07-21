@@ -5,13 +5,13 @@ the checked-in v1 HTTP contract directly over a local Windows named pipe and
 does not start the Go runtime client, read runtime state, or expose a TCP port.
 
 The built-in stateful model implements every path in
-`contracts/upstream/windows-client-ipc.openapi.yaml`:
+`contracts/upstream/client-ipc-v1.openapi.yaml`:
 
 - status and finite `application/x-ndjson` event snapshots;
 - connect, disconnect, logout, and enrollment transitions;
 - server identity inspection and explicit trust recovery;
 - network listing and selection;
-- redacted diagnostics and recent logs.
+- redacted diagnostics snapshots, bounded bundle metadata, and recent logs.
 
 ## Quick start
 

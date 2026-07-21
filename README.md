@@ -39,8 +39,8 @@ Build an unsigned validation MSI from a previously verified Go-core artifact:
   -ClientExe .\.artifacts\endlessnet-client_windows_amd64.exe
 ```
 
-Production releases are initiated by an immutable `repository_dispatch` from
-the backend release workflow. They sign both executables and the final MSI,
+Production releases are initiated by an immutable `client-core-published`
+dispatch from the `unng-lab/endlessnet-client` release workflow. They sign both executables and the final MSI,
 publish private release provenance, mirror public artifacts through
 `unng-lab/endlessnetfront`, and trigger `unng-lab/endlessnet-system-tests`.
 
@@ -51,7 +51,8 @@ reviewers. Configure `WINDOWS_CODESIGN_PFX_BASE64` and
 `WINDOWS_CODESIGN_PFX_PASSWORD` as environment secrets. Configure these
 repository secrets with separate fine-grained tokens:
 
-- `BACKEND_RELEASE_TOKEN`: read-only Contents access to `unng-lab/endlessnet`;
+- `CLIENT_RELEASE_TOKEN`: read-only Contents access to
+  `unng-lab/endlessnet-client`;
 - `FRONT_RELEASE_TOKEN`: Contents write access only to
   `unng-lab/endlessnetfront`, for `repository_dispatch`.
 

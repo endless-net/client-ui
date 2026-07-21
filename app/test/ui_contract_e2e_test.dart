@@ -10,7 +10,6 @@ void main() {
     final config = AppConfig.parse(const []);
 
     expect(config.adminURL, 'https://admin.endlessnet.ru/');
-    expect(config.connectURL, 'https://admin.endlessnet.ru/connect/windows/');
   });
 
   test('UI contract constants mirror the OpenAPI enum/path surface', () {
@@ -18,62 +17,47 @@ void main() {
     final openAPI = contract.readAsStringSync();
 
     expect(openAPI, contains('title: EndlessNet Client Local Service IPC'));
-    for (final path in const [
-      ServiceIPCPath.status,
-      ServiceIPCPath.events,
-      ServiceIPCPath.enroll,
-      ServiceIPCPath.connect,
-      ServiceIPCPath.serverIdentity,
-      ServiceIPCPath.trustServer,
-      ServiceIPCPath.disconnect,
-      ServiceIPCPath.logout,
-      ServiceIPCPath.networks,
-      ServiceIPCPath.selectNetwork,
-      ServiceIPCPath.diagnostics,
-      ServiceIPCPath.recentLogs,
+    expect(_contractPaths(openAPI), ServiceIPCPath.all.toSet());
+    expect(_schemaEnum(openAPI, 'ServiceState'), ServiceState.all.toSet());
+    expect(_schemaEnum(openAPI, 'ControlState'), ControlState.all.toSet());
+    expect(
+      _schemaEnum(openAPI, 'DesiredState'),
+      ConnectionIntentState.all.toSet(),
+    );
+    expect(_schemaProperties(openAPI, 'EnrollRequest'), {
+      'enroll_token',
+      'server',
+      'mode',
+      'hostname',
+      'idempotency_key',
+    });
+    expect(_schemaProperties(openAPI, 'ServerIdentityResponse'), {
+      'control_plane_url',
+      'trusted_key_id',
+      'announced_key_id',
+      'changed',
+    });
+    expect(_schemaProperties(openAPI, 'DiagnosticsResponse'), {'diagnostics'});
+    expect(_schemaProperties(openAPI, 'LogsRecentResponse'), {'logs'});
+    for (final header in const [
+      ServiceIPCMetadata.protocolHeader,
+      ServiceIPCMetadata.versionHeader,
+      ServiceIPCMetadata.minimumVersionHeader,
     ]) {
-      expect(openAPI, contains('  $path:'));
+      expect(openAPI, contains('name: $header'));
     }
-
-    for (final state in const [
-      ServiceState.connected,
-      ServiceState.disconnected,
-      ServiceState.connecting,
-      ServiceState.updating,
-      ServiceState.degraded,
-      ServiceState.error,
-      ServiceState.needsEnrollment,
-      ServiceState.needsApproval,
-      ServiceState.serverIdentityChanged,
+    for (final removedProperty in const [
+      'join_token',
+      'server_url',
+      'server_urls',
+      'enrollment_pending',
+      'enrollment_approval_url',
     ]) {
-      expect(openAPI, contains('        - $state'));
-    }
-
-    for (final state in const [
-      ControlState.connecting,
-      ControlState.updating,
-      ControlState.syncing,
-      ControlState.needsApproval,
-      ControlState.approvalRequired,
-      ControlState.pendingApproval,
-      ControlState.degraded,
-      ControlState.offlineCache,
-      ControlState.ready,
-      ControlState.registered,
-      ControlState.cacheInvalid,
-      ControlState.error,
-      ControlState.notRegistered,
-      ControlState.disconnected,
-      ControlState.serverIdentityChanged,
-    ]) {
-      expect(openAPI, contains('        - $state'));
-    }
-
-    for (final state in const [
-      ConnectionIntentState.connected,
-      ConnectionIntentState.disconnected,
-    ]) {
-      expect(openAPI, contains('        - $state'));
+      expect(
+        RegExp('^\\s+$removedProperty:', multiLine: true).hasMatch(openAPI),
+        isFalse,
+        reason: '$removedProperty must not remain in the strict IPC contract',
+      );
     }
   });
 
@@ -90,8 +74,6 @@ void main() {
       config: AppConfig.parse(const [
         '--ipc-pipe',
         r'\\.\pipe\endlessnet-ui-e2e',
-        '--connect-url',
-        'https://admin.endlessnet.ru/connect/windows/',
         '--admin-url',
         'https://admin.endlessnet.ru/',
       ]),
@@ -140,7 +122,6 @@ void main() {
       {
         'state': ServiceState.needsApproval,
         'control_state': ControlState.pendingApproval,
-        'enrollment_pending': true,
         'enrollment_request_id': 'ner_ui_connect',
         'approval_url':
             'https://admin.endlessnet.ru/?enrollment_request=ner_ui_connect',
@@ -244,7 +225,7 @@ File _ipcContractFile() {
   var current = Directory.current.absolute;
   while (true) {
     final candidate = File(
-      '${current.path}${Platform.pathSeparator}contracts${Platform.pathSeparator}upstream${Platform.pathSeparator}windows-client-ipc.openapi.yaml',
+      '${current.path}${Platform.pathSeparator}contracts${Platform.pathSeparator}upstream${Platform.pathSeparator}client-ipc-v1.openapi.yaml',
     );
     if (candidate.existsSync()) {
       return candidate;
@@ -252,7 +233,7 @@ File _ipcContractFile() {
     final parent = current.parent;
     if (parent.path == current.path) {
       throw StateError(
-        'contracts/upstream/windows-client-ipc.openapi.yaml was not found above ${Directory.current.path}',
+        'contracts/upstream/client-ipc-v1.openapi.yaml was not found above ${Directory.current.path}',
       );
     }
     current = parent;
@@ -267,15 +248,11 @@ class ContractFakeBridge extends EndlessNetClientBridge {
       ) {
     if (identityChanged) {
       statusPayload = _contractStatus(
-        state: ServiceState.degraded,
-        controlState: ControlState.degraded,
+        state: ServiceState.serverIdentityChanged,
+        controlState: ControlState.serverIdentityChanged,
         desiredState: ConnectionIntentState.connected,
         userDisconnected: false,
       );
-      statusPayload['agent'] = {
-        ...statusPayload['agent'] as Map<String, dynamic>,
-        'last_error': 'server map signing key changed',
-      };
     }
   }
 
@@ -320,7 +297,7 @@ class ContractFakeBridge extends EndlessNetClientBridge {
   Future<Map<String, dynamic>> serverIdentity() async {
     calls.add('server-identity');
     return {
-      'server_url': 'https://api.endlessnet.ru',
+      'control_plane_url': 'https://api.endlessnet.ru',
       'trusted_key_id': 'ed25519:old',
       'announced_key_id': 'ed25519:new',
       'changed': true,
@@ -362,6 +339,7 @@ Map<String, dynamic> _contractStatus({
     'ipc_protocol': 'endlessnet-client-ipc',
     'ipc_version': 1,
     'ipc_min_supported_version': 1,
+    'ipc_negotiated_version': 1,
     'service_version': 'ui-e2e',
     'service_commit': 'contract',
     'service_build_date': '2026-07-09T00:00:00Z',
@@ -376,7 +354,11 @@ Map<String, dynamic> _contractStatus({
     },
     'cached_map_present': true,
     'cached_map_valid': true,
+    'map_signing_trust_present': true,
+    'token_present': true,
     'node_credential_present': true,
+    'device_fingerprint_present': true,
+    'identity_private_key_present': true,
     'private_key_present': true,
     'account_id': 'acc_ui_e2e',
     'node_id': 'node_ui_e2e',
@@ -387,6 +369,7 @@ Map<String, dynamic> _contractStatus({
     'map_revision': 7,
     'peer_count': 1,
     'agent': {
+      'state_present': true,
       'node_id': 'node_ui_e2e',
       'network_id': 'net_prod',
       'overlay_ip': '100.64.0.42',
@@ -394,9 +377,66 @@ Map<String, dynamic> _contractStatus({
         {
           'peer_id': 'node_peer_a',
           'hostname': 'peer-a',
+          'direct': {'type': 'direct', 'state': 'reachable'},
+          'relay': {'type': 'relay', 'state': 'standby'},
           'selected_path': 'direct',
         },
       ],
     },
   };
+}
+
+Set<String> _contractPaths(String openAPI) {
+  return RegExp(
+    r'^  (/[^:]+):\r?$',
+    multiLine: true,
+  ).allMatches(openAPI).map((match) => match.group(1)!).toSet();
+}
+
+Set<String> _schemaEnum(String openAPI, String schema) {
+  final block = _schemaBlock(openAPI, schema);
+  return RegExp(
+    r'^        - ([^\r\n]+)\r?$',
+    multiLine: true,
+  ).allMatches(block).map((match) => match.group(1)!).toSet();
+}
+
+Set<String> _schemaProperties(String openAPI, String schema) {
+  final block = _schemaBlock(openAPI, schema);
+  final properties = RegExp(
+    r'^( +)properties:\r?$',
+    multiLine: true,
+  ).firstMatch(block);
+  if (properties == null) {
+    throw StateError('OpenAPI schema has no properties: $schema');
+  }
+  final indent = properties.group(1)!.length + 2;
+  final prefix = ' ' * indent;
+  return block
+      .split(RegExp(r'\r?\n'))
+      .map((line) {
+        if (!line.startsWith(prefix) || line.startsWith('$prefix ')) {
+          return null;
+        }
+        return RegExp(
+          r'^([a-z][a-z0-9_]*):$',
+        ).firstMatch(line.trim())?.group(1);
+      })
+      .whereType<String>()
+      .toSet();
+}
+
+String _schemaBlock(String openAPI, String schema) {
+  final start = openAPI.indexOf('    $schema:');
+  if (start < 0) {
+    throw StateError('OpenAPI schema was not found: $schema');
+  }
+  final nextSchema = RegExp(
+    r'^    [A-Za-z][A-Za-z0-9]*:',
+    multiLine: true,
+  ).firstMatch(openAPI.substring(start + schema.length + 5));
+  final end = nextSchema == null
+      ? openAPI.length
+      : start + schema.length + 5 + nextSchema.start;
+  return openAPI.substring(start, end);
 }

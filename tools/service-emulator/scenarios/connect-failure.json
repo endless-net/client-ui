@@ -12,7 +12,6 @@
           "status": 503,
           "delay_ms": 750,
           "body": {
-            "ok": false,
             "error_code": "connect_failed",
             "error": "emulated control plane outage"
           },
