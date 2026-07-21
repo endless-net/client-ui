@@ -11,5 +11,13 @@
 - PR workflows must not receive signing or cross-repository release secrets.
 - Published releases must verify the immutable Go-core manifest and sign both
   executables and the final MSI before publication.
+- GitHub Actions runner-unit infrastructure, including installation,
+  registration, host inventory, service configuration, restart and resource
+  limits, guarded rollout, recovery, and rollback, is owned by
+  `unng-lab/endlessnet-observability`. Keep only the minimal `runs-on`
+  scheduling selectors here; do not add runner-management workflows, scripts,
+  units, secrets, or host configuration to this repository.
+- `app/windows/runner` is the Flutter Windows application runner, not GitHub
+  Actions infrastructure.
 - Format changed Go files with `gofmt`; run `go test ./...`, `flutter analyze`,
   and `flutter test` before publishing changes.
