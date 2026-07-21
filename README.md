@@ -66,9 +66,31 @@ same immutable core manifest.
 ## Release configuration
 
 The `release` environment is restricted to `main` and has no required
-reviewers. Configure `WINDOWS_CODESIGN_PFX_BASE64` and
-`WINDOWS_CODESIGN_PFX_PASSWORD` as environment secrets. Configure these
-repository secrets with separate fine-grained tokens:
+reviewers. The current signing mode is deliberately temporary: a stable
+self-signed code-signing certificate is reused between releases. Its signatures
+do not provide public Windows trust or Microsoft SmartScreen reputation.
+
+Configure the protected `release` environment with:
+
+- `WINDOWS_CODESIGN_MODE=temporary-self-signed` as an environment variable;
+- `WINDOWS_CODESIGN_EXPECTED_THUMBPRINT` as an environment variable containing
+  the stable certificate's 40-character SHA-1 thumbprint;
+- `WINDOWS_CODESIGN_PFX_BASE64` and `WINDOWS_CODESIGN_PFX_PASSWORD` as
+  environment secrets containing that same stable PFX and its password.
+
+Do not generate a new PFX per run. The release job imports the PFX as
+non-exportable, verifies signature integrity and the exact signer without adding
+a trusted root, and removes the certificate, private-key container, and
+temporary files in an `if: always()` cleanup step.
+
+Migration to a publicly trusted PFX requires no packaging change: replace the
+two PFX secrets and expected thumbprint, then set
+`WINDOWS_CODESIGN_MODE=public-authenticode`. That mode rejects self-signed
+certificates and requires Windows trust validation. A future cloud signer can
+replace the isolated import/signing adapter while retaining the exact-signer
+checks, Wintun verification, provenance, and publication gates.
+
+Configure these repository secrets with separate fine-grained tokens:
 
 - `CLIENT_CORE_RELEASE_TOKEN`: read-only Contents access to
   `unng-lab/endlessnet-client`;

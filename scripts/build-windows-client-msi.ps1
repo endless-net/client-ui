@@ -9,11 +9,16 @@ param(
     [string]$IconFile = "",
     [string]$PublicBaseUrl = "https://endlessnet.ru/downloads",
     [switch]$Sign,
+    [string]$SigningMode = $env:WINDOWS_CODESIGN_MODE,
     [string]$SignTool = $env:SIGNTOOL_EXE,
     [string]$CertificateThumbprint = $env:ENDLESSNET_CODESIGN_THUMBPRINT
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($Sign -and $SigningMode -notin @("temporary-self-signed", "public-authenticode")) {
+    throw "SigningMode must be temporary-self-signed or public-authenticode for signed releases"
+}
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
@@ -63,6 +68,9 @@ if (-not (Test-Path -LiteralPath $WintunDll)) {
 $wintunSignature = Get-AuthenticodeSignature -LiteralPath $WintunDll
 if ($wintunSignature.Status -ne "Valid") {
     throw "Official Wintun Authenticode verification failed: $($wintunSignature.Status)"
+}
+if ($Sign -and $wintunSignature.SignerCertificate.Thumbprint -eq $CertificateThumbprint) {
+    throw "Official Wintun signature must not be replaced by the EndlessNet release signer"
 }
 $clientVersion = (& $ClientExe version 2>&1 | Out-String)
 if ($LASTEXITCODE -ne 0 -or $clientVersion -notmatch "endlessnet-client\s+$([regex]::Escape($Version))(\s|$)") {
@@ -122,8 +130,16 @@ function Invoke-EndlessNetSign([string]$Path) {
         throw "Authenticode signing failed for $Path with exit code $LASTEXITCODE"
     }
     $signature = Get-AuthenticodeSignature -LiteralPath $Path
-    if ($signature.Status -ne "Valid") {
+    $allowedStatuses = if ($SigningMode -eq "temporary-self-signed") {
+        @("Valid", "NotTrusted", "UnknownError")
+    } else {
+        @("Valid")
+    }
+    if ($signature.Status -notin $allowedStatuses) {
         throw "Authenticode verification failed for ${Path}: $($signature.Status)"
+    }
+    if ($signature.SignerCertificate.Thumbprint -ne $CertificateThumbprint) {
+        throw "Unexpected Authenticode signer for $Path"
     }
 }
 
@@ -192,6 +208,11 @@ $buildOutput = [ordered]@{
     ui_commit = $commit
     target = "windows/amd64"
     signed = [bool]$Sign
+    signing = [ordered]@{
+        mode = $(if ($Sign) { $SigningMode } else { "unsigned" })
+        certificate_thumbprint = $(if ($Sign) { $CertificateThumbprint.ToUpperInvariant() } else { $null })
+        publicly_trusted = [bool]($Sign -and $SigningMode -eq "public-authenticode")
+    }
     client = [ordered]@{
         path = $packagedClientExe
         unsigned_sha256 = $unsignedClientHash
@@ -202,6 +223,7 @@ $buildOutput = [ordered]@{
         path = $packagedWintunDll
         archive_sha256 = $wintunArchiveSHA256
         sha256 = $wintunHash
+        signer_thumbprint = $wintunSignature.SignerCertificate.Thumbprint.ToUpperInvariant()
     }
     app = [ordered]@{
         path = $appExe
