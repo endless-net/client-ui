@@ -29,7 +29,8 @@ func TestReleaseConsumesStandaloneClientCore(t *testing.T) {
 		"client_commit",
 		"CLIENT_CORE_RELEASE_TOKEN",
 		"unng-lab/endlessnet-client/releases/download",
-		"client_core",
+		"client-ipc-v1.openapi.yaml",
+		"client = [ordered]@{",
 	} {
 		if !strings.Contains(text, expected) {
 			t.Errorf("standalone client release boundary is missing %q", expected)
@@ -40,6 +41,8 @@ func TestReleaseConsumesStandaloneClientCore(t *testing.T) {
 		"backend_commit",
 		"BACKEND_RELEASE_TOKEN",
 		"unng-lab/endlessnet/releases/download",
+		"windows-client-ipc.openapi.yaml",
+		"client_core",
 	} {
 		if strings.Contains(text, removed) {
 			t.Errorf("superseded backend client release boundary remains: %q", removed)

@@ -61,6 +61,26 @@ void main() {
     );
   });
 
+  test('validates negotiated IPC metadata', () {
+    expect(
+      () => validateIPCEnvelope({
+        'ipc_protocol': ServiceIPCMetadata.protocol,
+        'ipc_version': ServiceIPCMetadata.version,
+        'ipc_min_supported_version': ServiceIPCMetadata.minimumSupportedVersion,
+        'ipc_negotiated_version': ServiceIPCMetadata.version,
+      }, requireNegotiated: true),
+      returnsNormally,
+    );
+    expect(
+      () => validateIPCEnvelope({
+        'ipc_protocol': ServiceIPCMetadata.protocol,
+        'ipc_version': ServiceIPCMetadata.version,
+        'ipc_min_supported_version': ServiceIPCMetadata.minimumSupportedVersion,
+      }, requireNegotiated: true),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
   test('app bridge maps UI actions directly to service IPC', () async {
     final ipc = _RecordingNamedPipeHttpClient();
     final bridge = EndlessNetClientBridge(
@@ -72,6 +92,7 @@ void main() {
     await bridge.status();
     await bridge.connect();
     await bridge.disconnect();
+    await bridge.diagnosticsBundle(logLimit: 100);
     await bridge.selectNetwork('net-1');
     await bridge.trustServer('key-1');
     await bridge.enroll(
@@ -86,6 +107,9 @@ void main() {
       const _IPCCall('GET', ServiceIPCPath.status, null),
       const _IPCCall('POST', ServiceIPCPath.connect, {}),
       const _IPCCall('POST', ServiceIPCPath.disconnect, {}),
+      const _IPCCall('POST', ServiceIPCPath.diagnosticsBundle, {
+        'log_limit': 100,
+      }),
       const _IPCCall('POST', ServiceIPCPath.selectNetwork, {
         'network_id': 'net-1',
       }),
@@ -94,8 +118,8 @@ void main() {
         'confirmed_key_id': 'key-1',
       }),
       const _IPCCall('POST', ServiceIPCPath.enroll, {
-        'join_token': 'join-secret',
-        'server_url': 'https://api.example.test',
+        'enroll_token': 'join-secret',
+        'server': 'https://api.example.test',
         'mode': 'workstation',
       }),
     ]);

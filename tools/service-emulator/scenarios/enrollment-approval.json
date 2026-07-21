@@ -13,7 +13,11 @@
     "agent": null,
     "cached_map_present": false,
     "cached_map_valid": false,
+    "map_signing_trust_present": false,
+    "token_present": false,
     "node_credential_present": false,
+    "device_fingerprint_present": false,
+    "identity_private_key_present": false,
     "private_key_present": false,
     "peer_count": 0
   },
@@ -25,11 +29,19 @@
       "responses": [
         {
           "body": {
-            "ok": true,
             "state": "NeedsApproval",
-            "enrollment_pending": true,
+            "control_state": "pending_approval",
+            "desired_state": "connected",
             "enrollment_request_id": "ner_emulator",
-            "approval_url": "https://admin.example.test/?enrollment_request=ner_emulator"
+            "approval_url": "https://admin.example.test/?enrollment_request=ner_emulator",
+            "cached_map_present": false,
+            "cached_map_valid": false,
+            "map_signing_trust_present": false,
+            "token_present": false,
+            "node_credential_present": false,
+            "device_fingerprint_present": false,
+            "identity_private_key_present": false,
+            "private_key_present": false
           },
           "status_patch": {
             "state": "NeedsApproval",
@@ -40,9 +52,17 @@
         },
         {
           "body": {
-            "ok": true,
             "state": "Connected",
-            "enrolled": true,
+            "control_state": "ready",
+            "desired_state": "connected",
+            "cached_map_present": true,
+            "cached_map_valid": true,
+            "map_signing_trust_present": true,
+            "token_present": true,
+            "node_credential_present": true,
+            "device_fingerprint_present": true,
+            "identity_private_key_present": true,
+            "private_key_present": true,
             "node_id": "node_emulator",
             "network_id": "net_primary"
           },
@@ -56,7 +76,11 @@
             "overlay_ip": "100.64.0.10",
             "cached_map_present": true,
             "cached_map_valid": true,
+            "map_signing_trust_present": true,
+            "token_present": true,
             "node_credential_present": true,
+            "device_fingerprint_present": true,
+            "identity_private_key_present": true,
             "private_key_present": true
           }
         }

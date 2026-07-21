@@ -219,7 +219,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     </StandardDirectory>
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="EndlessNet">
-        <Directory Id="EndlessNetAppDataFolder" Name="data" />
+		<Directory Id="EndlessNetAppDataFolder" Name="data" />
       </Directory>
     </StandardDirectory>
     <StandardDirectory Id="CommonAppDataFolder">

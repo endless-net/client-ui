@@ -65,7 +65,7 @@ goto parse_existing_args
 :write_provenance
 if "!TARGET_DIR!"=="" exit /b 3
 if not exist "!TARGET_DIR!" mkdir "!TARGET_DIR!"
->"!TARGET_DIR!\release-provenance.json" echo {"client_core":{"manifest_sha256":"%FAKE_MANIFEST_SHA%"}}
+>"!TARGET_DIR!\release-provenance.json" echo {"client":{"manifest_sha256":"%FAKE_MANIFEST_SHA%"}}
 exit /b 0
 `
 	if err := os.WriteFile(fakeGH, []byte(fakeBody), 0o600); err != nil {

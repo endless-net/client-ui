@@ -6,12 +6,12 @@ import 'package:endlessnet/service_contract.dart';
 void main() {
   test('parseEnrollment accepts EndlessNet deep links', () {
     final request = parseEnrollment(
-      'endlessnet://enroll?join_token=enj_test_token&server=https%3A%2F%2Fapi.example.test&mode=server',
+      'endlessnet://enroll?enroll_token=enr_test_token&server=https%3A%2F%2Fapi.example.test&mode=server',
       '',
       'workstation',
     );
 
-    expect(request.token, 'enj_test_token');
+    expect(request.token, 'enr_test_token');
     expect(request.server, 'https://api.example.test');
     expect(request.mode, 'server');
   });
@@ -31,6 +31,16 @@ void main() {
     },
   );
 
+  test('parseEnrollment does not accept legacy token query aliases', () {
+    final request = parseEnrollment(
+      'endlessnet://enroll?join_token=enr_legacy&server=https%3A%2F%2Fapi.example.test',
+      '',
+      'workstation',
+    );
+
+    expect(request.token, isEmpty);
+  });
+
   test('parseEnrollment extracts pasted token text', () {
     final request = parseEnrollment(
       'connect with enr_pasted_secret now',
@@ -45,13 +55,13 @@ void main() {
 
   test('redactText removes enrollment tokens and credentials', () {
     final redacted = redactText(
-      'token=enr_secret private_key: abc Bearer bearer-secret endlessnet://enroll?token=enj_secret',
+      'token=enr_secret private_key: abc Bearer bearer-secret endlessnet://enroll?enroll_token=enr_url_secret',
     );
 
     expect(redacted, isNot(contains('enr_secret')));
     expect(redacted, isNot(contains('abc')));
     expect(redacted, isNot(contains('bearer-secret')));
-    expect(redacted, isNot(contains('enj_secret')));
+    expect(redacted, isNot(contains('enr_url_secret')));
   });
 
   test('isDeviceEnrolled detects enrolled status markers', () {
@@ -68,7 +78,7 @@ void main() {
     expect(
       isDeviceEnrolled({
         'state': ServiceState.disconnected,
-        'agent': {'network_id': 'net_123', 'overlay_ip': '100.64.0.2'},
+        'node_credential_present': true,
       }),
       isTrue,
     );
@@ -102,14 +112,13 @@ void main() {
     expect(needsEnrollment.deviceEnrolled, isFalse);
 
     final identityChanged = ServiceStatus({
-      'state': ServiceState.degraded,
+      'state': ServiceState.serverIdentityChanged,
       'node_id': 'node-1',
-      'agent': {'last_error': 'server map signing key changed'},
     });
     expect(identityChanged.serverIdentityChanged, isTrue);
   });
 
-  test('ServiceStatus parses selected paths and relay fallback', () {
+  test('ServiceStatus parses strict peer path diagnostics', () {
     final status = ServiceStatus({
       'agent': {
         'state_present': true,
@@ -122,6 +131,12 @@ void main() {
             'hostname': 'peer-a',
             'selected_path': 'direct',
             'selected_endpoint': '192.168.1.20:51820',
+            'direct': {
+              'type': 'direct',
+              'state': 'reachable',
+              'endpoint': '192.168.1.20:51820',
+            },
+            'relay': {'type': 'relay', 'state': 'standby'},
             'candidates': [
               {
                 'type': 'direct',
@@ -134,7 +149,7 @@ void main() {
           },
           {
             'peer_id': 'peer-relay',
-            'hostname': 'older-peer',
+            'hostname': 'relay-peer',
             'selected_path': 'relay',
             'selection_reason':
                 'relay-first path established while direct candidates are probed',
@@ -153,45 +168,31 @@ void main() {
     expect(status.peerPaths.first.candidates.single.rttMS, 4.5);
     expect(status.peerPaths.last.selectedPath, 'relay');
     expect(selectedPathsLabel(status.agent), '1 direct · 1 relay');
-    expect(peerLabels(status.payload), contains('older-peer - Relay'));
+    expect(peerLabels(status.payload), contains('relay-peer - Relay'));
   });
 
-  test('ServiceDiagnostics parses STUN and PCP/NAT-PMP results', () {
+  test('ServiceDiagnostics reads status from the strict response envelope', () {
     final diagnostics = ServiceDiagnostics({
-      'agent_state': {
-        'stun': {
-          'ok': true,
-          'results': [
-            {
-              'id': 'stun-1',
-              'reachable': true,
-              'mapped_address': '198.51.100.10:51820',
-              'duration': 10000000,
-            },
-          ],
-          'nat': {
-            'classification': 'consistent_mapping',
-            'total_endpoints': 1,
-            'reachable_endpoints': 1,
+      'diagnostics': {
+        'generated_at': '2026-07-21T12:00:00Z',
+        'status': {
+          'state': ServiceState.connected,
+          'agent': {
+            'state_present': true,
+            'stun_ok': true,
+            'relay_ok': true,
+            'selected_path_counts': {'direct': 1},
+            'peers': <Map<String, dynamic>>[],
           },
-          'port_mappings': [
-            {
-              'protocol': 'nat_pmp',
-              'ok': true,
-              'mapped_endpoint': '198.51.100.10:51820',
-              'lifetime_seconds': 120,
-            },
-          ],
         },
       },
     });
 
-    expect(diagnostics.stun.classification, 'consistent_mapping');
-    expect(diagnostics.stun.results.single.reachable, isTrue);
-    expect(diagnostics.stun.portMappings.single.protocol, 'nat_pmp');
+    expect(diagnostics.generatedAt, '2026-07-21T12:00:00Z');
+    expect(diagnostics.status.connected, isTrue);
     expect(
-      portMappingSummary(diagnostics.stun.portMappings),
-      'NAT-PMP 198.51.100.10:51820',
+      discoveryHealthLabel(diagnostics.agent),
+      'STUN reachable · relay available',
     );
   });
 }

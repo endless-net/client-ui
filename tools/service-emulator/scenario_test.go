@@ -2,34 +2,38 @@ package serviceemulator
 
 import (
 	"encoding/json"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 )
 
 func TestContractRoutesMatchCheckedInOpenAPI(t *testing.T) {
-	contractPath := filepath.Join("..", "..", "contracts", "upstream", "windows-client-ipc.openapi.yaml")
+	contractPath := filepath.Join("..", "..", "contracts", "upstream", "client-ipc-v1.openapi.yaml")
 	raw, err := os.ReadFile(contractPath)
 	if err != nil {
 		t.Fatalf("read IPC contract: %v", err)
 	}
-	matches := regexp.MustCompile(`(?m)^  (/[^:]+):\r?$`).FindAllStringSubmatch(string(raw), -1)
-	want := make([]string, 0, len(matches))
-	for _, match := range matches {
-		want = append(want, match[1])
+	pathPattern := regexp.MustCompile(`(?m)^  (/[^:]+):\r?$`)
+	methodPattern := regexp.MustCompile(`(?m)^    (get|post|put|patch|delete):\r?$`)
+	matches := pathPattern.FindAllStringSubmatchIndex(string(raw), -1)
+	want := make(map[string]string, len(matches))
+	for i, match := range matches {
+		blockEnd := len(raw)
+		if i+1 < len(matches) {
+			blockEnd = matches[i+1][0]
+		}
+		method := methodPattern.FindSubmatch(raw[match[1]:blockEnd])
+		if method == nil {
+			t.Fatalf("OpenAPI path %q has no HTTP operation", string(raw[match[2]:match[3]]))
+		}
+		want[string(raw[match[2]:match[3]])] = strings.ToUpper(string(method[1]))
 	}
-	slices.Sort(want)
-	got := make([]string, 0, len(contractRoutes))
-	for path := range contractRoutes {
-		got = append(got, path)
-	}
-	slices.Sort(got)
-	if !slices.Equal(got, want) {
-		t.Fatalf("emulator paths = %v, OpenAPI paths = %v", got, want)
+	if !maps.Equal(contractRoutes, want) {
+		t.Fatalf("emulator routes = %v, OpenAPI routes = %v", contractRoutes, want)
 	}
 }
 
@@ -94,13 +98,19 @@ func TestDefaultEngineImplementsContractSurface(t *testing.T) {
 
 	diagnostics := decodeResult(t, engine.Handle(http.MethodGet, "/diagnostics", nil))
 	assertEnvelope(t, diagnostics)
-	if diagnostics["status"] == nil || diagnostics["recent_logs"] == nil || diagnostics["agent_state"] == nil {
-		t.Fatal("diagnostics response omitted status, recent_logs, or agent_state")
+	diagnosticsPayload, ok := diagnostics["diagnostics"].(map[string]any)
+	if !ok || diagnosticsPayload["status"] == nil || diagnosticsPayload["recent_logs"] == nil {
+		t.Fatal("diagnostics response omitted diagnostics.status or diagnostics.recent_logs")
 	}
-	agentState := diagnostics["agent_state"].(map[string]any)
-	stun := agentState["stun"].(map[string]any)
-	if len(stun["port_mappings"].([]any)) != 1 || len(agentState["paths"].([]any)) != 1 {
-		t.Fatalf("diagnostics response omitted v0.2.0 path or port mapping data: %#v", agentState)
+	diagnosticsStatus := diagnosticsPayload["status"].(map[string]any)
+	diagnosticsAgent := diagnosticsStatus["agent"].(map[string]any)
+	if len(diagnosticsAgent["peers"].([]any)) != 1 {
+		t.Fatalf("diagnostics response omitted peer path data: %#v", diagnosticsAgent)
+	}
+	bundle := decodeResult(t, engine.Handle(http.MethodPost, "/diagnostics/bundle", []byte(`{"log_limit":100}`)))
+	assertEnvelope(t, bundle)
+	if bundle["path"] == nil || bundle["size_bytes"] == nil {
+		t.Fatal("diagnostics bundle response omitted path or size_bytes")
 	}
 	logs := decodeResult(t, engine.Handle(http.MethodGet, "/logs/recent?limit=1", nil))
 	assertEnvelope(t, logs)
@@ -109,9 +119,9 @@ func TestDefaultEngineImplementsContractSurface(t *testing.T) {
 	if got := loggedOut["state"]; got != "NeedsEnrollment" {
 		t.Fatalf("logout state = %v, want NeedsEnrollment", got)
 	}
-	enrolled := decodeResult(t, engine.Handle(http.MethodPost, "/enroll", []byte(`{"join_token":"enj_secret","mode":"workstation"}`)))
-	if got := enrolled["enrolled"]; got != true {
-		t.Fatalf("enrolled = %v, want true", got)
+	enrolled := decodeResult(t, engine.Handle(http.MethodPost, "/enroll", []byte(`{"enroll_token":"enr_secret","mode":"workstation"}`)))
+	if got := enrolled["state"]; got != "Connected" {
+		t.Fatalf("enrolled state = %v, want Connected", got)
 	}
 
 	events := engine.Handle(http.MethodGet, "/events", nil)
@@ -142,7 +152,7 @@ func TestScriptedRouteChecksBodyPatchesStatusAndRepeats(t *testing.T) {
     "responses": [{
       "expect_body": {},
       "status": 503,
-      "body": {"ok": false, "error_code": "connect_failed", "error": "offline"},
+		"body": {"error_code": "connect_failed", "error": "offline"},
       "delay_ms": 25,
       "status_patch": {"state": "Degraded", "control_state": "offline_cache"}
     }]
@@ -183,7 +193,7 @@ func TestScriptedRouteRejectsUnexpectedBodyAndExhaustion(t *testing.T) {
     "path": "/network/select",
     "responses": [{
       "expect_body": {"network_id": "net_primary"},
-      "body": {"ok": true, "state": "Connected"}
+		"body": {"state": "Connected", "desired_state": "connected", "selected_network_id": "net_primary", "selected_network": {"id": "net_primary"}, "node_id": "node_emulator", "map_revision": 1}
     }]
   }]
 }`
@@ -208,9 +218,9 @@ func TestInteractionRedactsEnrollmentSecrets(t *testing.T) {
 	engine := newTestEngine(t, DefaultScenario(), func(interaction Interaction) {
 		got = interaction
 	})
-	engine.Handle(http.MethodPost, "/enroll", []byte(`{"join_token":"enj_secret","mode":"workstation"}`))
+	engine.Handle(http.MethodPost, "/enroll", []byte(`{"enroll_token":"enr_secret","mode":"workstation"}`))
 
-	if got.RequestBody["join_token"] != "<redacted>" {
+	if got.RequestBody["enroll_token"] != "<redacted>" {
 		t.Fatalf("journal leaked enrollment token: %#v", got.RequestBody)
 	}
 	if got.Method != http.MethodPost || got.Target != "/enroll" || got.Sequence != 1 {
@@ -264,7 +274,7 @@ func decodeResult(t *testing.T, result Result) map[string]any {
 
 func assertEnvelope(t *testing.T, payload map[string]any) {
 	t.Helper()
-	if payload["ipc_protocol"] != IPCProtocol || payload["ipc_version"] != float64(IPCVersion) || payload["ipc_min_supported_version"] != float64(IPCVersion) {
+	if payload["ipc_protocol"] != IPCProtocol || payload["ipc_version"] != float64(IPCVersion) || payload["ipc_min_supported_version"] != float64(IPCVersion) || payload["ipc_negotiated_version"] != float64(IPCVersion) {
 		t.Fatalf("invalid IPC envelope: %#v", payload)
 	}
 }

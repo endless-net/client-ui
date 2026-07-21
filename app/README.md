@@ -5,10 +5,11 @@ EndlessNet service named pipe using the versioned local HTTP contract.
 
 The main window summarizes the service-reported direct/relay selection for each
 peer. Connectivity diagnostics show authenticated candidate health, selection
-reasons, STUN mappings, and PCP/NAT-PMP results from `/diagnostics`. Relay is a
-normal compatible path, including while direct candidates are being evaluated
-or when the remote peer runs an older client. Missing optional v1 extension data
-is displayed as unavailable and is never reconstructed from private state.
+reasons, STUN reachability, and relay availability from the producer-defined
+`diagnostics.status.agent` schema. Relay is a normal path while direct
+candidates are being evaluated or when no direct candidate is reachable. The UI
+does not consume fields outside `client-ipc-v1.openapi.yaml` and never
+reconstructs diagnostics from private state.
 
 Run ordinary UI tests from this directory:
 

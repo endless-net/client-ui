@@ -37,6 +37,10 @@ if ($ManifestUrl -ne $expectedManifestUrl) {
 $savedGitHubToken = $env:GH_TOKEN
 try {
     $env:GH_TOKEN = $GitHubToken
+    $releaseTarget = (& gh api "/repos/unng-lab/endlessnet-client/releases/tags/$tag" --jq ".target_commitish" | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $releaseTarget -ne $ClientCommit.ToLowerInvariant()) {
+        throw "client core release target does not match client_commit"
+    }
     & gh release download $tag --repo unng-lab/endlessnet-client --pattern $manifestAsset --dir $OutputDir --clobber
     if ($LASTEXITCODE -ne 0) { throw "failed to download the client core manifest" }
     Move-Item -LiteralPath (Join-Path $OutputDir $manifestAsset) -Destination $manifestPath -Force
@@ -59,21 +63,27 @@ if ($manifest.version -ne $Version -or $manifest.commit -ne $ClientCommit.ToLowe
 if ($manifest.target -ne "windows/amd64" -or $manifest.ipc_version -ne "v1") {
     throw "client core manifest target or IPC version mismatch"
 }
-if ($manifest.artifacts.client.sha256 -notmatch '^[a-fA-F0-9]{64}$') {
-    throw "client core manifest has an invalid executable digest"
+if ($manifest.artifacts.client.sha256 -notmatch '^[a-fA-F0-9]{64}$' -or
+    $manifest.artifacts.ipc_contract.sha256 -notmatch '^[a-fA-F0-9]{64}$') {
+    throw "client core manifest has an invalid artifact digest"
 }
-$expectedClientUrl = "https://github.com/unng-lab/endlessnet-client/releases/download/$tag/endlessnet-client_windows_amd64.exe"
-$expectedContractUrl = "https://github.com/unng-lab/endlessnet-client/releases/download/$tag/windows-client-ipc.openapi.yaml"
-if ($manifest.artifacts.client.url -ne $expectedClientUrl -or $manifest.artifacts.ipc_contract.url -ne $expectedContractUrl) {
-    throw "client core artifacts do not use immutable client release paths"
+$clientAsset = "endlessnet-client_windows_amd64.exe"
+$contractAsset = "client-ipc-v1.openapi.yaml"
+$expectedClientUrl = "https://github.com/unng-lab/endlessnet-client/releases/download/$tag/$clientAsset"
+$expectedContractUrl = "https://github.com/unng-lab/endlessnet-client/releases/download/$tag/$contractAsset"
+if ($manifest.artifacts.client.name -ne $clientAsset -or
+    $manifest.artifacts.ipc_contract.name -ne $contractAsset -or
+    $manifest.artifacts.client.url -ne $expectedClientUrl -or
+    $manifest.artifacts.ipc_contract.url -ne $expectedContractUrl) {
+    throw "client core artifacts do not use immutable client release names and paths"
 }
 
-$clientPath = Join-Path $OutputDir "endlessnet-client_windows_amd64.exe"
-$contractPath = Join-Path $OutputDir "windows-client-ipc.openapi.yaml"
+$clientPath = Join-Path $OutputDir $clientAsset
+$contractPath = Join-Path $OutputDir $contractAsset
 $savedGitHubToken = $env:GH_TOKEN
 try {
     $env:GH_TOKEN = $GitHubToken
-    & gh release download $tag --repo unng-lab/endlessnet-client --pattern "endlessnet-client_windows_amd64.exe" --pattern "windows-client-ipc.openapi.yaml" --dir $OutputDir --clobber
+    & gh release download $tag --repo unng-lab/endlessnet-client --pattern $clientAsset --pattern $contractAsset --dir $OutputDir --clobber
     if ($LASTEXITCODE -ne 0) { throw "failed to download client core artifacts" }
 } finally {
     $env:GH_TOKEN = $savedGitHubToken

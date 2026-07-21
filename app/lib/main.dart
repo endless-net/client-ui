@@ -33,7 +33,6 @@ const _appTarget = String.fromEnvironment(
 const _defaultPipe = r'\\.\pipe\endlessnet-service';
 const _defaultDebugLogDir = r'~\.endlessnet\logs';
 const _defaultAdminURL = 'https://admin.endlessnet.ru/';
-const _defaultConnectURL = 'https://admin.endlessnet.ru/connect/windows/';
 const _showSignalPath = r'~\.endlessnet\endlessnet.show';
 const _defaultEnrollmentPollInterval = Duration(seconds: 2);
 const _defaultEnrollmentPollTimeout = Duration(minutes: 10);
@@ -131,7 +130,6 @@ class AppConfig {
   AppConfig({
     required this.pipe,
     required this.adminURL,
-    required this.connectURL,
     required this.server,
     required this.mode,
     required this.enrollText,
@@ -144,7 +142,6 @@ class AppConfig {
 
   final String pipe;
   final String adminURL;
-  final String connectURL;
   final String server;
   final String mode;
   final String enrollText;
@@ -157,7 +154,6 @@ class AppConfig {
   static AppConfig parse(List<String> args) {
     var pipe = _defaultPipe;
     var adminURL = _defaultAdminURL;
-    var connectURL = _defaultConnectURL;
     var server = '';
     var mode = 'workstation';
     var enrollText = '';
@@ -180,8 +176,6 @@ class AppConfig {
         pipe = nextValue();
       } else if (arg == '--admin-url') {
         adminURL = nextValue();
-      } else if (arg == '--connect-url') {
-        connectURL = nextValue();
       } else if (arg == '--server') {
         server = nextValue();
       } else if (arg == '--mode') {
@@ -204,9 +198,6 @@ class AppConfig {
     return AppConfig(
       pipe: pipe.trim().isEmpty ? _defaultPipe : pipe.trim(),
       adminURL: adminURL.trim().isEmpty ? _defaultAdminURL : adminURL.trim(),
-      connectURL: connectURL.trim().isEmpty
-          ? _defaultConnectURL
-          : connectURL.trim(),
       server: server.trim(),
       mode: mode.trim().isEmpty ? 'workstation' : mode.trim(),
       enrollText: enrollText.trim(),
@@ -417,20 +408,13 @@ EnrollmentRequest parseEnrollment(
     isEnrollmentLink =
         uri.scheme.toLowerCase() == 'endlessnet' &&
         uri.host.toLowerCase() == 'enroll';
-    token =
-        uri.queryParameters['token'] ??
-        uri.queryParameters['enroll_token'] ??
-        uri.queryParameters['join_token'] ??
-        '';
+    token = uri.queryParameters['enroll_token'] ?? '';
     server = (uri.queryParameters['server'] ?? server).trim();
     mode = (uri.queryParameters['mode'] ?? mode).trim();
   }
-  if (token.trim().isEmpty) {
+  if (token.trim().isEmpty && !isEnrollmentLink) {
     token =
-        RegExp(
-          r'\b(?:enj|enr|join)_[A-Za-z0-9_-]+\b',
-        ).firstMatch(trimmed)?.group(0) ??
-        '';
+        RegExp(r'\benr_[A-Za-z0-9_-]+\b').firstMatch(trimmed)?.group(0) ?? '';
   }
   if (token.trim().isEmpty && !isEnrollmentLink) {
     throw StateError('Enrollment token is required.');
@@ -477,6 +461,11 @@ class EndlessNetClientBridge {
       _request('GET', ServiceIPCPath.networks);
   Future<Map<String, dynamic>> diagnostics() =>
       _request('GET', ServiceIPCPath.diagnostics);
+  Future<Map<String, dynamic>> diagnosticsBundle({int? logLimit}) => _request(
+    'POST',
+    ServiceIPCPath.diagnosticsBundle,
+    body: {'log_limit': ?logLimit},
+  );
   Future<Map<String, dynamic>> recentLogs() =>
       _request('GET', ServiceIPCPath.recentLogs);
 
@@ -489,12 +478,14 @@ class EndlessNetClientBridge {
   }
 
   Future<Map<String, dynamic>> enroll(EnrollmentRequest request) {
+    final token = request.token.trim();
+    final server = request.server.trim();
     return _request(
       'POST',
       ServiceIPCPath.enroll,
       body: {
-        'join_token': request.token.trim(),
-        'server_url': request.server.trim(),
+        if (token.isNotEmpty) 'enroll_token': token,
+        if (server.isNotEmpty) 'server': server,
         'mode': request.mode,
       },
       timeout: const Duration(minutes: 2),
@@ -687,7 +678,8 @@ class EndlessNetController extends ChangeNotifier
     busy = true;
     notifyListeners();
     try {
-      statusPayload = await action();
+      await action();
+      statusPayload = await bridge.status();
       errorText = null;
       logger.info('action completed state=$state');
     } catch (err, stack) {
@@ -721,7 +713,7 @@ class EndlessNetController extends ChangeNotifier
       }
       final confirmed = await showServerIdentityChangeDialog(
         context,
-        serverURL: valueText(identity['server_url'], fallback: 'server'),
+        serverURL: valueText(identity['control_plane_url'], fallback: 'server'),
         trustedKeyID: valueText(identity['trusted_key_id']),
         announcedKeyID: announcedKeyID,
       );
@@ -1242,10 +1234,7 @@ class HomeScreen extends StatelessWidget {
                           children: [
                             InfoRow(
                               label: 'Hostname',
-                              value: valueText(
-                                status?['hostname'] ??
-                                    nestedValue(status, 'agent', 'hostname'),
-                              ),
+                              value: valueText(status?['hostname']),
                             ),
                             InfoRow(
                               label: 'Overlay IP',
@@ -1440,7 +1429,7 @@ class DiagnosticsDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final diagnostics = ServiceDiagnostics(payload);
-    final stun = diagnostics.stun;
+    final agent = diagnostics.agent;
     final paths = diagnostics.paths;
     final window = MediaQuery.sizeOf(context);
     final dialogWidth = (window.width - 96).clamp(320.0, 700.0).toDouble();
@@ -1453,29 +1442,18 @@ class DiagnosticsDialog extends StatelessWidget {
         child: ListView(
           children: [
             InfoPanel(
-              title: 'Network discovery',
+              title: 'Connectivity',
               children: [
                 InfoRow(
                   label: 'Generated',
                   value: valueText(diagnostics.generatedAt),
                 ),
                 InfoRow(
-                  label: 'NAT',
-                  value: stun.present
-                      ? stunClassificationLabel(stun.classification)
-                      : 'Not reported by the service',
+                  label: 'State',
+                  value: diagnostics.status.state(fallback: '-'),
                 ),
-                InfoRow(label: 'STUN', value: stunHealthLabel(stun)),
-                InfoRow(
-                  label: 'Mapped IPs',
-                  value: stun.mappedAddresses.isEmpty
-                      ? '-'
-                      : stun.mappedAddresses.join(', '),
-                ),
-                InfoRow(
-                  label: 'Port map',
-                  value: portMappingSummary(stun.portMappings),
-                ),
+                InfoRow(label: 'Paths', value: selectedPathsLabel(agent)),
+                InfoRow(label: 'Discovery', value: discoveryHealthLabel(agent)),
               ],
             ),
             const SizedBox(height: 16),
@@ -1484,32 +1462,6 @@ class DiagnosticsDialog extends StatelessWidget {
             if (paths.isEmpty)
               const Text('No peer path diagnostics are available.'),
             for (final path in paths) PeerPathDiagnosticsTile(path: path),
-            const SizedBox(height: 16),
-            Text(
-              'STUN endpoints',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            if (stun.results.isEmpty)
-              const Text('No STUN endpoint results are available.'),
-            for (final result in stun.results)
-              DiagnosticsLine(
-                title: firstNonEmpty(result.id, result.address, 'STUN'),
-                value: stunResultLabel(result),
-              ),
-            if (stun.portMappings.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(
-                'Port mappings',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              for (final mapping in stun.portMappings)
-                DiagnosticsLine(
-                  title: portMappingProtocolLabel(mapping.protocol),
-                  value: portMappingLabel(mapping),
-                ),
-            ],
           ],
         ),
       ),
@@ -1714,13 +1666,18 @@ String networksSummary(Map<String, dynamic>? payload) {
 }
 
 String recentLogsSummary(Map<String, dynamic> payload) {
-  final lines = payload['lines'];
-  if (lines is List && lines.isNotEmpty) {
-    return lines.map((line) => '$line').join('\n');
-  }
   final logs = payload['logs'];
   if (logs is List && logs.isNotEmpty) {
-    return logs.map((line) => '$line').join('\n');
+    return logs
+        .map((entry) {
+          if (entry is! Map) {
+            return '$entry';
+          }
+          return '${valueText(entry['timestamp'], fallback: '')} '
+                  '${valueText(entry['message'], fallback: '')}'
+              .trim();
+        })
+        .join('\n');
   }
   return 'No recent logs.';
 }
@@ -1729,10 +1686,7 @@ String thisDeviceLabel(Map<String, dynamic>? payload) {
   if (payload == null) {
     return 'This device: loading...';
   }
-  final host = valueText(
-    payload['hostname'] ?? nestedValue(payload, 'agent', 'hostname'),
-    fallback: 'this Windows device',
-  );
+  final host = valueText(payload['hostname'], fallback: 'this Windows device');
   final ip = valueText(
     payload['overlay_ip'] ?? nestedValue(payload, 'agent', 'overlay_ip'),
     fallback: '',
@@ -1803,7 +1757,6 @@ String selectedPathLabel(String path) {
     case 'relay':
       return 'Relay';
     case 'none':
-    case 'offline':
     case '':
       return 'Offline';
     default:
@@ -1865,100 +1818,6 @@ String candidateStateLabel(String state) {
   }
 }
 
-String stunClassificationLabel(String classification) {
-  switch (classification.trim().toLowerCase()) {
-    case 'consistent_mapping':
-      return 'Stable mapped address';
-    case 'varying_mapping':
-      return 'Mapping varies by STUN server';
-    case 'unreachable':
-      return 'STUN unavailable';
-    case 'no_endpoints':
-      return 'No STUN endpoints';
-    case '':
-      return 'Unknown';
-    default:
-      return classification.replaceAll('_', ' ');
-  }
-}
-
-String stunHealthLabel(STUNDiagnostics stun) {
-  if (!stun.present) {
-    return 'Not reported by the service';
-  }
-  final summary = '${stun.reachableEndpoints}/${stun.totalEndpoints} reachable';
-  if (stun.error.isNotEmpty) {
-    return '$summary · ${stun.error}';
-  }
-  return summary;
-}
-
-String stunResultLabel(STUNResult result) {
-  final parts = <String>[];
-  parts.add(result.reachable ? 'Reachable' : 'Failed');
-  if (result.address.isNotEmpty) {
-    parts.add(result.address);
-  }
-  if (result.mappedAddress.isNotEmpty) {
-    parts.add('mapped ${result.mappedAddress}');
-  }
-  final duration = result.durationNanoseconds;
-  if (duration != null && duration > 0) {
-    final milliseconds = duration / 1000000;
-    parts.add('${milliseconds.toStringAsFixed(milliseconds >= 10 ? 0 : 1)} ms');
-  }
-  if (result.error.isNotEmpty) {
-    parts.add(result.error);
-  }
-  return parts.join(' · ');
-}
-
-String portMappingSummary(List<PortMappingStatus> mappings) {
-  if (mappings.isEmpty) {
-    return 'No PCP/NAT-PMP result';
-  }
-  final active = mappings.where((mapping) => mapping.ok).toList();
-  if (active.isEmpty) {
-    return 'No active mapping';
-  }
-  return active
-      .map(
-        (mapping) =>
-            '${portMappingProtocolLabel(mapping.protocol)} ${valueText(mapping.mappedEndpoint)}',
-      )
-      .join(' · ');
-}
-
-String portMappingProtocolLabel(String protocol) {
-  switch (protocol.trim().toLowerCase()) {
-    case 'pcp':
-      return 'PCP';
-    case 'nat_pmp':
-    case 'nat-pmp':
-      return 'NAT-PMP';
-    default:
-      return protocol.trim().isEmpty ? 'Port mapping' : protocol.toUpperCase();
-  }
-}
-
-String portMappingLabel(PortMappingStatus mapping) {
-  if (!mapping.ok) {
-    return firstNonEmpty(
-      mapping.error,
-      mapping.gateway.isEmpty ? '' : 'Gateway ${mapping.gateway}',
-      'Unavailable',
-    );
-  }
-  final parts = <String>[valueText(mapping.mappedEndpoint, fallback: 'Mapped')];
-  if (mapping.lifetimeSeconds > 0) {
-    parts.add('${mapping.lifetimeSeconds}s lease');
-  }
-  if (mapping.gateway.isNotEmpty) {
-    parts.add('gateway ${mapping.gateway}');
-  }
-  return parts.join(' · ');
-}
-
 bool isDeviceEnrolled(Map<String, dynamic>? payload) {
   return ServiceStatus(payload).deviceEnrolled;
 }
@@ -1967,25 +1826,14 @@ bool isEnrollmentPending(Map<String, dynamic>? payload) {
   if (payload == null) {
     return false;
   }
-  if (payload['enrollment_pending'] == true) {
-    return true;
-  }
-  final state = valueText(payload['state'], fallback: '').toLowerCase();
-  final controlState = valueText(
-    payload['control_state'],
-    fallback: '',
-  ).toLowerCase();
-  return state == ServiceState.needsApproval.toLowerCase() ||
-      controlState == ControlState.needsApproval ||
-      controlState == ControlState.approvalRequired ||
-      controlState == ControlState.pendingApproval;
+  return valueText(payload['state'], fallback: '') ==
+          ServiceState.needsApproval ||
+      valueText(payload['control_state'], fallback: '') ==
+          ControlState.pendingApproval;
 }
 
 String enrollmentApprovalURL(Map<String, dynamic>? payload) {
-  return firstNonEmpty(
-    valueText(payload?['approval_url'], fallback: ''),
-    valueText(payload?['enrollment_approval_url'], fallback: ''),
-  );
+  return valueText(payload?['approval_url'], fallback: '');
 }
 
 Object? nestedValue(Map<String, dynamic>? payload, String key, String nested) {

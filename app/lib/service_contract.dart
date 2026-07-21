@@ -10,27 +10,56 @@ class ServiceIPCPath {
   static const networks = '/networks';
   static const selectNetwork = '/network/select';
   static const diagnostics = '/diagnostics';
+  static const diagnosticsBundle = '/diagnostics/bundle';
   static const recentLogs = '/logs/recent';
+
+  static const all = <String>[
+    status,
+    events,
+    enroll,
+    connect,
+    serverIdentity,
+    trustServer,
+    disconnect,
+    logout,
+    networks,
+    selectNetwork,
+    diagnostics,
+    diagnosticsBundle,
+    recentLogs,
+  ];
+}
+
+class ServiceIPCMetadata {
+  static const protocol = 'endlessnet-client-ipc';
+  static const version = 1;
+  static const minimumSupportedVersion = 1;
+  static const protocolHeader = 'X-EndlessNet-IPC-Protocol';
+  static const versionHeader = 'X-EndlessNet-IPC-Version';
+  static const minimumVersionHeader = 'X-EndlessNet-IPC-Min-Supported-Version';
 }
 
 class ServiceState {
   static const connected = 'Connected';
   static const disconnected = 'Disconnected';
-  static const connecting = 'Connecting';
-  static const updating = 'Updating';
   static const degraded = 'Degraded';
   static const error = 'Error';
   static const needsEnrollment = 'NeedsEnrollment';
   static const needsApproval = 'NeedsApproval';
   static const serverIdentityChanged = 'ServerIdentityChanged';
+
+  static const all = <String>[
+    connected,
+    disconnected,
+    degraded,
+    error,
+    needsEnrollment,
+    needsApproval,
+    serverIdentityChanged,
+  ];
 }
 
 class ControlState {
-  static const connecting = 'connecting';
-  static const updating = 'updating';
-  static const syncing = 'syncing';
-  static const needsApproval = 'needs_approval';
-  static const approvalRequired = 'approval_required';
   static const pendingApproval = 'pending_approval';
   static const degraded = 'degraded';
   static const offlineCache = 'offline_cache';
@@ -41,11 +70,26 @@ class ControlState {
   static const error = 'error';
   static const cacheInvalid = 'cache_invalid';
   static const serverIdentityChanged = 'server_identity_changed';
+
+  static const all = <String>[
+    pendingApproval,
+    degraded,
+    offlineCache,
+    ready,
+    registered,
+    cacheInvalid,
+    error,
+    notRegistered,
+    disconnected,
+    serverIdentityChanged,
+  ];
 }
 
 class ConnectionIntentState {
   static const connected = 'connected';
   static const disconnected = 'disconnected';
+
+  static const all = <String>[connected, disconnected];
 }
 
 class ServiceStatus {
@@ -59,57 +103,37 @@ class ServiceStatus {
   List<PeerPathStatus> get peerPaths => agent.peers;
 
   String state({required String fallback}) {
-    return _valueText(payload?['state'] ?? payload?['control_state'], fallback);
+    return _valueText(payload?['state'], fallback);
   }
 
-  bool get connected => _sameState(state(fallback: ''), ServiceState.connected);
-
-  String get lastError =>
-      _valueText(_nestedValue(payload, 'agent', 'last_error'), '');
+  bool get connected => state(fallback: '') == ServiceState.connected;
 
   bool get serverIdentityChanged =>
-      lastError.toLowerCase().contains('server map signing key changed') ||
-      _sameState(state(fallback: ''), ServiceState.serverIdentityChanged) ||
-      _sameState(
-        _valueText(payload?['control_state'], ''),
-        ControlState.serverIdentityChanged,
-      );
+      state(fallback: '') == ServiceState.serverIdentityChanged ||
+      _valueText(payload?['control_state'], '') ==
+          ControlState.serverIdentityChanged;
 
   bool get needsEnrollment =>
-      _sameState(state(fallback: ''), ServiceState.needsEnrollment) ||
-      _sameState(
-        _valueText(payload?['control_state'], ''),
-        ControlState.notRegistered,
-      );
+      state(fallback: '') == ServiceState.needsEnrollment;
 
   bool get userDisconnected =>
       payload?['user_disconnected'] == true ||
-      _sameState(
-        _valueText(payload?['control_state'], ''),
-        ControlState.disconnected,
-      ) ||
-      _sameState(
-        _valueText(
-          _nestedValue(payload, 'connection_intent', 'desired_state'),
-          '',
-        ),
-        ConnectionIntentState.disconnected,
-      );
+      _valueText(payload?['desired_state'], '') ==
+          ConnectionIntentState.disconnected;
 
   bool get deviceEnrolled {
     if (payload == null || needsEnrollment) {
       return false;
     }
-    final markers = [
+    if (payload?['node_credential_present'] == true) {
+      return true;
+    }
+    final identifiers = [
       payload?['account_id'],
       payload?['node_id'],
       payload?['network_id'],
-      payload?['overlay_ip'],
-      _nestedValue(payload, 'agent', 'node_id'),
-      _nestedValue(payload, 'agent', 'network_id'),
-      _nestedValue(payload, 'agent', 'overlay_ip'),
     ];
-    return markers.any((value) => _valueText(value, '').isNotEmpty);
+    return identifiers.any((value) => _valueText(value, '').isNotEmpty);
   }
 }
 
@@ -145,7 +169,7 @@ class ServiceAgentStatus {
       }
     }
     return ServiceAgentStatus(
-      present: payload != null && payload['state_present'] != false,
+      present: payload?['state_present'] == true,
       generatedAt: _valueText(payload?['generated_at'], ''),
       stunOK: _boolValue(payload?['stun_ok']),
       relayOK: _boolValue(payload?['relay_ok']),
@@ -267,143 +291,15 @@ class ServiceDiagnostics {
 
   final Map<String, dynamic> payload;
 
-  Map<String, dynamic>? get agentState => _mapValue(payload['agent_state']);
+  Map<String, dynamic>? get diagnostics => _mapValue(payload['diagnostics']);
 
-  ServiceStatus get status => ServiceStatus(_mapValue(payload['status']));
+  ServiceStatus get status => ServiceStatus(_mapValue(diagnostics?['status']));
 
-  String get generatedAt => _valueText(payload['generated_at'], '');
+  ServiceAgentStatus get agent => status.agent;
 
-  List<PeerPathStatus> get paths {
-    final state = agentState;
-    final paths = _mapList(
-      state?['paths'],
-    ).map(PeerPathStatus.fromMap).toList(growable: false);
-    return paths.isNotEmpty ? paths : status.peerPaths;
-  }
+  String get generatedAt => _valueText(diagnostics?['generated_at'], '');
 
-  STUNDiagnostics get stun => STUNDiagnostics.fromValue(agentState?['stun']);
-}
-
-class STUNDiagnostics {
-  STUNDiagnostics({
-    required this.present,
-    required this.ok,
-    required this.classification,
-    required this.totalEndpoints,
-    required this.reachableEndpoints,
-    required this.mappedAddresses,
-    required this.results,
-    required this.portMappings,
-    required this.error,
-  });
-
-  factory STUNDiagnostics.fromValue(Object? value) {
-    final payload = _mapValue(value);
-    final nat = _mapValue(payload?['nat']);
-    return STUNDiagnostics(
-      present: payload != null,
-      ok: _boolValue(payload?['ok']),
-      classification: _valueText(nat?['classification'], ''),
-      totalEndpoints: _intValue(nat?['total_endpoints']) ?? 0,
-      reachableEndpoints: _intValue(nat?['reachable_endpoints']) ?? 0,
-      mappedAddresses: _stringList(nat?['mapped_addresses']),
-      results: _mapList(
-        payload?['results'],
-      ).map(STUNResult.fromMap).toList(growable: false),
-      portMappings: _mapList(
-        payload?['port_mappings'],
-      ).map(PortMappingStatus.fromMap).toList(growable: false),
-      error: _valueText(payload?['error'] ?? nat?['error'], ''),
-    );
-  }
-
-  final bool present;
-  final bool? ok;
-  final String classification;
-  final int totalEndpoints;
-  final int reachableEndpoints;
-  final List<String> mappedAddresses;
-  final List<STUNResult> results;
-  final List<PortMappingStatus> portMappings;
-  final String error;
-}
-
-class STUNResult {
-  STUNResult({
-    required this.id,
-    required this.address,
-    required this.reachable,
-    required this.mappedAddress,
-    required this.durationNanoseconds,
-    required this.error,
-  });
-
-  factory STUNResult.fromMap(Map<String, dynamic> payload) {
-    return STUNResult(
-      id: _valueText(payload['id'], ''),
-      address: _valueText(payload['addr'], ''),
-      reachable: payload['reachable'] == true,
-      mappedAddress: _valueText(payload['mapped_address'], ''),
-      durationNanoseconds: _intValue(payload['duration']),
-      error: _valueText(payload['error'], ''),
-    );
-  }
-
-  final String id;
-  final String address;
-  final bool reachable;
-  final String mappedAddress;
-  final int? durationNanoseconds;
-  final String error;
-}
-
-class PortMappingStatus {
-  PortMappingStatus({
-    required this.protocol,
-    required this.gateway,
-    required this.ok,
-    required this.internalPort,
-    required this.externalPort,
-    required this.externalAddress,
-    required this.mappedEndpoint,
-    required this.lifetimeSeconds,
-    required this.error,
-  });
-
-  factory PortMappingStatus.fromMap(Map<String, dynamic> payload) {
-    return PortMappingStatus(
-      protocol: _valueText(payload['protocol'], ''),
-      gateway: _valueText(payload['gateway'], ''),
-      ok: payload['ok'] == true,
-      internalPort: _intValue(payload['internal_port']) ?? 0,
-      externalPort: _intValue(payload['external_port']) ?? 0,
-      externalAddress: _valueText(payload['external_address'], ''),
-      mappedEndpoint: _valueText(payload['mapped_endpoint'], ''),
-      lifetimeSeconds: _intValue(payload['lifetime_seconds']) ?? 0,
-      error: _valueText(payload['error'], ''),
-    );
-  }
-
-  final String protocol;
-  final String gateway;
-  final bool ok;
-  final int internalPort;
-  final int externalPort;
-  final String externalAddress;
-  final String mappedEndpoint;
-  final int lifetimeSeconds;
-  final String error;
-}
-
-bool _sameState(String a, String b) =>
-    a.trim().toLowerCase() == b.trim().toLowerCase();
-
-Object? _nestedValue(Map<String, dynamic>? payload, String key, String nested) {
-  final child = payload?[key];
-  if (child is Map) {
-    return child[nested];
-  }
-  return null;
+  List<PeerPathStatus> get paths => status.peerPaths;
 }
 
 String _valueText(Object? value, String fallback) {
@@ -426,16 +322,6 @@ List<Map<String, dynamic>> _mapList(Object? value) {
     return const [];
   }
   return value.map(_mapValue).whereType<Map<String, dynamic>>().toList();
-}
-
-List<String> _stringList(Object? value) {
-  if (value is! List) {
-    return const [];
-  }
-  return value
-      .map((item) => _valueText(item, ''))
-      .where((item) => item.isNotEmpty)
-      .toList(growable: false);
 }
 
 bool? _boolValue(Object? value) => value is bool ? value : null;

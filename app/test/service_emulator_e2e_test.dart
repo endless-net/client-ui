@@ -51,13 +51,17 @@ void main() {
       expect(trusted['state'], 'Connected');
 
       final diagnostics = await bridge.diagnostics();
-      expect(diagnostics['status'], isA<Map<String, dynamic>>());
-      expect(diagnostics['recent_logs'], isNotEmpty);
-      final agentState = diagnostics['agent_state'] as Map<String, dynamic>;
-      expect(agentState['paths'], isNotEmpty);
-      final stun = agentState['stun'] as Map<String, dynamic>;
-      expect(stun['results'], isNotEmpty);
-      expect(stun['port_mappings'], isNotEmpty);
+      final diagnosticsPayload =
+          diagnostics['diagnostics'] as Map<String, dynamic>;
+      final diagnosticsStatus =
+          diagnosticsPayload['status'] as Map<String, dynamic>;
+      final diagnosticsAgent =
+          diagnosticsStatus['agent'] as Map<String, dynamic>;
+      expect(diagnosticsAgent['peers'], isNotEmpty);
+      expect(diagnosticsPayload['recent_logs'], isNotEmpty);
+      final bundle = await bridge.diagnosticsBundle(logLimit: 100);
+      expect(bundle['path'], isNotEmpty);
+      expect(bundle['size_bytes'], greaterThan(0));
       final logs = await bridge.recentLogs();
       expect(logs['logs'], isNotEmpty);
 
@@ -65,13 +69,12 @@ void main() {
       expect(status['state'], 'NeedsEnrollment');
       status = await bridge.enroll(
         EnrollmentRequest(
-          token: 'enj_emulator_e2e_secret',
+          token: 'enr_emulator_e2e_secret',
           server: 'https://api.example.test',
           mode: 'workstation',
         ),
       );
       expect(status['state'], 'Connected');
-      expect(status['enrolled'], isTrue);
 
       final interactions = await emulator.interactions();
       expect(
@@ -85,6 +88,7 @@ void main() {
           'GET /server-identity',
           'POST /server-identity/trust',
           'GET /diagnostics',
+          'POST /diagnostics/bundle',
           'GET /logs/recent',
           'POST /logout',
           'POST /enroll',
@@ -94,12 +98,12 @@ void main() {
         (entry) => entry['target'] == '/enroll',
       );
       expect(
-        (enroll['request_body'] as Map<String, dynamic>)['join_token'],
+        (enroll['request_body'] as Map<String, dynamic>)['enroll_token'],
         '<redacted>',
       );
       expect(
         jsonEncode(interactions),
-        isNot(contains('enj_emulator_e2e_secret')),
+        isNot(contains('enr_emulator_e2e_secret')),
       );
     },
     skip: skipReason != false,
@@ -186,7 +190,6 @@ void main() {
                 'expect_body': <String, dynamic>{},
                 'status': 503,
                 'body': <String, dynamic>{
-                  'ok': false,
                   'error_code': 'connect_failed',
                   'error': 'control plane unavailable',
                 },

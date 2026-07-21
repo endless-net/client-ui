@@ -98,7 +98,7 @@ if (-not (Test-Path -LiteralPath $provenancePath -PathType Leaf)) {
     throw "release $tag exists without provenance"
 }
 $existing = Get-Content -LiteralPath $provenancePath -Raw | ConvertFrom-Json
-if ($existing.client_core.manifest_sha256 -ne $CoreManifestSHA256.ToLowerInvariant()) {
+if ($existing.client.manifest_sha256 -ne $CoreManifestSHA256.ToLowerInvariant()) {
     throw "release $tag already exists for a different core manifest"
 }
 

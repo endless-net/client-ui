@@ -5,6 +5,10 @@ Windows distribution pipeline for EndlessNet Client. The Go runtime client and
 the versioned local IPC producer contract are owned by
 [`unng-lab/endlessnet-client`](https://github.com/unng-lab/endlessnet-client).
 
+Architecture, accepted decisions, known limitations, and possible development
+directions are documented in
+[`docs/architecture-and-future.md`](docs/architecture-and-future.md).
+
 ## Local checks
 
 ```powershell
@@ -33,18 +37,14 @@ The packaged v0.2.0 service runs WireGuard Go as its only tunnel engine. The
 MSI does not pass a backend-selection flag or fix the UDP listen port. Wintun
 remains a required, verified runtime dependency beside `endlessnet-client.exe`.
 
-Peers start on relay, authenticated probes evaluate local, STUN, PCP, and
-NAT-PMP candidates, and the service promotes a reachable direct path using
-latency hysteresis. A failed direct path returns to relay. Mixed-version peers
-remaining on relay is expected compatibility behavior, not by itself an error.
+Peers start on relay, authenticated probes evaluate direct candidates, and the
+service promotes a reachable direct path using latency hysteresis. A failed
+direct path returns to relay.
 
-The UI reads selected paths and candidate health from the producer's
-`status.agent` extension and reads the full STUN, port-mapping, and path snapshot
-from `diagnostics.agent_state`. The IPC version remains v1. The current OpenAPI
-contract permits these objects through `additionalProperties` but does not yet
-define their nested schemas; the UI therefore treats absent extension data as
-"not reported" instead of synthesizing it. Formal nested diagnostics schemas
-are a producer-contract follow-up, not a blocker for v0.2.0.
+The UI reads selected paths, candidate health, STUN reachability, and relay
+availability exclusively from the producer-defined `status.agent` schema.
+The diagnostics response is consumed through `diagnostics.status.agent`; the UI
+does not recognize fields that are absent from `client-ipc-v1.openapi.yaml`.
 
 Build an unsigned validation MSI from a previously verified Go-core artifact:
 
@@ -55,7 +55,8 @@ Build an unsigned validation MSI from a previously verified Go-core artifact:
 ```
 
 Production releases are initiated by an immutable `client-core-published`
-`repository_dispatch` from the client-core release workflow. They sign both executables and the final MSI,
+`repository_dispatch` from the `unng-lab/endlessnet-client` release workflow.
+They sign both executables and the final MSI,
 publish private release provenance, mirror public artifacts through
 `unng-lab/endlessnetfront`, and trigger `unng-lab/endlessnet-system-tests`.
 The owning workflow uses `scripts/resolve-release-idempotency.ps1` to distinguish
