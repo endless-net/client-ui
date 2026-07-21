@@ -5,6 +5,10 @@ Windows distribution pipeline for EndlessNet Client. The Go runtime client and
 the versioned local IPC producer contract remain in
 [`unng-lab/endlessnet`](https://github.com/unng-lab/endlessnet).
 
+Architecture, accepted decisions, known limitations, and possible development
+directions are documented in
+[`docs/architecture-and-future.md`](docs/architecture-and-future.md).
+
 ## Local checks
 
 ```powershell
