@@ -14,8 +14,14 @@ param(
 $ErrorActionPreference = "Stop"
 $core = Get-Content -LiteralPath $CoreManifest -Raw | ConvertFrom-Json
 $build = Get-Content -LiteralPath $BuildOutput -Raw | ConvertFrom-Json
-if ($core.version -ne $build.version -or $core.target -ne $build.target) {
-    throw "core and UI build metadata do not describe the same release"
+if ($build.schema_version -ne 2) {
+    throw "unsupported UI build metadata schema"
+}
+if ($core.version -ne $build.client.version -or $core.target -ne $build.target) {
+    throw "client-core manifest and packaged client metadata do not match"
+}
+if ($build.version -notmatch '^\d+\.\d+\.\d+$') {
+    throw "UI build metadata does not contain a stable SemVer"
 }
 if ($build.wintun.version -ne "0.14.1" -or
     $build.wintun.archive_sha256 -notmatch '^[0-9a-f]{64}$' -or
@@ -33,11 +39,12 @@ if ($build.signing.mode -eq "temporary-self-signed" -and $build.signing.publicly
 }
 
 $provenance = [ordered]@{
-    schema_version = 1
-    version = $core.version
+    schema_version = 2
+    version = $build.version
     target = $core.target
     ipc_version = $core.ipc_version
     client = [ordered]@{
+        version = $core.version
         repository = $core.repository
         commit = $core.commit
         manifest_url = $CoreManifestUrl
@@ -46,6 +53,7 @@ $provenance = [ordered]@{
         ipc_contract_sha256 = $core.artifacts.ipc_contract.sha256
     }
     ui = [ordered]@{
+        version = $build.version
         repository = "unng-lab/endlessnet-client-ui"
         commit = $build.ui_commit
     }

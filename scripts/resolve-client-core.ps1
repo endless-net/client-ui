@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ManifestSHA256,
     [Parameter(Mandatory = $true)]
-    [string]$Version,
+    [string]$CoreVersion,
     [Parameter(Mandatory = $true)]
     [string]$ClientCommit,
     [Parameter(Mandatory = $true)]
@@ -21,14 +21,14 @@ if ($ManifestSHA256 -notmatch '^[a-fA-F0-9]{64}$') {
 if ($ClientCommit -notmatch '^[a-fA-F0-9]{40}$') {
     throw "client_commit must be a full Git commit SHA"
 }
-if ($Version -notmatch '^\d+\.\d+\.\d+$') {
-    throw "version must be a release version without a v prefix"
+if ($CoreVersion -notmatch '^\d+\.\d+\.\d+$') {
+    throw "client-core version must be a stable SemVer without a v prefix"
 }
 
 $OutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 $manifestPath = Join-Path $OutputDir "client-core-manifest.json"
-$tag = "v$Version"
+$tag = "v$CoreVersion"
 $manifestAsset = "endlessnet-client_windows_amd64.manifest.json"
 $expectedManifestUrl = "https://github.com/unng-lab/endlessnet-client/releases/download/$tag/$manifestAsset"
 if ($ManifestUrl -ne $expectedManifestUrl) {
@@ -57,7 +57,7 @@ $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 if ($manifest.schema_version -ne 1 -or $manifest.repository -ne "unng-lab/endlessnet-client") {
     throw "unsupported client core manifest producer or schema"
 }
-if ($manifest.version -ne $Version -or $manifest.commit -ne $ClientCommit.ToLowerInvariant()) {
+if ($manifest.version -ne $CoreVersion -or $manifest.commit -ne $ClientCommit.ToLowerInvariant()) {
     throw "client core manifest version or client commit mismatch"
 }
 if ($manifest.target -ne "windows/amd64" -or $manifest.ipc_version -ne "v1") {

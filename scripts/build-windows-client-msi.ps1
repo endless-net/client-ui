@@ -1,6 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Version,
+    [string]$UIVersion,
+    [Parameter(Mandatory = $true)]
+    [string]$CoreVersion,
     [Parameter(Mandatory = $true)]
     [string]$ClientExe,
     [string]$WintunDll = "",
@@ -19,6 +21,12 @@ $ErrorActionPreference = "Stop"
 if ($Sign -and $SigningMode -notin @("temporary-self-signed", "public-authenticode")) {
     throw "SigningMode must be temporary-self-signed or public-authenticode for signed releases"
 }
+if ($UIVersion -notmatch '^\d+\.\d+\.\d+$') {
+    throw "UIVersion must be a stable SemVer without a v prefix"
+}
+if ($CoreVersion -notmatch '^\d+\.\d+\.\d+$') {
+    throw "CoreVersion must be a stable SemVer without a v prefix"
+}
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
@@ -28,7 +36,7 @@ $OutputDir = [System.IO.Path]::GetFullPath($OutputDir)
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 
 if ([string]::IsNullOrWhiteSpace($Msi)) {
-    $Msi = Join-Path $OutputDir "EndlessNet.Client.$Version.msi"
+    $Msi = Join-Path $OutputDir "EndlessNet.Client.$UIVersion.msi"
 }
 $Msi = [System.IO.Path]::GetFullPath($Msi)
 
@@ -73,8 +81,8 @@ if ($Sign -and $wintunSignature.SignerCertificate.Thumbprint -eq $CertificateThu
     throw "Official Wintun signature must not be replaced by the EndlessNet release signer"
 }
 $clientVersion = (& $ClientExe version 2>&1 | Out-String)
-if ($LASTEXITCODE -ne 0 -or $clientVersion -notmatch "endlessnet-client\s+$([regex]::Escape($Version))(\s|$)") {
-    throw "Go client version does not match requested release $Version"
+if ($LASTEXITCODE -ne 0 -or $clientVersion -notmatch "endlessnet-client\s+$([regex]::Escape($CoreVersion))(\s|$)") {
+    throw "Go client version does not match requested client-core release $CoreVersion"
 }
 
 $commit = (& git -C $repoRoot rev-parse HEAD).Trim()
@@ -94,7 +102,8 @@ $flutterApp = Join-Path $repoRoot "app"
 Push-Location $flutterApp
 try {
     & flutter build windows --release `
-        --dart-define "ENDLESSNET_VERSION=$Version" `
+        --build-name $UIVersion `
+        --dart-define "ENDLESSNET_VERSION=$UIVersion" `
         --dart-define "ENDLESSNET_COMMIT=$commit" `
         --dart-define "ENDLESSNET_BUILD_DATE=$buildDate" `
         --dart-define "ENDLESSNET_TARGET=windows/amd64"
@@ -152,7 +161,7 @@ Push-Location $repoRoot
 try {
     & go run ./tools/windows-packaging/cmd/endlessnet-windows-package render-msi `
         --output-dir $renderDir `
-        --version $Version `
+        --version $UIVersion `
         --client-exe $packagedClientExe `
         --wintun-dll $packagedWintunDll `
         --app-exe $appExe `
@@ -186,12 +195,12 @@ Invoke-EndlessNetSign $Msi
 $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Msi).Hash.ToLowerInvariant()
 $checksumFile = "$Msi.sha256"
 Set-Content -LiteralPath $checksumFile -Value "$hash  $([System.IO.Path]::GetFileName($Msi))" -Encoding ascii
-$installerUrl = "$($PublicBaseUrl.TrimEnd('/'))/v$Version/$([System.IO.Path]::GetFileName($Msi))"
+$installerUrl = "$($PublicBaseUrl.TrimEnd('/'))/v$UIVersion/$([System.IO.Path]::GetFileName($Msi))"
 Push-Location $repoRoot
 try {
     & go run ./tools/windows-packaging/cmd/endlessnet-windows-package render-winget `
         --output-dir $wingetDir `
-        --version $Version `
+        --version $UIVersion `
         --installer-file $Msi `
         --installer-url $installerUrl `
         --release-date ((Get-Date).ToUniversalTime().ToString("yyyy-MM-dd"))
@@ -203,8 +212,8 @@ try {
 }
 
 $buildOutput = [ordered]@{
-    schema_version = 1
-    version = $Version
+    schema_version = 2
+    version = $UIVersion
     ui_commit = $commit
     target = "windows/amd64"
     signed = [bool]$Sign
@@ -214,6 +223,7 @@ $buildOutput = [ordered]@{
         publicly_trusted = [bool]($Sign -and $SigningMode -eq "public-authenticode")
     }
     client = [ordered]@{
+        version = $CoreVersion
         path = $packagedClientExe
         unsigned_sha256 = $unsignedClientHash
         signed_sha256 = $signedClientHash

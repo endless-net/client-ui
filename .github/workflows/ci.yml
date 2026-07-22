@@ -14,6 +14,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
+      - name: Resolve independent UI version
+        shell: pwsh
+        run: ./scripts/resolve-ui-version.ps1
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -61,14 +64,15 @@ jobs:
         shell: pwsh
         run: >-
           ./scripts/build-windows-client-msi.ps1
-          -Version 0.0.0
+          -UIVersion $env:UI_VERSION
+          -CoreVersion 0.0.0
           -ClientExe "$env:RUNNER_TEMP/endlessnet-client.exe"
           -OutputDir "$env:RUNNER_TEMP/windows-client-msi"
       - name: Reject accidental signatures in PR artifact
         if: github.event_name == 'pull_request'
         shell: pwsh
         run: |
-          $msi = Get-Item "$env:RUNNER_TEMP/windows-client-msi/EndlessNet.Client.0.0.0.msi"
+          $msi = Get-Item "$env:RUNNER_TEMP/windows-client-msi/EndlessNet.Client.$env:UI_VERSION.msi"
           if ((Get-AuthenticodeSignature -LiteralPath $msi.FullName).Status -ne "NotSigned") {
             throw "PR MSI must be unsigned"
           }
@@ -78,7 +82,7 @@ jobs:
         with:
           name: unsigned-msi-packaging-smoke
           path: |
-            ${{ runner.temp }}/windows-client-msi/EndlessNet.Client.0.0.0.msi
-            ${{ runner.temp }}/windows-client-msi/EndlessNet.Client.0.0.0.msi.sha256
+            ${{ runner.temp }}/windows-client-msi/EndlessNet.Client.*.msi
+            ${{ runner.temp }}/windows-client-msi/EndlessNet.Client.*.msi.sha256
           if-no-files-found: error
           retention-days: 7

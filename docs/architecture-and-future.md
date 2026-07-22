@@ -2,7 +2,7 @@
 
 - Статус: действующая архитектура и ориентиры развития
 - Владелец: `unng-lab/endlessnet-client-ui`
-- Последняя сверка с реализацией: 2026-07-21
+- Последняя сверка с реализацией: 2026-07-22
 
 ## 1. Назначение документа
 
@@ -214,6 +214,7 @@ MSI дополнительно:
 flowchart TD
     Core["endlessnet-client публикует Go core,<br/>IPC contract и immutable manifest"]
     Dispatch["repository_dispatch<br/>client-core-published"]
+    UIVersion["UI SemVer из<br/>app/pubspec.yaml"]
     Verify["Проверка version, commit,<br/>URL и SHA-256 manifest/artifacts"]
     Contract["UI tests против<br/>опубликованного IPC contract"]
     Build["Сборка Flutter + MSI<br/>с pinned Flutter, WiX и Wintun"]
@@ -224,13 +225,17 @@ flowchart TD
     Mirror["Dispatch в public mirror"]
 
     Core --> Dispatch --> Verify --> Contract --> Build --> Sign --> E2E --> Provenance --> Private --> Mirror
+    UIVersion --> Build
 ```
 
 Релиз инициирует публикация core из `unng-lab/endlessnet-client`, потому что MSI должен объединить
 совместимые версии Go runtime, IPC-контракта и UI. Workflow принимает только
 immutable release URLs, сверяет полный client commit, версию, имена и SHA-256 каждого
-артефакта. Повторный dispatch той же версии допускается только для того же core
-manifest.
+артефакта. Версия core при этом не становится версией UI: собственный стабильный
+SemVer UI читается из `app/pubspec.yaml` и определяет MSI, GitHub tag, WinGet и
+public mirror payload. Повторный dispatch для существующего UI tag допускается
+только с теми же immutable core inputs; для выпуска с другим core требуется
+явно увеличить UI SemVer.
 
 Release secrets доступны только job с environment `release`. Pull request CI
 не получает signing material или cross-repository release tokens и публикует
@@ -347,13 +352,16 @@ identity и отправляет подтверждённый announced key ID �
 
 Windows release запускается `client-core-published` dispatch и принимает core
 только из immutable GitHub release path `unng-lab/endlessnet-client` с
-проверенными manifest, именами артефактов и SHA-256.
+проверенными manifest, именами артефактов и SHA-256. UI release tag и версия MSI
+берутся независимо из `app/pubspec.yaml`, а версия core сохраняется отдельно в
+provenance.
 
 Причины: исключение подмены бинарника между тестированием и упаковкой и
 воспроизводимая связь UI/core.
 
 Последствия: произвольный локальный core допустим для unsigned validation MSI,
-но не для публикации production release.
+но не для публикации production release; новый состав UI/core требует
+собственного нового UI SemVer.
 
 ### ADR-008. Все исполняемые Windows-артефакты проверяются по цепочке доверия
 

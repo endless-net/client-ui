@@ -50,19 +50,26 @@ Build an unsigned validation MSI from a previously verified Go-core artifact:
 
 ```powershell
 .\scripts\build-windows-client-msi.ps1 `
-  -Version 1.2.3 `
+  -UIVersion 1.2.3 `
+  -CoreVersion 0.2.0 `
   -ClientExe .\.artifacts\endlessnet-client_windows_amd64.exe
 ```
 
 Production releases are initiated by an immutable `client-core-published`
 `repository_dispatch` from the `unng-lab/endlessnet-client` release workflow.
-They sign both executables and the final MSI,
+The client-core version identifies only the verified runtime input. The UI owns
+an independent stable SemVer in `app/pubspec.yaml`; that version determines the
+MSI version, GitHub tag, WinGet manifests, and public mirror payload. Releases
+sign both executables and the final MSI,
 publish private release provenance, mirror public artifacts through
 `unng-lab/endlessnetfront`, and trigger `unng-lab/endlessnet-system-tests`.
+Provenance schema v2 records the UI version at the top level and preserves the
+client-core version separately under `client.version`.
 The owning workflow uses `scripts/resolve-release-idempotency.ps1` to distinguish
 an expected missing release (continue with `noop=false`) from real GitHub CLI or
-API failures. Existing releases are no-ops only when their provenance names the
-same immutable core manifest.
+API failures. Existing UI releases are no-ops only when their provenance names
+the same UI version and immutable client-core inputs. A new core input therefore
+requires an intentional UI SemVer bump before another UI release is published.
 
 ## Release configuration
 
