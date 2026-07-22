@@ -31,11 +31,13 @@ state transitions and fault injection, and records a redacted JSONL request
 journal. See [`tools/service-emulator/README.md`](tools/service-emulator/README.md)
 for manual UI testing and custom scenarios.
 
-## Backend v0.2.0 integration
+## Backend v0.2.3 integration
 
-The packaged v0.2.0 service runs WireGuard Go as its only tunnel engine. The
+The packaged v0.2.3 service runs WireGuard Go as its only tunnel engine. The
 MSI does not pass a backend-selection flag or fix the UDP listen port. Wintun
 remains a required, verified runtime dependency beside `endlessnet-client.exe`.
+The service owns the live WireGuard configuration in process; the MSI does not
+pass the removed `--output` flag or create a rendered `endlessnet.conf` file.
 
 Peers start on relay, authenticated probes evaluate direct candidates, and the
 service promotes a reachable direct path using latency hysteresis. A failed
@@ -46,12 +48,21 @@ availability exclusively from the producer-defined `status.agent` schema.
 The diagnostics response is consumed through `diagnostics.status.agent`; the UI
 does not recognize fields that are absent from `client-ipc-v1.openapi.yaml`.
 
+Core 0.2.3 introduces the local-owner authorization model for enrollment and
+other owner operations. The desktop UI first calls `/enroll` without elevation,
+allowing a clean installation to bind ownership to the current Windows user.
+Only an `owner_required` or `administrator_required` IPC response launches a
+short-lived copy of `endlessnet.exe` with the Windows `runas` verb for migration
+of ownerless legacy state. The optional IPC `server` field stays absent unless
+the caller explicitly supplied an override; the Go service applies its own
+public-server default.
+
 Build an unsigned validation MSI from a previously verified Go-core artifact:
 
 ```powershell
 .\scripts\build-windows-client-msi.ps1 `
   -UIVersion 1.2.3 `
-  -CoreVersion 0.2.0 `
+  -CoreVersion 0.2.3 `
   -ClientExe .\.artifacts\endlessnet-client_windows_amd64.exe
 ```
 

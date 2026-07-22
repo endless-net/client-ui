@@ -36,6 +36,8 @@ const _defaultAdminURL = 'https://admin.endlessnet.ru/';
 const _showSignalPath = r'~\.endlessnet\endlessnet.show';
 const _defaultEnrollmentPollInterval = Duration(seconds: 2);
 const _defaultEnrollmentPollTimeout = Duration(minutes: 10);
+const _defaultConnectionPollInterval = Duration(seconds: 1);
+const _defaultConnectionPollTimeout = Duration(seconds: 30);
 
 RandomAccessFile? _instanceLock;
 
@@ -55,6 +57,10 @@ Future<void> main(List<String> args) async {
   }
 
   final bridge = EndlessNetClientBridge(config: config, logger: logger);
+  if (config.elevatedEnrollment) {
+    await _runEnrollmentAndExit(config, bridge, logger);
+    exit(exitCode);
+  }
   if (config.enrollText.trim().isNotEmpty) {
     await _runEnrollmentAndExit(config, bridge, logger);
     exit(exitCode);
@@ -94,14 +100,13 @@ Future<void> _runEnrollmentAndExit(
   EndlessNetClientBridge bridge,
   AppLogger logger,
 ) async {
+  EnrollmentRequest? request;
   try {
-    final request = parseEnrollment(
-      config.enrollText,
-      config.server,
-      config.mode,
-    );
-    final payload = await bridge.enroll(request);
-    logger.info('deep-link enrollment completed');
+    request = config.enrollText.trim().isEmpty
+        ? EnrollmentRequest(token: '', server: config.server, mode: config.mode)
+        : parseEnrollment(config.enrollText, config.server, config.mode);
+    var payload = await bridge.enroll(request);
+    logger.info('enrollment request completed');
     final approvalURL = enrollmentApprovalURL(payload);
     if (approvalURL.isNotEmpty) {
       final opened = await launchExternalURL(Uri.parse(approvalURL));
@@ -110,15 +115,49 @@ Future<void> _runEnrollmentAndExit(
           'Windows could not open the device connection page in your default browser.',
         );
       }
-      logger.info('deep-link device connection page opened');
-    } else {
-      await showMessageBox(
-        'EndlessNet enrollment',
-        'Device enrollment completed.',
-      );
+      logger.info('device connection page opened');
     }
+    final deadline = DateTime.now().add(_defaultEnrollmentPollTimeout);
+    while (isEnrollmentPending(payload) && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(_defaultEnrollmentPollInterval);
+      payload = await bridge.status();
+    }
+    if (isEnrollmentPending(payload)) {
+      throw StateError('Device connection timed out. Try again.');
+    }
+    if (!ServiceStatus(payload).deviceEnrolled) {
+      throw StateError('The service did not complete device enrollment.');
+    }
+    logger.info('enrollment completed');
   } catch (err, stack) {
-    logger.error('deep-link enrollment failed', err, stack);
+    if (!config.elevatedEnrollment &&
+        Platform.isWindows &&
+        request != null &&
+        requiresAdministratorElevation(err)) {
+      try {
+        final launched = await launchElevatedEnrollment(config, request);
+        if (!launched) {
+          throw StateError(
+            'Administrator approval is required to connect this device.',
+          );
+        }
+        logger.info('elevated enrollment process launched after owner denial');
+        return;
+      } catch (elevatedErr, elevatedStack) {
+        logger.error(
+          'failed to launch elevated enrollment',
+          elevatedErr,
+          elevatedStack,
+        );
+        await showMessageBox(
+          'EndlessNet enrollment',
+          safeErrorText(elevatedErr),
+        );
+        exitCode = 1;
+        return;
+      }
+    }
+    logger.error('enrollment failed', err, stack);
     await showMessageBox('EndlessNet enrollment', safeErrorText(err));
     exitCode = 1;
   } finally {
@@ -133,6 +172,7 @@ class AppConfig {
     required this.server,
     required this.mode,
     required this.enrollText,
+    required this.elevatedEnrollment,
     required this.showWindow,
     required this.debug,
     required this.debugLogDir,
@@ -145,6 +185,7 @@ class AppConfig {
   final String server;
   final String mode;
   final String enrollText;
+  final bool elevatedEnrollment;
   final bool showWindow;
   final bool debug;
   final String debugLogDir;
@@ -157,6 +198,7 @@ class AppConfig {
     var server = '';
     var mode = 'workstation';
     var enrollText = '';
+    var elevatedEnrollment = false;
     var showWindow = false;
     var debug = false;
     var debugLogDir = _defaultDebugLogDir;
@@ -182,6 +224,8 @@ class AppConfig {
         mode = nextValue();
       } else if (arg == '--enroll') {
         enrollText = nextValue();
+      } else if (arg == '--elevated-enroll') {
+        elevatedEnrollment = true;
       } else if (arg == '--show-window') {
         showWindow = true;
       } else if (arg == '--debug') {
@@ -201,6 +245,7 @@ class AppConfig {
       server: server.trim(),
       mode: mode.trim().isEmpty ? 'workstation' : mode.trim(),
       enrollText: enrollText.trim(),
+      elevatedEnrollment: elevatedEnrollment,
       showWindow: showWindow,
       debug: debug,
       debugLogDir: debugLogDir.trim().isEmpty
@@ -426,6 +471,114 @@ EnrollmentRequest parseEnrollment(
   );
 }
 
+typedef ElevatedEnrollmentLauncher =
+    Future<bool> Function(EnrollmentRequest request);
+
+bool requiresAdministratorElevation(Object error) {
+  if (error is! ServiceIPCException) {
+    return false;
+  }
+  return error.errorCode == 'owner_required' ||
+      error.errorCode == 'administrator_required';
+}
+
+Future<bool> launchElevatedEnrollment(
+  AppConfig config,
+  EnrollmentRequest request,
+) async {
+  if (!Platform.isWindows) {
+    throw UnsupportedError(
+      'Administrative enrollment is only supported on Windows.',
+    );
+  }
+  return launchWindowsProcessElevated(
+    Platform.resolvedExecutable,
+    elevatedEnrollmentArguments(config, request),
+  );
+}
+
+List<String> elevatedEnrollmentArguments(
+  AppConfig config,
+  EnrollmentRequest request,
+) {
+  final arguments = <String>[
+    '--elevated-enroll',
+    '--pipe',
+    config.pipe,
+    '--mode',
+    request.mode,
+  ];
+  if (request.server.trim().isNotEmpty) {
+    arguments.addAll(['--server', request.server.trim()]);
+  }
+  if (request.token.trim().isNotEmpty) {
+    arguments.addAll(['--enroll', request.token.trim()]);
+  }
+  if (config.debug) {
+    arguments.addAll(['--debug', '--debug-log-dir', config.debugLogDir]);
+  }
+  return arguments;
+}
+
+bool launchWindowsProcessElevated(String executable, List<String> arguments) {
+  final verbPtr = 'runas'.toNativeUtf16();
+  final executablePtr = executable.toNativeUtf16();
+  final parametersPtr = arguments
+      .map(quoteWindowsCommandLineArgument)
+      .join(' ')
+      .toNativeUtf16();
+  try {
+    final result = ShellExecute(
+      null,
+      PCWSTR(verbPtr),
+      PCWSTR(executablePtr),
+      PCWSTR(parametersPtr),
+      null,
+      SW_SHOWNORMAL,
+    );
+    return result.address > 32;
+  } finally {
+    calloc.free(verbPtr);
+    calloc.free(executablePtr);
+    calloc.free(parametersPtr);
+  }
+}
+
+String quoteWindowsCommandLineArgument(String value) {
+  if (value.isEmpty) {
+    return '""';
+  }
+  if (!RegExp(r'[\s"]').hasMatch(value)) {
+    return value;
+  }
+  final quoted = StringBuffer('"');
+  var backslashes = 0;
+  void writeBackslashes(int count) {
+    for (var i = 0; i < count; i++) {
+      quoted.write(r'\');
+    }
+  }
+
+  for (final codeUnit in value.codeUnits) {
+    if (codeUnit == 0x5c) {
+      backslashes++;
+      continue;
+    }
+    if (codeUnit == 0x22) {
+      writeBackslashes(backslashes * 2 + 1);
+      quoted.write('"');
+      backslashes = 0;
+      continue;
+    }
+    writeBackslashes(backslashes);
+    backslashes = 0;
+    quoted.writeCharCode(codeUnit);
+  }
+  writeBackslashes(backslashes * 2);
+  quoted.write('"');
+  return quoted.toString();
+}
+
 class EndlessNetClientBridge {
   EndlessNetClientBridge({
     required this.config,
@@ -519,10 +672,19 @@ class EndlessNetController extends ChangeNotifier
     this.desktopIntegrationEnabled = true,
     Future<bool> Function(Uri uri)? externalURLLauncher,
     Future<void> Function(String title, String message)? messagePresenter,
+    ElevatedEnrollmentLauncher? elevatedEnrollmentLauncher,
+    bool? enrollmentElevationSupported,
     this.enrollmentPollInterval = _defaultEnrollmentPollInterval,
     this.enrollmentPollTimeout = _defaultEnrollmentPollTimeout,
+    this.connectionPollInterval = _defaultConnectionPollInterval,
+    this.connectionPollTimeout = _defaultConnectionPollTimeout,
   }) : externalURLLauncher = externalURLLauncher ?? launchExternalURL,
-       messagePresenter = messagePresenter ?? showMessageBox;
+       messagePresenter = messagePresenter ?? showMessageBox,
+       elevatedEnrollmentLauncher =
+           elevatedEnrollmentLauncher ??
+           ((request) => launchElevatedEnrollment(config, request)),
+       enrollmentElevationSupported =
+           enrollmentElevationSupported ?? Platform.isWindows;
 
   final AppConfig config;
   final EndlessNetClientBridge bridge;
@@ -530,8 +692,12 @@ class EndlessNetController extends ChangeNotifier
   final bool desktopIntegrationEnabled;
   final Future<bool> Function(Uri uri) externalURLLauncher;
   final Future<void> Function(String title, String message) messagePresenter;
+  final ElevatedEnrollmentLauncher elevatedEnrollmentLauncher;
+  final bool enrollmentElevationSupported;
   final Duration enrollmentPollInterval;
   final Duration enrollmentPollTimeout;
+  final Duration connectionPollInterval;
+  final Duration connectionPollTimeout;
 
   Map<String, dynamic>? statusPayload;
   String? errorText;
@@ -540,9 +706,11 @@ class EndlessNetController extends ChangeNotifier
   Timer? _refreshTimer;
   Timer? _showSignalTimer;
   Timer? _enrollmentPollTimer;
-  EnrollmentRequest? _pendingEnrollmentRequest;
+  Timer? _connectionPollTimer;
   DateTime? _enrollmentPollingStartedAt;
+  DateTime? _connectionPollingStartedAt;
   bool _enrollmentPollInFlight = false;
+  bool _connectionPollInFlight = false;
   DateTime? _lastShowSignalWrite;
 
   ServiceStatus get serviceStatus => ServiceStatus(statusPayload);
@@ -659,10 +827,11 @@ class EndlessNetController extends ChangeNotifier
       statusPayload = payload;
       errorText = null;
       if (isEnrollmentPending(payload)) {
-        _startEnrollmentPolling(_defaultEnrollmentRequest());
+        _startEnrollmentPolling();
       } else if (ServiceStatus(payload).deviceEnrolled) {
         _stopEnrollmentPolling();
       }
+      _reconcileConnectionPolling(payload);
       logger.info('status refreshed state=$state');
     } catch (err, stack) {
       errorText = safeErrorText(err);
@@ -681,6 +850,7 @@ class EndlessNetController extends ChangeNotifier
       await action();
       statusPayload = await bridge.status();
       errorText = null;
+      _reconcileConnectionPolling(statusPayload!);
       logger.info('action completed state=$state');
     } catch (err, stack) {
       errorText = safeErrorText(err);
@@ -841,15 +1011,38 @@ class EndlessNetController extends ChangeNotifier
           connectionURL,
           pageName: 'device connection page',
         );
-        _startEnrollmentPolling(request);
+        _startEnrollmentPolling();
         logger.info('device enrollment request created and opened');
       } else if (ServiceStatus(payload).deviceEnrolled) {
         _stopEnrollmentPolling();
+        _reconcileConnectionPolling(payload);
         logger.info('device enrollment completed immediately');
       } else {
         throw StateError('The service did not start device enrollment.');
       }
     } catch (err, stack) {
+      if (enrollmentElevationSupported && requiresAdministratorElevation(err)) {
+        try {
+          final launched = await elevatedEnrollmentLauncher(request);
+          if (!launched) {
+            throw StateError(
+              'Administrator approval is required to connect this device.',
+            );
+          }
+          _startEnrollmentPolling();
+          logger.info('elevated device enrollment launched after owner denial');
+          return;
+        } catch (elevatedErr, elevatedStack) {
+          errorText = safeErrorText(elevatedErr);
+          logger.error(
+            'elevated device enrollment failed',
+            elevatedErr,
+            elevatedStack,
+          );
+          await messagePresenter('EndlessNet', errorText!);
+          return;
+        }
+      }
       errorText = safeErrorText(err);
       logger.error('device enrollment failed', err, stack);
       await messagePresenter('EndlessNet', errorText!);
@@ -905,8 +1098,7 @@ class EndlessNetController extends ChangeNotifier
     );
   }
 
-  void _startEnrollmentPolling(EnrollmentRequest request) {
-    _pendingEnrollmentRequest = request;
+  void _startEnrollmentPolling() {
     _enrollmentPollingStartedAt ??= DateTime.now();
     _enrollmentPollTimer ??= Timer.periodic(
       enrollmentPollInterval,
@@ -917,17 +1109,61 @@ class EndlessNetController extends ChangeNotifier
   void _stopEnrollmentPolling() {
     _enrollmentPollTimer?.cancel();
     _enrollmentPollTimer = null;
-    _pendingEnrollmentRequest = null;
     _enrollmentPollingStartedAt = null;
+  }
+
+  void _reconcileConnectionPolling(Map<String, dynamic> payload) {
+    if (isConnectionSettling(payload)) {
+      _startConnectionPolling();
+    } else {
+      _stopConnectionPolling();
+    }
+  }
+
+  void _startConnectionPolling() {
+    _connectionPollingStartedAt ??= DateTime.now();
+    _connectionPollTimer ??= Timer.periodic(
+      connectionPollInterval,
+      (_) => _pollConnectionStatus(),
+    );
+  }
+
+  void _stopConnectionPolling() {
+    _connectionPollTimer?.cancel();
+    _connectionPollTimer = null;
+    _connectionPollingStartedAt = null;
+  }
+
+  Future<void> _pollConnectionStatus() async {
+    if (_connectionPollInFlight || quitting || busy) {
+      return;
+    }
+    final startedAt = _connectionPollingStartedAt;
+    if (startedAt != null &&
+        DateTime.now().difference(startedAt) >= connectionPollTimeout) {
+      _stopConnectionPolling();
+      logger.info('connection status polling stopped state=$state');
+      return;
+    }
+
+    _connectionPollInFlight = true;
+    try {
+      final payload = await bridge.status();
+      statusPayload = payload;
+      errorText = null;
+      _reconcileConnectionPolling(payload);
+      logger.info('connection status refreshed state=$state');
+    } catch (err, stack) {
+      logger.error('connection status refresh failed', err, stack);
+    } finally {
+      _connectionPollInFlight = false;
+      await _updateTray();
+      notifyListeners();
+    }
   }
 
   Future<void> _pollEnrollment() async {
     if (_enrollmentPollInFlight || quitting) {
-      return;
-    }
-    final request = _pendingEnrollmentRequest;
-    if (request == null) {
-      _stopEnrollmentPolling();
       return;
     }
     final startedAt = _enrollmentPollingStartedAt;
@@ -947,7 +1183,7 @@ class EndlessNetController extends ChangeNotifier
 
     _enrollmentPollInFlight = true;
     try {
-      final payload = await bridge.enroll(request);
+      final payload = await bridge.status();
       statusPayload = payload;
       errorText = null;
       if (!isEnrollmentPending(payload)) {
@@ -958,6 +1194,7 @@ class EndlessNetController extends ChangeNotifier
           errorText = 'Device enrollment did not complete.';
         }
       }
+      _reconcileConnectionPolling(payload);
     } catch (err, stack) {
       errorText = safeErrorText(err);
       logger.error('device enrollment polling failed', err, stack);
@@ -1041,6 +1278,7 @@ class EndlessNetController extends ChangeNotifier
 
   Future<void> logout() async {
     _stopEnrollmentPolling();
+    _stopConnectionPolling();
     await runAction(() => bridge.logout());
   }
 
@@ -1049,6 +1287,7 @@ class EndlessNetController extends ChangeNotifier
     _refreshTimer?.cancel();
     _showSignalTimer?.cancel();
     _stopEnrollmentPolling();
+    _stopConnectionPolling();
     if (!desktopIntegrationEnabled) {
       await logger.close();
       return;
@@ -1830,6 +2069,19 @@ bool isEnrollmentPending(Map<String, dynamic>? payload) {
           ServiceState.needsApproval ||
       valueText(payload['control_state'], fallback: '') ==
           ControlState.pendingApproval;
+}
+
+bool isConnectionSettling(Map<String, dynamic>? payload) {
+  if (payload == null) {
+    return false;
+  }
+  final status = ServiceStatus(payload);
+  return status.deviceEnrolled &&
+      !status.connected &&
+      !status.userDisconnected &&
+      status.state(fallback: '') == ServiceState.degraded &&
+      valueText(payload['desired_state'], fallback: '') ==
+          ConnectionIntentState.connected;
 }
 
 String enrollmentApprovalURL(Map<String, dynamic>? payload) {

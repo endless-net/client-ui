@@ -39,6 +39,7 @@ func renderMSI(args []string) error {
 	appBundleDir := fs.String("app-bundle-dir", "", "path to the Flutter Windows release bundle")
 	iconFile := fs.String("icon-file", defaults.IconFile, "path to the application icon")
 	msi := fs.String("msi", "", "final MSI output path")
+	resetStateOnInstall := fs.Bool("reset-state-on-install", false, "delete existing client state before starting the installed service")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -56,17 +57,18 @@ func renderMSI(args []string) error {
 		}
 	}
 	artifacts, err := packaging.WriteWindowsInstallerArtifacts(*outputDir, packaging.WindowsInstallerOptions{
-		ProductName:    defaults.ProductName,
-		Manufacturer:   defaults.Manufacturer,
-		Version:        *version,
-		UpgradeCode:    defaults.UpgradeCode,
-		ClientExe:      *clientExe,
-		WintunDLL:      *wintunDLL,
-		AppExe:         *appExe,
-		AppBundleDir:   *appBundleDir,
-		IconFile:       *iconFile,
-		OutputName:     *msi,
-		ServiceOptions: packaging.DefaultWindowsServiceOptions(),
+		ProductName:         defaults.ProductName,
+		Manufacturer:        defaults.Manufacturer,
+		Version:             *version,
+		UpgradeCode:         defaults.UpgradeCode,
+		ClientExe:           *clientExe,
+		WintunDLL:           *wintunDLL,
+		AppExe:              *appExe,
+		AppBundleDir:        *appBundleDir,
+		IconFile:            *iconFile,
+		OutputName:          *msi,
+		ResetStateOnInstall: *resetStateOnInstall,
+		ServiceOptions:      packaging.DefaultWindowsServiceOptions(),
 	})
 	if err != nil {
 		return err

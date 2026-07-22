@@ -20,7 +20,6 @@ type WindowsServiceOptions struct {
 	Description       string
 	BinaryPath        string
 	ConfigPath        string
-	WGConfigPath      string
 	StatePath         string
 	DiagnosticsDir    string
 	IPCPipe           string
@@ -42,7 +41,6 @@ func DefaultWindowsServiceOptions() WindowsServiceOptions {
 		Description:       "EndlessNet client agent",
 		BinaryPath:        `C:\Program Files\EndlessNet\endlessnet-client.exe`,
 		ConfigPath:        `C:\ProgramData\EndlessNet\client.json`,
-		WGConfigPath:      `C:\ProgramData\EndlessNet\endlessnet.conf`,
 		StatePath:         `C:\ProgramData\EndlessNet\agent-state.json`,
 		DiagnosticsDir:    `C:\ProgramData\EndlessNet\Diagnostics`,
 		IPCPipe:           DefaultWindowsServicePipeName,
@@ -68,7 +66,6 @@ func normalizeWindowsServiceOptions(opts WindowsServiceOptions) WindowsServiceOp
 		{&opts.Description, defaults.Description},
 		{&opts.BinaryPath, defaults.BinaryPath},
 		{&opts.ConfigPath, defaults.ConfigPath},
-		{&opts.WGConfigPath, defaults.WGConfigPath},
 		{&opts.StatePath, defaults.StatePath},
 		{&opts.DiagnosticsDir, defaults.DiagnosticsDir},
 		{&opts.IPCPipe, defaults.IPCPipe},
@@ -100,7 +97,6 @@ func windowsServiceAgentArgs(opts WindowsServiceOptions) []string {
 		"agent",
 		"--windows-service",
 		"--config", opts.ConfigPath,
-		"--output", opts.WGConfigPath,
 		"--state-output", opts.StatePath,
 		"--diagnostics-dir", opts.DiagnosticsDir,
 		"--interval", opts.Interval.String(),

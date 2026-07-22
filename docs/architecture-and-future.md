@@ -108,7 +108,9 @@ flowchart LR
 UI:
 
 1. разбирает параметры запуска и скрывает чувствительные значения в логах;
-2. при `--enroll` обрабатывает deep link в короткоживущем процессе;
+2. при enrollment сначала обращается к protected pipe от текущего пользователя,
+   а `runas` использует только при ответе `owner_required` или
+   `administrator_required`;
 3. в обычном режиме получает `/status`;
 4. обновляет окно и tray;
 5. повторяет чтение статуса каждые 15 секунд;
@@ -133,7 +135,7 @@ Win32 pipe вынесена в отдельный Dart isolate, чтобы бл�
 | --- | --- | --- |
 | `GET /status` | Текущее состояние service | Основной источник состояния, polling |
 | `GET /events` | NDJSON-поток изменений | Описан контрактом, UI пока не подписывается |
-| `POST /enroll` | Enrollment устройства | Deep link, ручное подключение и polling approval |
+| `POST /enroll` | Enrollment устройства | Текущий локальный владелец; elevated worker только для миграции ownerless state |
 | `POST /connect` | Поднять туннель | Кнопка и tray |
 | `POST /disconnect` | Сохранить disconnect intent и опустить туннель | Кнопка и tray |
 | `GET /server-identity` | Сравнить закреплённый и объявленный signing key | Recovery при смене identity |
@@ -148,13 +150,22 @@ Win32 pipe вынесена в отдельный Dart isolate, чтобы бл�
 ### 5.3. Enrollment
 
 UI принимает `endlessnet://enroll?enroll_token=...` или `enr_` токен из
-командной строки и отправляет только `enroll_token`, `server` и `mode`. Токен,
-deep link и значения авторизации редактируются до записи в debug log.
+командной строки и сначала отправляет `/enroll` от текущего пользователя. На
+чистой установке core 0.2.3 закрепляет этого пользователя как локального
+владельца без UAC. Только ответы `owner_required` и `administrator_required`
+означают миграцию ownerless legacy state и запускают собственный executable
+через `ShellExecute` с verb `runas`. Короткоживущий процесс с
+`--elevated-enroll` отправляет напрямую в protected pipe `enroll_token`, `mode`
+и только явно заданный `server`; Go core как IPC-адаптер не запускается. Токен,
+deep link и значения авторизации редактируются до записи в debug log. Service
+применяет собственный public-server default, поэтому UI не подставляет и не
+передаёт адрес сервера без явного override.
 
-Если service завершает enrollment сразу, UI показывает успешное состояние.
-Если требуется web approval, UI открывает предоставленный service URL в браузере
-и повторяет `/enroll` каждые 2 секунды не более 10 минут. Источником истины о
-завершении остаётся service, а не browser callback или локальный UI state.
+Если service завершает enrollment сразу, процесс enrollment завершается. Если
+требуется web approval, UI открывает предоставленный service URL в браузере и
+проверяет `GET /status` каждые 2 секунды не более 10 минут. Обычный UI остаётся
+без повышенных прав. Источником истины остаётся service, а не browser callback
+или локальный UI state.
 
 ### 5.4. Connect и смена server identity
 
@@ -189,7 +200,6 @@ MSI устанавливается per-machine в `C:\Program Files\EndlessNet`.
 | Данные | Путь |
 | --- | --- |
 | Конфигурация enrollment | `C:\ProgramData\EndlessNet\client.json` |
-| WireGuard-конфигурация | `C:\ProgramData\EndlessNet\endlessnet.conf` |
 | Состояние agent | `C:\ProgramData\EndlessNet\agent-state.json` |
 | Диагностика | `C:\ProgramData\EndlessNet\Diagnostics` |
 
@@ -382,7 +392,9 @@ Release подписывает Go core, Flutter executable и финальный
 Статус: принято.
 
 Upgrade, repair и обычный uninstall не удаляют `ProgramData`. Полная очистка —
-отдельное явное действие.
+явное действие оператора через `ENDLESSNET_REMOVE_STATE=1` при установке или
+удалении MSI. При установке это позволяет сбросить несовместимое состояние до
+запуска новой службы.
 
 Причины: обновление или восстановление установки не должно неожиданно удалять
 идентичность устройства.

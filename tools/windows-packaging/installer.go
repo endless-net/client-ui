@@ -10,17 +10,18 @@ import (
 )
 
 type WindowsInstallerOptions struct {
-	ProductName    string
-	Manufacturer   string
-	Version        string
-	UpgradeCode    string
-	ClientExe      string
-	WintunDLL      string
-	AppExe         string
-	AppBundleDir   string
-	IconFile       string
-	OutputName     string
-	ServiceOptions WindowsServiceOptions
+	ProductName         string
+	Manufacturer        string
+	Version             string
+	UpgradeCode         string
+	ClientExe           string
+	WintunDLL           string
+	AppExe              string
+	AppBundleDir        string
+	IconFile            string
+	OutputName          string
+	ResetStateOnInstall bool
+	ServiceOptions      WindowsServiceOptions
 }
 
 type WindowsInstallerArtifacts struct {
@@ -134,7 +135,6 @@ func validateWindowsInstallerOptions(opts WindowsInstallerOptions) error {
 		"service name": opts.ServiceOptions.ServiceName,
 		"display name": opts.ServiceOptions.DisplayName,
 		"config path":  opts.ServiceOptions.ConfigPath,
-		"wg config":    opts.ServiceOptions.WGConfigPath,
 		"agent state":  opts.ServiceOptions.StatePath,
 		"diagnostics":  opts.ServiceOptions.DiagnosticsDir,
 		"event source": opts.ServiceOptions.EventLogSource,
@@ -158,6 +158,10 @@ func validateWindowsInstallerOptions(opts WindowsInstallerOptions) error {
 func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 	serviceArgs := windowsServiceAgentArgs(opts.ServiceOptions)
 	stateRoot := windowsParentPath(opts.ServiceOptions.ConfigPath)
+	removeStatePropertyValue := ""
+	if opts.ResetStateOnInstall {
+		removeStatePropertyValue = ` Value="1"`
+	}
 	// Windows Installer requires a maintenance source with the registered MSI
 	// package name. Browsers commonly rename duplicate downloads, so an ordinary
 	// second /i must return success before source validation instead of failing
@@ -173,7 +177,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of EndlessNet Client is already installed." />
     <util:ExitEarlyWithSuccess />
     <SetProperty Id="NEWERVERSIONDETECTED" Value="1" Before="FindRelatedProducts" Sequence="execute" Condition="%s" />
-    <Property Id="ENDLESSNET_REMOVE_STATE" Secure="yes" />
+    <Property Id="ENDLESSNET_REMOVE_STATE" Secure="yes"%s />
     <Property Id="ENDLESSNET_REMOVE_STATE_ROOT" Secure="yes" Value="%s" />
     <MediaTemplate EmbedCab="yes" />
     <UI Id="EndlessNetInstallerUI">
@@ -275,6 +279,12 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
         <RegistryValue Root="HKLM" Key="Software\EndlessNet\Client" Name="RemoveStateMarker" Type="integer" Value="1" KeyPath="yes" />
         <util:RemoveFolderEx Id="RemoveEndlessNetStateRoot" On="uninstall" Property="ENDLESSNET_REMOVE_STATE_ROOT" Condition="ENDLESSNET_REMOVE_STATE=&quot;1&quot;" />
       </Component>
+      <Component Id="ResetStateBeforeInstall" Directory="ENDLESSNETPROGRAMDATA" Guid="*" Bitness="always64" Condition="ENDLESSNET_REMOVE_STATE=&quot;1&quot;">
+        <RemoveFile Id="RemoveClientStateBeforeInstall" Name="client.json" On="install" />
+        <RemoveFile Id="RemoveAgentStateBeforeInstall" Name="agent-state.json" On="install" />
+        <RemoveFile Id="RemoveAgentLockBeforeInstall" Name="client.json.agent.lock" On="install" />
+        <RegistryValue Root="HKLM" Key="Software\EndlessNet\Client" Name="StateResetMarker" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
     </ComponentGroup>
     <ComponentGroup Id="EndlessNetAppBundleFiles" Directory="INSTALLFOLDER">
       <Files Include="$(var.AppBundleDir)\*.dll" />
@@ -293,6 +303,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 		xmlAttrEscape(opts.ProductName),
 		xmlAttrEscape(opts.Manufacturer),
 		idempotentInstallCondition,
+		removeStatePropertyValue,
 		xmlAttrEscape(stateRoot),
 		appShutdownCondition,
 		appShutdownCondition,

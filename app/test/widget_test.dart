@@ -1,9 +1,108 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:endlessnet/main.dart';
+import 'package:endlessnet/named_pipe_http.dart';
 import 'package:endlessnet/service_contract.dart';
 
 void main() {
+  test('AppConfig recognizes the elevated enrollment worker', () {
+    final config = AppConfig.parse(const ['--elevated-enroll']);
+
+    expect(config.elevatedEnrollment, isTrue);
+    expect(config.enrollText, isEmpty);
+    expect(config.server, isEmpty);
+  });
+
+  test('interactive enrollment leaves the optional server unset', () {
+    final request = parseEnrollment('endlessnet://enroll', '', 'workstation');
+
+    expect(request.token, isEmpty);
+    expect(request.server, isEmpty);
+  });
+
+  test('elevated enrollment omits an unset optional server', () {
+    final config = AppConfig.parse(const []);
+    final arguments = elevatedEnrollmentArguments(
+      config,
+      EnrollmentRequest(token: '', server: '', mode: 'workstation'),
+    );
+
+    expect(arguments, isNot(contains('--server')));
+  });
+
+  test('elevated enrollment preserves the protected pipe and request', () {
+    final config = AppConfig.parse(const [
+      '--pipe',
+      r'\\.\pipe\endlessnet-test',
+      '--debug',
+      '--debug-log-dir',
+      r'C:\Users\tester\EndlessNet Logs',
+    ]);
+    final arguments = elevatedEnrollmentArguments(
+      config,
+      EnrollmentRequest(
+        token: 'enr_secret',
+        server: 'https://api.example.test',
+        mode: 'workstation',
+      ),
+    );
+
+    expect(arguments.first, '--elevated-enroll');
+    expect(arguments, containsAllInOrder(['--pipe', config.pipe]));
+    expect(
+      arguments,
+      containsAllInOrder(['--server', 'https://api.example.test']),
+    );
+    expect(arguments, containsAllInOrder(['--enroll', 'enr_secret']));
+    expect(
+      arguments,
+      containsAllInOrder(['--debug-log-dir', config.debugLogDir]),
+    );
+  });
+
+  test('Windows elevation arguments are quoted for ShellExecute', () {
+    expect(quoteWindowsCommandLineArgument('plain'), 'plain');
+    expect(
+      quoteWindowsCommandLineArgument(
+        r'C:\Program Files\EndlessNet\endlessnet.exe',
+      ),
+      r'"C:\Program Files\EndlessNet\endlessnet.exe"',
+    );
+  });
+
+  test('only owner policy errors trigger administrator elevation', () {
+    expect(
+      requiresAdministratorElevation(
+        const ServiceIPCException(
+          statusCode: 403,
+          errorCode: 'owner_required',
+          message: 'owner required',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      requiresAdministratorElevation(
+        const ServiceIPCException(
+          statusCode: 403,
+          errorCode: 'administrator_required',
+          message: 'administrator required',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      requiresAdministratorElevation(
+        const ServiceIPCException(
+          statusCode: 400,
+          errorCode: 'enrollment_failed',
+          message: 'enrollment failed',
+        ),
+      ),
+      isFalse,
+    );
+  });
+
   test('parseEnrollment accepts EndlessNet deep links', () {
     final request = parseEnrollment(
       'endlessnet://enroll?enroll_token=enr_test_token&server=https%3A%2F%2Fapi.example.test&mode=server',

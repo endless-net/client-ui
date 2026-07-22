@@ -18,7 +18,7 @@ func TestWindowsPackagingServiceContractIsStable(t *testing.T) {
 			t.Fatalf("service arguments missing %q: %s", want, args)
 		}
 	}
-	for _, obsolete := range []string{"--userspace-wireguard", "--apply-wireguard", "--apply-wg-quick", "--wireguard-windows"} {
+	for _, obsolete := range []string{"--output", "endlessnet.conf", "--userspace-wireguard", "--apply-wireguard", "--apply-wg-quick", "--wireguard-windows"} {
 		if strings.Contains(args, obsolete) {
 			t.Fatalf("default service arguments contain obsolete WireGuard backend selector %q: %s", obsolete, args)
 		}
