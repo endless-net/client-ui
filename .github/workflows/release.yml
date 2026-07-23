@@ -47,13 +47,13 @@ jobs:
         if: steps.idempotency.outputs.noop != 'true'
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
       - uses: subosito/flutter-action@v2
         if: steps.idempotency.outputs.noop != 'true'
         with:
           channel: stable
           flutter-version: 3.38.1
-          cache: true
+          cache: false
 
       - name: Install pinned WiX Toolset
         if: steps.idempotency.outputs.noop != 'true'
