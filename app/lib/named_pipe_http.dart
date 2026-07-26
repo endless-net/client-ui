@@ -46,8 +46,10 @@ class NamedPipeHttpClient {
       requireNegotiated: parsed.statusCode >= 200 && parsed.statusCode < 300,
     );
     if (parsed.statusCode < 200 || parsed.statusCode >= 300) {
-      throw StateError(
-        _firstNonEmpty([
+      throw ServiceIPCException(
+        statusCode: parsed.statusCode,
+        errorCode: payload['error_code']?.toString().trim() ?? '',
+        message: _firstNonEmpty([
           payload['error']?.toString(),
           payload['message']?.toString(),
           'EndlessNet service request failed with HTTP ${parsed.statusCode}.',
@@ -56,6 +58,21 @@ class NamedPipeHttpClient {
     }
     return payload;
   }
+}
+
+class ServiceIPCException implements Exception {
+  const ServiceIPCException({
+    required this.statusCode,
+    required this.errorCode,
+    required this.message,
+  });
+
+  final int statusCode;
+  final String errorCode;
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 Uint8List namedPipeHttpExchange(

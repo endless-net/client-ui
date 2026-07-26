@@ -102,6 +102,9 @@ void main() {
         mode: 'workstation',
       ),
     );
+    await bridge.enroll(
+      EnrollmentRequest(token: '', server: '', mode: 'workstation'),
+    );
 
     expect(ipc.calls, [
       const _IPCCall('GET', ServiceIPCPath.status, null),
@@ -122,6 +125,7 @@ void main() {
         'server': 'https://api.example.test',
         'mode': 'workstation',
       }),
+      const _IPCCall('POST', ServiceIPCPath.enroll, {'mode': 'workstation'}),
     ]);
     expect(ipc.lastRequestTimeout, const Duration(minutes: 2));
   });

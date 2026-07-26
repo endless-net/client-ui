@@ -10,7 +10,12 @@ info:
     protected local channel; it is not a network listener. Every request must
     send the protocol, current-version, and minimum-supported-version headers.
     The server negotiates the highest overlapping version and returns it in the
-    response envelope. The initial contract supports only version 1.
+    response envelope. The initial contract supports only version 1. Observer
+    operations are available to every identified local peer. Owner operations
+    are available to the SID/UID that first enrolls the device and to local
+    administrators/root; initial enrollment claims an owner when none exists.
+    An existing ownerless enrollment requires an administrator/root peer to
+    claim ownership. Administrator operations always require such a peer.
 servers:
   - url: http://endlessnet.local
     description: Placeholder authority used by local IPC clients.
@@ -68,7 +73,7 @@ paths:
     parameters: *ipcVersionHeaders
     post:
       operationId: enroll
-      x-endlessnet-required-privilege: administrator
+      x-endlessnet-required-privilege: owner
       summary: Enroll this device using a one-time token.
       requestBody:
         required: true
@@ -89,7 +94,7 @@ paths:
     parameters: *ipcVersionHeaders
     post:
       operationId: connect
-      x-endlessnet-required-privilege: administrator
+      x-endlessnet-required-privilege: owner
       summary: Clear local disconnect intent and bring the tunnel up.
       requestBody:
         content:
@@ -146,7 +151,7 @@ paths:
     parameters: *ipcVersionHeaders
     post:
       operationId: disconnect
-      x-endlessnet-required-privilege: administrator
+      x-endlessnet-required-privilege: owner
       summary: Persist local disconnect intent and bring the tunnel down.
       requestBody:
         content:
@@ -167,7 +172,7 @@ paths:
     parameters: *ipcVersionHeaders
     post:
       operationId: logout
-      x-endlessnet-required-privilege: administrator
+      x-endlessnet-required-privilege: owner
       summary: Revoke/remove local enrollment and clear generated tunnel state.
       requestBody:
         content:
@@ -203,7 +208,7 @@ paths:
     parameters: *ipcVersionHeaders
     post:
       operationId: network.select
-      x-endlessnet-required-privilege: administrator
+      x-endlessnet-required-privilege: owner
       summary: Select the already-enrolled network.
       requestBody:
         required: true
@@ -1337,6 +1342,7 @@ components:
         - request_failed
         - response_too_large
         - unauthorized
+        - owner_required
         - administrator_required
         - ipc_version_required
         - ipc_protocol_unsupported

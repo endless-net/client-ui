@@ -99,6 +99,11 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`Component Id="RemoveStateOnUninstall"`,
 		`util:RemoveFolderEx Id="RemoveEndlessNetStateRoot"`,
 		`On="uninstall"`,
+		`Component Id="ResetStateBeforeInstall"`,
+		`Condition="ENDLESSNET_REMOVE_STATE=&quot;1&quot;"`,
+		`RemoveFile Id="RemoveClientStateBeforeInstall" Name="client.json" On="install"`,
+		`RemoveFile Id="RemoveAgentStateBeforeInstall" Name="agent-state.json" On="install"`,
+		`RemoveFile Id="RemoveAgentLockBeforeInstall" Name="client.json.agent.lock" On="install"`,
 		`Condition="ENDLESSNET_REMOVE_STATE=&quot;1&quot;"`,
 		`<PermissionEx Sddl="D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)" />`,
 	} {
@@ -108,6 +113,9 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 	}
 	if got := strings.Count(artifacts.WixSource, `Condition="NOT Installed OR REMOVE~=&quot;ALL&quot; OR REINSTALL"`); got != 2 {
 		t.Fatalf("app shutdown lifecycle condition count = %d, want 2:\n%s", got, artifacts.WixSource)
+	}
+	if got := strings.Count(artifacts.WixSource, `Condition="ENDLESSNET_REMOVE_STATE=&quot;1&quot;"`); got != 2 {
+		t.Fatalf("state removal condition count = %d, want 2:\n%s", got, artifacts.WixSource)
 	}
 	for _, forbidden := range []string{
 		`WixUI_Minimal`,
@@ -119,6 +127,8 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`EndlessNetTray`,
 		`TrayExe`,
 		`TrayBundleDir`,
+		`--output`,
+		`endlessnet.conf`,
 		`--userspace-wireguard`,
 		`--apply-wireguard`,
 		`--apply-wg-quick`,

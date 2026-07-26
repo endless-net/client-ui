@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:endlessnet/main.dart';
+import 'package:endlessnet/named_pipe_http.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -215,11 +216,13 @@ void main() {
       await expectLater(
         bridge.connect(),
         throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'control plane unavailable',
-          ),
+          isA<ServiceIPCException>()
+              .having((error) => error.errorCode, 'errorCode', 'connect_failed')
+              .having(
+                (error) => error.message,
+                'message',
+                'control plane unavailable',
+              ),
         ),
       );
       final status = await bridge.status();

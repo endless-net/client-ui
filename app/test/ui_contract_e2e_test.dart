@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:endlessnet/main.dart';
+import 'package:endlessnet/named_pipe_http.dart';
 import 'package:endlessnet/service_contract.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -226,7 +227,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Connect this device creates and opens an enrollment request', (
+  testWidgets('Connect this device enrolls as local owner without elevation', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1000, 720);
@@ -236,22 +237,16 @@ void main() {
 
     final launchRequests = <Uri>[];
     final messages = <String>[];
+    final elevatedRequests = <EnrollmentRequest>[];
     final bridge = ContractFakeBridge();
     bridge.statusPayload = {'state': ServiceState.needsEnrollment};
-    bridge.enrollmentPayloads.addAll([
-      {
-        'state': ServiceState.needsApproval,
-        'control_state': ControlState.pendingApproval,
-        'enrollment_request_id': 'ner_ui_connect',
-        'approval_url':
-            'https://admin.endlessnet.ru/?enrollment_request=ner_ui_connect',
-      },
-      _contractStatus(
-        state: ServiceState.connected,
-        desiredState: ConnectionIntentState.connected,
-        userDisconnected: false,
-      ),
-    ]);
+    bridge.enrollmentPayloads.add({
+      'state': ServiceState.needsApproval,
+      'control_state': ControlState.pendingApproval,
+      'enrollment_request_id': 'ner_ui_connect',
+      'approval_url':
+          'https://admin.endlessnet.ru/?enrollment_request=ner_ui_connect',
+    });
     final controller = EndlessNetController(
       config: AppConfig.parse(const [
         '--connect-url',
@@ -267,6 +262,11 @@ void main() {
       messagePresenter: (title, message) async {
         messages.add('$title: $message');
       },
+      elevatedEnrollmentLauncher: (request) async {
+        elevatedRequests.add(request);
+        return true;
+      },
+      enrollmentElevationSupported: true,
       enrollmentPollInterval: const Duration(milliseconds: 10),
     );
     addTearDown(controller.exitApp);
@@ -285,17 +285,104 @@ void main() {
       ),
     ]);
     expect(messages, isEmpty);
+    expect(elevatedRequests, isEmpty);
     expect(bridge.enrollmentRequests, hasLength(1));
     expect(bridge.enrollmentRequests.single.token, isEmpty);
+    expect(bridge.enrollmentRequests.single.server, isEmpty);
     expect(bridge.enrollmentRequests.single.mode, 'workstation');
 
     await tester.pump(const Duration(milliseconds: 11));
+    bridge.statusPayload = _contractStatus(
+      state: ServiceState.connected,
+      desiredState: ConnectionIntentState.connected,
+      userDisconnected: false,
+    );
+    await tester.pump(const Duration(milliseconds: 11));
     await tester.pumpAndSettle();
 
-    expect(bridge.calls.where((call) => call == 'enroll'), hasLength(2));
+    expect(bridge.calls.where((call) => call == 'enroll'), hasLength(1));
+    expect(bridge.calls.where((call) => call == 'status'), isNotEmpty);
     expect(find.text(ServiceState.connected), findsOneWidget);
     expect(find.text('Disconnect'), findsOneWidget);
   });
+
+  test(
+    'cancelled UAC leaves the device unenrolled with a clear error',
+    () async {
+      final messages = <String>[];
+      final bridge = ContractFakeBridge();
+      bridge.statusPayload = {'state': ServiceState.needsEnrollment};
+      bridge.enrollmentError = const ServiceIPCException(
+        statusCode: 403,
+        errorCode: 'owner_required',
+        message: 'local owner or administrator is required',
+      );
+      final controller = EndlessNetController(
+        config: AppConfig.parse(const []),
+        bridge: bridge,
+        logger: AppLogger('', enabled: false),
+        desktopIntegrationEnabled: false,
+        elevatedEnrollmentLauncher: (_) async => false,
+        enrollmentElevationSupported: true,
+        messagePresenter: (title, message) async {
+          messages.add('$title: $message');
+        },
+      );
+      addTearDown(controller.exitApp);
+      controller.statusPayload = bridge.statusPayload;
+
+      await controller.connectDevice();
+
+      expect(controller.errorText, contains('Administrator approval'));
+      expect(messages.single, contains('Administrator approval'));
+      expect(bridge.enrollmentRequests, hasLength(1));
+    },
+  );
+
+  test(
+    'degraded connected intent is refreshed until service is ready',
+    () async {
+      final bridge = ContractFakeBridge();
+      bridge.statusPayload = _contractStatus(
+        state: ServiceState.degraded,
+        controlState: ControlState.degraded,
+        desiredState: ConnectionIntentState.connected,
+        userDisconnected: false,
+      );
+      final controller = EndlessNetController(
+        config: AppConfig.parse(const []),
+        bridge: bridge,
+        logger: AppLogger('', enabled: false),
+        desktopIntegrationEnabled: false,
+        connectionPollInterval: const Duration(milliseconds: 5),
+        connectionPollTimeout: const Duration(seconds: 1),
+      );
+      addTearDown(controller.exitApp);
+
+      await controller.refreshStatus();
+      expect(controller.state, ServiceState.degraded);
+
+      bridge.statusPayload = _contractStatus(
+        state: ServiceState.connected,
+        desiredState: ConnectionIntentState.connected,
+        userDisconnected: false,
+      );
+      final deadline = DateTime.now().add(const Duration(seconds: 1));
+      while (!controller.connected && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+
+      expect(controller.connected, isTrue);
+      final completedStatusCalls = bridge.calls
+          .where((call) => call == 'status')
+          .length;
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(
+        bridge.calls.where((call) => call == 'status').length,
+        completedStatusCalls,
+      );
+    },
+  );
 
   testWidgets('UI explicitly confirms server identity recovery', (
     tester,
@@ -379,6 +466,7 @@ class ContractFakeBridge extends EndlessNetClientBridge {
   final calls = <String>[];
   final enrollmentPayloads = <Map<String, dynamic>>[];
   final enrollmentRequests = <EnrollmentRequest>[];
+  Object? enrollmentError;
 
   Map<String, dynamic> statusPayload = _contractStatus(
     state: ServiceState.connected,
@@ -407,6 +495,9 @@ class ContractFakeBridge extends EndlessNetClientBridge {
   Future<Map<String, dynamic>> enroll(EnrollmentRequest request) async {
     calls.add('enroll');
     enrollmentRequests.add(request);
+    if (enrollmentError case final error?) {
+      throw error;
+    }
     if (enrollmentPayloads.isNotEmpty) {
       statusPayload = enrollmentPayloads.removeAt(0);
     }
