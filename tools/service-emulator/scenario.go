@@ -142,6 +142,7 @@ func DefaultScenario() Scenario {
 			"private_key_present":          true,
 			"agent": map[string]any{
 				"state_present":        true,
+				"snapshot_state":       "current",
 				"generated_at":         "2026-01-01T00:00:00Z",
 				"node_id":              "node_emulator",
 				"network_id":           "net_primary",

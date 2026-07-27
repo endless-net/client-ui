@@ -1,96 +1,143 @@
 package repository_test
 
 import (
+	"io/fs"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
 
-func TestWindowsReleaseConsumesStrictClientCoreDispatch(t *testing.T) {
+func TestWindowsReleaseUsesUITagAndReviewedCoreLock(t *testing.T) {
 	workflow := readRepositoryFile(t, ".github/workflows/release.yml")
 	for _, required := range []string{
-		"types: [client-core-published]",
-		"github.event.client_payload.client_commit",
-		"CORE_VERSION: ${{ github.event.client_payload.version }}",
-		"./scripts/resolve-ui-version.ps1",
-		"-UIVersion $env:UI_VERSION",
-		"-CoreVersion $env:CORE_VERSION",
-		"client_version = $env:CORE_VERSION",
-		"CLIENT_CORE_RELEASE_TOKEN",
-		"client-core/client-ipc-v1.openapi.yaml",
+		`tags:`,
+		`- "v*"`,
+		`${{ github.ref_name }}`,
+		`./client-core.lock.json`,
+		`./scripts/resolve-client-core.ps1`,
+		`windows-2025`,
+		`GH_TOKEN: ${{ github.token }}`,
+		`-UIVersion $env:UI_VERSION`,
+		`-CoreVersion $env:CORE_VERSION`,
+		`windows-distribution-sbom.spdx.json`,
 	} {
 		if !strings.Contains(workflow, required) {
 			t.Errorf("release workflow is missing %q", required)
 		}
 	}
-	for _, removed := range []string{
-		"backend-client-core-published",
-		"backend_commit",
-		"BACKEND_COMMIT",
-		"BACKEND_RELEASE_TOKEN",
-		"CLIENT_RELEASE_TOKEN",
-		"windows-client-ipc.openapi.yaml",
-		"\n      VERSION: ${{ github.event.client_payload.version }}",
-		"$env:VERSION",
-		"EndlessNet.Client.${{ github.event.client_payload.version }}.msi",
-	} {
-		if strings.Contains(workflow, removed) {
-			t.Errorf("release workflow retains legacy value %q", removed)
+
+	ci := readRepositoryFile(t, ".github/workflows/ci.yml")
+	for _, workflowText := range []string{ci, workflow} {
+		if !strings.Contains(workflowText, "permissions:") ||
+			!strings.Contains(workflowText, "contents: read") {
+			t.Error("workflow must default to read-only repository contents")
 		}
 	}
 }
 
-func TestCoreResolverPinsManifestAndArtifactsToClientRepository(t *testing.T) {
+func TestActionsArePinnedToFullCommitSHAs(t *testing.T) {
+	actionUse := regexp.MustCompile(`(?m)^\s*-\s+uses:\s+[^@\s]+@([^\s#]+)`)
+	fullSHA := regexp.MustCompile(`^[0-9a-f]{40}$`)
+	for _, path := range []string{
+		".github/workflows/ci.yml",
+		".github/workflows/release.yml",
+	} {
+		workflow := readRepositoryFile(t, path)
+		matches := actionUse.FindAllStringSubmatch(workflow, -1)
+		if len(matches) == 0 {
+			t.Fatalf("%s has no actions to validate", path)
+		}
+		for _, match := range matches {
+			if !fullSHA.MatchString(match[1]) {
+				t.Errorf("%s contains an action not pinned to a full commit SHA: %s", path, match[0])
+			}
+		}
+	}
+}
+
+func TestCoreResolverConsumesOnlyReviewedLock(t *testing.T) {
 	resolver := readRepositoryFile(t, "scripts/resolve-client-core.ps1")
 	for _, required := range []string{
-		"[string]$CoreVersion",
-		"[string]$ClientCommit",
-		"endless-net/client/releases/download/$tag/$manifestAsset",
-		"--repo endless-net/client",
-		"/repos/endless-net/client/releases/tags/$tag",
-		"$contractAsset = \"client-ipc-v1.openapi.yaml\"",
-		"$manifest.artifacts.ipc_contract.sha256",
-		"$manifest.artifacts.ipc_contract.name -ne $contractAsset",
+		`[string]$LockFile`,
+		`client-core.lock.json`,
+		`$lock.schema_version -ne 1`,
+		`$lock.repository -cne "endless-net/client"`,
+		`$lock.tag -cne "v$($lock.version)"`,
+		`/releases/tags/$($lock.tag)`,
+		`/git/ref/tags/$($lock.tag)`,
+		`/git/tags/$tagObjectSHA`,
+		`client core tag does not resolve to the reviewed commit`,
+		`$manifest.artifacts.ipc_contract.sha256`,
+		`checked-in IPC contract does not match`,
 	} {
 		if !strings.Contains(resolver, required) {
 			t.Errorf("client core resolver is missing %q", required)
 		}
 	}
-	for _, removed := range []string{
-		"[string]$Version",
-		"[string]$BackendCommit",
-		"windows-client-ipc.openapi.yaml",
-	} {
-		if strings.Contains(resolver, removed) {
-			t.Errorf("client core resolver retains legacy value %q", removed)
-		}
-	}
 
 	provenance := readRepositoryFile(t, "scripts/write-release-provenance.ps1")
-	if !strings.Contains(provenance, "client = [ordered]@{") || strings.Contains(provenance, "backend = [ordered]@{") {
-		t.Error("release provenance must identify the client producer without a backend alias")
-	}
 	for _, required := range []string{
-		"version = $build.version",
-		"version = $core.version",
-		"$core.version -ne $build.client.version",
+		"schema_version = 3",
+		"lock_sha256",
+		"ui_source_sha256",
+		"windows_distribution_sha256",
+		"client = [ordered]@{",
 	} {
 		if !strings.Contains(provenance, required) {
-			t.Errorf("release provenance does not separate UI/core version via %q", required)
+			t.Errorf("release provenance is missing %q", required)
 		}
 	}
+}
 
-	build := readRepositoryFile(t, "scripts/build-windows-client-msi.ps1")
-	for _, required := range []string{
-		"[string]$UIVersion",
-		"[string]$CoreVersion",
-		"--version $UIVersion",
-		"ENDLESSNET_VERSION=$UIVersion",
-		"version = $CoreVersion",
-	} {
-		if !strings.Contains(build, required) {
-			t.Errorf("Windows build does not separate UI/core version via %q", required)
+func TestPublicTreeHasNoLegacyReleaseCoupling(t *testing.T) {
+	forbidden := []string{
+		strings.Join([]string{"endlessnet", "front"}, ""),
+		strings.Join([]string{"FRONT", "RELEASE", "TOKEN"}, "_"),
+		strings.Join([]string{"windows", "client", "ui", "published"}, "-"),
+		strings.Join([]string{"CLIENT", "CORE", "RELEASE", "TOKEN"}, "_"),
+		strings.Join([]string{"self", "hosted"}, "-"),
+		strings.Join([]string{"repository", "dispatch"}, "_"),
+		strings.Join([]string{"client", "core", "published"}, "-"),
+		strings.Join([]string{"private", "release"}, " "),
+		strings.Join([]string{"private", "mirror"}, " "),
+	}
+	skipDirs := map[string]bool{
+		".git":       true,
+		".artifacts": true,
+		".dart_tool": true,
+		"build":      true,
+		"dist":       true,
+		"ephemeral":  true,
+	}
+	err := filepath.WalkDir(".", func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
 		}
+		if entry.IsDir() && path != "." && skipDirs[entry.Name()] {
+			return filepath.SkipDir
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		raw, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		lower := strings.ToLower(string(raw))
+		for _, value := range forbidden {
+			if strings.Contains(lower, strings.ToLower(value)) {
+				t.Errorf("%s retains removed release coupling %q", path, value)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

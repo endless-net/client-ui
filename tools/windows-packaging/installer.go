@@ -16,6 +16,7 @@ type WindowsInstallerOptions struct {
 	UpgradeCode         string
 	ClientExe           string
 	WintunDLL           string
+	WintunLicense       string
 	AppExe              string
 	AppBundleDir        string
 	IconFile            string
@@ -39,6 +40,7 @@ func DefaultWindowsInstallerOptions() WindowsInstallerOptions {
 		UpgradeCode:    "9f7a7362-64c3-4b3a-9a58-7c8fc90779e1",
 		ClientExe:      `C:\Program Files\EndlessNet\endlessnet-client.exe`,
 		WintunDLL:      `C:\Program Files\EndlessNet\wintun.dll`,
+		WintunLicense:  `C:\Program Files\EndlessNet\wintun-LICENSE.txt`,
 		AppExe:         `C:\Program Files\EndlessNet\endlessnet.exe`,
 		AppBundleDir:   `C:\Program Files\EndlessNet`,
 		IconFile:       filepath.Join("app", "assets", "icons", "endlessnet.ico"),
@@ -104,6 +106,9 @@ func normalizeWindowsInstallerOptions(opts WindowsInstallerOptions) WindowsInsta
 	if strings.TrimSpace(opts.WintunDLL) == "" {
 		opts.WintunDLL = defaults.WintunDLL
 	}
+	if strings.TrimSpace(opts.WintunLicense) == "" {
+		opts.WintunLicense = defaults.WintunLicense
+	}
 	if strings.TrimSpace(opts.AppExe) == "" {
 		opts.AppExe = defaults.AppExe
 	}
@@ -122,22 +127,23 @@ func normalizeWindowsInstallerOptions(opts WindowsInstallerOptions) WindowsInsta
 
 func validateWindowsInstallerOptions(opts WindowsInstallerOptions) error {
 	for name, value := range map[string]string{
-		"product name": opts.ProductName,
-		"manufacturer": opts.Manufacturer,
-		"version":      opts.Version,
-		"upgrade code": opts.UpgradeCode,
-		"client exe":   opts.ClientExe,
-		"wintun dll":   opts.WintunDLL,
-		"app exe":      opts.AppExe,
-		"app bundle":   opts.AppBundleDir,
-		"icon file":    opts.IconFile,
-		"output name":  opts.OutputName,
-		"service name": opts.ServiceOptions.ServiceName,
-		"display name": opts.ServiceOptions.DisplayName,
-		"config path":  opts.ServiceOptions.ConfigPath,
-		"agent state":  opts.ServiceOptions.StatePath,
-		"diagnostics":  opts.ServiceOptions.DiagnosticsDir,
-		"event source": opts.ServiceOptions.EventLogSource,
+		"product name":   opts.ProductName,
+		"manufacturer":   opts.Manufacturer,
+		"version":        opts.Version,
+		"upgrade code":   opts.UpgradeCode,
+		"client exe":     opts.ClientExe,
+		"wintun dll":     opts.WintunDLL,
+		"wintun license": opts.WintunLicense,
+		"app exe":        opts.AppExe,
+		"app bundle":     opts.AppBundleDir,
+		"icon file":      opts.IconFile,
+		"output name":    opts.OutputName,
+		"service name":   opts.ServiceOptions.ServiceName,
+		"display name":   opts.ServiceOptions.DisplayName,
+		"config path":    opts.ServiceOptions.ConfigPath,
+		"agent state":    opts.ServiceOptions.StatePath,
+		"diagnostics":    opts.ServiceOptions.DiagnosticsDir,
+		"event source":   opts.ServiceOptions.EventLogSource,
 	} {
 		if strings.TrimSpace(value) == "" {
 			return fmt.Errorf("%s is required", name)
@@ -240,6 +246,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       </Component>
       <Component Id="WintunLibrary" Guid="*" Bitness="always64">
         <File Id="WintunDllFile" Source="$(var.WintunDll)" Name="wintun.dll" KeyPath="yes" />
+        <File Id="WintunLicenseFile" Source="$(var.WintunLicense)" Name="wintun-LICENSE.txt" />
       </Component>
       <Component Id="AppExecutable" Guid="*" Bitness="always64">
         <File Id="AppExeFile" Source="$(var.AppExe)" Name="endlessnet.exe" KeyPath="yes" />
@@ -325,6 +332,7 @@ func renderWindowsInstallerBuildScript(opts WindowsInstallerOptions) string {
 	return fmt.Sprintf(`param(
   [string]$ClientExe = %s,
   [string]$WintunDll = %s,
+  [string]$WintunLicense = %s,
   [string]$AppExe = %s,
   [string]$AppBundleDir = %s,
   [string]$IconFile = %s,
@@ -338,7 +346,7 @@ $ErrorActionPreference = "Stop"
 $utilExtension = "WixToolset.Util.wixext"
 $uiExtension = "WixToolset.UI.wixext"
 
-foreach ($path in @($ClientExe, $WintunDll, $AppExe, $IconFile)) {
+foreach ($path in @($ClientExe, $WintunDll, $WintunLicense, $AppExe, $IconFile)) {
   if (-not (Test-Path -LiteralPath $path)) {
     throw "Required MSI input missing: $path"
   }
@@ -362,6 +370,7 @@ $wixArgs = @(
   "-ext", $uiExtension,
   "-d", "ClientExe=$ClientExe",
   "-d", "WintunDll=$WintunDll",
+  "-d", "WintunLicense=$WintunLicense",
   "-d", "AppExe=$AppExe",
   "-d", "AppBundleDir=$AppBundleDir",
   "-d", "IconFile=$IconFile",
@@ -384,6 +393,7 @@ if ($SignTool.Trim() -ne "" -and $CertificateThumbprint.Trim() -ne "") {
 `,
 		quotePowerShellSingle(opts.ClientExe),
 		quotePowerShellSingle(opts.WintunDLL),
+		quotePowerShellSingle(opts.WintunLicense),
 		quotePowerShellSingle(opts.AppExe),
 		quotePowerShellSingle(opts.AppBundleDir),
 		quotePowerShellSingle(opts.IconFile),

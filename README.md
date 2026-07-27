@@ -31,9 +31,9 @@ state transitions and fault injection, and records a redacted JSONL request
 journal. See [`tools/service-emulator/README.md`](tools/service-emulator/README.md)
 for manual UI testing and custom scenarios.
 
-## Backend v0.2.3 integration
+## Client core v0.3.1 integration
 
-The packaged v0.2.3 service runs WireGuard Go as its only tunnel engine. The
+The packaged v0.3.1 service runs WireGuard Go as its only tunnel engine. The
 MSI does not pass a backend-selection flag or fix the UDP listen port. Wintun
 remains a required, verified runtime dependency beside `endlessnet-client.exe`.
 The service owns the live WireGuard configuration in process; the MSI does not
@@ -48,7 +48,7 @@ availability exclusively from the producer-defined `status.agent` schema.
 The diagnostics response is consumed through `diagnostics.status.agent`; the UI
 does not recognize fields that are absent from `client-ipc-v1.openapi.yaml`.
 
-Core 0.2.3 introduces the local-owner authorization model for enrollment and
+Core 0.3.1 uses the local-owner authorization model for enrollment and
 other owner operations. The desktop UI first calls `/enroll` without elevation,
 allowing a clean installation to bind ownership to the current Windows user.
 Only an `owner_required` or `administrator_required` IPC response launches a
@@ -57,25 +57,26 @@ of ownerless legacy state. The optional IPC `server` field stays absent unless
 the caller explicitly supplied an override; the Go service applies its own
 public-server default.
 
-Build an unsigned validation MSI from a previously verified Go-core artifact:
+Resolve the reviewed public core input and build an unsigned validation MSI:
 
 ```powershell
+.\scripts\resolve-client-core.ps1 -OutputDir .\.artifacts\client-core
 .\scripts\build-windows-client-msi.ps1 `
-  -UIVersion 1.2.3 `
-  -CoreVersion 0.2.3 `
-  -ClientExe .\.artifacts\endlessnet-client_windows_amd64.exe
+  -UIVersion 1.0.4 `
+  -CoreVersion 0.3.1 `
+  -ClientExe .\.artifacts\client-core\endlessnet-client_windows_amd64.exe `
+  -CoreMetadataDir .\.artifacts\client-core `
+  -UISourceSBOM .\.artifacts\ui-source-sbom.spdx.json
 ```
 
-Production releases are initiated by an immutable `client-core-published`
-`repository_dispatch` from the `endless-net/client` release workflow.
-The client-core version identifies only the verified runtime input. The UI owns
-an independent stable SemVer in `app/pubspec.yaml`; that version determines the
-MSI version, GitHub tag, WinGet manifests, and public mirror payload. Releases
-sign both executables and the final MSI,
-publish private release provenance, mirror public artifacts through
-`endless-net/front`, and trigger `endless-net/system-tests`.
-Provenance schema v2 records the UI version at the top level and preserves the
-client-core version separately under `client.version`.
+`client-core.lock.json` is the reviewed release interface. It pins the public
+core version, commit, immutable manifest, compliance files, and every SHA-256
+needed to resolve the runtime input. The UI owns an independent stable SemVer in
+`app/pubspec.yaml`; pushing the matching `v*` tag starts the release. That
+version determines the MSI version, GitHub release, and WinGet manifests.
+Releases sign both executables and the final MSI and publish source/distribution
+SBOMs with provenance schema v3. The client-core version remains separate under
+`client.version`.
 The owning workflow uses `scripts/resolve-release-idempotency.ps1` to distinguish
 an expected missing release (continue with `noop=false`) from real GitHub CLI or
 API failures. Existing UI releases are no-ops only when their provenance names
@@ -109,11 +110,6 @@ certificates and requires Windows trust validation. A future cloud signer can
 replace the isolated import/signing adapter while retaining the exact-signer
 checks, Wintun verification, provenance, and publication gates.
 
-Configure these repository secrets with separate fine-grained tokens:
-
-- `CLIENT_CORE_RELEASE_TOKEN`: read-only Contents access to
-  `endless-net/client`;
-- `FRONT_RELEASE_TOKEN`: Contents write access only to
-  `endless-net/front`, for `repository_dispatch`.
-
-No signing material is referenced by pull-request CI.
+The release environment contains only the signing variables and secrets listed
+above. Public core artifacts are read with the built-in workflow token, and
+pull-request CI never references signing material.

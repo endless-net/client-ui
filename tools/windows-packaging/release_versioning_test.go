@@ -1,7 +1,9 @@
 package packaging
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -58,18 +60,52 @@ func TestReleaseProvenanceKeepsUIAndCoreVersionsIndependent(t *testing.T) {
 	script := filepath.Join(root, "scripts", "write-release-provenance.ps1")
 	temp := t.TempDir()
 	corePath := filepath.Join(temp, "core.json")
+	lockPath := filepath.Join(temp, "client-core.lock.json")
 	buildPath := filepath.Join(temp, "build.json")
+	uiSBOMPath := filepath.Join(temp, "ui-source-sbom.spdx.json")
+	distributionSBOMPath := filepath.Join(temp, "windows-distribution-sbom.spdx.json")
 	outputPath := filepath.Join(temp, "release-provenance.json")
+	uiSBOM := []byte(`{"spdxVersion":"SPDX-2.3","name":"ui-source"}`)
+	distributionSBOM := []byte(`{"spdxVersion":"SPDX-2.3","name":"windows-distribution"}`)
+	if err := os.WriteFile(uiSBOMPath, uiSBOM, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(distributionSBOMPath, distributionSBOM, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	uiSBOMDigest := fmt.Sprintf("%x", sha256.Sum256(uiSBOM))
 
 	core := map[string]any{
-		"version":     "0.2.0",
-		"target":      "windows/amd64",
-		"ipc_version": "v1",
-		"repository":  "endless-net/client",
-		"commit":      strings.Repeat("a", 40),
+		"schema_version": 1,
+		"version":        "0.3.1",
+		"target":         "windows/amd64",
+		"ipc_version":    "v1",
+		"repository":     "endless-net/client",
+		"commit":         strings.Repeat("a", 40),
 		"artifacts": map[string]any{
 			"client":       map[string]any{"sha256": strings.Repeat("b", 64)},
 			"ipc_contract": map[string]any{"sha256": strings.Repeat("c", 64)},
+		},
+	}
+	coreRaw, err := json.Marshal(core)
+	if err != nil {
+		t.Fatal(err)
+	}
+	coreManifestDigest := fmt.Sprintf("%x", sha256.Sum256(coreRaw))
+	lock := map[string]any{
+		"schema_version": 1,
+		"repository":     "endless-net/client",
+		"version":        "0.3.1",
+		"commit":         strings.Repeat("a", 40),
+		"manifest": map[string]any{
+			"url":    "https://example.test/core-manifest.json",
+			"sha256": coreManifestDigest,
+		},
+		"compliance": map[string]any{
+			"license":             map[string]any{"sha256": strings.Repeat("8", 64)},
+			"notice":              map[string]any{"sha256": strings.Repeat("9", 64)},
+			"third_party_notices": map[string]any{"sha256": strings.Repeat("a", 64)},
+			"source_sbom":         map[string]any{"sha256": strings.Repeat("b", 64)},
 		},
 	}
 	build := map[string]any{
@@ -84,8 +120,8 @@ func TestReleaseProvenanceKeepsUIAndCoreVersionsIndependent(t *testing.T) {
 			"publicly_trusted":       false,
 		},
 		"client": map[string]any{
-			"version":         "0.2.0",
-			"unsigned_sha256": strings.Repeat("e", 64),
+			"version":         "0.3.1",
+			"unsigned_sha256": strings.Repeat("b", 64),
 			"signed_sha256":   strings.Repeat("f", 64),
 		},
 		"wintun": map[string]any{
@@ -93,6 +129,13 @@ func TestReleaseProvenanceKeepsUIAndCoreVersionsIndependent(t *testing.T) {
 			"archive_sha256":    strings.Repeat("1", 64),
 			"sha256":            strings.Repeat("2", 64),
 			"signer_thumbprint": strings.Repeat("B", 40),
+			"license_sha256":    strings.Repeat("7", 64),
+		},
+		"compliance": map[string]any{
+			"ui_source_sbom_sha256":   uiSBOMDigest,
+			"core_source_sbom_sha256": strings.Repeat("b", 64),
+			"ui_license_sha256":       strings.Repeat("9", 64),
+			"core_license_sha256":     strings.Repeat("8", 64),
 		},
 		"app": map[string]any{
 			"unsigned_sha256": strings.Repeat("3", 64),
@@ -104,6 +147,7 @@ func TestReleaseProvenanceKeepsUIAndCoreVersionsIndependent(t *testing.T) {
 		},
 	}
 	writeJSONFixture(t, corePath, core)
+	writeJSONFixture(t, lockPath, lock)
 	writeJSONFixture(t, buildPath, build)
 
 	cmd := exec.Command(
@@ -111,8 +155,11 @@ func TestReleaseProvenanceKeepsUIAndCoreVersionsIndependent(t *testing.T) {
 		"-NoLogo", "-NoProfile", "-File", script,
 		"-CoreManifest", corePath,
 		"-CoreManifestUrl", "https://example.test/core-manifest.json",
-		"-CoreManifestSHA256", strings.Repeat("7", 64),
+		"-CoreManifestSHA256", coreManifestDigest,
+		"-CoreLock", lockPath,
 		"-BuildOutput", buildPath,
+		"-UISourceSBOM", uiSBOMPath,
+		"-DistributionSBOM", distributionSBOMPath,
 		"-Output", outputPath,
 	)
 	if output, err := cmd.CombinedOutput(); err != nil {
@@ -132,8 +179,13 @@ func TestReleaseProvenanceKeepsUIAndCoreVersionsIndependent(t *testing.T) {
 	if provenance["version"] != "1.4.0" || ui["version"] != "1.4.0" {
 		t.Fatalf("UI provenance version is not independent: %#v", provenance)
 	}
-	if client["version"] != "0.2.0" {
-		t.Fatalf("client-core provenance version = %v, want 0.2.0", client["version"])
+	if client["version"] != "0.3.1" {
+		t.Fatalf("client-core provenance version = %v, want 0.3.1", client["version"])
+	}
+	artifacts := provenance["artifacts"].(map[string]any)
+	sbom := artifacts["sbom"].(map[string]any)
+	if sbom["ui_source_sha256"] != uiSBOMDigest {
+		t.Fatalf("UI source SBOM digest = %v, want %s", sbom["ui_source_sha256"], uiSBOMDigest)
 	}
 }
 

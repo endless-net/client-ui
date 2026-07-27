@@ -151,7 +151,7 @@ Win32 pipe вынесена в отдельный Dart isolate, чтобы бл�
 
 UI принимает `endlessnet://enroll?enroll_token=...` или `enr_` токен из
 командной строки и сначала отправляет `/enroll` от текущего пользователя. На
-чистой установке core 0.2.3 закрепляет этого пользователя как локального
+чистой установке core 0.3.1 закрепляет этого пользователя как локального
 владельца без UAC. Только ответы `owner_required` и `administrator_required`
 означают миграцию ownerless legacy state и запускают собственный executable
 через `ShellExecute` с verb `runas`. Короткоживущий процесс с
@@ -223,33 +223,34 @@ MSI дополнительно:
 ```mermaid
 flowchart TD
     Core["endlessnet-client публикует Go core,<br/>IPC contract и immutable manifest"]
-    Dispatch["repository_dispatch<br/>client-core-published"]
+    Lock["Reviewed client-core.lock.json"]
     UIVersion["UI SemVer из<br/>app/pubspec.yaml"]
-    Verify["Проверка version, commit,<br/>URL и SHA-256 manifest/artifacts"]
+    Tag["UI tag v&lt;SemVer&gt;"]
+    Verify["Проверка version, commit,<br/>tag target, URL и SHA-256"]
     Contract["UI tests против<br/>опубликованного IPC contract"]
     Build["Сборка Flutter + MSI<br/>с pinned Flutter, WiX и Wintun"]
     Sign["Проверка подписи Wintun;<br/>подпись core, UI и MSI"]
     E2E["Install / repair / upgrade / uninstall<br/>и live named-pipe test"]
-    Provenance["Checksums + release-provenance.json"]
-    Private["Private GitHub Release"]
-    Mirror["Dispatch в public mirror"]
+    Provenance["Checksums + source/distribution SBOM<br/>+ release-provenance.json"]
+    Public["Public GitHub Release"]
 
-    Core --> Dispatch --> Verify --> Contract --> Build --> Sign --> E2E --> Provenance --> Private --> Mirror
+    Core --> Lock --> Verify --> Contract --> Build --> Sign --> E2E --> Provenance --> Public
+    UIVersion --> Tag --> Verify
     UIVersion --> Build
 ```
 
-Релиз инициирует публикация core из `endless-net/client`, потому что MSI должен объединить
-совместимые версии Go runtime, IPC-контракта и UI. Workflow принимает только
-immutable release URLs, сверяет полный client commit, версию, имена и SHA-256 каждого
-артефакта. Версия core при этом не становится версией UI: собственный стабильный
-SemVer UI читается из `app/pubspec.yaml` и определяет MSI, GitHub tag, WinGet и
-public mirror payload. Повторный dispatch для существующего UI tag допускается
+Релиз инициирует UI tag, который обязан совпадать со стабильным SemVer из
+`app/pubspec.yaml`. Workflow читает только reviewed `client-core.lock.json`,
+принимает immutable public release URLs и сверяет release target, фактический
+tag commit, полный client commit, версию, имена и SHA-256 каждого артефакта.
+Версия core при этом не становится версией UI: UI SemVer определяет MSI,
+GitHub release и WinGet. Повторный запуск для существующего UI tag допускается
 только с теми же immutable core inputs; для выпуска с другим core требуется
-явно увеличить UI SemVer.
+явно увеличить UI SemVer и обновить lock отдельным review.
 
 Release secrets доступны только job с environment `release`. Pull request CI
-не получает signing material или cross-repository release tokens и публикует
-только короткоживущий unsigned MSI для packaging smoke test.
+не получает signing material и публикует только короткоживущий unsigned MSI для
+packaging smoke test. Публичные core assets читаются встроенным workflow token.
 
 Перед публикацией workflow:
 
@@ -259,7 +260,8 @@ Release secrets доступны только job с environment `release`. Pull
 4. подписывает оба executable и итоговый MSI, затем проверяет все подписи;
 5. тестирует install, repair, upgrade и uninstall;
 6. проверяет UI против реально установленного Go service;
-7. сохраняет hashes и происхождение входных и выходных артефактов.
+7. проверяет dependency licenses и наличие notices/SBOM в дистрибутиве;
+8. сохраняет hashes и происхождение входных и выходных артефактов.
 
 ## 8. Стратегия тестирования
 
@@ -360,11 +362,11 @@ identity и отправляет подтверждённый announced key ID �
 
 Статус: принято.
 
-Windows release запускается `client-core-published` dispatch и принимает core
-только из immutable GitHub release path `endless-net/client` с
-проверенными manifest, именами артефактов и SHA-256. UI release tag и версия MSI
-берутся независимо из `app/pubspec.yaml`, а версия core сохраняется отдельно в
-provenance.
+Windows release запускается собственным UI tag и принимает core только из
+reviewed `client-core.lock.json`: immutable GitHub release path
+`endless-net/client`, проверенные tag target, manifest, имена артефактов
+и SHA-256. UI release tag и версия MSI берутся независимо из
+`app/pubspec.yaml`, а версия core сохраняется отдельно в provenance.
 
 Причины: исключение подмены бинарника между тестированием и упаковкой и
 воспроизводимая связь UI/core.
@@ -430,7 +432,7 @@ service.
   отдельного transport adapter и отдельной packaging/release модели.
 - Debug logging включён текущими installer defaults. До расширения аудитории
   нужно определить retention, объём и пользовательское управление логированием.
-- Release зависит от self-hosted Windows runner, certificate lifecycle и
+- Release зависит от GitHub-hosted `windows-2025`, certificate lifecycle и
   доступности timestamp service.
 
 ## 11. Возможное будущее

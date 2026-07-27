@@ -211,6 +211,17 @@ Uint8List _readAll(HANDLE handle) {
             'EndlessNet service IPC response is too large.',
           );
         }
+        final expectedBytes = _contentLengthResponseBytes(chunks.toBytes());
+        if (expectedBytes != null) {
+          if (expectedBytes > _maxResponseBytes) {
+            throw const FormatException(
+              'EndlessNet service IPC response is too large.',
+            );
+          }
+          if (chunks.length >= expectedBytes) {
+            break;
+          }
+        }
       }
       if (result.value) {
         if (read.value == 0) {
@@ -218,7 +229,10 @@ Uint8List _readAll(HANDLE handle) {
         }
         continue;
       }
-      if (result.error == ERROR_BROKEN_PIPE) {
+      if (result.error == ERROR_BROKEN_PIPE ||
+          result.error == ERROR_NO_DATA ||
+          result.error == ERROR_PIPE_NOT_CONNECTED ||
+          (result.error == ERROR_SUCCESS && chunks.length > 0)) {
         break;
       }
       if (result.error == ERROR_MORE_DATA) {
@@ -234,6 +248,42 @@ Uint8List _readAll(HANDLE handle) {
     calloc.free(read);
     calloc.free(buffer);
   }
+}
+
+int? _contentLengthResponseBytes(Uint8List raw) {
+  final headerEnd = _indexOf(raw, const [13, 10, 13, 10]);
+  if (headerEnd < 0 || headerEnd > 64 * 1024) {
+    return null;
+  }
+  final headerText = ascii.decode(
+    raw.sublist(0, headerEnd),
+    allowInvalid: false,
+  );
+  int? contentLength;
+  for (final line in headerText.split('\r\n').skip(1)) {
+    final colon = line.indexOf(':');
+    if (colon <= 0) {
+      continue;
+    }
+    if (line.substring(0, colon).trim().toLowerCase() != 'content-length') {
+      continue;
+    }
+    if (contentLength != null) {
+      throw const FormatException(
+        'Duplicate Content-Length in EndlessNet service response.',
+      );
+    }
+    contentLength = int.tryParse(line.substring(colon + 1).trim());
+    if (contentLength == null || contentLength < 0) {
+      throw const FormatException(
+        'Invalid Content-Length in EndlessNet service response.',
+      );
+    }
+  }
+  if (contentLength == null) {
+    return null;
+  }
+  return headerEnd + 4 + contentLength;
 }
 
 class NamedPipeHttpResponse {

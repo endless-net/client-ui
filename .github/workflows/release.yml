@@ -1,39 +1,73 @@
 name: Release Windows client
 
 on:
-  repository_dispatch:
-    types: [client-core-published]
+  push:
+    tags:
+      - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: windows-client-ui-${{ github.sha }}
+  group: windows-client-ui-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   release:
-    runs-on: [self-hosted, windows, x64]
+    runs-on: windows-2025
     environment: release
-    timeout-minutes: 90
+    timeout-minutes: 120
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
     env:
-      CORE_VERSION: ${{ github.event.client_payload.version }}
-      CLIENT_COMMIT: ${{ github.event.client_payload.client_commit }}
-      CORE_MANIFEST_URL: ${{ github.event.client_payload.manifest_url }}
-      CORE_MANIFEST_SHA256: ${{ github.event.client_payload.manifest_sha256 }}
       GH_TOKEN: ${{ github.token }}
-      # Temporary until a publicly trusted Authenticode or cloud signer is available.
       WINDOWS_CODESIGN_MODE: ${{ vars.WINDOWS_CODESIGN_MODE || 'temporary-self-signed' }}
       WINDOWS_CODESIGN_EXPECTED_THUMBPRINT: ${{ vars.WINDOWS_CODESIGN_EXPECTED_THUMBPRINT }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       - name: Resolve independent UI version
         id: ui-version
         shell: pwsh
         run: ./scripts/resolve-ui-version.ps1
 
-      - name: Validate dispatch and enforce idempotency
+      - name: Validate UI release tag
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_name }}" -cne "v$env:UI_VERSION") {
+            throw "release tag must exactly match app/pubspec.yaml UI version"
+          }
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: 3.38.1
+          cache: false
+
+      - name: Install pinned WiX Toolset
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.0
+          wix extension add --global WixToolset.Util.wixext/5.0.0
+          wix extension add --global WixToolset.UI.wixext/5.0.0
+
+      - name: Resolve reviewed public client core
+        id: core
+        shell: pwsh
+        run: >-
+          ./scripts/resolve-client-core.ps1
+          -OutputDir "$env:RUNNER_TEMP/client-core"
+
+      - name: Validate tag idempotency
         id: idempotency
         shell: pwsh
         run: >-
@@ -43,60 +77,44 @@ jobs:
           -ClientCommit $env:CLIENT_COMMIT
           -CoreManifestSHA256 $env:CORE_MANIFEST_SHA256
 
-      - uses: actions/setup-go@v6
+      - name: Prepare Flutter dependencies
         if: steps.idempotency.outputs.noop != 'true'
-        with:
-          go-version-file: go.mod
-          cache: false
-      - uses: subosito/flutter-action@v2
-        if: steps.idempotency.outputs.noop != 'true'
-        with:
-          channel: stable
-          flutter-version: 3.38.1
-          cache: false
+        working-directory: app
+        run: flutter pub get
 
-      - name: Install pinned WiX Toolset
+      - name: Validate dependency licenses
         if: steps.idempotency.outputs.noop != 'true'
         shell: pwsh
-        run: |
-          dotnet tool install --global wix --version 5.0.0
-          wix extension add --global WixToolset.Util.wixext/5.0.0
-          wix extension add --global WixToolset.UI.wixext/5.0.0
+        run: >-
+          ./scripts/check-dependency-licenses.ps1
+          -Output "$env:RUNNER_TEMP/dependency-licenses.json"
 
       - name: Test sources
         if: steps.idempotency.outputs.noop != 'true'
         shell: pwsh
         run: |
-          go test ./tools/windows-packaging/...
+          go test ./...
           Push-Location app
           try {
-            flutter pub get
             flutter analyze
             flutter test
           } finally {
             Pop-Location
           }
 
-      - name: Resolve immutable Go core
-        if: steps.idempotency.outputs.noop != 'true'
-        env:
-          CLIENT_CORE_RELEASE_TOKEN: ${{ secrets.CLIENT_CORE_RELEASE_TOKEN }}
-        shell: pwsh
-        run: >-
-          ./scripts/resolve-client-core.ps1
-          -ManifestUrl $env:CORE_MANIFEST_URL
-          -ManifestSHA256 $env:CORE_MANIFEST_SHA256
-          -CoreVersion $env:CORE_VERSION
-          -ClientCommit $env:CLIENT_COMMIT
-          -OutputDir "$env:RUNNER_TEMP/client-core"
-          -GitHubToken $env:CLIENT_CORE_RELEASE_TOKEN
-
       - name: Test UI against released IPC contract
         if: steps.idempotency.outputs.noop != 'true'
         env:
-          ENDLESSNET_IPC_OPENAPI: ${{ runner.temp }}/client-core/client-ipc-v1.openapi.yaml
+          ENDLESSNET_IPC_OPENAPI: ${{ steps.core.outputs.ipc_contract }}
         working-directory: app
         run: flutter test test/ui_contract_e2e_test.dart
+
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        if: steps.idempotency.outputs.noop != 'true'
+        with:
+          path: .
+          format: spdx-json
+          output-file: ${{ runner.temp }}/ui-source-sbom.spdx.json
 
       - name: Import release signing certificate
         if: steps.idempotency.outputs.noop != 'true'
@@ -128,7 +146,9 @@ jobs:
           ./scripts/build-windows-client-msi.ps1
           -UIVersion $env:UI_VERSION
           -CoreVersion $env:CORE_VERSION
-          -ClientExe "$env:RUNNER_TEMP/client-core/endlessnet-client_windows_amd64.exe"
+          -ClientExe "${{ steps.core.outputs.client_exe }}"
+          -CoreMetadataDir "$env:RUNNER_TEMP/client-core"
+          -UISourceSBOM "$env:RUNNER_TEMP/ui-source-sbom.spdx.json"
           -OutputDir "$env:RUNNER_TEMP/release"
           -SigningMode $env:WINDOWS_CODESIGN_MODE
           -Sign
@@ -156,14 +176,21 @@ jobs:
               throw "unexpected Authenticode signer for $path"
             }
           }
-          $wintunPath = "$env:RUNNER_TEMP/release/wintun.dll"
-          $wintunSignature = Get-AuthenticodeSignature -LiteralPath $wintunPath
+          $wintunSignature = Get-AuthenticodeSignature -LiteralPath "$env:RUNNER_TEMP/release/wintun.dll"
           if ($wintunSignature.Status -ne "Valid") {
             throw "invalid official Wintun Authenticode signature: $($wintunSignature.Status)"
           }
           if ($wintunSignature.SignerCertificate.Thumbprint -eq $env:ENDLESSNET_CODESIGN_THUMBPRINT) {
             throw "official Wintun signature was replaced by the EndlessNet release signer"
           }
+
+      - name: Verify compliance files inside release MSI
+        if: steps.idempotency.outputs.noop != 'true'
+        shell: pwsh
+        run: >-
+          ./scripts/test-windows-distribution-compliance.ps1
+          -DistributionDir "$env:RUNNER_TEMP/release"
+          -Msi "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:UI_VERSION.msi"
 
       - name: Download previous MSI when available
         if: steps.idempotency.outputs.noop != 'true'
@@ -208,20 +235,58 @@ jobs:
             if ($uninstall.ExitCode -ne 0) { throw "MSI uninstall failed with $($uninstall.ExitCode)" }
           }
 
-      - name: Assemble release provenance
+      - name: Prepare installed distribution for SBOM
+        if: steps.idempotency.outputs.noop != 'true'
+        shell: pwsh
+        run: |
+          $source = "$env:RUNNER_TEMP/release"
+          $target = "$env:RUNNER_TEMP/distribution-sbom-input"
+          New-Item -ItemType Directory -Path $target | Out-Null
+          Copy-Item "$source/app" "$target/app" -Recurse
+          foreach ($name in @(
+            "endlessnet-client.exe",
+            "wintun.dll",
+            "wintun-LICENSE.txt",
+            "EndlessNet.Client.$env:UI_VERSION.msi"
+          )) {
+            Copy-Item (Join-Path $source $name) (Join-Path $target $name)
+          }
+
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        if: steps.idempotency.outputs.noop != 'true'
+        with:
+          path: ${{ runner.temp }}/distribution-sbom-input
+          format: spdx-json
+          output-file: ${{ runner.temp }}/release/windows-distribution-sbom.spdx.json
+
+      - name: Assemble release metadata
         if: steps.idempotency.outputs.noop != 'true'
         shell: pwsh
         run: |
           Compress-Archive -Path "$env:RUNNER_TEMP/release/app/*" -DestinationPath "$env:RUNNER_TEMP/release/endlessnet_windows_amd64.zip"
           Compress-Archive -Path "$env:RUNNER_TEMP/release/winget/*" -DestinationPath "$env:RUNNER_TEMP/release/winget-manifests.zip"
+          Copy-Item "$env:RUNNER_TEMP/ui-source-sbom.spdx.json" "$env:RUNNER_TEMP/release/endlessnet-client-ui-source-sbom.spdx.json"
+          Copy-Item "${{ steps.core.outputs.source_sbom }}" "$env:RUNNER_TEMP/release/endlessnet-client-source-sbom.spdx.json"
+          Copy-Item "$env:RUNNER_TEMP/dependency-licenses.json" "$env:RUNNER_TEMP/release/dependency-licenses.json"
           ./scripts/write-release-provenance.ps1 `
-            -CoreManifest "$env:RUNNER_TEMP/client-core/client-core-manifest.json" `
+            -CoreManifest "${{ steps.core.outputs.manifest }}" `
             -CoreManifestUrl $env:CORE_MANIFEST_URL `
             -CoreManifestSHA256 $env:CORE_MANIFEST_SHA256 `
+            -CoreLock ./client-core.lock.json `
             -BuildOutput "$env:RUNNER_TEMP/release/build-output.json" `
+            -UISourceSBOM "$env:RUNNER_TEMP/release/endlessnet-client-ui-source-sbom.spdx.json" `
+            -DistributionSBOM "$env:RUNNER_TEMP/release/windows-distribution-sbom.spdx.json" `
             -Output "$env:RUNNER_TEMP/release/release-provenance.json"
 
-      - name: Publish private GitHub Release
+      - uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
+        if: steps.idempotency.outputs.noop != 'true'
+        with:
+          subject-path: |
+            ${{ runner.temp }}/release/EndlessNet.Client.*.msi
+            ${{ runner.temp }}/release/endlessnet_windows_amd64.zip
+            ${{ runner.temp }}/release/*-sbom.spdx.json
+
+      - name: Publish public GitHub Release
         if: steps.idempotency.outputs.noop != 'true'
         shell: pwsh
         run: |
@@ -240,42 +305,14 @@ jobs:
             "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:UI_VERSION.msi.sha256" `
             "$env:RUNNER_TEMP/release/endlessnet-client.exe" `
             "$env:RUNNER_TEMP/release/wintun.dll" `
+            "$env:RUNNER_TEMP/release/wintun-LICENSE.txt" `
             "$env:RUNNER_TEMP/release/endlessnet_windows_amd64.zip" `
             "$env:RUNNER_TEMP/release/winget-manifests.zip" `
+            "$env:RUNNER_TEMP/release/dependency-licenses.json" `
+            "$env:RUNNER_TEMP/release/endlessnet-client-ui-source-sbom.spdx.json" `
+            "$env:RUNNER_TEMP/release/endlessnet-client-source-sbom.spdx.json" `
+            "$env:RUNNER_TEMP/release/windows-distribution-sbom.spdx.json" `
             "$env:RUNNER_TEMP/release/release-provenance.json"
-
-      - name: Dispatch public mirror
-        if: steps.idempotency.outputs.noop != 'true'
-        env:
-          FRONT_RELEASE_TOKEN: ${{ secrets.FRONT_RELEASE_TOKEN }}
-        shell: pwsh
-        run: |
-          $releaseDir = "$env:RUNNER_TEMP/release"
-          $msi = Join-Path $releaseDir "EndlessNet.Client.$env:UI_VERSION.msi"
-          $checksum = "$msi.sha256"
-          $provenance = Join-Path $releaseDir "release-provenance.json"
-          $body = @{
-            event_type = "windows-client-ui-published"
-            client_payload = @{
-              version = $env:UI_VERSION
-              tag = "v$env:UI_VERSION"
-              ui_commit = $env:GITHUB_SHA
-              client_version = $env:CORE_VERSION
-              client_commit = $env:CLIENT_COMMIT
-              release_repository = "endless-net/client-ui"
-              msi_asset = [IO.Path]::GetFileName($msi)
-              msi_sha256 = (Get-FileHash -Algorithm SHA256 $msi).Hash.ToLowerInvariant()
-              checksum_asset = [IO.Path]::GetFileName($checksum)
-              checksum_sha256 = (Get-FileHash -Algorithm SHA256 $checksum).Hash.ToLowerInvariant()
-              provenance_asset = [IO.Path]::GetFileName($provenance)
-              provenance_sha256 = (Get-FileHash -Algorithm SHA256 $provenance).Hash.ToLowerInvariant()
-            }
-          } | ConvertTo-Json -Depth 6
-          Invoke-RestMethod -Method Post `
-            -Uri "https://api.github.com/repos/endless-net/front/dispatches" `
-            -Headers @{ Authorization = "Bearer $env:FRONT_RELEASE_TOKEN"; Accept = "application/vnd.github+json"; "X-GitHub-Api-Version" = "2022-11-28" } `
-            -ContentType "application/json" `
-            -Body $body
 
       - name: Remove release signing certificate and private key
         if: ${{ always() }}

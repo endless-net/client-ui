@@ -22,6 +22,10 @@ void main() {
     expect(_schemaEnum(openAPI, 'ServiceState'), ServiceState.all.toSet());
     expect(_schemaEnum(openAPI, 'ControlState'), ControlState.all.toSet());
     expect(
+      _schemaEnum(openAPI, 'AgentSnapshotState'),
+      AgentSnapshotState.all.toSet(),
+    );
+    expect(
       _schemaEnum(openAPI, 'DesiredState'),
       ConnectionIntentState.all.toSet(),
     );
@@ -64,6 +68,8 @@ void main() {
       _schemaProperties(openAPI, 'AgentStatus'),
       containsAll({
         'state_present',
+        'snapshot_state',
+        'target_map_revision',
         'generated_at',
         'stun_ok',
         'relay_ok',
@@ -623,6 +629,7 @@ Map<String, dynamic> _contractStatus({
     'peer_count': 1,
     'agent': {
       'state_present': true,
+      'snapshot_state': 'current',
       'node_id': 'node_ui_e2e',
       'network_id': 'net_prod',
       'overlay_ip': '100.64.0.42',

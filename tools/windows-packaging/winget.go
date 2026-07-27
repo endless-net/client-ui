@@ -22,6 +22,7 @@ type WindowsWingetOptions struct {
 	InstallerFile     string
 	Homepage          string
 	License           string
+	LicenseURL        string
 	Description       string
 	ShortDescription  string
 	ReleaseDate       string
@@ -53,7 +54,7 @@ func DefaultWindowsWingetOptions() WindowsWingetOptions {
 		Publisher:         "UNNG",
 		Version:           installerDefaults.Version,
 		Homepage:          "https://endlessnet.ru",
-		License:           "Proprietary",
+		License:           "Apache-2.0",
 		Description:       "EndlessNet desktop and server client for private WireGuard-style networks.",
 		ShortDescription:  "EndlessNet Windows VPN client",
 		ManifestVersion:   "1.12.0",
@@ -131,6 +132,9 @@ func normalizeWindowsWingetOptions(opts WindowsWingetOptions) (WindowsWingetOpti
 	if strings.TrimSpace(opts.License) == "" {
 		opts.License = defaults.License
 	}
+	if strings.TrimSpace(opts.LicenseURL) == "" {
+		opts.LicenseURL = "https://raw.githubusercontent.com/endless-net/client-ui/v" + opts.Version + "/LICENSE"
+	}
 	if strings.TrimSpace(opts.Description) == "" {
 		opts.Description = defaults.Description
 	}
@@ -167,6 +171,7 @@ func validateWindowsWingetOptions(opts WindowsWingetOptions) error {
 		"installer SHA256":   opts.InstallerSHA256,
 		"homepage":           opts.Homepage,
 		"license":            opts.License,
+		"license URL":        opts.LicenseURL,
 		"description":        opts.Description,
 		"short description":  opts.ShortDescription,
 		"manifest version":   opts.ManifestVersion,
@@ -191,6 +196,9 @@ func validateWindowsWingetOptions(opts WindowsWingetOptions) error {
 	}
 	if !strings.HasPrefix(strings.ToLower(opts.InstallerURL), "https://") {
 		return errors.New("installer URL must be an HTTPS URL")
+	}
+	if !strings.HasPrefix(strings.ToLower(opts.LicenseURL), "https://") {
+		return errors.New("license URL must be an HTTPS URL")
 	}
 	if !wingetSHA256Pattern.MatchString(opts.InstallerSHA256) {
 		return errors.New("installer SHA256 must be 64 hexadecimal characters")
@@ -250,6 +258,7 @@ func renderWindowsWingetLocaleManifest(opts WindowsWingetOptions) string {
 		"Publisher: " + yamlScalar(opts.Publisher),
 		"PackageName: " + yamlScalar(opts.PackageName),
 		"License: " + yamlScalar(opts.License),
+		"LicenseUrl: " + yamlScalar(opts.LicenseURL),
 		"ShortDescription: " + yamlScalar(opts.ShortDescription),
 		"Description: " + yamlScalar(opts.Description),
 		"PackageUrl: " + yamlScalar(opts.Homepage),

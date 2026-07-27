@@ -43,8 +43,6 @@ func TestReleaseSigningIsIsolatedAndCleanedUp(t *testing.T) {
 	for _, forbidden := range []string{
 		"WINDOWS_CODESIGN_PFX_BASE64",
 		"WINDOWS_CODESIGN_PFX_PASSWORD",
-		"CLIENT_CORE_RELEASE_TOKEN",
-		"FRONT_RELEASE_TOKEN",
 	} {
 		if strings.Contains(ci, forbidden) {
 			t.Errorf("pull-request workflow references protected release secret %q", forbidden)

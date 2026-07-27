@@ -100,6 +100,7 @@ func servePipeConnection(server *Server, handle windows.Handle) {
 	}
 	defer func() {
 		windows.FlushFileBuffers(handle)
+		windows.DisconnectNamedPipe(handle)
 		file.Close()
 	}()
 

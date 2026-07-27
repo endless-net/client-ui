@@ -65,7 +65,7 @@ goto parse_existing_args
 :write_provenance
 if "!TARGET_DIR!"=="" exit /b 3
 if not exist "!TARGET_DIR!" mkdir "!TARGET_DIR!"
->"!TARGET_DIR!\release-provenance.json" echo {"schema_version":2,"version":"1.0.0","ui":{"version":"1.0.0"},"client":{"version":"0.2.0","commit":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","manifest_sha256":"%FAKE_MANIFEST_SHA%"}}
+>"!TARGET_DIR!\release-provenance.json" echo {"schema_version":3,"version":"1.0.0","ui":{"version":"1.0.0"},"client":{"version":"0.2.0","commit":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","manifest_sha256":"%FAKE_MANIFEST_SHA%"}}
 exit /b 0
 `
 	if err := os.WriteFile(fakeGH, []byte(fakeBody), 0o600); err != nil {

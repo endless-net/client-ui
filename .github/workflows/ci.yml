@@ -10,79 +10,121 @@ permissions:
 
 jobs:
   windows:
-    runs-on: [self-hosted, windows, x64]
-    timeout-minutes: 45
+    runs-on: windows-2025
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
       - name: Resolve independent UI version
         shell: pwsh
         run: ./scripts/resolve-ui-version.ps1
-      - uses: actions/setup-go@v6
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: false
-      - uses: subosito/flutter-action@v2
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
           flutter-version: 3.38.1
           cache: false
+
       - name: Install pinned WiX Toolset
         shell: pwsh
         run: |
           dotnet tool install --global wix --version 5.0.0
           wix extension add --global WixToolset.Util.wixext/5.0.0
           wix extension add --global WixToolset.UI.wixext/5.0.0
+
+      - name: Resolve reviewed public client core
+        id: core
+        shell: pwsh
+        run: >-
+          ./scripts/resolve-client-core.ps1
+          -OutputDir "$env:RUNNER_TEMP/client-core"
+
+      - name: Prepare Flutter dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Validate dependency licenses
+        shell: pwsh
+        run: >-
+          ./scripts/check-dependency-licenses.ps1
+          -Output "$env:RUNNER_TEMP/dependency-licenses.json"
+
       - name: Test Go tools
-        run: go test ./tools/...
+        run: go test ./...
+
       - name: Build service emulator
         shell: pwsh
         run: >-
           go build
           -o "$env:RUNNER_TEMP/endlessnet-service-emulator.exe"
           ./tools/service-emulator/cmd/endlessnet-service-emulator
+
       - name: Analyze and test Flutter UI
         working-directory: app
         env:
           ENDLESSNET_SERVICE_EMULATOR: ${{ runner.temp }}\endlessnet-service-emulator.exe
         run: |
-          flutter pub get
           flutter analyze
           flutter test
+
       - name: Build Windows release
         working-directory: app
         run: flutter build windows --release
-      - name: Build non-release core fixture
-        if: github.event_name == 'pull_request'
-        shell: pwsh
-        run: >-
-          go build
-          -ldflags "-X main.version=0.0.0"
-          -o "$env:RUNNER_TEMP/endlessnet-client.exe"
-          ./tools/windows-packaging/cmd/core-fixture
+
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: ${{ runner.temp }}/ui-source-sbom.spdx.json
+
       - name: Build unsigned packaging-smoke MSI
-        if: github.event_name == 'pull_request'
         shell: pwsh
         run: >-
           ./scripts/build-windows-client-msi.ps1
           -UIVersion $env:UI_VERSION
-          -CoreVersion 0.0.0
-          -ClientExe "$env:RUNNER_TEMP/endlessnet-client.exe"
+          -CoreVersion $env:CORE_VERSION
+          -ClientExe "${{ steps.core.outputs.client_exe }}"
+          -CoreMetadataDir "$env:RUNNER_TEMP/client-core"
+          -UISourceSBOM "$env:RUNNER_TEMP/ui-source-sbom.spdx.json"
           -OutputDir "$env:RUNNER_TEMP/windows-client-msi"
-      - name: Reject accidental signatures in PR artifact
-        if: github.event_name == 'pull_request'
+
+      - name: Reject accidental signatures in CI artifact
         shell: pwsh
         run: |
           $msi = Get-Item "$env:RUNNER_TEMP/windows-client-msi/EndlessNet.Client.$env:UI_VERSION.msi"
           if ((Get-AuthenticodeSignature -LiteralPath $msi.FullName).Status -ne "NotSigned") {
-            throw "PR MSI must be unsigned"
+            throw "CI MSI must be unsigned"
           }
-      - name: Upload private unsigned MSI
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v6
+
+      - name: Verify compliance files inside packaging-smoke MSI
+        shell: pwsh
+        run: >-
+          ./scripts/test-windows-distribution-compliance.ps1
+          -DistributionDir "$env:RUNNER_TEMP/windows-client-msi"
+          -Msi "$env:RUNNER_TEMP/windows-client-msi/EndlessNet.Client.$env:UI_VERSION.msi"
+
+      - name: Exercise unsigned install, repair and uninstall
+        env:
+          ENDLESSNET_E2E_WINDOWS_MSI: "1"
+        shell: pwsh
+        run: |
+          $env:ENDLESSNET_E2E_WINDOWS_MSI_PATH = "$env:RUNNER_TEMP/windows-client-msi/EndlessNet.Client.$env:UI_VERSION.msi"
+          go test -tags e2e ./tests -run TestWindowsClientMSIInstallUpgradeUninstall -count=1 -timeout 20m
+
+      - name: Upload unsigned packaging-smoke MSI
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: unsigned-msi-packaging-smoke
           path: |
             ${{ runner.temp }}/windows-client-msi/EndlessNet.Client.*.msi
             ${{ runner.temp }}/windows-client-msi/EndlessNet.Client.*.msi.sha256
+            ${{ runner.temp }}/dependency-licenses.json
           if-no-files-found: error
           retention-days: 7

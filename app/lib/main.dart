@@ -1969,7 +1969,17 @@ String selectedPathsLabel(ServiceAgentStatus agent) {
       labels.add('${entry.value} ${entry.key}');
     }
   }
-  return labels.isEmpty ? 'No peer paths' : labels.join(' · ');
+  final paths = labels.isEmpty ? 'No peer paths' : labels.join(' · ');
+  if (!agent.isPreviousSnapshot) {
+    return paths;
+  }
+  final revision = switch ((agent.mapRevision, agent.targetMapRevision)) {
+    (final current?, final target?) => 'map $current → $target',
+    (null, final target?) => 'updating to map $target',
+    (final current?, null) => 'map $current',
+    _ => 'updating',
+  };
+  return '$paths · previous snapshot ($revision)';
 }
 
 String discoveryHealthLabel(ServiceAgentStatus agent) {

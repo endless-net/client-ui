@@ -23,6 +23,12 @@ void main() {
       expect(status['ipc_protocol'], 'endlessnet-client-ipc');
       expect(status['ipc_version'], 1);
       expect(status['state'], isNotEmpty);
+
+      final diagnostics = await client.request(
+        'GET',
+        ServiceIPCPath.diagnostics,
+      );
+      expect(diagnostics['diagnostics'], isA<Map<String, dynamic>>());
     },
     skip: live ? false : 'set ENDLESSNET_LIVE_PIPE_TEST=1',
   );

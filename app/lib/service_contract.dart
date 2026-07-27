@@ -140,6 +140,9 @@ class ServiceStatus {
 class ServiceAgentStatus {
   ServiceAgentStatus({
     required this.present,
+    required this.snapshotState,
+    required this.mapRevision,
+    required this.targetMapRevision,
     required this.generatedAt,
     required this.stunOK,
     required this.relayOK,
@@ -168,8 +171,17 @@ class ServiceAgentStatus {
         }
       }
     }
+    final present = payload?['state_present'] == true;
+    final snapshotState = _valueText(payload?['snapshot_state'], '');
     return ServiceAgentStatus(
-      present: payload?['state_present'] == true,
+      present: present,
+      snapshotState: AgentSnapshotState.all.contains(snapshotState)
+          ? snapshotState
+          : present
+          ? AgentSnapshotState.current
+          : AgentSnapshotState.absent,
+      mapRevision: _intValue(payload?['map_revision']),
+      targetMapRevision: _intValue(payload?['target_map_revision']),
       generatedAt: _valueText(payload?['generated_at'], ''),
       stunOK: _boolValue(payload?['stun_ok']),
       relayOK: _boolValue(payload?['relay_ok']),
@@ -179,11 +191,23 @@ class ServiceAgentStatus {
   }
 
   final bool present;
+  final String snapshotState;
+  final int? mapRevision;
+  final int? targetMapRevision;
   final String generatedAt;
   final bool? stunOK;
   final bool? relayOK;
   final Map<String, int> selectedPathCounts;
   final List<PeerPathStatus> peers;
+
+  bool get isPreviousSnapshot => snapshotState == AgentSnapshotState.previous;
+}
+
+abstract final class AgentSnapshotState {
+  static const absent = 'absent';
+  static const current = 'current';
+  static const previous = 'previous';
+  static const all = {absent, current, previous};
 }
 
 class PeerPathStatus {

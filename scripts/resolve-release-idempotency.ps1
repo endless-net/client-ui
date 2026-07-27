@@ -103,7 +103,7 @@ if (-not (Test-Path -LiteralPath $provenancePath -PathType Leaf)) {
     throw "release $tag exists without provenance"
 }
 $existing = Get-Content -LiteralPath $provenancePath -Raw | ConvertFrom-Json
-if ($existing.schema_version -ne 2 -or
+if ($existing.schema_version -ne 3 -or
     $existing.version -ne $UIVersion -or
     $existing.ui.version -ne $UIVersion -or
     $existing.client.version -ne $CoreVersion -or

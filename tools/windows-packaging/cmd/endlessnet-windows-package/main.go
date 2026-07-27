@@ -35,6 +35,7 @@ func renderMSI(args []string) error {
 	version := fs.String("version", "", "MSI product version")
 	clientExe := fs.String("client-exe", "", "path to the verified Go client executable")
 	wintunDLL := fs.String("wintun-dll", "", "path to the verified official Wintun DLL")
+	wintunLicense := fs.String("wintun-license", "", "path to the official Wintun prebuilt-binary license")
 	appExe := fs.String("app-exe", "", "path to the Flutter application executable")
 	appBundleDir := fs.String("app-bundle-dir", "", "path to the Flutter Windows release bundle")
 	iconFile := fs.String("icon-file", defaults.IconFile, "path to the application icon")
@@ -48,6 +49,7 @@ func renderMSI(args []string) error {
 		"version":        *version,
 		"client-exe":     *clientExe,
 		"wintun-dll":     *wintunDLL,
+		"wintun-license": *wintunLicense,
 		"app-exe":        *appExe,
 		"app-bundle-dir": *appBundleDir,
 		"msi":            *msi,
@@ -63,6 +65,7 @@ func renderMSI(args []string) error {
 		UpgradeCode:         defaults.UpgradeCode,
 		ClientExe:           *clientExe,
 		WintunDLL:           *wintunDLL,
+		WintunLicense:       *wintunLicense,
 		AppExe:              *appExe,
 		AppBundleDir:        *appBundleDir,
 		IconFile:            *iconFile,

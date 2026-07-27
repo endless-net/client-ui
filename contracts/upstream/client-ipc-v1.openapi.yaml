@@ -10,7 +10,7 @@ info:
     protected local channel; it is not a network listener. Every request must
     send the protocol, current-version, and minimum-supported-version headers.
     The server negotiates the highest overlapping version and returns it in the
-    response envelope. The initial contract supports only version 1. Observer
+    response envelope. This contract supports only version 1. Observer
     operations are available to every identified local peer. Owner operations
     are available to the SID/UID that first enrolls the device and to local
     administrators/root; initial enrollment claims an owner when none exists.
@@ -229,7 +229,7 @@ paths:
     parameters: *ipcVersionHeaders
     get:
       operationId: diagnostics
-      x-endlessnet-required-privilege: administrator
+      x-endlessnet-required-privilege: owner
       summary: Read a redacted diagnostics snapshot without filesystem side effects.
       responses:
         "200":
@@ -244,7 +244,7 @@ paths:
     parameters: *ipcVersionHeaders
     post:
       operationId: diagnostics.bundle
-      x-endlessnet-required-privilege: administrator
+      x-endlessnet-required-privilege: owner
       summary: Create or reuse a bounded redacted diagnostics bundle.
       requestBody:
         content:
@@ -270,7 +270,7 @@ paths:
     parameters: *ipcVersionHeaders
     get:
       operationId: logs.recent
-      x-endlessnet-required-privilege: administrator
+      x-endlessnet-required-privilege: owner
       summary: Read recent redacted service log entries.
       parameters:
         - name: limit
@@ -549,14 +549,33 @@ components:
         priority:
           type: integer
           minimum: 0
+    AgentSnapshotState:
+      type: string
+      description: |
+        Relationship between the attached agent snapshot and the authoritative
+        cached map exposed by the enclosing status. `previous` keeps the last
+        coherent runtime snapshot visible after the cached map advances; its
+        fields retain their own `map_revision`.
+      enum:
+        - absent
+        - current
+        - previous
     AgentStatus:
       type: object
       required:
         - state_present
+        - snapshot_state
       additionalProperties: false
       properties:
         state_present:
           type: boolean
+          description: True when snapshot fields are populated, including a previous-revision snapshot.
+        snapshot_state:
+          $ref: "#/components/schemas/AgentSnapshotState"
+        target_map_revision:
+          type: integer
+          minimum: 0
+          description: Authoritative cached map revision to reconcile when snapshot_state is previous.
         connection_paused:
           type: boolean
         generated_at:
@@ -708,7 +727,13 @@ components:
             wireguard:
               $ref: "#/components/schemas/WireGuardApplyResult"
     EnrollResponse:
-      $ref: "#/components/schemas/StatusResponse"
+      allOf:
+        - $ref: "#/components/schemas/StatusResponse"
+        - type: object
+          properties:
+            wireguard_apply:
+              $ref: "#/components/schemas/WireGuardApplyResult"
+              description: Present only after enrollment has synchronously brought up the local tunnel.
     TrustServerResponse:
       allOf:
         - $ref: "#/components/schemas/ConnectResponse"

@@ -1,0 +1,20 @@
+Third-party components
+======================
+
+The source distribution uses the following dependency license families:
+
+- Flutter framework and Flutter plugins — BSD-3-Clause
+- Dart SDK packages — BSD-3-Clause and Apache-2.0
+- cupertino_icons, tray_manager, window_manager, screen_retriever, menu_base —
+  MIT
+- golang.org/x/sys — BSD-3-Clause
+
+The Windows distribution also includes:
+
+- endlessnet-client — Apache-2.0, with its own LICENSE, NOTICE,
+  THIRD_PARTY_NOTICES, and SPDX SBOM
+- Wintun prebuilt binaries — WireGuard LLC Prebuilt Binaries License
+
+Flutter's generated NOTICES.Z, the client-core compliance files, and the Wintun
+prebuilt-binary license are included in the installed application. CI validates
+all resolved dependency licenses and rejects unknown or missing license texts.

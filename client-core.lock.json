@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "repository": "endless-net/client",
+  "version": "0.3.1",
+  "tag": "v0.3.1",
+  "commit": "adcb14d68cb91d63a34ade51c762935f281d69b4",
+  "manifest": {
+    "name": "endlessnet-client_windows_amd64.manifest.json",
+    "url": "https://github.com/endless-net/client/releases/download/v0.3.1/endlessnet-client_windows_amd64.manifest.json",
+    "sha256": "eef9443ea6a4920d1ef2c09656ace8c90d11914871dcbc730e61ccdfb7c50813"
+  },
+  "compliance": {
+    "license": {
+      "name": "LICENSE",
+      "url": "https://github.com/endless-net/client/releases/download/v0.3.1/LICENSE",
+      "sha256": "710d2474780d6b594415ef56986b5c880cc74a8b6322f5ba27e7aa3c73fc85a3"
+    },
+    "notice": {
+      "name": "NOTICE",
+      "url": "https://github.com/endless-net/client/releases/download/v0.3.1/NOTICE",
+      "sha256": "2543c62773b51df7a45da854f351d4a35452da49eafb974d07d0f52c488c86a0"
+    },
+    "third_party_notices": {
+      "name": "THIRD_PARTY_NOTICES",
+      "url": "https://github.com/endless-net/client/releases/download/v0.3.1/THIRD_PARTY_NOTICES",
+      "sha256": "8f0999ce7bfb10fdd18e41094b8995cc83a97dbc9a1f337ea191b57daff2bbad"
+    },
+    "source_sbom": {
+      "name": "source-sbom.spdx.json",
+      "url": "https://github.com/endless-net/client/releases/download/v0.3.1/source-sbom.spdx.json",
+      "sha256": "32cef8ed20cb54d34dd0f6fcd1129aed1ee0933dca5a3436bcd55e5e2348dde4"
+    }
+  }
+}

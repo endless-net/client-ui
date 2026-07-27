@@ -221,6 +221,7 @@ void main() {
     final status = ServiceStatus({
       'agent': {
         'state_present': true,
+        'snapshot_state': 'current',
         'stun_ok': true,
         'relay_ok': true,
         'selected_path_counts': {'direct': 1, 'relay': 1},
@@ -266,8 +267,27 @@ void main() {
     expect(status.peerPaths, hasLength(2));
     expect(status.peerPaths.first.candidates.single.rttMS, 4.5);
     expect(status.peerPaths.last.selectedPath, 'relay');
+    expect(status.agent.snapshotState, AgentSnapshotState.current);
     expect(selectedPathsLabel(status.agent), '1 direct · 1 relay');
     expect(peerLabels(status.payload), contains('relay-peer - Relay'));
+  });
+
+  test('ServiceStatus labels a previous agent snapshot during map sync', () {
+    final status = ServiceStatus({
+      'agent': {
+        'state_present': true,
+        'snapshot_state': 'previous',
+        'map_revision': 7,
+        'target_map_revision': 8,
+        'selected_path_counts': {'direct': 1},
+      },
+    });
+
+    expect(status.agent.isPreviousSnapshot, isTrue);
+    expect(
+      selectedPathsLabel(status.agent),
+      '1 direct · previous snapshot (map 7 → 8)',
+    );
   });
 
   test('ServiceDiagnostics reads status from the strict response envelope', () {
@@ -278,6 +298,7 @@ void main() {
           'state': ServiceState.connected,
           'agent': {
             'state_present': true,
+            'snapshot_state': 'current',
             'stun_ok': true,
             'relay_ok': true,
             'selected_path_counts': {'direct': 1},
