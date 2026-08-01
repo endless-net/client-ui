@@ -19,8 +19,10 @@ func TestContractRoutesMatchCheckedInOpenAPI(t *testing.T) {
 	}
 	pathPattern := regexp.MustCompile(`(?m)^  (/[^:]+):\r?$`)
 	methodPattern := regexp.MustCompile(`(?m)^    (get|post|put|patch|delete):\r?$`)
+	privilegePattern := regexp.MustCompile(`(?m)^      x-endlessnet-required-privilege: ([a-z_]+)\r?$`)
 	matches := pathPattern.FindAllStringSubmatchIndex(string(raw), -1)
 	want := make(map[string]string, len(matches))
+	privileges := make(map[string]string, len(matches))
 	for i, match := range matches {
 		blockEnd := len(raw)
 		if i+1 < len(matches) {
@@ -30,10 +32,34 @@ func TestContractRoutesMatchCheckedInOpenAPI(t *testing.T) {
 		if method == nil {
 			t.Fatalf("OpenAPI path %q has no HTTP operation", string(raw[match[2]:match[3]]))
 		}
-		want[string(raw[match[2]:match[3]])] = strings.ToUpper(string(method[1]))
+		path := string(raw[match[2]:match[3]])
+		want[path] = strings.ToUpper(string(method[1]))
+		privilege := privilegePattern.FindSubmatch(raw[match[1]:blockEnd])
+		if privilege == nil {
+			t.Fatalf("OpenAPI path %q has no required privilege", path)
+		}
+		privileges[path] = string(privilege[1])
 	}
 	if !maps.Equal(contractRoutes, want) {
 		t.Fatalf("emulator routes = %v, OpenAPI routes = %v", contractRoutes, want)
+	}
+	wantPrivileges := map[string]string{
+		"/status":                "observer",
+		"/events":                "observer",
+		"/enroll":                "owner",
+		"/connect":               "owner",
+		"/server-identity":       "observer",
+		"/server-identity/trust": "administrator",
+		"/disconnect":            "owner",
+		"/logout":                "owner",
+		"/networks":              "observer",
+		"/network/select":        "owner",
+		"/diagnostics":           "owner",
+		"/diagnostics/bundle":    "owner",
+		"/logs/recent":           "owner",
+	}
+	if !maps.Equal(privileges, wantPrivileges) {
+		t.Fatalf("OpenAPI privileges = %v, want %v", privileges, wantPrivileges)
 	}
 }
 
@@ -123,6 +149,10 @@ func TestDefaultEngineImplementsContractSurface(t *testing.T) {
 	if got := enrolled["state"]; got != "Connected" {
 		t.Fatalf("enrolled state = %v, want Connected", got)
 	}
+	wireGuardApply, ok := enrolled["wireguard_apply"].(map[string]any)
+	if !ok || wireGuardApply["ok"] != true || wireGuardApply["method"] != "wireguard-go" {
+		t.Fatalf("enrollment omitted synchronous WireGuard result: %#v", enrolled)
+	}
 
 	events := engine.Handle(http.MethodGet, "/events", nil)
 	if events.ContentType != "application/x-ndjson" {
@@ -138,6 +168,49 @@ func TestDefaultEngineImplementsContractSurface(t *testing.T) {
 			t.Fatalf("decode event: %v", err)
 		}
 		assertEnvelope(t, event)
+	}
+}
+
+func TestEnrollmentApprovalFixtureOmitsApplyUntilTunnelStarts(t *testing.T) {
+	file, err := os.Open(filepath.Join("scenarios", "enrollment-approval.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	scenario, err := LoadScenario(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine := newTestEngine(t, scenario, nil)
+	request := []byte(`{"mode":"workstation"}`)
+
+	pending := decodeResult(t, engine.Handle(http.MethodPost, "/enroll", request))
+	if pending["state"] != "NeedsApproval" || pending["wireguard_apply"] != nil {
+		t.Fatalf("pending enrollment response = %#v", pending)
+	}
+	connected := decodeResult(t, engine.Handle(http.MethodPost, "/enroll", request))
+	apply, ok := connected["wireguard_apply"].(map[string]any)
+	if connected["state"] != "Connected" || !ok || apply["ok"] != true {
+		t.Fatalf("completed enrollment response = %#v", connected)
+	}
+}
+
+func TestOwnerRequiredFixtureReturnsStableContractError(t *testing.T) {
+	file, err := os.Open(filepath.Join("scenarios", "owner-required.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	scenario, err := LoadScenario(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine := newTestEngine(t, scenario, nil)
+
+	result := engine.Handle(http.MethodPost, "/connect", []byte(`{}`))
+	payload := decodeResult(t, result)
+	if result.StatusCode != http.StatusForbidden || payload["error_code"] != "owner_required" {
+		t.Fatalf("owner-required response = status %d payload %#v", result.StatusCode, payload)
 	}
 }
 

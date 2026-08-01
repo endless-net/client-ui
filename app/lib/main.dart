@@ -2100,13 +2100,7 @@ bool isDeviceEnrolled(Map<String, dynamic>? payload) {
 }
 
 bool isEnrollmentPending(Map<String, dynamic>? payload) {
-  if (payload == null) {
-    return false;
-  }
-  return valueText(payload['state'], fallback: '') ==
-          ServiceState.needsApproval ||
-      valueText(payload['control_state'], fallback: '') ==
-          ControlState.pendingApproval;
+  return payload != null && EnrollmentResponse(payload).pending;
 }
 
 bool isConnectionSettling(Map<String, dynamic>? payload) {
@@ -2123,7 +2117,7 @@ bool isConnectionSettling(Map<String, dynamic>? payload) {
 }
 
 String enrollmentApprovalURL(Map<String, dynamic>? payload) {
-  return valueText(payload?['approval_url'], fallback: '');
+  return payload == null ? '' : EnrollmentResponse(payload).approvalURL;
 }
 
 Object? nestedValue(Map<String, dynamic>? payload, String key, String nested) {

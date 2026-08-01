@@ -39,6 +39,34 @@ class ServiceIPCMetadata {
   static const minimumVersionHeader = 'X-EndlessNet-IPC-Min-Supported-Version';
 }
 
+abstract final class ServiceIPCErrorCode {
+  static const requestFailed = 'request_failed';
+  static const ownerRequired = 'owner_required';
+  static const administratorRequired = 'administrator_required';
+}
+
+abstract final class ServiceIPCPrivilege {
+  static const observer = 'observer';
+  static const owner = 'owner';
+  static const administrator = 'administrator';
+
+  static const requiredByPath = <String, String>{
+    ServiceIPCPath.status: observer,
+    ServiceIPCPath.events: observer,
+    ServiceIPCPath.enroll: owner,
+    ServiceIPCPath.connect: owner,
+    ServiceIPCPath.serverIdentity: observer,
+    ServiceIPCPath.trustServer: administrator,
+    ServiceIPCPath.disconnect: owner,
+    ServiceIPCPath.logout: owner,
+    ServiceIPCPath.networks: observer,
+    ServiceIPCPath.selectNetwork: owner,
+    ServiceIPCPath.diagnostics: owner,
+    ServiceIPCPath.diagnosticsBundle: owner,
+    ServiceIPCPath.recentLogs: owner,
+  };
+}
+
 class ServiceState {
   static const connected = 'Connected';
   static const disconnected = 'Disconnected';
@@ -160,6 +188,69 @@ class ServiceStatus {
     ];
     return identifiers.any((value) => _valueText(value, '').isNotEmpty);
   }
+}
+
+class EnrollmentResponse {
+  EnrollmentResponse(this.payload)
+    : status = ServiceStatus(payload),
+      wireGuardApply = WireGuardApplyResult.fromValue(
+        payload['wireguard_apply'],
+      );
+
+  final Map<String, dynamic> payload;
+  final ServiceStatus status;
+  final WireGuardApplyResult? wireGuardApply;
+
+  bool get pending =>
+      status.state(fallback: '') == ServiceState.needsApproval ||
+      _valueText(payload['control_state'], '') == ControlState.pendingApproval;
+
+  String get approvalURL => _valueText(payload['approval_url'], '');
+}
+
+class WireGuardApplyResult {
+  WireGuardApplyResult({
+    required this.ok,
+    required this.method,
+    required this.interfaceName,
+    required this.changed,
+    required this.skipped,
+    required this.reason,
+    required this.downError,
+    required this.upError,
+    required this.syncError,
+    required this.routeError,
+  });
+
+  static WireGuardApplyResult? fromValue(Object? value) {
+    final payload = _mapValue(value);
+    if (payload == null) {
+      return null;
+    }
+    return WireGuardApplyResult(
+      ok: payload['ok'] == true,
+      method: _valueText(payload['method'], ''),
+      interfaceName: _valueText(payload['interface'], ''),
+      changed: payload['changed'] == true,
+      skipped: payload['skipped'] == true,
+      reason: _valueText(payload['reason'], ''),
+      downError: _valueText(payload['down_error'], ''),
+      upError: _valueText(payload['up_error'], ''),
+      syncError: _valueText(payload['sync_error'], ''),
+      routeError: _valueText(payload['route_error'], ''),
+    );
+  }
+
+  final bool ok;
+  final String method;
+  final String interfaceName;
+  final bool changed;
+  final bool skipped;
+  final String reason;
+  final String downError;
+  final String upError;
+  final String syncError;
+  final String routeError;
 }
 
 enum PeerDevicesState { available, refreshing, confirmedEmpty }

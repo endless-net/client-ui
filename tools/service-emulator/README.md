@@ -8,11 +8,18 @@ The built-in stateful model implements every path in
 `contracts/upstream/client-ipc-v1.openapi.yaml`:
 
 - status and finite `application/x-ndjson` event snapshots;
-- connect, disconnect, logout, and enrollment transitions;
+- connect, disconnect, logout, and enrollment transitions, including the
+  optional successful-enrollment `wireguard_apply` result;
 - server identity inspection and explicit trust recovery;
 - network listing and selection;
 - redacted diagnostics snapshots with peer-path status, bounded bundle
   metadata, and recent logs.
+
+The OpenAPI privilege metadata is verified by tests: status/events/identity and
+network reads are observers; enrollment, connect/disconnect, logout, and network
+selection and redacted diagnostics are owner operations; identity trust is an
+administrator operation. The emulator does not impersonate Windows SIDs;
+authorization failures can be injected as scripted contract errors.
 
 ## Quick start
 
@@ -93,6 +100,7 @@ silently accepting them.
 Ready-to-use examples live in `scenarios/`:
 
 - `enrollment-approval.json` models pending approval followed by enrollment;
+- `owner-required.json` rejects an owner operation for a different local user;
 - `server-identity-changed.json` drives explicit signing-key recovery;
 - `connect-failure.json` injects a delayed control-plane failure.
 

@@ -48,7 +48,10 @@ class NamedPipeHttpClient {
     if (parsed.statusCode < 200 || parsed.statusCode >= 300) {
       throw ServiceIPCException(
         statusCode: parsed.statusCode,
-        errorCode: payload['error_code']?.toString().trim() ?? '',
+        errorCode: _firstNonEmpty([
+          payload['error_code']?.toString(),
+          ServiceIPCErrorCode.requestFailed,
+        ]),
         message: _firstNonEmpty([
           payload['error']?.toString(),
           payload['message']?.toString(),
@@ -70,6 +73,8 @@ class ServiceIPCException implements Exception {
   final int statusCode;
   final String errorCode;
   final String message;
+
+  String get code => errorCode;
 
   @override
   String toString() => message;

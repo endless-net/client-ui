@@ -58,6 +58,17 @@ func TestNamedPipeServerRoundTrip(t *testing.T) {
 	if missingHeaders.StatusCode != http.StatusUpgradeRequired || missingHeaders.Payload["error_code"] != "ipc_version_required" {
 		t.Fatalf("missing IPC headers response = %#v", missingHeaders)
 	}
+	version2Headers := fmt.Sprintf(
+		"%s: %s\r\n%s: 2\r\n%s: 2\r\n",
+		IPCProtocolHeader,
+		IPCProtocol,
+		IPCVersionHeader,
+		IPCMinVersionHeader,
+	)
+	version2 := pipeRequestWithRawIPCHeaders(t, pipePath, http.MethodGet, "/status", nil, version2Headers)
+	if version2.StatusCode != http.StatusUpgradeRequired || version2.Payload["error_code"] != "ipc_version_unsupported" {
+		t.Fatalf("IPC version 2 response = %#v", version2)
+	}
 }
 
 type pipeResponse struct {
@@ -75,13 +86,18 @@ func pipeRequestWithoutIPCHeaders(t *testing.T, pipePath, method, target string,
 
 func pipeRequestWithHeaders(t *testing.T, pipePath, method, target string, body []byte, includeIPCHeaders bool) pipeResponse {
 	t.Helper()
-	file, err := os.OpenFile(pipePath, os.O_RDWR, 0)
-	if err != nil {
-		t.Fatalf("open pipe: %v", err)
-	}
 	ipcHeaders := ""
 	if includeIPCHeaders {
 		ipcHeaders = fmt.Sprintf("%s: %s\r\n%s: %d\r\n%s: %d\r\n", IPCProtocolHeader, IPCProtocol, IPCVersionHeader, IPCVersion, IPCMinVersionHeader, IPCVersion)
+	}
+	return pipeRequestWithRawIPCHeaders(t, pipePath, method, target, body, ipcHeaders)
+}
+
+func pipeRequestWithRawIPCHeaders(t *testing.T, pipePath, method, target string, body []byte, ipcHeaders string) pipeResponse {
+	t.Helper()
+	file, err := os.OpenFile(pipePath, os.O_RDWR, 0)
+	if err != nil {
+		t.Fatalf("open pipe: %v", err)
 	}
 	request := fmt.Sprintf(
 		"%s %s HTTP/1.1\r\nHost: endlessnet.local\r\nContent-Type: application/json\r\n%sContent-Length: %d\r\nConnection: close\r\n\r\n",

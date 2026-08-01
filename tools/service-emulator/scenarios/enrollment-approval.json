@@ -64,7 +64,12 @@
             "identity_private_key_present": true,
             "private_key_present": true,
             "node_id": "node_emulator",
-            "network_id": "net_primary"
+            "network_id": "net_primary",
+            "wireguard_apply": {
+              "ok": true,
+              "method": "wireguard-go",
+              "changed": true
+            }
           },
           "status_patch": {
             "state": "Connected",

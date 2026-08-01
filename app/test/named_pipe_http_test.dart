@@ -79,6 +79,27 @@ void main() {
       }, requireNegotiated: true),
       throwsA(isA<FormatException>()),
     );
+    expect(
+      () => validateIPCEnvelope({
+        'ipc_protocol': ServiceIPCMetadata.protocol,
+        'ipc_version': 2,
+        'ipc_min_supported_version': 2,
+        'ipc_negotiated_version': 2,
+      }, requireNegotiated: true),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('service IPC errors retain the current contract error code', () {
+    const error = ServiceIPCException(
+      statusCode: 403,
+      errorCode: ServiceIPCErrorCode.ownerRequired,
+      message: 'device enrollment is owned by another local user',
+    );
+
+    expect(error, isA<Exception>());
+    expect(error.statusCode, 403);
+    expect(error.code, 'owner_required');
   });
 
   test('app bridge maps UI actions directly to service IPC', () async {

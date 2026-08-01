@@ -217,6 +217,35 @@ void main() {
     expect(identityChanged.serverIdentityChanged, isTrue);
   });
 
+  test('EnrollmentResponse parses optional synchronous WireGuard apply', () {
+    final pending = EnrollmentResponse({
+      'state': ServiceState.needsApproval,
+      'control_state': ControlState.pendingApproval,
+      'approval_url': 'https://admin.example.test/connect',
+    });
+    expect(pending.pending, isTrue);
+    expect(pending.approvalURL, 'https://admin.example.test/connect');
+    expect(pending.wireGuardApply, isNull);
+
+    final completed = EnrollmentResponse({
+      'state': ServiceState.connected,
+      'control_state': ControlState.ready,
+      'node_id': 'node-1',
+      'wireguard_apply': {
+        'ok': true,
+        'method': 'wireguard-go',
+        'interface': 'EndlessNet',
+        'changed': true,
+      },
+    });
+    expect(completed.pending, isFalse);
+    expect(completed.status.deviceEnrolled, isTrue);
+    expect(completed.wireGuardApply?.ok, isTrue);
+    expect(completed.wireGuardApply?.method, 'wireguard-go');
+    expect(completed.wireGuardApply?.interfaceName, 'EndlessNet');
+    expect(completed.wireGuardApply?.changed, isTrue);
+  });
+
   test('ServiceStatus parses strict peer path diagnostics', () {
     final status = ServiceStatus({
       'agent': {

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "name": "owner-required",
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/connect",
+      "repeat_last": true,
+      "responses": [
+        {
+          "status": 403,
+          "body": {
+            "error_code": "owner_required",
+            "error": "connect requires the local user that enrolled this device or an administrator"
+          }
+        }
+      ]
+    }
+  ]
+}

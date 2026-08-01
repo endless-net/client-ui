@@ -130,6 +130,8 @@ Win32 pipe вынесена в отдельный Dart isolate, чтобы бл�
 
 Контракт описан в
 [`contracts/upstream/client-ipc-v1.openapi.yaml`](../contracts/upstream/client-ipc-v1.openapi.yaml).
+Его vendored-копия и provenance синхронизированы с immutable core release,
+закреплённым в `client-core.lock.json`.
 
 | Endpoint | Назначение | Текущее использование UI |
 | --- | --- | --- |
@@ -146,6 +148,13 @@ Win32 pipe вынесена в отдельный Dart isolate, чтобы бл�
 | `GET /diagnostics` | Получить redacted diagnostics | Копирование в clipboard с дополнительной redaction |
 | `POST /diagnostics/bundle` | Создать bounded redacted bundle | Bridge и эмулятор поддерживают контрактный вызов |
 | `GET /logs/recent` | Получить redacted logs | Просмотр последних записей |
+
+Observer-операции доступны любому идентифицированному локальному peer. Первый
+пользователь, запускающий enrollment, становится локальным владельцем по
+Windows SID; этот владелец и administrator могут выполнять enroll, connect,
+disconnect, logout, выбор сети и redacted diagnostics. Другой обычный
+пользователь получает `owner_required`. Trust нового server identity всегда
+требует administrator.
 
 ### 5.3. Enrollment
 
@@ -165,7 +174,9 @@ deep link и значения авторизации редактируются 
 требуется web approval, UI открывает предоставленный service URL в браузере и
 проверяет `GET /status` каждые 2 секунды не более 10 минут. Обычный UI остаётся
 без повышенных прав. Источником истины остаётся service, а не browser callback
-или локальный UI state.
+или локальный UI state. Pending-ответ не содержит `wireguard_apply`; после
+синхронного запуска туннеля UI разбирает опциональный `wireguard_apply`, включая
+`ok`, `method`, `changed` и диагностические поля результата.
 
 ### 5.4. Connect и смена server identity
 

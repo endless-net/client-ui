@@ -11,6 +11,11 @@ candidates are being evaluated or when no direct candidate is reachable. The UI
 does not consume fields outside `client-ipc-v1.openapi.yaml` and never
 reconstructs diagnostics from private state.
 
+The current v1 response model distinguishes observer, local-owner, and
+administrator operations. Enrollment responses are full status envelopes with
+an optional `wireguard_apply` result only when the service synchronously starts
+the tunnel.
+
 Run ordinary UI tests from this directory:
 
 ```powershell

@@ -18,7 +18,13 @@ void main() {
     final openAPI = contract.readAsStringSync();
 
     expect(openAPI, contains('title: EndlessNet Client Local Service IPC'));
+    expect(openAPI, contains('  version: 1.0.0'));
+    expect(
+      openAPI,
+      isNot(contains(['client-ipc', 'v2.openapi.yaml'].join('-'))),
+    );
     expect(_contractPaths(openAPI), ServiceIPCPath.all.toSet());
+    expect(_contractPrivileges(openAPI), ServiceIPCPrivilege.requiredByPath);
     expect(_schemaEnum(openAPI, 'ServiceState'), ServiceState.all.toSet());
     expect(_schemaEnum(openAPI, 'ControlState'), ControlState.all.toSet());
     expect(
@@ -44,6 +50,26 @@ void main() {
     });
     expect(_schemaProperties(openAPI, 'DiagnosticsResponse'), {'diagnostics'});
     expect(_schemaProperties(openAPI, 'LogsRecentResponse'), {'logs'});
+    expect(_schemaProperties(openAPI, 'EnrollResponse'), {'wireguard_apply'});
+    expect(
+      _schemaEnum(openAPI, 'ErrorCode'),
+      containsAll({
+        ServiceIPCErrorCode.ownerRequired,
+        ServiceIPCErrorCode.administratorRequired,
+      }),
+    );
+    expect(
+      _schemaPropertyConst(openAPI, 'ProtocolEnvelope', 'ipc_version'),
+      ServiceIPCMetadata.version.toString(),
+    );
+    expect(
+      _schemaPropertyConst(
+        openAPI,
+        'ProtocolEnvelope',
+        'ipc_min_supported_version',
+      ),
+      ServiceIPCMetadata.minimumSupportedVersion.toString(),
+    );
     expect(
       _schemaProperties(openAPI, 'StatusResponse'),
       containsAll({
@@ -770,6 +796,32 @@ Set<String> _contractPaths(String openAPI) {
   ).allMatches(openAPI).map((match) => match.group(1)!).toSet();
 }
 
+Map<String, String> _contractPrivileges(String openAPI) {
+  final matches = RegExp(
+    r'^  (/[^:]+):\r?$',
+    multiLine: true,
+  ).allMatches(openAPI).toList(growable: false);
+  final privileges = <String, String>{};
+  for (var index = 0; index < matches.length; index++) {
+    final match = matches[index];
+    final blockEnd = index + 1 < matches.length
+        ? matches[index + 1].start
+        : openAPI.indexOf('\ncomponents:', match.end);
+    final block = openAPI.substring(
+      match.end,
+      blockEnd < 0 ? openAPI.length : blockEnd,
+    );
+    final privilege = RegExp(
+      r'^      x-endlessnet-required-privilege: ([a-z_]+)\r?$',
+      multiLine: true,
+    ).firstMatch(block);
+    if (privilege != null) {
+      privileges[match.group(1)!] = privilege.group(1)!;
+    }
+  }
+  return privileges;
+}
+
 Set<String> _schemaEnum(String openAPI, String schema) {
   final block = _schemaBlock(openAPI, schema);
   return RegExp(
@@ -801,6 +853,32 @@ Set<String> _schemaProperties(String openAPI, String schema) {
       })
       .whereType<String>()
       .toSet();
+}
+
+String _schemaPropertyConst(String openAPI, String schema, String property) {
+  final block = _schemaBlock(openAPI, schema);
+  final propertyStart = block.indexOf('        $property:');
+  if (propertyStart < 0) {
+    throw StateError(
+      'OpenAPI schema property was not found: $schema.$property',
+    );
+  }
+  final nextProperty = RegExp(
+    r'^        [a-z][a-z0-9_]*:',
+    multiLine: true,
+  ).firstMatch(block.substring(propertyStart + property.length + 9));
+  final propertyEnd = nextProperty == null
+      ? block.length
+      : propertyStart + property.length + 9 + nextProperty.start;
+  final propertyBlock = block.substring(propertyStart, propertyEnd);
+  final value = RegExp(
+    r'^          const: ([^\r\n]+)\r?$',
+    multiLine: true,
+  ).firstMatch(propertyBlock);
+  if (value == null) {
+    throw StateError('OpenAPI schema property has no const: $schema.$property');
+  }
+  return value.group(1)!;
 }
 
 String _schemaBlock(String openAPI, String schema) {

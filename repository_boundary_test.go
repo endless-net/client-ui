@@ -91,6 +91,68 @@ func TestCoreResolverConsumesOnlyReviewedLock(t *testing.T) {
 	}
 }
 
+func TestVendoredIPCContractTracksReviewedRelease(t *testing.T) {
+	provenance := readRepositoryFile(t, "contracts/upstream/README.md")
+	lock := readRepositoryFile(t, "client-core.lock.json")
+	for _, required := range []string{
+		"v0.3.1",
+		"adcb14d68cb91d63a34ade51c762935f281d69b4",
+		"client-ipc-v1.openapi.yaml",
+		"266ec8c3c8fd9a775c0303316b70102a3ccbcc72928a3b30ba16454ff71054a6",
+	} {
+		if !strings.Contains(provenance, required) {
+			t.Errorf("vendored IPC provenance is missing %q", required)
+		}
+	}
+	for _, required := range []string{
+		`"repository": "endless-net/client"`,
+		`"version": "0.3.1"`,
+		`"commit": "adcb14d68cb91d63a34ade51c762935f281d69b4"`,
+	} {
+		if !strings.Contains(lock, required) {
+			t.Errorf("reviewed client core lock is missing %q", required)
+		}
+	}
+}
+
+func TestProductionTreeHasNoIPCVersion2References(t *testing.T) {
+	forbidden := []string{
+		strings.Join([]string{"client-ipc", "v2"}, "-"),
+		strings.Join([]string{"ipc", "v2"}, "/"),
+		strings.Join([]string{"IPC", "v2"}, " "),
+	}
+	err := filepath.WalkDir(".", func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			switch entry.Name() {
+			case ".git", ".artifacts", ".dart_tool", "build", "dist", "ephemeral":
+				return filepath.SkipDir
+			default:
+				return nil
+			}
+		}
+		if strings.HasSuffix(path, "_test.go") || entry.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		raw, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		text := string(raw)
+		for _, removed := range forbidden {
+			if strings.Contains(text, removed) {
+				t.Errorf("%s retains IPC version 2 reference %q", path, removed)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPublicTreeHasNoLegacyReleaseCoupling(t *testing.T) {
 	forbidden := []string{
 		strings.Join([]string{"endlessnet", "front"}, ""),

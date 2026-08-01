@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:endlessnet/main.dart';
 import 'package:endlessnet/named_pipe_http.dart';
+import 'package:endlessnet/service_contract.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -76,6 +77,9 @@ void main() {
         ),
       );
       expect(status['state'], 'Connected');
+      final enrollment = EnrollmentResponse(status);
+      expect(enrollment.wireGuardApply?.ok, isTrue);
+      expect(enrollment.wireGuardApply?.method, 'wireguard-go');
 
       final interactions = await emulator.interactions();
       expect(

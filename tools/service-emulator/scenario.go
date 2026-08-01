@@ -532,7 +532,9 @@ func (e *Engine) enroll(body map[string]any) Result {
 		"identity_private_key_present": true,
 		"private_key_present":          true,
 	})
-	return jsonResult(http.StatusOK, e.status)
+	response := cloneMap(e.status)
+	response["wireguard_apply"] = wireGuardApplyResult(true)
+	return jsonResult(http.StatusOK, response)
 }
 
 func (e *Engine) trustServer(body map[string]any) Result {
