@@ -907,14 +907,14 @@ class EndlessNetController extends ChangeNotifier
       return;
     }
     await trayManager.setToolTip('EndlessNet: $state');
-    await trayManager.setContextMenu(_buildTrayMenu());
+    await trayManager.setContextMenu(buildTrayMenu());
   }
 
-  Menu _buildTrayMenu() {
+  Menu buildTrayMenu() {
     final status = statusPayload;
     final account = valueText(status?['account_id'], fallback: 'No account');
     final thisDevice = thisDeviceLabel(status);
-    final peers = peerLabels(status);
+    final devices = networkDevicesPresentation(status);
     return Menu(
       items: [
         MenuItem.checkbox(key: 'open', label: 'EndlessNet', checked: true),
@@ -942,9 +942,11 @@ class EndlessNetController extends ChangeNotifier
           label: 'Network devices',
           submenu: Menu(
             items: [
-              if (peers.isEmpty)
-                MenuItem(label: 'No peer devices', disabled: true),
-              ...peers.map((peer) => MenuItem(label: peer, disabled: true)),
+              if (devices.message != null)
+                MenuItem(label: devices.message, disabled: true),
+              ...devices.peerLabels.map(
+                (peer) => MenuItem(label: peer, disabled: true),
+              ),
               MenuItem.separator(),
               MenuItem(key: 'status', label: 'Status...'),
               MenuItem(key: 'networks', label: 'Networks...'),
@@ -1363,6 +1365,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = controller.statusPayload;
     final agent = controller.serviceStatus.agent;
+    final devices = networkDevicesPresentation(status);
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FB),
       body: SafeArea(
@@ -1507,10 +1510,9 @@ class HomeScreen extends StatelessWidget {
                         child: InfoPanel(
                           title: 'Network devices',
                           children: [
-                            for (final peer in peerLabels(status))
+                            for (final peer in devices.peerLabels)
                               InfoRow(label: '', value: peer),
-                            if (peerLabels(status).isEmpty)
-                              const Text('No peer devices.'),
+                            if (devices.message != null) Text(devices.message!),
                           ],
                         ),
                       ),
@@ -1941,15 +1943,41 @@ String networkLabel(Map<String, dynamic>? payload) {
   );
 }
 
-List<String> peerLabels(Map<String, dynamic>? payload) {
-  return ServiceStatus(payload).peerPaths
+const noPeerDevicesLabel = 'No peer devices';
+const refreshingDevicePathsLabel = 'Refreshing device paths…';
+
+class NetworkDevicesPresentation {
+  const NetworkDevicesPresentation({
+    required this.peerLabels,
+    required this.message,
+  });
+
+  final List<String> peerLabels;
+  final String? message;
+}
+
+NetworkDevicesPresentation networkDevicesPresentation(
+  Map<String, dynamic>? payload,
+) {
+  final devices = ServiceStatus(payload).peerDevices;
+  final labels = devices.paths
       .take(20)
       .map((peer) {
         final name = valueText(peer.displayName, fallback: 'Unknown peer');
         return '$name - ${selectedPathLabel(peer.selectedPath)}';
       })
       .where((line) => line.trim().isNotEmpty)
-      .toList();
+      .toList(growable: false);
+  final message = switch (devices.state) {
+    PeerDevicesState.available => null,
+    PeerDevicesState.refreshing => refreshingDevicePathsLabel,
+    PeerDevicesState.confirmedEmpty => noPeerDevicesLabel,
+  };
+  return NetworkDevicesPresentation(peerLabels: labels, message: message);
+}
+
+List<String> peerLabels(Map<String, dynamic>? payload) {
+  return networkDevicesPresentation(payload).peerLabels;
 }
 
 String selectedPathsLabel(ServiceAgentStatus agent) {

@@ -233,6 +233,106 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'Network devices refreshes paths while the agent snapshot catches up',
+    (tester) async {
+      tester.view.physicalSize = const Size(1000, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final bridge = ContractFakeBridge();
+      bridge.statusPayload =
+          _contractStatus(
+              state: ServiceState.connected,
+              desiredState: ConnectionIntentState.connected,
+              userDisconnected: false,
+            )
+            ..['map_revision'] = 8
+            ..['peer_count'] = 1
+            ..['agent'] = <String, dynamic>{'state_present': false};
+      final controller = EndlessNetController(
+        config: AppConfig.parse(const []),
+        bridge: bridge,
+        logger: AppLogger('', enabled: false),
+        desktopIntegrationEnabled: false,
+      );
+      addTearDown(controller.exitApp);
+      controller.statusPayload = bridge.statusPayload;
+
+      await tester.pumpWidget(EndlessNetApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      expect(find.text(refreshingDevicePathsLabel), findsOneWidget);
+      expect(find.text(noPeerDevicesLabel), findsNothing);
+
+      final trayDevices = controller
+          .buildTrayMenu()
+          .getMenuItem('devices')!
+          .submenu!
+          .items!;
+      expect(
+        trayDevices.map((item) => item.label),
+        contains(refreshingDevicePathsLabel),
+      );
+      expect(
+        trayDevices.map((item) => item.label),
+        isNot(contains(noPeerDevicesLabel)),
+      );
+    },
+  );
+
+  testWidgets(
+    'Network devices only shows empty after an authoritative zero peer count',
+    (tester) async {
+      tester.view.physicalSize = const Size(1000, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final bridge = ContractFakeBridge();
+      bridge.statusPayload =
+          _contractStatus(
+              state: ServiceState.connected,
+              desiredState: ConnectionIntentState.connected,
+              userDisconnected: false,
+            )
+            ..['peer_count'] = 0
+            ..['agent'] = <String, dynamic>{
+              'state_present': true,
+              'peers': <Map<String, dynamic>>[],
+            };
+      final controller = EndlessNetController(
+        config: AppConfig.parse(const []),
+        bridge: bridge,
+        logger: AppLogger('', enabled: false),
+        desktopIntegrationEnabled: false,
+      );
+      addTearDown(controller.exitApp);
+      controller.statusPayload = bridge.statusPayload;
+
+      await tester.pumpWidget(EndlessNetApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      expect(find.text(noPeerDevicesLabel), findsOneWidget);
+      expect(find.text(refreshingDevicePathsLabel), findsNothing);
+
+      final trayDevices = controller
+          .buildTrayMenu()
+          .getMenuItem('devices')!
+          .submenu!
+          .items!;
+      expect(
+        trayDevices.map((item) => item.label),
+        contains(noPeerDevicesLabel),
+      );
+      expect(
+        trayDevices.map((item) => item.label),
+        isNot(contains(refreshingDevicePathsLabel)),
+      );
+    },
+  );
+
   testWidgets('Connect this device enrolls as local owner without elevation', (
     tester,
   ) async {

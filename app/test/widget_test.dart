@@ -290,6 +290,41 @@ void main() {
     );
   });
 
+  test(
+    'ServiceStatus refreshes device paths when authoritative peers exist without agent state',
+    () {
+      final status = ServiceStatus({
+        'map_revision': 8,
+        'peer_count': 1,
+        'agent': {'state_present': false},
+      });
+
+      expect(status.peerCount, 1);
+      expect(status.peerDevices.state, PeerDevicesState.refreshing);
+      expect(status.peerDevices.paths, isEmpty);
+      expect(
+        networkDevicesPresentation(status.payload).message,
+        refreshingDevicePathsLabel,
+      );
+    },
+  );
+
+  test('ServiceStatus only confirms no devices from a zero peer count', () {
+    final status = ServiceStatus({
+      'map_revision': 8,
+      'peer_count': 0,
+      'agent': {'state_present': true, 'peers': <Map<String, dynamic>>[]},
+    });
+
+    expect(status.peerCount, 0);
+    expect(status.peerDevices.state, PeerDevicesState.confirmedEmpty);
+    expect(status.peerDevices.paths, isEmpty);
+    expect(
+      networkDevicesPresentation(status.payload).message,
+      noPeerDevicesLabel,
+    );
+  });
+
   test('ServiceDiagnostics reads status from the strict response envelope', () {
     final diagnostics = ServiceDiagnostics({
       'diagnostics': {

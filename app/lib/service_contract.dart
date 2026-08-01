@@ -100,7 +100,32 @@ class ServiceStatus {
   ServiceAgentStatus get agent =>
       ServiceAgentStatus.fromValue(payload?['agent']);
 
-  List<PeerPathStatus> get peerPaths => agent.peers;
+  int? get peerCount => _intValue(payload?['peer_count']);
+
+  PeerDevicesStatus get peerDevices {
+    final authoritativePeerCount = peerCount;
+    if (authoritativePeerCount == 0) {
+      return const PeerDevicesStatus(
+        state: PeerDevicesState.confirmedEmpty,
+        paths: [],
+      );
+    }
+
+    final agentStatus = agent;
+    if (!agentStatus.present || agentStatus.peers.isEmpty) {
+      return const PeerDevicesStatus(
+        state: PeerDevicesState.refreshing,
+        paths: [],
+      );
+    }
+
+    return PeerDevicesStatus(
+      state: PeerDevicesState.available,
+      paths: agentStatus.peers,
+    );
+  }
+
+  List<PeerPathStatus> get peerPaths => peerDevices.paths;
 
   String state({required String fallback}) {
     return _valueText(payload?['state'], fallback);
@@ -135,6 +160,15 @@ class ServiceStatus {
     ];
     return identifiers.any((value) => _valueText(value, '').isNotEmpty);
   }
+}
+
+enum PeerDevicesState { available, refreshing, confirmedEmpty }
+
+class PeerDevicesStatus {
+  const PeerDevicesStatus({required this.state, required this.paths});
+
+  final PeerDevicesState state;
+  final List<PeerPathStatus> paths;
 }
 
 class ServiceAgentStatus {
