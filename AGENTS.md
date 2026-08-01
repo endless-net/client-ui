@@ -5,6 +5,8 @@
 - Work directly on `main`. Do not create feature branches or pull requests.
 - After completing and validating a change, commit only its intended files and
   push the commit directly to `main` immediately.
+- Format every commit message according to Conventional Commits, for example
+  `feat: ...`, `fix: ...`, `docs: ...`, or `chore: ...`.
 
 - This repository owns the EndlessNet Flutter desktop UI, Windows packaging,
   code signing, WinGet manifests, and Windows client releases.
