@@ -57,6 +57,12 @@ of ownerless legacy state. The optional IPC `server` field stays absent unless
 the caller explicitly supplied an override; the Go service applies its own
 public-server default.
 
+Server identity recovery also keeps the desktop process unprivileged. After the
+user reviews the changed key, an `administrator_required` response presents a
+dedicated UAC action. A hidden, short-lived `endlessnet.exe` worker re-reads the
+announced key, verifies that it still matches the confirmed key ID, and sends
+the trust request directly to the protected pipe.
+
 Resolve the reviewed public core input and build an unsigned validation MSI:
 
 ```powershell

@@ -549,6 +549,68 @@ void main() {
     );
     expect(find.text(ServiceState.connected), findsOneWidget);
   });
+
+  testWidgets('administrator_required offers UAC server trust confirmation', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final elevatedKeys = <String>[];
+    final bridge = ContractFakeBridge(identityChanged: true)
+      ..serverTrustError = const ServiceIPCException(
+        statusCode: 403,
+        errorCode: ServiceIPCErrorCode.administratorRequired,
+        message: 'administrator required',
+      );
+    final controller = EndlessNetController(
+      config: AppConfig.parse(const []),
+      bridge: bridge,
+      logger: AppLogger('', enabled: false),
+      desktopIntegrationEnabled: false,
+      serverTrustElevationSupported: true,
+      elevatedServerTrustLauncher: (confirmedKeyID) async {
+        elevatedKeys.add(confirmedKeyID);
+        bridge
+          ..serverTrustError = null
+          ..statusPayload = _contractStatus(
+            state: ServiceState.connected,
+            desiredState: ConnectionIntentState.connected,
+            userDisconnected: false,
+          );
+        return true;
+      },
+    );
+    addTearDown(controller.exitApp);
+    controller.statusPayload = bridge.statusPayload;
+
+    await tester.pumpWidget(EndlessNetApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Connect'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Trust and connect'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Administrator approval required'), findsOneWidget);
+    expect(
+      find.textContaining('Windows requires administrator approval'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('ed25519:new'), findsOneWidget);
+
+    await tester.tap(find.text('Confirm as administrator'));
+    await tester.pumpAndSettle();
+
+    expect(elevatedKeys, ['ed25519:new']);
+    expect(
+      bridge.calls,
+      containsAllInOrder(['server-identity', 'trust-server', 'status']),
+    );
+    expect(controller.errorText, isNull);
+    expect(find.text(ServiceState.connected), findsOneWidget);
+  });
 }
 
 File _ipcContractFile() {
@@ -599,6 +661,7 @@ class ContractFakeBridge extends EndlessNetClientBridge {
   final enrollmentPayloads = <Map<String, dynamic>>[];
   final enrollmentRequests = <EnrollmentRequest>[];
   Object? enrollmentError;
+  Object? serverTrustError;
 
   Map<String, dynamic> statusPayload = _contractStatus(
     state: ServiceState.connected,
@@ -651,6 +714,9 @@ class ContractFakeBridge extends EndlessNetClientBridge {
   Future<Map<String, dynamic>> trustServer(String confirmedKeyID) async {
     calls.add('trust-server');
     expect(confirmedKeyID, 'ed25519:new');
+    if (serverTrustError case final error?) {
+      throw error;
+    }
     statusPayload = _contractStatus(
       state: ServiceState.connected,
       desiredState: ConnectionIntentState.connected,

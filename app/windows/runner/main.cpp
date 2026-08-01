@@ -2,6 +2,8 @@
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
 
+#include <algorithm>
+
 #include "flutter_window.h"
 #include "utils.h"
 
@@ -21,10 +23,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
+  const bool elevated_worker =
+      std::find(command_line_arguments.begin(), command_line_arguments.end(),
+                "--elevated-enroll") != command_line_arguments.end() ||
+      std::find(command_line_arguments.begin(), command_line_arguments.end(),
+                "--elevated-trust-server") != command_line_arguments.end();
 
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
-  FlutterWindow window(project);
+  FlutterWindow window(project, !elevated_worker);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(760, 560);
   if (!window.Create(L"EndlessNet", origin, size)) {

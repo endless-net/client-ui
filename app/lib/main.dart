@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi' as ffi;
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
@@ -57,6 +59,10 @@ Future<void> main(List<String> args) async {
   }
 
   final bridge = EndlessNetClientBridge(config: config, logger: logger);
+  if (config.elevatedServerTrust) {
+    await _runServerTrustAndExit(config, bridge, logger);
+    exit(exitCode);
+  }
   if (config.elevatedEnrollment) {
     await _runEnrollmentAndExit(config, bridge, logger);
     exit(exitCode);
@@ -86,6 +92,38 @@ Future<void> main(List<String> args) async {
   );
   runApp(EndlessNetApp(controller: controller));
   await controller.initialize();
+}
+
+Future<void> _runServerTrustAndExit(
+  AppConfig config,
+  EndlessNetClientBridge bridge,
+  AppLogger logger,
+) async {
+  try {
+    final confirmedKeyID = config.confirmedServerKeyID.trim();
+    if (confirmedKeyID.isEmpty) {
+      throw StateError('The confirmed server signing key ID is required.');
+    }
+    final identity = await bridge.serverIdentity();
+    final announcedKeyID = valueText(identity['announced_key_id']);
+    if (announcedKeyID.isEmpty) {
+      throw StateError('The server did not announce a signing key ID.');
+    }
+    if (announcedKeyID != confirmedKeyID) {
+      throw StateError(
+        'The server signing key changed again before it could be trusted. '
+        'Review the newly announced key in EndlessNet.',
+      );
+    }
+    await bridge.trustServer(confirmedKeyID);
+    logger.info('server identity trusted by elevated worker');
+  } catch (err, stack) {
+    logger.error('elevated server identity trust failed', err, stack);
+    await showMessageBox('EndlessNet server identity', safeErrorText(err));
+    exitCode = 1;
+  } finally {
+    await logger.close();
+  }
 }
 
 String versionText() {
@@ -173,6 +211,8 @@ class AppConfig {
     required this.mode,
     required this.enrollText,
     required this.elevatedEnrollment,
+    required this.elevatedServerTrust,
+    required this.confirmedServerKeyID,
     required this.showWindow,
     required this.debug,
     required this.debugLogDir,
@@ -186,6 +226,8 @@ class AppConfig {
   final String mode;
   final String enrollText;
   final bool elevatedEnrollment;
+  final bool elevatedServerTrust;
+  final String confirmedServerKeyID;
   final bool showWindow;
   final bool debug;
   final String debugLogDir;
@@ -199,6 +241,8 @@ class AppConfig {
     var mode = 'workstation';
     var enrollText = '';
     var elevatedEnrollment = false;
+    var elevatedServerTrust = false;
+    var confirmedServerKeyID = '';
     var showWindow = false;
     var debug = false;
     var debugLogDir = _defaultDebugLogDir;
@@ -226,6 +270,10 @@ class AppConfig {
         enrollText = nextValue();
       } else if (arg == '--elevated-enroll') {
         elevatedEnrollment = true;
+      } else if (arg == '--elevated-trust-server') {
+        elevatedServerTrust = true;
+      } else if (arg == '--confirmed-key-id') {
+        confirmedServerKeyID = nextValue();
       } else if (arg == '--show-window') {
         showWindow = true;
       } else if (arg == '--debug') {
@@ -246,6 +294,8 @@ class AppConfig {
       mode: mode.trim().isEmpty ? 'workstation' : mode.trim(),
       enrollText: enrollText.trim(),
       elevatedEnrollment: elevatedEnrollment,
+      elevatedServerTrust: elevatedServerTrust,
+      confirmedServerKeyID: confirmedServerKeyID.trim(),
       showWindow: showWindow,
       debug: debug,
       debugLogDir: debugLogDir.trim().isEmpty
@@ -473,13 +523,20 @@ EnrollmentRequest parseEnrollment(
 
 typedef ElevatedEnrollmentLauncher =
     Future<bool> Function(EnrollmentRequest request);
+typedef ElevatedServerTrustLauncher =
+    Future<bool> Function(String confirmedKeyID);
 
 bool requiresAdministratorElevation(Object error) {
   if (error is! ServiceIPCException) {
     return false;
   }
-  return error.errorCode == 'owner_required' ||
-      error.errorCode == 'administrator_required';
+  return error.errorCode == ServiceIPCErrorCode.ownerRequired ||
+      error.errorCode == ServiceIPCErrorCode.administratorRequired;
+}
+
+bool requiresAdministratorTrustElevation(Object error) {
+  return error is ServiceIPCException &&
+      error.errorCode == ServiceIPCErrorCode.administratorRequired;
 }
 
 Future<bool> launchElevatedEnrollment(
@@ -520,6 +577,39 @@ List<String> elevatedEnrollmentArguments(
   return arguments;
 }
 
+Future<bool> launchElevatedServerTrust(
+  AppConfig config,
+  String confirmedKeyID,
+) async {
+  if (!Platform.isWindows) {
+    throw UnsupportedError(
+      'Administrative server identity confirmation is only supported on Windows.',
+    );
+  }
+  final executable = Platform.resolvedExecutable;
+  final arguments = elevatedServerTrustArguments(config, confirmedKeyID);
+  return Isolate.run(
+    () => launchWindowsProcessElevatedAndWait(executable, arguments),
+  );
+}
+
+List<String> elevatedServerTrustArguments(
+  AppConfig config,
+  String confirmedKeyID,
+) {
+  final arguments = <String>[
+    '--elevated-trust-server',
+    '--confirmed-key-id',
+    confirmedKeyID.trim(),
+    '--pipe',
+    config.pipe,
+  ];
+  if (config.debug) {
+    arguments.addAll(['--debug', '--debug-log-dir', config.debugLogDir]);
+  }
+  return arguments;
+}
+
 bool launchWindowsProcessElevated(String executable, List<String> arguments) {
   final verbPtr = 'runas'.toNativeUtf16();
   final executablePtr = executable.toNativeUtf16();
@@ -538,6 +628,59 @@ bool launchWindowsProcessElevated(String executable, List<String> arguments) {
     );
     return result.address > 32;
   } finally {
+    calloc.free(verbPtr);
+    calloc.free(executablePtr);
+    calloc.free(parametersPtr);
+  }
+}
+
+bool launchWindowsProcessElevatedAndWait(
+  String executable,
+  List<String> arguments,
+) {
+  const seeMaskNoCloseProcess = 0x00000040;
+  const workerTimeoutMilliseconds = 30000;
+  final verbPtr = 'runas'.toNativeUtf16();
+  final executablePtr = executable.toNativeUtf16();
+  final parametersPtr = arguments
+      .map(quoteWindowsCommandLineArgument)
+      .join(' ')
+      .toNativeUtf16();
+  final executeInfo = calloc<SHELLEXECUTEINFO>();
+  try {
+    executeInfo.ref
+      ..cbSize = ffi.sizeOf<SHELLEXECUTEINFO>()
+      ..fMask = seeMaskNoCloseProcess
+      ..lpVerb = PWSTR(verbPtr)
+      ..lpFile = PWSTR(executablePtr)
+      ..lpParameters = PWSTR(parametersPtr)
+      ..nShow = SW_HIDE;
+    final launched = ShellExecuteEx(executeInfo);
+    if (!launched.value || !executeInfo.ref.hProcess.isValid) {
+      return false;
+    }
+
+    final process = executeInfo.ref.hProcess;
+    try {
+      final waitResult = WaitForSingleObject(
+        process,
+        workerTimeoutMilliseconds,
+      );
+      if (waitResult.value != WAIT_OBJECT_0) {
+        return false;
+      }
+      final exitCodePtr = calloc<ffi.Uint32>();
+      try {
+        final readExitCode = GetExitCodeProcess(process, exitCodePtr);
+        return readExitCode.value && exitCodePtr.value == 0;
+      } finally {
+        calloc.free(exitCodePtr);
+      }
+    } finally {
+      process.close();
+    }
+  } finally {
+    calloc.free(executeInfo);
     calloc.free(verbPtr);
     calloc.free(executablePtr);
     calloc.free(parametersPtr);
@@ -674,6 +817,8 @@ class EndlessNetController extends ChangeNotifier
     Future<void> Function(String title, String message)? messagePresenter,
     ElevatedEnrollmentLauncher? elevatedEnrollmentLauncher,
     bool? enrollmentElevationSupported,
+    ElevatedServerTrustLauncher? elevatedServerTrustLauncher,
+    bool? serverTrustElevationSupported,
     this.enrollmentPollInterval = _defaultEnrollmentPollInterval,
     this.enrollmentPollTimeout = _defaultEnrollmentPollTimeout,
     this.connectionPollInterval = _defaultConnectionPollInterval,
@@ -684,7 +829,13 @@ class EndlessNetController extends ChangeNotifier
            elevatedEnrollmentLauncher ??
            ((request) => launchElevatedEnrollment(config, request)),
        enrollmentElevationSupported =
-           enrollmentElevationSupported ?? Platform.isWindows;
+           enrollmentElevationSupported ?? Platform.isWindows,
+       elevatedServerTrustLauncher =
+           elevatedServerTrustLauncher ??
+           ((confirmedKeyID) =>
+               launchElevatedServerTrust(config, confirmedKeyID)),
+       serverTrustElevationSupported =
+           serverTrustElevationSupported ?? Platform.isWindows;
 
   final AppConfig config;
   final EndlessNetClientBridge bridge;
@@ -694,6 +845,8 @@ class EndlessNetController extends ChangeNotifier
   final Future<void> Function(String title, String message) messagePresenter;
   final ElevatedEnrollmentLauncher elevatedEnrollmentLauncher;
   final bool enrollmentElevationSupported;
+  final ElevatedServerTrustLauncher elevatedServerTrustLauncher;
+  final bool serverTrustElevationSupported;
   final Duration enrollmentPollInterval;
   final Duration enrollmentPollTimeout;
   final Duration connectionPollInterval;
@@ -890,11 +1043,56 @@ class EndlessNetController extends ChangeNotifier
       if (!confirmed) {
         return;
       }
-      await runAction(() => bridge.trustServer(announcedKeyID));
+      busy = true;
+      notifyListeners();
+      late Map<String, dynamic> payload;
+      try {
+        payload = await bridge.trustServer(announcedKeyID);
+      } catch (err) {
+        if (!serverTrustElevationSupported ||
+            !requiresAdministratorTrustElevation(err)) {
+          rethrow;
+        }
+        logger.info('administrator approval required to trust server identity');
+        busy = false;
+        notifyListeners();
+        if (!context.mounted) {
+          return;
+        }
+        final approveElevation =
+            await showServerTrustAdministratorRequiredDialog(
+              context,
+              announcedKeyID: announcedKeyID,
+            );
+        if (!approveElevation) {
+          return;
+        }
+        busy = true;
+        notifyListeners();
+        final trusted = await elevatedServerTrustLauncher(announcedKeyID);
+        if (!trusted) {
+          throw StateError(
+            'Administrator approval was canceled or the confirmation failed. '
+            'The new server key was not trusted.',
+          );
+        }
+        logger.info('elevated server identity confirmation completed');
+        payload = await bridge.status();
+        if (ServiceStatus(payload).serverIdentityChanged) {
+          throw StateError(
+            'Administrator confirmation did not complete. '
+            'The new server key was not trusted.',
+          );
+        }
+      }
+      statusPayload = payload;
+      errorText = null;
+      _reconcileConnectionPolling(payload);
+      logger.info('server identity recovery completed state=$state');
     } catch (err, stack) {
       errorText = safeErrorText(err);
       logger.error('server identity recovery failed', err, stack);
-      await showMessageBox('EndlessNet', errorText!);
+      await messagePresenter('EndlessNet', errorText!);
     } finally {
       busy = false;
       await _updateTray();
@@ -1856,6 +2054,50 @@ Future<bool> showServerIdentityChangeDialog(
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Trust and connect'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+}
+
+Future<bool> showServerTrustAdministratorRequiredDialog(
+  BuildContext context, {
+  required String announcedKeyID,
+}) async {
+  return await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Administrator approval required'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Trusting a new server signing key changes a security setting '
+                  'for this device. Windows requires administrator approval.',
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'EndlessNet will open a User Account Control prompt. The main '
+                  'desktop app will remain unprivileged.',
+                ),
+                const SizedBox(height: 12),
+                SelectableText('Key to trust:\n$announcedKeyID'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).pop(true),
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              label: const Text('Confirm as administrator'),
             ),
           ],
         ),

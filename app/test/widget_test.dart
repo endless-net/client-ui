@@ -13,6 +13,17 @@ void main() {
     expect(config.server, isEmpty);
   });
 
+  test('AppConfig recognizes the elevated server trust worker', () {
+    final config = AppConfig.parse(const [
+      '--elevated-trust-server',
+      '--confirmed-key-id',
+      'ed25519:new',
+    ]);
+
+    expect(config.elevatedServerTrust, isTrue);
+    expect(config.confirmedServerKeyID, 'ed25519:new');
+  });
+
   test('interactive enrollment leaves the optional server unset', () {
     final request = parseEnrollment('endlessnet://enroll', '', 'workstation');
 
@@ -60,6 +71,28 @@ void main() {
     );
   });
 
+  test('elevated server trust preserves the protected pipe and key ID', () {
+    final config = AppConfig.parse(const [
+      '--pipe',
+      r'\\.\pipe\endlessnet-test',
+      '--debug',
+      '--debug-log-dir',
+      r'C:\Users\tester\EndlessNet Logs',
+    ]);
+    final arguments = elevatedServerTrustArguments(config, 'ed25519:new');
+
+    expect(arguments.first, '--elevated-trust-server');
+    expect(
+      arguments,
+      containsAllInOrder(['--confirmed-key-id', 'ed25519:new']),
+    );
+    expect(arguments, containsAllInOrder(['--pipe', config.pipe]));
+    expect(
+      arguments,
+      containsAllInOrder(['--debug-log-dir', config.debugLogDir]),
+    );
+  });
+
   test('Windows elevation arguments are quoted for ShellExecute', () {
     expect(quoteWindowsCommandLineArgument('plain'), 'plain');
     expect(
@@ -97,6 +130,29 @@ void main() {
           statusCode: 400,
           errorCode: 'enrollment_failed',
           message: 'enrollment failed',
+        ),
+      ),
+      isFalse,
+    );
+  });
+
+  test('server trust elevation only accepts administrator_required', () {
+    expect(
+      requiresAdministratorTrustElevation(
+        const ServiceIPCException(
+          statusCode: 403,
+          errorCode: ServiceIPCErrorCode.administratorRequired,
+          message: 'administrator required',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      requiresAdministratorTrustElevation(
+        const ServiceIPCException(
+          statusCode: 403,
+          errorCode: ServiceIPCErrorCode.ownerRequired,
+          message: 'owner required',
         ),
       ),
       isFalse,
