@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "name": "server-identity-toctou",
+  "initial_status": {
+    "state": "ServerIdentityChanged",
+    "control_state": "server_identity_changed",
+    "desired_state": "connected"
+  },
+  "server_identity": {
+    "control_origin": "https://api.example.test",
+    "trusted_key_id": "ed25519:old",
+    "announced_key_id": "ed25519:newer",
+    "changed": true
+  },
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/server-identity/trust",
+      "repeat_last": true,
+      "responses": [
+        {
+          "expect_body": {
+            "confirmed_control_origin": "https://api.example.test",
+            "confirmed_key_id": "ed25519:new"
+          },
+          "status": 409,
+          "body": {
+            "error_code": "server_identity_confirmation_mismatch",
+            "error": "the announced key changed before confirmation",
+            "request_id": "req-identity-race"
+          }
+        }
+      ]
+    }
+  ]
+}

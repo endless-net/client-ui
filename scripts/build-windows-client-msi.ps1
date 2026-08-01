@@ -6,6 +6,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ClientExe,
     [Parameter(Mandatory = $true)]
+    [string]$RecoveryHelperExe,
+    [Parameter(Mandatory = $true)]
     [string]$CoreMetadataDir,
     [Parameter(Mandatory = $true)]
     [string]$UISourceSBOM,
@@ -81,6 +83,10 @@ $ClientExe = [System.IO.Path]::GetFullPath($ClientExe)
 if (-not (Test-Path -LiteralPath $ClientExe)) {
     throw "Verified EndlessNet Go client is missing: $ClientExe"
 }
+$RecoveryHelperExe = [System.IO.Path]::GetFullPath($RecoveryHelperExe)
+if (-not (Test-Path -LiteralPath $RecoveryHelperExe -PathType Leaf)) {
+    throw "Verified EndlessNet recovery helper is missing: $RecoveryHelperExe"
+}
 
 $wintunVersion = "0.14.1"
 $wintunArchiveSHA256 = "07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51"
@@ -123,6 +129,7 @@ $commit = (& git -C $repoRoot rev-parse HEAD).Trim()
 $buildDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
 $packagedClientExe = Join-Path $OutputDir "endlessnet-client.exe"
+$packagedRecoveryHelperExe = Join-Path $OutputDir "endlessnet-client-recovery-helper.exe"
 $packagedWintunDll = Join-Path $OutputDir "wintun.dll"
 $packagedWintunLicense = Join-Path $OutputDir "wintun-LICENSE.txt"
 $appBundleDir = Join-Path $OutputDir "app"
@@ -131,6 +138,7 @@ $renderDir = Join-Path $OutputDir "installer"
 $wingetDir = Join-Path $OutputDir "winget"
 
 Copy-Item -LiteralPath $ClientExe -Destination $packagedClientExe -Force
+Copy-Item -LiteralPath $RecoveryHelperExe -Destination $packagedRecoveryHelperExe -Force
 Copy-Item -LiteralPath $WintunDll -Destination $packagedWintunDll -Force
 Copy-Item -LiteralPath $WintunLicense -Destination $packagedWintunLicense -Force
 
@@ -174,6 +182,7 @@ Copy-Item -LiteralPath $coreCompliance.third_party_notices -Destination (Join-Pa
 Copy-Item -LiteralPath $coreCompliance.source_sbom -Destination (Join-Path $coreLicensesDir "source-sbom.spdx.json") -Force
 
 $unsignedClientHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $packagedClientExe).Hash.ToLowerInvariant()
+$unsignedRecoveryHelperHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $packagedRecoveryHelperExe).Hash.ToLowerInvariant()
 $wintunHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $packagedWintunDll).Hash.ToLowerInvariant()
 $unsignedAppHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $appExe).Hash.ToLowerInvariant()
 
@@ -203,8 +212,10 @@ function Invoke-EndlessNetSign([string]$Path) {
 }
 
 Invoke-EndlessNetSign $packagedClientExe
+Invoke-EndlessNetSign $packagedRecoveryHelperExe
 Invoke-EndlessNetSign $appExe
 $signedClientHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $packagedClientExe).Hash.ToLowerInvariant()
+$signedRecoveryHelperHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $packagedRecoveryHelperExe).Hash.ToLowerInvariant()
 $signedAppHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $appExe).Hash.ToLowerInvariant()
 
 Push-Location $repoRoot
@@ -213,6 +224,7 @@ try {
         --output-dir $renderDir `
         --version $UIVersion `
         --client-exe $packagedClientExe `
+        --recovery-helper-exe $packagedRecoveryHelperExe `
         --wintun-dll $packagedWintunDll `
         --wintun-license $packagedWintunLicense `
         --app-exe $appExe `
@@ -279,6 +291,12 @@ $buildOutput = [ordered]@{
         unsigned_sha256 = $unsignedClientHash
         signed_sha256 = $signedClientHash
     }
+    recovery_helper = [ordered]@{
+        path = $packagedRecoveryHelperExe
+        installed_name = "endlessnet-client-recovery-helper.exe"
+        unsigned_sha256 = $unsignedRecoveryHelperHash
+        signed_sha256 = $signedRecoveryHelperHash
+    }
     wintun = [ordered]@{
         version = $wintunVersion
         path = $packagedWintunDll
@@ -314,6 +332,7 @@ Write-Host "MSI=$Msi"
 Write-Host "SHA256=$hash"
 Write-Host "Checksum=$checksumFile"
 Write-Host "ClientExe=$packagedClientExe"
+Write-Host "RecoveryHelperExe=$packagedRecoveryHelperExe"
 Write-Host "WintunDll=$packagedWintunDll"
 Write-Host "WintunLicense=$packagedWintunLicense"
 Write-Host "AppExe=$appExe"

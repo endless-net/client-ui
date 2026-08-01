@@ -7,6 +7,7 @@ class ServiceIPCPath {
   static const trustServer = '/server-identity/trust';
   static const disconnect = '/disconnect';
   static const logout = '/logout';
+  static const localForget = '/logout/local';
   static const networks = '/networks';
   static const selectNetwork = '/network/select';
   static const diagnostics = '/diagnostics';
@@ -22,6 +23,7 @@ class ServiceIPCPath {
     trustServer,
     disconnect,
     logout,
+    localForget,
     networks,
     selectNetwork,
     diagnostics,
@@ -32,8 +34,8 @@ class ServiceIPCPath {
 
 class ServiceIPCMetadata {
   static const protocol = 'endlessnet-client-ipc';
-  static const version = 1;
-  static const minimumSupportedVersion = 1;
+  static const version = 2;
+  static const minimumSupportedVersion = 2;
   static const protocolHeader = 'X-EndlessNet-IPC-Protocol';
   static const versionHeader = 'X-EndlessNet-IPC-Version';
   static const minimumVersionHeader = 'X-EndlessNet-IPC-Min-Supported-Version';
@@ -43,6 +45,14 @@ abstract final class ServiceIPCErrorCode {
   static const requestFailed = 'request_failed';
   static const ownerRequired = 'owner_required';
   static const administratorRequired = 'administrator_required';
+  static const remoteCleanupRequired = 'remote_cleanup_required';
+  static const localForgetConfirmationRequired =
+      'local_forget_confirmation_required';
+  static const recoveryOperationInvalid = 'recovery_operation_invalid';
+  static const recoveryOperationIDFailed = 'recovery_operation_id_failed';
+  static const localForgetFailed = 'local_forget_failed';
+  static const serverIdentityConfirmationMismatch =
+      'server_identity_confirmation_mismatch';
 }
 
 abstract final class ServiceIPCPrivilege {
@@ -59,6 +69,7 @@ abstract final class ServiceIPCPrivilege {
     ServiceIPCPath.trustServer: administrator,
     ServiceIPCPath.disconnect: owner,
     ServiceIPCPath.logout: owner,
+    ServiceIPCPath.localForget: administrator,
     ServiceIPCPath.networks: observer,
     ServiceIPCPath.selectNetwork: owner,
     ServiceIPCPath.diagnostics: owner,
@@ -75,6 +86,10 @@ class ServiceState {
   static const needsEnrollment = 'NeedsEnrollment';
   static const needsApproval = 'NeedsApproval';
   static const serverIdentityChanged = 'ServerIdentityChanged';
+  static const recovering = 'Recovering';
+  static const recoveryBlocked = 'RecoveryBlocked';
+  static const policyBlocked = 'PolicyBlocked';
+  static const needsLogin = 'NeedsLogin';
 
   static const all = <String>[
     connected,
@@ -84,6 +99,10 @@ class ServiceState {
     needsEnrollment,
     needsApproval,
     serverIdentityChanged,
+    recovering,
+    recoveryBlocked,
+    policyBlocked,
+    needsLogin,
   ];
 }
 
@@ -98,6 +117,10 @@ class ControlState {
   static const error = 'error';
   static const cacheInvalid = 'cache_invalid';
   static const serverIdentityChanged = 'server_identity_changed';
+  static const recovering = 'recovering';
+  static const recoveryBlocked = 'recovery_blocked';
+  static const policyBlocked = 'policy_blocked';
+  static const needsLogin = 'needs_login';
 
   static const all = <String>[
     pendingApproval,
@@ -110,7 +133,33 @@ class ControlState {
     notRegistered,
     disconnected,
     serverIdentityChanged,
+    recovering,
+    recoveryBlocked,
+    policyBlocked,
+    needsLogin,
   ];
+}
+
+abstract final class RecoveryOperation {
+  static const trustServerIdentity = 'trust_server_identity';
+  static const forgetLocalEnrollment = 'forget_local_enrollment';
+
+  static const all = <String>[trustServerIdentity, forgetLocalEnrollment];
+}
+
+abstract final class RecoveryOperationOutcome {
+  static const accepted = 'accepted';
+  static const alreadyApplied = 'already_applied';
+  static const completed = 'completed';
+
+  static const all = <String>[accepted, alreadyApplied, completed];
+}
+
+abstract final class LogoutOutcome {
+  static const remoteCleanupConfirmed = 'remote_cleanup_confirmed';
+  static const remoteCleanupUnconfirmed = 'remote_cleanup_unconfirmed';
+
+  static const all = <String>[remoteCleanupConfirmed, remoteCleanupUnconfirmed];
 }
 
 class ConnectionIntentState {
@@ -169,6 +218,17 @@ class ServiceStatus {
   bool get needsEnrollment =>
       state(fallback: '') == ServiceState.needsEnrollment;
 
+  bool get recovering => state(fallback: '') == ServiceState.recovering;
+
+  bool get needsLogin => state(fallback: '') == ServiceState.needsLogin;
+
+  bool get recoveryBlocked =>
+      state(fallback: '') == ServiceState.recoveryBlocked;
+
+  bool get policyBlocked => state(fallback: '') == ServiceState.policyBlocked;
+
+  RecoveryStatus get recovery => RecoveryStatus.fromValue(payload?['recovery']);
+
   bool get userDisconnected =>
       payload?['user_disconnected'] == true ||
       _valueText(payload?['desired_state'], '') ==
@@ -188,6 +248,48 @@ class ServiceStatus {
     ];
     return identifiers.any((value) => _valueText(value, '').isNotEmpty);
   }
+}
+
+class RecoveryStatus {
+  const RecoveryStatus({
+    required this.operationID,
+    required this.state,
+    required this.errorCode,
+    required this.requestID,
+    required this.retryable,
+  });
+
+  factory RecoveryStatus.fromValue(Object? value) {
+    final payload = _mapValue(value);
+    return RecoveryStatus(
+      operationID: _valueText(payload?['operation_id'], ''),
+      state: _valueText(payload?['state'], ''),
+      errorCode: _valueText(payload?['error_code'], ''),
+      requestID: _valueText(payload?['request_id'], ''),
+      retryable: payload?['retryable'] == true,
+    );
+  }
+
+  final String operationID;
+  final String state;
+  final String errorCode;
+  final String requestID;
+  final bool retryable;
+}
+
+class LogoutResponse {
+  LogoutResponse(this.payload) : status = ServiceStatus(payload);
+
+  final Map<String, dynamic> payload;
+  final ServiceStatus status;
+
+  String get state => _valueText(payload['state'], '');
+  String get controlState => _valueText(payload['control_state'], '');
+  String get outcome => _valueText(payload['outcome'], '');
+  String get remoteRequestID => _valueText(payload['remote_request_id'], '');
+
+  bool get remoteCleanupUnconfirmed =>
+      outcome == LogoutOutcome.remoteCleanupUnconfirmed;
 }
 
 class EnrollmentResponse {

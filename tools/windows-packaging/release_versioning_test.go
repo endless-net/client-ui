@@ -76,15 +76,19 @@ func TestReleaseProvenanceKeepsUIAndCoreVersionsIndependent(t *testing.T) {
 	uiSBOMDigest := fmt.Sprintf("%x", sha256.Sum256(uiSBOM))
 
 	core := map[string]any{
-		"schema_version": 1,
+		"schema_version": 2,
 		"version":        "0.3.1",
 		"target":         "windows/amd64",
-		"ipc_version":    "v1",
+		"ipc_version":    "v2",
 		"repository":     "endless-net/client",
 		"commit":         strings.Repeat("a", 40),
 		"artifacts": map[string]any{
 			"client":       map[string]any{"sha256": strings.Repeat("b", 64)},
 			"ipc_contract": map[string]any{"sha256": strings.Repeat("c", 64)},
+			"recovery_helper": map[string]any{
+				"sha256":         strings.Repeat("e", 64),
+				"installed_name": "endlessnet-client-recovery-helper.exe",
+			},
 		},
 	}
 	coreRaw, err := json.Marshal(core)
@@ -123,6 +127,11 @@ func TestReleaseProvenanceKeepsUIAndCoreVersionsIndependent(t *testing.T) {
 			"version":         "0.3.1",
 			"unsigned_sha256": strings.Repeat("b", 64),
 			"signed_sha256":   strings.Repeat("f", 64),
+		},
+		"recovery_helper": map[string]any{
+			"installed_name":  "endlessnet-client-recovery-helper.exe",
+			"unsigned_sha256": strings.Repeat("e", 64),
+			"signed_sha256":   strings.Repeat("0", 64),
 		},
 		"wintun": map[string]any{
 			"version":           "0.14.1",
@@ -183,6 +192,10 @@ func TestReleaseProvenanceKeepsUIAndCoreVersionsIndependent(t *testing.T) {
 		t.Fatalf("client-core provenance version = %v, want 0.3.1", client["version"])
 	}
 	artifacts := provenance["artifacts"].(map[string]any)
+	recoveryHelper := artifacts["recovery_helper"].(map[string]any)
+	if recoveryHelper["installed_name"] != "endlessnet-client-recovery-helper.exe" {
+		t.Fatalf("recovery helper provenance = %#v", recoveryHelper)
+	}
 	sbom := artifacts["sbom"].(map[string]any)
 	if sbom["ui_source_sha256"] != uiSBOMDigest {
 		t.Fatalf("UI source SBOM digest = %v, want %s", sbom["ui_source_sha256"], uiSBOMDigest)

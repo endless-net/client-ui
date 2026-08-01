@@ -8,7 +8,7 @@ peer. Connectivity diagnostics show authenticated candidate health, selection
 reasons, STUN reachability, and relay availability from the producer-defined
 `diagnostics.status.agent` schema. Relay is a normal path while direct
 candidates are being evaluated or when no direct candidate is reachable. The UI
-does not consume fields outside `client-ipc-v1.openapi.yaml` and never
+does not consume fields outside `client-ipc-v2.openapi.yaml` and never
 reconstructs diagnostics from private state.
 
 The current v1 response model distinguishes observer, local-owner, and

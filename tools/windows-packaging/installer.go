@@ -15,6 +15,7 @@ type WindowsInstallerOptions struct {
 	Version             string
 	UpgradeCode         string
 	ClientExe           string
+	RecoveryHelperExe   string
 	WintunDLL           string
 	WintunLicense       string
 	AppExe              string
@@ -34,18 +35,19 @@ type WindowsInstallerArtifacts struct {
 
 func DefaultWindowsInstallerOptions() WindowsInstallerOptions {
 	return WindowsInstallerOptions{
-		ProductName:    "EndlessNet Client",
-		Manufacturer:   "UNNG",
-		Version:        "0.0.0",
-		UpgradeCode:    "9f7a7362-64c3-4b3a-9a58-7c8fc90779e1",
-		ClientExe:      `C:\Program Files\EndlessNet\endlessnet-client.exe`,
-		WintunDLL:      `C:\Program Files\EndlessNet\wintun.dll`,
-		WintunLicense:  `C:\Program Files\EndlessNet\wintun-LICENSE.txt`,
-		AppExe:         `C:\Program Files\EndlessNet\endlessnet.exe`,
-		AppBundleDir:   `C:\Program Files\EndlessNet`,
-		IconFile:       filepath.Join("app", "assets", "icons", "endlessnet.ico"),
-		OutputName:     "EndlessNet.Client.msi",
-		ServiceOptions: DefaultWindowsServiceOptions(),
+		ProductName:       "EndlessNet Client",
+		Manufacturer:      "UNNG",
+		Version:           "0.0.0",
+		UpgradeCode:       "9f7a7362-64c3-4b3a-9a58-7c8fc90779e1",
+		ClientExe:         `C:\Program Files\EndlessNet\endlessnet-client.exe`,
+		RecoveryHelperExe: `C:\Program Files\EndlessNet\endlessnet-client-recovery-helper.exe`,
+		WintunDLL:         `C:\Program Files\EndlessNet\wintun.dll`,
+		WintunLicense:     `C:\Program Files\EndlessNet\wintun-LICENSE.txt`,
+		AppExe:            `C:\Program Files\EndlessNet\endlessnet.exe`,
+		AppBundleDir:      `C:\Program Files\EndlessNet`,
+		IconFile:          filepath.Join("app", "assets", "icons", "endlessnet.ico"),
+		OutputName:        "EndlessNet.Client.msi",
+		ServiceOptions:    DefaultWindowsServiceOptions(),
 	}
 }
 
@@ -103,6 +105,9 @@ func normalizeWindowsInstallerOptions(opts WindowsInstallerOptions) WindowsInsta
 	if strings.TrimSpace(opts.ClientExe) == "" {
 		opts.ClientExe = defaults.ClientExe
 	}
+	if strings.TrimSpace(opts.RecoveryHelperExe) == "" {
+		opts.RecoveryHelperExe = defaults.RecoveryHelperExe
+	}
 	if strings.TrimSpace(opts.WintunDLL) == "" {
 		opts.WintunDLL = defaults.WintunDLL
 	}
@@ -127,24 +132,25 @@ func normalizeWindowsInstallerOptions(opts WindowsInstallerOptions) WindowsInsta
 
 func validateWindowsInstallerOptions(opts WindowsInstallerOptions) error {
 	for name, value := range map[string]string{
-		"product name":   opts.ProductName,
-		"manufacturer":   opts.Manufacturer,
-		"version":        opts.Version,
-		"upgrade code":   opts.UpgradeCode,
-		"client exe":     opts.ClientExe,
-		"wintun dll":     opts.WintunDLL,
-		"wintun license": opts.WintunLicense,
-		"app exe":        opts.AppExe,
-		"app bundle":     opts.AppBundleDir,
-		"icon file":      opts.IconFile,
-		"output name":    opts.OutputName,
-		"service name":   opts.ServiceOptions.ServiceName,
-		"display name":   opts.ServiceOptions.DisplayName,
-		"config path":    opts.ServiceOptions.ConfigPath,
-		"agent state":    opts.ServiceOptions.StatePath,
-		"diagnostics":    opts.ServiceOptions.DiagnosticsDir,
-		"IPC pipe":       opts.ServiceOptions.IPCPipe,
-		"event source":   opts.ServiceOptions.EventLogSource,
+		"product name":    opts.ProductName,
+		"manufacturer":    opts.Manufacturer,
+		"version":         opts.Version,
+		"upgrade code":    opts.UpgradeCode,
+		"client exe":      opts.ClientExe,
+		"recovery helper": opts.RecoveryHelperExe,
+		"wintun dll":      opts.WintunDLL,
+		"wintun license":  opts.WintunLicense,
+		"app exe":         opts.AppExe,
+		"app bundle":      opts.AppBundleDir,
+		"icon file":       opts.IconFile,
+		"output name":     opts.OutputName,
+		"service name":    opts.ServiceOptions.ServiceName,
+		"display name":    opts.ServiceOptions.DisplayName,
+		"config path":     opts.ServiceOptions.ConfigPath,
+		"agent state":     opts.ServiceOptions.StatePath,
+		"diagnostics":     opts.ServiceOptions.DiagnosticsDir,
+		"IPC pipe":        opts.ServiceOptions.IPCPipe,
+		"event source":    opts.ServiceOptions.EventLogSource,
 	} {
 		if strings.TrimSpace(value) == "" {
 			return fmt.Errorf("%s is required", name)
@@ -251,6 +257,9 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
         <ServiceControl Id="EndlessNetServiceControl" Name="%s" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
         <RegistryValue Root="HKLM" Key="Software\EndlessNet\Client" Name="Installed" Type="integer" Value="1" />
       </Component>
+      <Component Id="RecoveryHelperExecutable" Guid="*" Bitness="always64">
+        <File Id="RecoveryHelperExeFile" Source="$(var.RecoveryHelperExe)" Name="endlessnet-client-recovery-helper.exe" KeyPath="yes" />
+      </Component>
       <Component Id="WintunLibrary" Guid="*" Bitness="always64">
         <File Id="WintunDllFile" Source="$(var.WintunDll)" Name="wintun.dll" KeyPath="yes" />
         <File Id="WintunLicenseFile" Source="$(var.WintunLicense)" Name="wintun-LICENSE.txt" />
@@ -343,6 +352,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 func renderWindowsInstallerBuildScript(opts WindowsInstallerOptions) string {
 	return fmt.Sprintf(`param(
   [string]$ClientExe = %s,
+  [string]$RecoveryHelperExe = %s,
   [string]$WintunDll = %s,
   [string]$WintunLicense = %s,
   [string]$AppExe = %s,
@@ -358,7 +368,7 @@ $ErrorActionPreference = "Stop"
 $utilExtension = "WixToolset.Util.wixext"
 $uiExtension = "WixToolset.UI.wixext"
 
-foreach ($path in @($ClientExe, $WintunDll, $WintunLicense, $AppExe, $IconFile)) {
+foreach ($path in @($ClientExe, $RecoveryHelperExe, $WintunDll, $WintunLicense, $AppExe, $IconFile)) {
   if (-not (Test-Path -LiteralPath $path)) {
     throw "Required MSI input missing: $path"
   }
@@ -381,6 +391,7 @@ $wixArgs = @(
   "-ext", $utilExtension,
   "-ext", $uiExtension,
   "-d", "ClientExe=$ClientExe",
+  "-d", "RecoveryHelperExe=$RecoveryHelperExe",
   "-d", "WintunDll=$WintunDll",
   "-d", "WintunLicense=$WintunLicense",
   "-d", "AppExe=$AppExe",
@@ -404,6 +415,7 @@ if ($SignTool.Trim() -ne "" -and $CertificateThumbprint.Trim() -ne "") {
 }
 `,
 		quotePowerShellSingle(opts.ClientExe),
+		quotePowerShellSingle(opts.RecoveryHelperExe),
 		quotePowerShellSingle(opts.WintunDLL),
 		quotePowerShellSingle(opts.WintunLicense),
 		quotePowerShellSingle(opts.AppExe),

@@ -33,7 +33,7 @@ void main() {
 
       var status = await bridge.status();
       expect(status['ipc_protocol'], 'endlessnet-client-ipc');
-      expect(status['ipc_version'], 1);
+      expect(status['ipc_version'], ServiceIPCMetadata.version);
       expect(status['state'], 'Connected');
 
       final networks = await bridge.networks();
@@ -48,8 +48,9 @@ void main() {
       expect(status['state'], 'Connected');
 
       final identity = await bridge.serverIdentity();
+      final controlOrigin = identity['control_origin'] as String;
       final announcedKey = identity['announced_key_id'] as String;
-      final trusted = await bridge.trustServer(announcedKey);
+      final trusted = await bridge.trustServer(controlOrigin, announcedKey);
       expect(trusted['state'], 'Connected');
 
       final diagnostics = await bridge.diagnostics();
@@ -69,6 +70,7 @@ void main() {
 
       status = await bridge.logout();
       expect(status['state'], 'NeedsEnrollment');
+      expect(status['outcome'], LogoutOutcome.remoteCleanupConfirmed);
       status = await bridge.enroll(
         EnrollmentRequest(
           token: 'enr_emulator_e2e_secret',
@@ -232,6 +234,30 @@ void main() {
       final status = await bridge.status();
       expect(status['state'], 'Degraded');
       expect(status['control_state'], 'offline_cache');
+    },
+    skip: skipReason != false,
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  test(
+    'local forget uses the explicit v2 confirmation endpoint',
+    () async {
+      final emulator = await ServiceEmulatorProcess.start(executable!);
+      addTearDown(emulator.stop);
+      final bridge = EndlessNetClientBridge(
+        config: AppConfig.parse(['--ipc-pipe', emulator.pipe]),
+        logger: AppLogger('', enabled: false),
+      );
+
+      final response = LogoutResponse(await bridge.localForget());
+      expect(response.status.needsEnrollment, isTrue);
+      expect(response.outcome, LogoutOutcome.remoteCleanupUnconfirmed);
+
+      final interactions = await emulator.interactions();
+      final request = interactions.lastWhere(
+        (entry) => entry['target'] == ServiceIPCPath.localForget,
+      );
+      expect(request['request_body'], {'confirmed': true});
     },
     skip: skipReason != false,
     timeout: const Timeout(Duration(seconds: 30)),

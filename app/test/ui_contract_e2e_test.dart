@@ -18,11 +18,7 @@ void main() {
     final openAPI = contract.readAsStringSync();
 
     expect(openAPI, contains('title: EndlessNet Client Local Service IPC'));
-    expect(openAPI, contains('  version: 1.0.0'));
-    expect(
-      openAPI,
-      isNot(contains(['client-ipc', 'v2.openapi.yaml'].join('-'))),
-    );
+    expect(openAPI, contains('  version: 2.0.0'));
     expect(_contractPaths(openAPI), ServiceIPCPath.all.toSet());
     expect(_contractPrivileges(openAPI), ServiceIPCPrivilege.requiredByPath);
     expect(_schemaEnum(openAPI, 'ServiceState'), ServiceState.all.toSet());
@@ -43,11 +39,24 @@ void main() {
       'idempotency_key',
     });
     expect(_schemaProperties(openAPI, 'ServerIdentityResponse'), {
-      'control_plane_url',
+      'control_origin',
       'trusted_key_id',
       'announced_key_id',
       'changed',
     });
+    expect(_schemaProperties(openAPI, 'TrustServerRequest'), {
+      'confirmed_control_origin',
+      'confirmed_key_id',
+    });
+    expect(_schemaProperties(openAPI, 'LocalForgetRequest'), {'confirmed'});
+    expect(_schemaProperties(openAPI, 'RecoveryStatus'), {
+      'operation_id',
+      'state',
+      'error_code',
+      'request_id',
+      'retryable',
+    });
+    expect(_schemaEnum(openAPI, 'LogoutOutcome'), LogoutOutcome.all.toSet());
     expect(_schemaProperties(openAPI, 'DiagnosticsResponse'), {'diagnostics'});
     expect(_schemaProperties(openAPI, 'LogsRecentResponse'), {'logs'});
     expect(_schemaProperties(openAPI, 'EnrollResponse'), {'wireguard_apply'});
@@ -56,6 +65,8 @@ void main() {
       containsAll({
         ServiceIPCErrorCode.ownerRequired,
         ServiceIPCErrorCode.administratorRequired,
+        ServiceIPCErrorCode.recoveryOperationIDFailed,
+        ServiceIPCErrorCode.localForgetFailed,
       }),
     );
     expect(
@@ -539,6 +550,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Server identity changed'), findsAtLeast(2));
+    expect(find.textContaining('https://api.endlessnet.ru'), findsOneWidget);
+    expect(find.textContaining('ed25519:old'), findsOneWidget);
     expect(find.textContaining('ed25519:new'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Trust and connect'));
     await tester.pumpAndSettle();
@@ -558,7 +571,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    final elevatedKeys = <String>[];
+    final elevatedRequests = <PrivilegedRecoveryRequest>[];
     final bridge = ContractFakeBridge(identityChanged: true)
       ..serverTrustError = const ServiceIPCException(
         statusCode: 403,
@@ -570,9 +583,9 @@ void main() {
       bridge: bridge,
       logger: AppLogger('', enabled: false),
       desktopIntegrationEnabled: false,
-      serverTrustElevationSupported: true,
-      elevatedServerTrustLauncher: (confirmedKeyID) async {
-        elevatedKeys.add(confirmedKeyID);
+      privilegedRecoverySupported: true,
+      privilegedRecoveryLauncher: (request) async {
+        elevatedRequests.add(request);
         bridge
           ..serverTrustError = null
           ..statusPayload = _contractStatus(
@@ -580,7 +593,7 @@ void main() {
             desiredState: ConnectionIntentState.connected,
             userDisconnected: false,
           );
-        return true;
+        return PrivilegedHelperResult.completed;
       },
     );
     addTearDown(controller.exitApp);
@@ -603,13 +616,208 @@ void main() {
     await tester.tap(find.text('Confirm as administrator'));
     await tester.pumpAndSettle();
 
-    expect(elevatedKeys, ['ed25519:new']);
+    expect(elevatedRequests, hasLength(1));
+    expect(
+      elevatedRequests.single.operation,
+      RecoveryOperation.trustServerIdentity,
+    );
+    expect(
+      elevatedRequests.single.confirmedControlOrigin,
+      'https://api.endlessnet.ru',
+    );
+    expect(elevatedRequests.single.confirmedKeyID, 'ed25519:new');
     expect(
       bridge.calls,
       containsAllInOrder(['server-identity', 'trust-server', 'status']),
     );
     expect(controller.errorText, isNull);
     expect(find.text(ServiceState.connected), findsOneWidget);
+  });
+
+  testWidgets('UAC cancellation preserves the identity-change state', (
+    tester,
+  ) async {
+    final bridge = ContractFakeBridge(identityChanged: true)
+      ..serverTrustError = const ServiceIPCException(
+        statusCode: 403,
+        errorCode: ServiceIPCErrorCode.administratorRequired,
+        message: 'raw service diagnostic must stay hidden',
+      );
+    final controller = EndlessNetController(
+      config: AppConfig.parse(const []),
+      bridge: bridge,
+      logger: AppLogger('', enabled: false),
+      desktopIntegrationEnabled: false,
+      privilegedRecoverySupported: true,
+      privilegedRecoveryLauncher: (_) async => PrivilegedHelperResult.canceled,
+    );
+    addTearDown(controller.exitApp);
+    controller.statusPayload = bridge.statusPayload;
+
+    await tester.pumpWidget(EndlessNetApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Connect'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Trust and connect'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm as administrator'));
+    await tester.pumpAndSettle();
+
+    expect(controller.serverIdentityChanged, isTrue);
+    expect(controller.errorText, contains('approval was canceled'));
+    expect(controller.errorText, isNot(contains('raw service diagnostic')));
+  });
+
+  testWidgets('key change during UAC is detected before retry', (tester) async {
+    final bridge = ContractFakeBridge(identityChanged: true)
+      ..serverTrustError = const ServiceIPCException(
+        statusCode: 403,
+        errorCode: ServiceIPCErrorCode.administratorRequired,
+        message: 'administrator required',
+      );
+    final controller = EndlessNetController(
+      config: AppConfig.parse(const []),
+      bridge: bridge,
+      logger: AppLogger('', enabled: false),
+      desktopIntegrationEnabled: false,
+      privilegedRecoverySupported: true,
+      privilegedRecoveryLauncher: (_) async {
+        bridge.identityPayload = {
+          ...bridge.identityPayload,
+          'announced_key_id': 'ed25519:newer',
+        };
+        return PrivilegedHelperResult.failed;
+      },
+    );
+    addTearDown(controller.exitApp);
+    controller.statusPayload = bridge.statusPayload;
+
+    await tester.pumpWidget(EndlessNetApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Connect'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Trust and connect'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm as administrator'));
+    await tester.pumpAndSettle();
+
+    expect(controller.serverIdentityChanged, isTrue);
+    expect(controller.errorText, contains('changed again'));
+    expect(
+      bridge.calls.where((call) => call == 'server-identity'),
+      hasLength(2),
+    );
+  });
+
+  test(
+    'recovery consumes event snapshots through enrollment to Connected',
+    () async {
+      final bridge = ContractFakeBridge();
+      bridge.statusPayload = _contractStatus(
+        state: ServiceState.recovering,
+        controlState: ControlState.recovering,
+        desiredState: ConnectionIntentState.connected,
+        userDisconnected: false,
+      );
+      bridge.statusEvents.addAll([
+        _contractStatus(
+          state: ServiceState.needsLogin,
+          controlState: ControlState.needsLogin,
+          desiredState: ConnectionIntentState.connected,
+          userDisconnected: false,
+        ),
+        _contractStatus(
+          state: ServiceState.needsEnrollment,
+          controlState: ControlState.notRegistered,
+          desiredState: ConnectionIntentState.connected,
+          userDisconnected: false,
+        ),
+      ]);
+      bridge.enrollmentPayloads.add(
+        _contractStatus(
+          state: ServiceState.connected,
+          desiredState: ConnectionIntentState.connected,
+          userDisconnected: false,
+        ),
+      );
+      final controller = EndlessNetController(
+        config: AppConfig.parse(const []),
+        bridge: bridge,
+        logger: AppLogger('', enabled: false),
+        desktopIntegrationEnabled: false,
+        recoveryPollInterval: const Duration(milliseconds: 5),
+        recoveryPollTimeout: const Duration(seconds: 1),
+      );
+      addTearDown(controller.exitApp);
+
+      await controller.refreshStatus();
+      final deadline = DateTime.now().add(const Duration(seconds: 1));
+      while (!controller.connected && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+
+      expect(controller.connected, isTrue);
+      expect(bridge.calls, contains('events'));
+      expect(bridge.calls, contains('enroll'));
+    },
+  );
+
+  test('local forget warning uses only the logout error request ID', () async {
+    const rawDiagnostic = 'raw remote cleanup database failure';
+    final messages = <String>[];
+    final recoveryRequests = <PrivilegedRecoveryRequest>[];
+    final bridge = ContractFakeBridge()
+      ..logoutError = const ServiceIPCException(
+        statusCode: 409,
+        errorCode: ServiceIPCErrorCode.remoteCleanupRequired,
+        message: rawDiagnostic,
+        requestID: 'req-authoritative',
+      );
+    final controller = EndlessNetController(
+      config: AppConfig.parse(const []),
+      bridge: bridge,
+      logger: AppLogger('', enabled: false),
+      desktopIntegrationEnabled: false,
+      localForgetConfirmationPresenter: (requestID) async {
+        expect(requestID, 'req-authoritative');
+        return true;
+      },
+      privilegedRecoveryLauncher: (request) async {
+        recoveryRequests.add(request);
+        bridge.statusPayload = {
+          ..._contractStatus(
+            state: ServiceState.needsEnrollment,
+            controlState: ControlState.notRegistered,
+            desiredState: ConnectionIntentState.disconnected,
+            userDisconnected: true,
+          ),
+          'recovery': {
+            'state': ServiceState.needsEnrollment,
+            'request_id': 'req-post-forget-must-not-win',
+          },
+        };
+        return PrivilegedHelperResult.completed;
+      },
+      messagePresenter: (title, message) async =>
+          messages.add('$title\n$message'),
+    );
+    addTearDown(controller.exitApp);
+    controller.statusPayload = bridge.statusPayload;
+
+    await controller.logout();
+
+    expect(
+      recoveryRequests.single.operation,
+      RecoveryOperation.forgetLocalEnrollment,
+    );
+    expect(messages.join('\n'), contains('req-authoritative'));
+    expect(
+      messages.join('\n'),
+      isNot(contains('req-post-forget-must-not-win')),
+    );
+    expect(messages.join('\n'), isNot(contains(rawDiagnostic)));
+    expect(messages.join('\n'), contains('Management console'));
+    expect(controller.serviceStatus.needsEnrollment, isTrue);
   });
 }
 
@@ -626,7 +834,7 @@ File _ipcContractFile() {
   var current = Directory.current.absolute;
   while (true) {
     final candidate = File(
-      '${current.path}${Platform.pathSeparator}contracts${Platform.pathSeparator}upstream${Platform.pathSeparator}client-ipc-v1.openapi.yaml',
+      '${current.path}${Platform.pathSeparator}contracts${Platform.pathSeparator}upstream${Platform.pathSeparator}client-ipc-v2.openapi.yaml',
     );
     if (candidate.existsSync()) {
       return candidate;
@@ -634,7 +842,7 @@ File _ipcContractFile() {
     final parent = current.parent;
     if (parent.path == current.path) {
       throw StateError(
-        'contracts/upstream/client-ipc-v1.openapi.yaml was not found above ${Directory.current.path}',
+        'contracts/upstream/client-ipc-v2.openapi.yaml was not found above ${Directory.current.path}',
       );
     }
     current = parent;
@@ -660,8 +868,16 @@ class ContractFakeBridge extends EndlessNetClientBridge {
   final calls = <String>[];
   final enrollmentPayloads = <Map<String, dynamic>>[];
   final enrollmentRequests = <EnrollmentRequest>[];
+  final statusEvents = <Map<String, dynamic>>[];
   Object? enrollmentError;
   Object? serverTrustError;
+  Object? logoutError;
+  Map<String, dynamic> identityPayload = {
+    'control_origin': 'https://api.endlessnet.ru',
+    'trusted_key_id': 'ed25519:old',
+    'announced_key_id': 'ed25519:new',
+    'changed': true,
+  };
 
   Map<String, dynamic> statusPayload = _contractStatus(
     state: ServiceState.connected,
@@ -672,6 +888,15 @@ class ContractFakeBridge extends EndlessNetClientBridge {
   @override
   Future<Map<String, dynamic>> status() async {
     calls.add('status');
+    return statusPayload;
+  }
+
+  @override
+  Future<Map<String, dynamic>> recoveryStatusEvent() async {
+    calls.add('events');
+    if (statusEvents.isNotEmpty) {
+      statusPayload = statusEvents.removeAt(0);
+    }
     return statusPayload;
   }
 
@@ -702,17 +927,16 @@ class ContractFakeBridge extends EndlessNetClientBridge {
   @override
   Future<Map<String, dynamic>> serverIdentity() async {
     calls.add('server-identity');
-    return {
-      'control_plane_url': 'https://api.endlessnet.ru',
-      'trusted_key_id': 'ed25519:old',
-      'announced_key_id': 'ed25519:new',
-      'changed': true,
-    };
+    return identityPayload;
   }
 
   @override
-  Future<Map<String, dynamic>> trustServer(String confirmedKeyID) async {
+  Future<Map<String, dynamic>> trustServer(
+    String confirmedControlOrigin,
+    String confirmedKeyID,
+  ) async {
     calls.add('trust-server');
+    expect(confirmedControlOrigin, 'https://api.endlessnet.ru');
     expect(confirmedKeyID, 'ed25519:new');
     if (serverTrustError case final error?) {
       throw error;
@@ -738,12 +962,42 @@ class ContractFakeBridge extends EndlessNetClientBridge {
   }
 
   @override
+  Future<Map<String, dynamic>> logout() async {
+    calls.add('logout');
+    if (logoutError case final error?) {
+      throw error;
+    }
+    statusPayload = _contractStatus(
+      state: ServiceState.needsEnrollment,
+      controlState: ControlState.notRegistered,
+      desiredState: ConnectionIntentState.disconnected,
+      userDisconnected: true,
+    );
+    return {...statusPayload, 'outcome': LogoutOutcome.remoteCleanupConfirmed};
+  }
+
+  @override
+  Future<Map<String, dynamic>> localForget() async {
+    calls.add('logout-local');
+    statusPayload = _contractStatus(
+      state: ServiceState.needsEnrollment,
+      controlState: ControlState.notRegistered,
+      desiredState: ConnectionIntentState.disconnected,
+      userDisconnected: true,
+    );
+    return {
+      ...statusPayload,
+      'outcome': LogoutOutcome.remoteCleanupUnconfirmed,
+    };
+  }
+
+  @override
   Future<Map<String, dynamic>> diagnostics() async {
     calls.add('diagnostics');
     return {
       'ipc_protocol': 'endlessnet-client-ipc',
-      'ipc_version': 1,
-      'ipc_min_supported_version': 1,
+      'ipc_version': 2,
+      'ipc_min_supported_version': 2,
       'diagnostics': {
         'generated_at': '2026-07-17T12:00:00Z',
         'client': {
@@ -788,9 +1042,9 @@ Map<String, dynamic> _contractStatus({
 }) {
   return {
     'ipc_protocol': 'endlessnet-client-ipc',
-    'ipc_version': 1,
-    'ipc_min_supported_version': 1,
-    'ipc_negotiated_version': 1,
+    'ipc_version': 2,
+    'ipc_min_supported_version': 2,
+    'ipc_negotiated_version': 2,
     'service_version': 'ui-e2e',
     'service_commit': 'contract',
     'service_build_date': '2026-07-09T00:00:00Z',

@@ -17,6 +17,7 @@ if (-not (Test-Path -LiteralPath $Msi -PathType Leaf)) {
 }
 
 $requiredStagedFiles = @(
+    "endlessnet-client-recovery-helper.exe",
     "wintun-LICENSE.txt",
     "app\data\flutter_assets\NOTICES.Z",
     "app\data\licenses\endlessnet-client-ui\LICENSE",
@@ -50,6 +51,7 @@ try {
             ForEach-Object { [string]$_.Name }
     )
     $requiredMSIFileCounts = [ordered]@{
+        "endlessnet-client-recovery-helper.exe" = 1
         "LICENSE" = 2
         "NOTICE" = 2
         "THIRD_PARTY_NOTICES" = 2

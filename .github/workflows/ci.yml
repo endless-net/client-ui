@@ -91,6 +91,7 @@ jobs:
           -UIVersion $env:UI_VERSION
           -CoreVersion $env:CORE_VERSION
           -ClientExe "${{ steps.core.outputs.client_exe }}"
+          -RecoveryHelperExe "${{ steps.core.outputs.recovery_helper_exe }}"
           -CoreMetadataDir "$env:RUNNER_TEMP/client-core"
           -UISourceSBOM "$env:RUNNER_TEMP/ui-source-sbom.spdx.json"
           -OutputDir "$env:RUNNER_TEMP/windows-client-msi"

@@ -18,7 +18,7 @@ import (
 const (
 	SchemaVersion       = 1
 	IPCProtocol         = "endlessnet-client-ipc"
-	IPCVersion          = 1
+	IPCVersion          = 2
 	IPCProtocolHeader   = "X-EndlessNet-IPC-Protocol"
 	IPCVersionHeader    = "X-EndlessNet-IPC-Version"
 	IPCMinVersionHeader = "X-EndlessNet-IPC-Min-Supported-Version"
@@ -34,6 +34,7 @@ var contractRoutes = map[string]string{
 	"/server-identity/trust": http.MethodPost,
 	"/disconnect":            http.MethodPost,
 	"/logout":                http.MethodPost,
+	"/logout/local":          http.MethodPost,
 	"/networks":              http.MethodGet,
 	"/network/select":        http.MethodPost,
 	"/diagnostics":           http.MethodGet,
@@ -190,10 +191,10 @@ func DefaultScenario() Scenario {
 			},
 		},
 		ServerIdentity: map[string]any{
-			"control_plane_url": "https://api.example.test",
-			"trusted_key_id":    "ed25519:emulator",
-			"announced_key_id":  "ed25519:emulator",
-			"changed":           false,
+			"control_origin":   "https://api.example.test",
+			"trusted_key_id":   "ed25519:emulator",
+			"announced_key_id": "ed25519:emulator",
+			"changed":          false,
 		},
 		Logs: []map[string]any{
 			{
@@ -481,7 +482,22 @@ func (e *Engine) builtin(method string, requestURL *url.URL, body map[string]any
 			return errorResult(http.StatusBadRequest, "invalid_json", err.Error())
 		}
 		e.logout()
-		return jsonResult(http.StatusOK, map[string]any{"state": e.status["state"]})
+		return jsonResult(http.StatusOK, map[string]any{
+			"state": e.status["state"], "control_state": e.status["control_state"],
+			"outcome": "remote_cleanup_confirmed",
+		})
+	case "/logout/local":
+		if err := requireOnlyKeys(body, "confirmed"); err != nil {
+			return errorResult(http.StatusBadRequest, "invalid_json", err.Error())
+		}
+		if confirmed, _ := body["confirmed"].(bool); !confirmed {
+			return errorResult(http.StatusBadRequest, "local_forget_confirmation_required", "explicit local forget confirmation is required")
+		}
+		e.logout()
+		return jsonResult(http.StatusOK, map[string]any{
+			"state": e.status["state"], "control_state": e.status["control_state"],
+			"outcome": "remote_cleanup_unconfirmed",
+		})
 	case "/enroll":
 		return e.enroll(body)
 	case "/server-identity":
@@ -538,22 +554,24 @@ func (e *Engine) enroll(body map[string]any) Result {
 }
 
 func (e *Engine) trustServer(body map[string]any) Result {
-	if err := requireOnlyKeys(body, "confirmed", "confirmed_key_id"); err != nil {
+	if err := requireOnlyKeys(body, "confirmed_control_origin", "confirmed_key_id"); err != nil {
 		return errorResult(http.StatusBadRequest, "invalid_json", err.Error())
 	}
-	confirmed, _ := body["confirmed"].(bool)
+	confirmedOrigin := stringValue(body["confirmed_control_origin"])
 	keyID := stringValue(body["confirmed_key_id"])
+	controlOrigin := stringValue(e.scenario.ServerIdentity["control_origin"])
 	announced := stringValue(e.scenario.ServerIdentity["announced_key_id"])
-	if !confirmed || keyID == "" || keyID != announced {
-		return errorResult(http.StatusBadRequest, "request_failed", "confirmed_key_id must match the announced server identity")
+	if confirmedOrigin == "" || confirmedOrigin != controlOrigin || keyID == "" || keyID != announced {
+		return errorResult(http.StatusConflict, "server_identity_confirmation_mismatch", "confirmed identity must match the currently announced server identity")
 	}
 	e.scenario.ServerIdentity["trusted_key_id"] = keyID
 	e.scenario.ServerIdentity["changed"] = false
 	e.setConnectionState("Connected", "ready", "connected", false)
-	result := e.connectResponse()
-	result["server_identity_updated"] = true
-	result["trusted_key_id"] = keyID
-	return jsonResult(http.StatusOK, result)
+	return jsonResult(http.StatusOK, map[string]any{
+		"operation_id": "recovery-emulator", "operation": "trust_server_identity",
+		"outcome": "completed", "state": e.status["state"],
+		"control_state": e.status["control_state"], "trusted_key_id": keyID,
+	})
 }
 
 func (e *Engine) selectNetwork(body map[string]any) Result {
@@ -686,7 +704,7 @@ func (e *Engine) setConnectionState(state, controlState, desiredState string, di
 }
 
 func (e *Engine) logout() {
-	e.setConnectionState("NeedsEnrollment", "not_registered", "disconnected", false)
+	e.setConnectionState("NeedsEnrollment", "not_registered", "disconnected", true)
 	for _, key := range []string{
 		"account_id", "node_id", "network_id", "network_name", "overlay_ip",
 		"overlay_ipv6", "agent", "control",
@@ -694,14 +712,14 @@ func (e *Engine) logout() {
 		delete(e.status, key)
 	}
 	mergeMap(e.status, map[string]any{
-		"map_signing_trust_present":    false,
+		"map_signing_trust_present":    true,
 		"token_present":                false,
 		"cached_map_present":           false,
 		"cached_map_valid":             false,
 		"node_credential_present":      false,
-		"device_fingerprint_present":   false,
-		"identity_private_key_present": false,
-		"private_key_present":          false,
+		"device_fingerprint_present":   true,
+		"identity_private_key_present": true,
+		"private_key_present":          true,
 		"peer_count":                   0,
 	})
 }

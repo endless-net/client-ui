@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "name": "control-plane-reset-recovery",
+  "initial_status": {
+    "state": "Recovering",
+    "control_state": "recovering",
+    "desired_state": "connected",
+    "recovery": {
+      "operation_id": "op-reset",
+      "state": "Recovering",
+      "retryable": true
+    }
+  },
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/status",
+      "repeat_last": true,
+      "responses": [
+        {
+          "body": {
+            "state": "Recovering",
+            "control_state": "recovering",
+            "desired_state": "connected",
+            "recovery": {
+              "operation_id": "op-reset",
+              "state": "Recovering",
+              "retryable": true
+            }
+          }
+        },
+        {
+          "body": {
+            "state": "NeedsLogin",
+            "control_state": "needs_login",
+            "desired_state": "connected",
+            "approval_url": "https://admin.example.test/login",
+            "recovery": {
+              "operation_id": "op-reset",
+              "state": "NeedsLogin",
+              "retryable": true
+            }
+          }
+        },
+        {
+          "body": {
+            "state": "NeedsEnrollment",
+            "control_state": "not_registered",
+            "desired_state": "connected",
+            "recovery": {
+              "operation_id": "op-reset",
+              "state": "NeedsEnrollment",
+              "retryable": true
+            }
+          }
+        },
+        {
+          "body": {
+            "state": "Connected",
+            "control_state": "ready",
+            "desired_state": "connected"
+          }
+        }
+      ]
+    }
+  ]
+}

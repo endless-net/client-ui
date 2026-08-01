@@ -13,17 +13,6 @@ void main() {
     expect(config.server, isEmpty);
   });
 
-  test('AppConfig recognizes the elevated server trust worker', () {
-    final config = AppConfig.parse(const [
-      '--elevated-trust-server',
-      '--confirmed-key-id',
-      'ed25519:new',
-    ]);
-
-    expect(config.elevatedServerTrust, isTrue);
-    expect(config.confirmedServerKeyID, 'ed25519:new');
-  });
-
   test('interactive enrollment leaves the optional server unset', () {
     final request = parseEnrollment('endlessnet://enroll', '', 'workstation');
 
@@ -71,25 +60,40 @@ void main() {
     );
   });
 
-  test('elevated server trust preserves the protected pipe and key ID', () {
-    final config = AppConfig.parse(const [
-      '--pipe',
-      r'\\.\pipe\endlessnet-test',
-      '--debug',
-      '--debug-log-dir',
-      r'C:\Users\tester\EndlessNet Logs',
-    ]);
-    final arguments = elevatedServerTrustArguments(config, 'ed25519:new');
-
-    expect(arguments.first, '--elevated-trust-server');
-    expect(
-      arguments,
-      containsAllInOrder(['--confirmed-key-id', 'ed25519:new']),
+  test('privileged trust helper receives only fixed operation values', () {
+    final arguments = privilegedRecoveryArguments(
+      const PrivilegedRecoveryRequest.trustServerIdentity(
+        confirmedControlOrigin: 'https://api.example.test',
+        confirmedKeyID: 'ed25519:new',
+      ),
     );
-    expect(arguments, containsAllInOrder(['--pipe', config.pipe]));
+
+    expect(arguments, [
+      '--operation',
+      'trust-server-identity',
+      '--confirmed-control-origin',
+      'https://api.example.test',
+      '--confirmed-key-id',
+      'ed25519:new',
+    ]);
+    expect(arguments, isNot(contains('--pipe')));
+    expect(arguments, isNot(contains('--debug-log-dir')));
+    expect(arguments, isNot(contains('--token')));
+  });
+
+  test('privileged recovery uses only the fixed installed helper path', () {
     expect(
-      arguments,
-      containsAllInOrder(['--debug-log-dir', config.debugLogDir]),
+      installedRecoveryHelperPath(),
+      r'C:\Program Files\EndlessNet\endlessnet-client-recovery-helper.exe',
+    );
+  });
+
+  test('privileged local forget helper uses one fixed confirmation flag', () {
+    expect(
+      privilegedRecoveryArguments(
+        const PrivilegedRecoveryRequest.forgetLocalEnrollment(),
+      ),
+      ['--operation', 'forget-local-enrollment', '--confirmed-local-forget'],
     );
   });
 
@@ -271,6 +275,53 @@ void main() {
       'node_id': 'node-1',
     });
     expect(identityChanged.serverIdentityChanged, isTrue);
+
+    final recovering = ServiceStatus({
+      'state': ServiceState.recovering,
+      'control_state': ControlState.recovering,
+      'recovery': {
+        'operation_id': 'op-1',
+        'state': ServiceState.recovering,
+        'retryable': true,
+      },
+    });
+    expect(recovering.recovering, isTrue);
+    expect(recovering.recovery.operationID, 'op-1');
+    expect(recovering.recovery.retryable, isTrue);
+
+    final needsLogin = ServiceStatus({
+      'state': ServiceState.needsLogin,
+      'control_state': ControlState.needsLogin,
+    });
+    expect(needsLogin.needsLogin, isTrue);
+  });
+
+  test('LogoutResponse preserves typed cleanup outcome and request ID', () {
+    final response = LogoutResponse({
+      'state': ServiceState.needsEnrollment,
+      'control_state': ControlState.notRegistered,
+      'outcome': LogoutOutcome.remoteCleanupUnconfirmed,
+      'remote_request_id': 'req-42',
+    });
+
+    expect(response.status.needsEnrollment, isTrue);
+    expect(response.remoteCleanupUnconfirmed, isTrue);
+    expect(response.remoteRequestID, 'req-42');
+  });
+
+  test('backend error messages are never rendered directly', () {
+    const raw = 'secret backend diagnostic with filesystem details';
+    final text = safeErrorText(
+      const ServiceIPCException(
+        statusCode: 500,
+        errorCode: 'internal_error',
+        message: raw,
+        requestID: 'req-safe',
+      ),
+    );
+
+    expect(text, isNot(contains(raw)));
+    expect(text, contains('req-safe'));
   });
 
   test('EnrollmentResponse parses optional synchronous WireGuard apply', () {

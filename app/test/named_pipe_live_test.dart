@@ -21,7 +21,7 @@ void main() {
       final status = await client.request('GET', ServiceIPCPath.status);
 
       expect(status['ipc_protocol'], 'endlessnet-client-ipc');
-      expect(status['ipc_version'], 1);
+      expect(status['ipc_version'], ServiceIPCMetadata.version);
       expect(status['state'], isNotEmpty);
 
       final diagnostics = await client.request(

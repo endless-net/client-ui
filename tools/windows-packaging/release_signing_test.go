@@ -72,6 +72,7 @@ func TestReleaseSigningIsIsolatedAndCleanedUp(t *testing.T) {
 	}
 	for _, expected := range []string{
 		"Invoke-EndlessNetSign $packagedClientExe",
+		"Invoke-EndlessNetSign $packagedRecoveryHelperExe",
 		"Invoke-EndlessNetSign $appExe",
 		"Invoke-EndlessNetSign $Msi",
 		"Official Wintun signature must not be replaced",

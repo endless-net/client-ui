@@ -34,6 +34,11 @@ if ($core.version -ne $build.client.version -or $core.target -ne $build.target) 
 if ($core.artifacts.client.sha256 -ne $build.client.unsigned_sha256) {
     throw "packaged unsigned client does not match the reviewed client-core manifest"
 }
+if ($core.artifacts.recovery_helper.sha256 -ne $build.recovery_helper.unsigned_sha256 -or
+    $core.artifacts.recovery_helper.installed_name -ne "endlessnet-client-recovery-helper.exe" -or
+    $build.recovery_helper.installed_name -ne "endlessnet-client-recovery-helper.exe") {
+    throw "packaged recovery helper does not match the reviewed client-core manifest"
+}
 if ($build.version -notmatch '^\d+\.\d+\.\d+$') {
     throw "UI build metadata does not contain a stable SemVer"
 }
@@ -94,6 +99,7 @@ $provenance = [ordered]@{
         lock_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $CoreLock).Hash.ToLowerInvariant()
         executable_sha256 = $core.artifacts.client.sha256
         ipc_contract_sha256 = $core.artifacts.ipc_contract.sha256
+        recovery_helper_sha256 = $core.artifacts.recovery_helper.sha256
         compliance = [ordered]@{
             license_sha256 = $coreLockValue.compliance.license.sha256
             notice_sha256 = $coreLockValue.compliance.notice.sha256
@@ -116,6 +122,11 @@ $provenance = [ordered]@{
         client = [ordered]@{
             unsigned_sha256 = $build.client.unsigned_sha256
             signed_sha256 = $build.client.signed_sha256
+        }
+        recovery_helper = [ordered]@{
+            installed_name = $build.recovery_helper.installed_name
+            unsigned_sha256 = $build.recovery_helper.unsigned_sha256
+            signed_sha256 = $build.recovery_helper.signed_sha256
         }
         wintun = [ordered]@{
             version = $build.wintun.version

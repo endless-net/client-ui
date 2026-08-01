@@ -31,9 +31,9 @@ state transitions and fault injection, and records a redacted JSONL request
 journal. See [`tools/service-emulator/README.md`](tools/service-emulator/README.md)
 for manual UI testing and custom scenarios.
 
-## Client core v0.3.1 integration
+## Client core v0.4.1 integration
 
-The packaged v0.3.1 service runs WireGuard Go as its only tunnel engine. The
+The packaged v0.4.1 service runs WireGuard Go as its only tunnel engine. The
 MSI does not pass a backend-selection flag or fix the UDP listen port. Wintun
 remains a required, verified runtime dependency beside `endlessnet-client.exe`.
 The service owns the live WireGuard configuration in process; the MSI does not
@@ -46,9 +46,9 @@ direct path returns to relay.
 The UI reads selected paths, candidate health, STUN reachability, and relay
 availability exclusively from the producer-defined `status.agent` schema.
 The diagnostics response is consumed through `diagnostics.status.agent`; the UI
-does not recognize fields that are absent from `client-ipc-v1.openapi.yaml`.
+does not recognize fields that are absent from `client-ipc-v2.openapi.yaml`.
 
-Core 0.3.1 uses the local-owner authorization model for enrollment and
+Core 0.4.1 uses the local-owner authorization model for enrollment and
 other owner operations. The desktop UI first calls `/enroll` without elevation,
 allowing a clean installation to bind ownership to the current Windows user.
 Only an `owner_required` or `administrator_required` IPC response launches a
@@ -59,9 +59,10 @@ public-server default.
 
 Server identity recovery also keeps the desktop process unprivileged. After the
 user reviews the changed key, an `administrator_required` response presents a
-dedicated UAC action. A hidden, short-lived `endlessnet.exe` worker re-reads the
-announced key, verifies that it still matches the confirmed key ID, and sends
-the trust request directly to the protected pipe.
+dedicated UAC action that launches the installed, signed
+`endlessnet-client-recovery-helper.exe` with its fixed trust operation and the
+confirmed origin/key ID. The UI then re-reads service status and identity so a
+key change during UAC cannot silently trust a different identity.
 
 Resolve the reviewed public core input and build an unsigned validation MSI:
 
@@ -69,8 +70,9 @@ Resolve the reviewed public core input and build an unsigned validation MSI:
 .\scripts\resolve-client-core.ps1 -OutputDir .\.artifacts\client-core
 .\scripts\build-windows-client-msi.ps1 `
   -UIVersion 1.0.4 `
-  -CoreVersion 0.3.1 `
+  -CoreVersion 0.4.1 `
   -ClientExe .\.artifacts\client-core\endlessnet-client_windows_amd64.exe `
+  -RecoveryHelperExe .\.artifacts\client-core\endlessnet-client-recovery-helper_windows_amd64.exe `
   -CoreMetadataDir .\.artifacts\client-core `
   -UISourceSBOM .\.artifacts\ui-source-sbom.spdx.json
 ```
@@ -80,9 +82,9 @@ core version, commit, immutable manifest, compliance files, and every SHA-256
 needed to resolve the runtime input. The UI owns an independent stable SemVer in
 `app/pubspec.yaml`; pushing the matching `v*` tag starts the release. That
 version determines the MSI version, GitHub release, and WinGet manifests.
-Releases sign both executables and the final MSI and publish source/distribution
-SBOMs with provenance schema v3. The client-core version remains separate under
-`client.version`.
+Releases sign the service, recovery helper, desktop UI, and final MSI and
+publish source/distribution SBOMs with provenance schema v3. The client-core
+version remains separate under `client.version`.
 The owning workflow uses `scripts/resolve-release-idempotency.ps1` to distinguish
 an expected missing release (continue with `noop=false`) from real GitHub CLI or
 API failures. Existing UI releases are no-ops only when their provenance names

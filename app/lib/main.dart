@@ -40,6 +40,8 @@ const _defaultEnrollmentPollInterval = Duration(seconds: 2);
 const _defaultEnrollmentPollTimeout = Duration(minutes: 10);
 const _defaultConnectionPollInterval = Duration(seconds: 1);
 const _defaultConnectionPollTimeout = Duration(seconds: 30);
+const _defaultRecoveryPollInterval = Duration(seconds: 1);
+const _defaultRecoveryPollTimeout = Duration(minutes: 10);
 
 RandomAccessFile? _instanceLock;
 
@@ -59,10 +61,6 @@ Future<void> main(List<String> args) async {
   }
 
   final bridge = EndlessNetClientBridge(config: config, logger: logger);
-  if (config.elevatedServerTrust) {
-    await _runServerTrustAndExit(config, bridge, logger);
-    exit(exitCode);
-  }
   if (config.elevatedEnrollment) {
     await _runEnrollmentAndExit(config, bridge, logger);
     exit(exitCode);
@@ -92,38 +90,6 @@ Future<void> main(List<String> args) async {
   );
   runApp(EndlessNetApp(controller: controller));
   await controller.initialize();
-}
-
-Future<void> _runServerTrustAndExit(
-  AppConfig config,
-  EndlessNetClientBridge bridge,
-  AppLogger logger,
-) async {
-  try {
-    final confirmedKeyID = config.confirmedServerKeyID.trim();
-    if (confirmedKeyID.isEmpty) {
-      throw StateError('The confirmed server signing key ID is required.');
-    }
-    final identity = await bridge.serverIdentity();
-    final announcedKeyID = valueText(identity['announced_key_id']);
-    if (announcedKeyID.isEmpty) {
-      throw StateError('The server did not announce a signing key ID.');
-    }
-    if (announcedKeyID != confirmedKeyID) {
-      throw StateError(
-        'The server signing key changed again before it could be trusted. '
-        'Review the newly announced key in EndlessNet.',
-      );
-    }
-    await bridge.trustServer(confirmedKeyID);
-    logger.info('server identity trusted by elevated worker');
-  } catch (err, stack) {
-    logger.error('elevated server identity trust failed', err, stack);
-    await showMessageBox('EndlessNet server identity', safeErrorText(err));
-    exitCode = 1;
-  } finally {
-    await logger.close();
-  }
 }
 
 String versionText() {
@@ -211,8 +177,6 @@ class AppConfig {
     required this.mode,
     required this.enrollText,
     required this.elevatedEnrollment,
-    required this.elevatedServerTrust,
-    required this.confirmedServerKeyID,
     required this.showWindow,
     required this.debug,
     required this.debugLogDir,
@@ -226,8 +190,6 @@ class AppConfig {
   final String mode;
   final String enrollText;
   final bool elevatedEnrollment;
-  final bool elevatedServerTrust;
-  final String confirmedServerKeyID;
   final bool showWindow;
   final bool debug;
   final String debugLogDir;
@@ -241,8 +203,6 @@ class AppConfig {
     var mode = 'workstation';
     var enrollText = '';
     var elevatedEnrollment = false;
-    var elevatedServerTrust = false;
-    var confirmedServerKeyID = '';
     var showWindow = false;
     var debug = false;
     var debugLogDir = _defaultDebugLogDir;
@@ -270,10 +230,6 @@ class AppConfig {
         enrollText = nextValue();
       } else if (arg == '--elevated-enroll') {
         elevatedEnrollment = true;
-      } else if (arg == '--elevated-trust-server') {
-        elevatedServerTrust = true;
-      } else if (arg == '--confirmed-key-id') {
-        confirmedServerKeyID = nextValue();
       } else if (arg == '--show-window') {
         showWindow = true;
       } else if (arg == '--debug') {
@@ -294,8 +250,6 @@ class AppConfig {
       mode: mode.trim().isEmpty ? 'workstation' : mode.trim(),
       enrollText: enrollText.trim(),
       elevatedEnrollment: elevatedEnrollment,
-      elevatedServerTrust: elevatedServerTrust,
-      confirmedServerKeyID: confirmedServerKeyID.trim(),
       showWindow: showWindow,
       debug: debug,
       debugLogDir: debugLogDir.trim().isEmpty
@@ -523,8 +477,39 @@ EnrollmentRequest parseEnrollment(
 
 typedef ElevatedEnrollmentLauncher =
     Future<bool> Function(EnrollmentRequest request);
-typedef ElevatedServerTrustLauncher =
-    Future<bool> Function(String confirmedKeyID);
+typedef PrivilegedRecoveryLauncher =
+    Future<PrivilegedHelperResult> Function(PrivilegedRecoveryRequest request);
+typedef LocalForgetConfirmationPresenter =
+    Future<bool> Function(String remoteRequestID);
+
+const _windowsRecoveryHelperPath =
+    r'C:\Program Files\EndlessNet\endlessnet-client-recovery-helper.exe';
+
+enum PrivilegedHelperResult { completed, canceled, failed }
+
+class PrivilegedRecoveryRequest {
+  const PrivilegedRecoveryRequest._({
+    required this.operation,
+    this.confirmedControlOrigin = '',
+    this.confirmedKeyID = '',
+  });
+
+  const PrivilegedRecoveryRequest.trustServerIdentity({
+    required String confirmedControlOrigin,
+    required String confirmedKeyID,
+  }) : this._(
+         operation: RecoveryOperation.trustServerIdentity,
+         confirmedControlOrigin: confirmedControlOrigin,
+         confirmedKeyID: confirmedKeyID,
+       );
+
+  const PrivilegedRecoveryRequest.forgetLocalEnrollment()
+    : this._(operation: RecoveryOperation.forgetLocalEnrollment);
+
+  final String operation;
+  final String confirmedControlOrigin;
+  final String confirmedKeyID;
+}
 
 bool requiresAdministratorElevation(Object error) {
   if (error is! ServiceIPCException) {
@@ -537,6 +522,11 @@ bool requiresAdministratorElevation(Object error) {
 bool requiresAdministratorTrustElevation(Object error) {
   return error is ServiceIPCException &&
       error.errorCode == ServiceIPCErrorCode.administratorRequired;
+}
+
+bool requiresLocalForget(Object error) {
+  return error is ServiceIPCException &&
+      error.errorCode == ServiceIPCErrorCode.remoteCleanupRequired;
 }
 
 Future<bool> launchElevatedEnrollment(
@@ -577,37 +567,60 @@ List<String> elevatedEnrollmentArguments(
   return arguments;
 }
 
-Future<bool> launchElevatedServerTrust(
-  AppConfig config,
-  String confirmedKeyID,
+Future<PrivilegedHelperResult> launchPrivilegedRecoveryHelper(
+  PrivilegedRecoveryRequest request,
 ) async {
   if (!Platform.isWindows) {
     throw UnsupportedError(
-      'Administrative server identity confirmation is only supported on Windows.',
+      'Administrative recovery is not available on this platform.',
     );
   }
-  final executable = Platform.resolvedExecutable;
-  final arguments = elevatedServerTrustArguments(config, confirmedKeyID);
+  final executable = installedRecoveryHelperPath();
+  if (!File(executable).existsSync()) {
+    throw StateError(
+      'The installed EndlessNet recovery helper is unavailable. Repair the '
+      'EndlessNet installation and try again.',
+    );
+  }
+  final arguments = privilegedRecoveryArguments(request);
   return Isolate.run(
     () => launchWindowsProcessElevatedAndWait(executable, arguments),
   );
 }
 
-List<String> elevatedServerTrustArguments(
-  AppConfig config,
-  String confirmedKeyID,
-) {
-  final arguments = <String>[
-    '--elevated-trust-server',
-    '--confirmed-key-id',
-    confirmedKeyID.trim(),
-    '--pipe',
-    config.pipe,
-  ];
-  if (config.debug) {
-    arguments.addAll(['--debug', '--debug-log-dir', config.debugLogDir]);
+String installedRecoveryHelperPath() => _windowsRecoveryHelperPath;
+
+List<String> privilegedRecoveryArguments(PrivilegedRecoveryRequest request) {
+  switch (request.operation) {
+    case RecoveryOperation.trustServerIdentity:
+      final origin = request.confirmedControlOrigin.trim();
+      final keyID = request.confirmedKeyID.trim();
+      if (origin.isEmpty || keyID.isEmpty) {
+        throw ArgumentError(
+          'Server identity recovery requires a confirmed origin and key ID.',
+        );
+      }
+      return [
+        '--operation',
+        'trust-server-identity',
+        '--confirmed-control-origin',
+        origin,
+        '--confirmed-key-id',
+        keyID,
+      ];
+    case RecoveryOperation.forgetLocalEnrollment:
+      return const [
+        '--operation',
+        'forget-local-enrollment',
+        '--confirmed-local-forget',
+      ];
+    default:
+      throw ArgumentError.value(
+        request.operation,
+        'operation',
+        'Unsupported privileged recovery operation.',
+      );
   }
-  return arguments;
 }
 
 bool launchWindowsProcessElevated(String executable, List<String> arguments) {
@@ -634,12 +647,12 @@ bool launchWindowsProcessElevated(String executable, List<String> arguments) {
   }
 }
 
-bool launchWindowsProcessElevatedAndWait(
+PrivilegedHelperResult launchWindowsProcessElevatedAndWait(
   String executable,
   List<String> arguments,
 ) {
   const seeMaskNoCloseProcess = 0x00000040;
-  const workerTimeoutMilliseconds = 30000;
+  const workerTimeoutMilliseconds = 120000;
   final verbPtr = 'runas'.toNativeUtf16();
   final executablePtr = executable.toNativeUtf16();
   final parametersPtr = arguments
@@ -657,7 +670,9 @@ bool launchWindowsProcessElevatedAndWait(
       ..nShow = SW_HIDE;
     final launched = ShellExecuteEx(executeInfo);
     if (!launched.value || !executeInfo.ref.hProcess.isValid) {
-      return false;
+      return launched.error == ERROR_CANCELLED
+          ? PrivilegedHelperResult.canceled
+          : PrivilegedHelperResult.failed;
     }
 
     final process = executeInfo.ref.hProcess;
@@ -667,12 +682,14 @@ bool launchWindowsProcessElevatedAndWait(
         workerTimeoutMilliseconds,
       );
       if (waitResult.value != WAIT_OBJECT_0) {
-        return false;
+        return PrivilegedHelperResult.failed;
       }
       final exitCodePtr = calloc<ffi.Uint32>();
       try {
         final readExitCode = GetExitCodeProcess(process, exitCodePtr);
-        return readExitCode.value && exitCodePtr.value == 0;
+        return readExitCode.value && exitCodePtr.value == 0
+            ? PrivilegedHelperResult.completed
+            : PrivilegedHelperResult.failed;
       } finally {
         calloc.free(exitCodePtr);
       }
@@ -740,19 +757,29 @@ class EndlessNetClientBridge {
 
   Future<Map<String, dynamic>> status() =>
       _request('GET', ServiceIPCPath.status);
+  Future<Map<String, dynamic>> recoveryStatusEvent() =>
+      _ipc.eventStatusSnapshot(requestTimeout: const Duration(seconds: 8));
   Future<Map<String, dynamic>> connect() =>
       _request('POST', ServiceIPCPath.connect, body: {});
   Future<Map<String, dynamic>> serverIdentity() =>
       _request('GET', ServiceIPCPath.serverIdentity);
-  Future<Map<String, dynamic>> trustServer(String confirmedKeyID) => _request(
+  Future<Map<String, dynamic>> trustServer(
+    String confirmedControlOrigin,
+    String confirmedKeyID,
+  ) => _request(
     'POST',
     ServiceIPCPath.trustServer,
-    body: {'confirmed': true, 'confirmed_key_id': confirmedKeyID},
+    body: {
+      'confirmed_control_origin': confirmedControlOrigin,
+      'confirmed_key_id': confirmedKeyID,
+    },
   );
   Future<Map<String, dynamic>> disconnect() =>
       _request('POST', ServiceIPCPath.disconnect, body: {});
   Future<Map<String, dynamic>> logout() =>
       _request('POST', ServiceIPCPath.logout, body: {});
+  Future<Map<String, dynamic>> localForget() =>
+      _request('POST', ServiceIPCPath.localForget, body: {'confirmed': true});
   Future<Map<String, dynamic>> networks() =>
       _request('GET', ServiceIPCPath.networks);
   Future<Map<String, dynamic>> diagnostics() =>
@@ -817,12 +844,15 @@ class EndlessNetController extends ChangeNotifier
     Future<void> Function(String title, String message)? messagePresenter,
     ElevatedEnrollmentLauncher? elevatedEnrollmentLauncher,
     bool? enrollmentElevationSupported,
-    ElevatedServerTrustLauncher? elevatedServerTrustLauncher,
-    bool? serverTrustElevationSupported,
+    PrivilegedRecoveryLauncher? privilegedRecoveryLauncher,
+    bool? privilegedRecoverySupported,
+    LocalForgetConfirmationPresenter? localForgetConfirmationPresenter,
     this.enrollmentPollInterval = _defaultEnrollmentPollInterval,
     this.enrollmentPollTimeout = _defaultEnrollmentPollTimeout,
     this.connectionPollInterval = _defaultConnectionPollInterval,
     this.connectionPollTimeout = _defaultConnectionPollTimeout,
+    this.recoveryPollInterval = _defaultRecoveryPollInterval,
+    this.recoveryPollTimeout = _defaultRecoveryPollTimeout,
   }) : externalURLLauncher = externalURLLauncher ?? launchExternalURL,
        messagePresenter = messagePresenter ?? showMessageBox,
        elevatedEnrollmentLauncher =
@@ -830,12 +860,12 @@ class EndlessNetController extends ChangeNotifier
            ((request) => launchElevatedEnrollment(config, request)),
        enrollmentElevationSupported =
            enrollmentElevationSupported ?? Platform.isWindows,
-       elevatedServerTrustLauncher =
-           elevatedServerTrustLauncher ??
-           ((confirmedKeyID) =>
-               launchElevatedServerTrust(config, confirmedKeyID)),
-       serverTrustElevationSupported =
-           serverTrustElevationSupported ?? Platform.isWindows;
+       privilegedRecoveryLauncher =
+           privilegedRecoveryLauncher ?? launchPrivilegedRecoveryHelper,
+       privilegedRecoverySupported =
+           privilegedRecoverySupported ?? Platform.isWindows,
+       localForgetConfirmationPresenter =
+           localForgetConfirmationPresenter ?? showLocalForgetConfirmation;
 
   final AppConfig config;
   final EndlessNetClientBridge bridge;
@@ -845,12 +875,15 @@ class EndlessNetController extends ChangeNotifier
   final Future<void> Function(String title, String message) messagePresenter;
   final ElevatedEnrollmentLauncher elevatedEnrollmentLauncher;
   final bool enrollmentElevationSupported;
-  final ElevatedServerTrustLauncher elevatedServerTrustLauncher;
-  final bool serverTrustElevationSupported;
+  final PrivilegedRecoveryLauncher privilegedRecoveryLauncher;
+  final bool privilegedRecoverySupported;
+  final LocalForgetConfirmationPresenter localForgetConfirmationPresenter;
   final Duration enrollmentPollInterval;
   final Duration enrollmentPollTimeout;
   final Duration connectionPollInterval;
   final Duration connectionPollTimeout;
+  final Duration recoveryPollInterval;
+  final Duration recoveryPollTimeout;
 
   Map<String, dynamic>? statusPayload;
   String? errorText;
@@ -860,10 +893,15 @@ class EndlessNetController extends ChangeNotifier
   Timer? _showSignalTimer;
   Timer? _enrollmentPollTimer;
   Timer? _connectionPollTimer;
+  Timer? _recoveryPollTimer;
   DateTime? _enrollmentPollingStartedAt;
   DateTime? _connectionPollingStartedAt;
+  DateTime? _recoveryPollingStartedAt;
   bool _enrollmentPollInFlight = false;
   bool _connectionPollInFlight = false;
+  bool _recoveryPollInFlight = false;
+  bool _autoEnrollmentInFlight = false;
+  bool _autoEnrollmentStartedForRecovery = false;
   DateTime? _lastShowSignalWrite;
 
   ServiceStatus get serviceStatus => ServiceStatus(statusPayload);
@@ -874,10 +912,27 @@ class EndlessNetController extends ChangeNotifier
         );
   bool get connected => serviceStatus.connected;
   bool get serverIdentityChanged => serviceStatus.serverIdentityChanged;
+  bool get recovering => serviceStatus.recovering;
+  bool get needsLogin => serviceStatus.needsLogin;
+  bool get recoveryBlocked => serviceStatus.recoveryBlocked;
+  bool get policyBlocked => serviceStatus.policyBlocked;
+  bool get recoveryFlowActive =>
+      serverIdentityChanged ||
+      recovering ||
+      needsLogin ||
+      recoveryBlocked ||
+      policyBlocked;
+  String? get recoveryMessage => recoveryStateMessage(serviceStatus);
   bool get deviceEnrolled => serviceStatus.deviceEnrolled;
-  bool get canConnect => deviceEnrolled && !connected;
-  bool get canDisconnect => deviceEnrolled && connected;
-  bool get showConnectThisDevice => statusPayload != null && !deviceEnrolled;
+  bool get canConnect => deviceEnrolled && !connected && !recoveryFlowActive;
+  bool get canDisconnect => deviceEnrolled && connected && !recoveryFlowActive;
+  bool get showConnectThisDevice =>
+      statusPayload != null &&
+      !deviceEnrolled &&
+      !recovering &&
+      !needsLogin &&
+      !recoveryBlocked &&
+      !policyBlocked;
 
   Future<void> initialize() async {
     if (!desktopIntegrationEnabled) {
@@ -984,6 +1039,7 @@ class EndlessNetController extends ChangeNotifier
       } else if (ServiceStatus(payload).deviceEnrolled) {
         _stopEnrollmentPolling();
       }
+      await _advanceRecoveryState(payload);
       _reconcileConnectionPolling(payload);
       logger.info('status refreshed state=$state');
     } catch (err, stack) {
@@ -1003,6 +1059,7 @@ class EndlessNetController extends ChangeNotifier
       await action();
       statusPayload = await bridge.status();
       errorText = null;
+      await _advanceRecoveryState(statusPayload!);
       _reconcileConnectionPolling(statusPayload!);
       logger.info('action completed state=$state');
     } catch (err, stack) {
@@ -1017,6 +1074,14 @@ class EndlessNetController extends ChangeNotifier
   }
 
   Future<void> connect(BuildContext context) async {
+    if (recovering) {
+      _startRecoveryPolling();
+      return;
+    }
+    if (needsLogin) {
+      await continueAfterLogin();
+      return;
+    }
     if (!serverIdentityChanged) {
       await runAction(() => bridge.connect());
       return;
@@ -1025,9 +1090,14 @@ class EndlessNetController extends ChangeNotifier
     notifyListeners();
     try {
       final identity = await bridge.serverIdentity();
+      final controlOrigin = valueText(identity['control_origin'], fallback: '');
+      final trustedKeyID = valueText(identity['trusted_key_id'], fallback: '');
       final announcedKeyID = valueText(identity['announced_key_id']);
-      if (announcedKeyID.isEmpty) {
-        throw StateError('The server did not announce a signing key ID.');
+      if (controlOrigin.isEmpty || announcedKeyID.isEmpty) {
+        throw StateError(
+          'EndlessNet could not verify the server identity details. No trust '
+          'setting was changed.',
+        );
       }
       busy = false;
       notifyListeners();
@@ -1036,8 +1106,8 @@ class EndlessNetController extends ChangeNotifier
       }
       final confirmed = await showServerIdentityChangeDialog(
         context,
-        serverURL: valueText(identity['control_plane_url'], fallback: 'server'),
-        trustedKeyID: valueText(identity['trusted_key_id']),
+        controlOrigin: controlOrigin,
+        trustedKeyID: trustedKeyID,
         announcedKeyID: announcedKeyID,
       );
       if (!confirmed) {
@@ -1047,9 +1117,10 @@ class EndlessNetController extends ChangeNotifier
       notifyListeners();
       late Map<String, dynamic> payload;
       try {
-        payload = await bridge.trustServer(announcedKeyID);
+        await bridge.trustServer(controlOrigin, announcedKeyID);
+        payload = await bridge.status();
       } catch (err) {
-        if (!serverTrustElevationSupported ||
+        if (!privilegedRecoverySupported ||
             !requiresAdministratorTrustElevation(err)) {
           rethrow;
         }
@@ -1062,6 +1133,8 @@ class EndlessNetController extends ChangeNotifier
         final approveElevation =
             await showServerTrustAdministratorRequiredDialog(
               context,
+              controlOrigin: controlOrigin,
+              trustedKeyID: trustedKeyID,
               announcedKeyID: announcedKeyID,
             );
         if (!approveElevation) {
@@ -1069,24 +1142,51 @@ class EndlessNetController extends ChangeNotifier
         }
         busy = true;
         notifyListeners();
-        final trusted = await elevatedServerTrustLauncher(announcedKeyID);
-        if (!trusted) {
-          throw StateError(
-            'Administrator approval was canceled or the confirmation failed. '
-            'The new server key was not trusted.',
-          );
-        }
-        logger.info('elevated server identity confirmation completed');
+        final helperResult = await privilegedRecoveryLauncher(
+          PrivilegedRecoveryRequest.trustServerIdentity(
+            confirmedControlOrigin: controlOrigin,
+            confirmedKeyID: announcedKeyID,
+          ),
+        );
         payload = await bridge.status();
-        if (ServiceStatus(payload).serverIdentityChanged) {
-          throw StateError(
-            'Administrator confirmation did not complete. '
-            'The new server key was not trusted.',
-          );
+        final status = ServiceStatus(payload);
+        if (helperResult == PrivilegedHelperResult.canceled) {
+          errorText =
+              'Administrator approval was canceled. No server trust setting '
+              'was changed.';
+          statusPayload = payload;
+          logger.info('administrator canceled server identity recovery');
+          return;
         }
+        if (status.serverIdentityChanged) {
+          final currentIdentity = await bridge.serverIdentity();
+          final currentOrigin = valueText(
+            currentIdentity['control_origin'],
+            fallback: '',
+          );
+          final currentKeyID = valueText(
+            currentIdentity['announced_key_id'],
+            fallback: '',
+          );
+          if (currentOrigin != controlOrigin ||
+              currentKeyID != announcedKeyID) {
+            errorText =
+                'The server identity changed again before confirmation. '
+                'Review the current origin and key IDs before trying again.';
+          } else {
+            errorText =
+                'Administrator confirmation did not complete. No server '
+                'trust setting was changed.';
+          }
+          statusPayload = payload;
+          logger.info('privileged server identity recovery was not applied');
+          return;
+        }
+        logger.info('privileged server identity recovery helper completed');
       }
       statusPayload = payload;
       errorText = null;
+      await _advanceRecoveryState(payload);
       _reconcileConnectionPolling(payload);
       logger.info('server identity recovery completed state=$state');
     } catch (err, stack) {
@@ -1221,6 +1321,26 @@ class EndlessNetController extends ChangeNotifier
         throw StateError('The service did not start device enrollment.');
       }
     } catch (err, stack) {
+      try {
+        final current = await bridge.status();
+        final currentStatus = ServiceStatus(current);
+        if (currentStatus.needsLogin ||
+            currentStatus.recovering ||
+            currentStatus.recoveryBlocked ||
+            currentStatus.policyBlocked) {
+          statusPayload = current;
+          errorText = null;
+          await _advanceRecoveryState(current);
+          logger.info('enrollment continued through recovery state=$state');
+          return;
+        }
+      } catch (statusErr, statusStack) {
+        logger.error(
+          'status refresh after enrollment failure failed',
+          statusErr,
+          statusStack,
+        );
+      }
       if (enrollmentElevationSupported && requiresAdministratorElevation(err)) {
         try {
           final launched = await elevatedEnrollmentLauncher(request);
@@ -1334,6 +1454,115 @@ class EndlessNetController extends ChangeNotifier
     _connectionPollingStartedAt = null;
   }
 
+  Future<void> _advanceRecoveryState(Map<String, dynamic> payload) async {
+    final status = ServiceStatus(payload);
+    if (status.recovering || status.needsLogin) {
+      if (status.needsLogin) {
+        _autoEnrollmentStartedForRecovery = false;
+      }
+      _startRecoveryPolling();
+      return;
+    }
+    if (status.needsEnrollment &&
+        valueText(payload['desired_state'], fallback: '') ==
+            ConnectionIntentState.connected) {
+      _stopRecoveryPolling();
+      if (!_autoEnrollmentInFlight &&
+          !_autoEnrollmentStartedForRecovery &&
+          !quitting) {
+        _autoEnrollmentStartedForRecovery = true;
+        scheduleMicrotask(() async {
+          if (quitting) {
+            return;
+          }
+          _autoEnrollmentInFlight = true;
+          try {
+            await connectDevice();
+          } finally {
+            _autoEnrollmentInFlight = false;
+          }
+        });
+      }
+      return;
+    }
+    if (status.connected ||
+        status.recoveryBlocked ||
+        status.policyBlocked ||
+        status.userDisconnected) {
+      _stopRecoveryPolling();
+    }
+    if (!status.needsEnrollment) {
+      _autoEnrollmentStartedForRecovery = false;
+    }
+  }
+
+  void _startRecoveryPolling() {
+    _recoveryPollingStartedAt ??= DateTime.now();
+    _recoveryPollTimer ??= Timer.periodic(
+      recoveryPollInterval,
+      (_) => _pollRecoveryStatus(),
+    );
+  }
+
+  void _stopRecoveryPolling() {
+    _recoveryPollTimer?.cancel();
+    _recoveryPollTimer = null;
+    _recoveryPollingStartedAt = null;
+  }
+
+  Future<void> _pollRecoveryStatus() async {
+    if (_recoveryPollInFlight || quitting || busy) {
+      return;
+    }
+    final startedAt = _recoveryPollingStartedAt;
+    if (startedAt != null &&
+        DateTime.now().difference(startedAt) >= recoveryPollTimeout) {
+      _stopRecoveryPolling();
+      errorText =
+          'Recovery is taking longer than expected. EndlessNet preserved the '
+          'current enrollment; try again later.';
+      await _updateTray();
+      notifyListeners();
+      return;
+    }
+
+    _recoveryPollInFlight = true;
+    try {
+      Map<String, dynamic> payload;
+      try {
+        payload = await bridge.recoveryStatusEvent();
+      } catch (err, stack) {
+        logger.error('recovery event snapshot unavailable', err, stack);
+        payload = await bridge.status();
+      }
+      statusPayload = payload;
+      errorText = null;
+      await _advanceRecoveryState(payload);
+      _reconcileConnectionPolling(payload);
+      logger.info('recovery status refreshed state=$state');
+    } catch (err, stack) {
+      errorText = safeErrorText(err);
+      logger.error('recovery status refresh failed', err, stack);
+    } finally {
+      _recoveryPollInFlight = false;
+      await _updateTray();
+      notifyListeners();
+    }
+  }
+
+  Future<void> continueAfterLogin() async {
+    final rawURL = firstNonEmpty(
+      valueText(statusPayload?['approval_url'], fallback: ''),
+      config.adminURL,
+    );
+    await _openExternalURL(rawURL, pageName: 'EndlessNet sign-in page');
+    _startRecoveryPolling();
+  }
+
+  Future<void> retryRecovery() async {
+    await runAction(() => bridge.connect());
+  }
+
   Future<void> _pollConnectionStatus() async {
     if (_connectionPollInFlight || quitting || busy) {
       return;
@@ -1351,6 +1580,7 @@ class EndlessNetController extends ChangeNotifier
       final payload = await bridge.status();
       statusPayload = payload;
       errorText = null;
+      await _advanceRecoveryState(payload);
       _reconcileConnectionPolling(payload);
       logger.info('connection status refreshed state=$state');
     } catch (err, stack) {
@@ -1394,6 +1624,7 @@ class EndlessNetController extends ChangeNotifier
           errorText = 'Device enrollment did not complete.';
         }
       }
+      await _advanceRecoveryState(payload);
       _reconcileConnectionPolling(payload);
     } catch (err, stack) {
       errorText = safeErrorText(err);
@@ -1479,7 +1710,93 @@ class EndlessNetController extends ChangeNotifier
   Future<void> logout() async {
     _stopEnrollmentPolling();
     _stopConnectionPolling();
-    await runAction(() => bridge.logout());
+    _stopRecoveryPolling();
+    busy = true;
+    errorText = null;
+    notifyListeners();
+    try {
+      final response = await bridge.logout();
+      final logout = LogoutResponse(response);
+      statusPayload = await bridge.status();
+      if (logout.remoteCleanupUnconfirmed) {
+        await _showRemoteCleanupWarning('');
+      }
+      logger.info('logout completed outcome=${logout.outcome}');
+    } catch (err, stack) {
+      if (requiresLocalForget(err)) {
+        final requestID = err is ServiceIPCException ? err.requestID : '';
+        busy = false;
+        notifyListeners();
+        await requestLocalForget(remoteRequestID: requestID);
+        return;
+      }
+      errorText = safeErrorText(err);
+      logger.error('logout failed', err, stack);
+      await messagePresenter('EndlessNet', errorText!);
+    } finally {
+      busy = false;
+      await _updateTray();
+      notifyListeners();
+    }
+  }
+
+  Future<void> requestLocalForget({String remoteRequestID = ''}) async {
+    final requestID = remoteRequestID.trim();
+    final confirmed = await localForgetConfirmationPresenter(requestID);
+    if (!confirmed) {
+      errorText =
+          'Local enrollment was kept. No device keys or trust settings were '
+          'changed.';
+      notifyListeners();
+      return;
+    }
+
+    busy = true;
+    errorText = null;
+    notifyListeners();
+    try {
+      final helperResult = await privilegedRecoveryLauncher(
+        const PrivilegedRecoveryRequest.forgetLocalEnrollment(),
+      );
+      statusPayload = await bridge.status();
+      if (helperResult == PrivilegedHelperResult.canceled) {
+        errorText =
+            'Administrator approval was canceled. Local enrollment was kept.';
+        logger.info('administrator canceled local enrollment forget');
+        return;
+      }
+      if (helperResult != PrivilegedHelperResult.completed ||
+          !serviceStatus.needsEnrollment) {
+        errorText =
+            'EndlessNet did not forget the local enrollment. Device keys and '
+            'trust settings were preserved.';
+        logger.info('privileged local enrollment forget was not applied');
+        return;
+      }
+      await _showRemoteCleanupWarning(requestID);
+      logger.info('local enrollment forgotten with remote cleanup unconfirmed');
+    } catch (err, stack) {
+      errorText = safeErrorText(err);
+      logger.error('local enrollment forget failed', err, stack);
+      await messagePresenter('EndlessNet', errorText!);
+    } finally {
+      busy = false;
+      await _updateTray();
+      notifyListeners();
+    }
+  }
+
+  Future<void> _showRemoteCleanupWarning(String requestID) async {
+    final suffix = requestID.trim().isEmpty
+        ? ''
+        : '\n\nSupport request ID: ${requestID.trim()}';
+    await messagePresenter(
+      'Enrollment forgotten locally',
+      'This device is disconnected and its local enrollment was removed. '
+          'Remote cleanup could not be confirmed, so the old device credential '
+          'may still be active. Revoke this device in the Management console.'
+          '$suffix',
+    );
   }
 
   Future<void> exitApp() async {
@@ -1488,6 +1805,7 @@ class EndlessNetController extends ChangeNotifier
     _showSignalTimer?.cancel();
     _stopEnrollmentPolling();
     _stopConnectionPolling();
+    _stopRecoveryPolling();
     if (!desktopIntegrationEnabled) {
       await logger.close();
       return;
@@ -1604,6 +1922,8 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 22),
               if (controller.errorText != null)
                 ErrorBanner(text: controller.errorText!),
+              if (controller.recoveryMessage case final message?)
+                RecoveryBanner(text: message),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -1616,7 +1936,35 @@ class HomeScreen extends StatelessWidget {
                       icon: const Icon(Icons.link),
                       label: const Text('Connect this device'),
                     ),
-                  if (controller.deviceEnrolled)
+                  if (controller.needsLogin)
+                    FilledButton.icon(
+                      onPressed: controller.busy
+                          ? null
+                          : controller.continueAfterLogin,
+                      icon: const Icon(Icons.login),
+                      label: const Text('Sign in to continue'),
+                    ),
+                  if (controller.policyBlocked)
+                    FilledButton.icon(
+                      onPressed: controller.busy
+                          ? null
+                          : controller.retryRecovery,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry recovery'),
+                    ),
+                  if (controller.recoveryBlocked)
+                    OutlinedButton.icon(
+                      onPressed: controller.busy
+                          ? null
+                          : controller.requestLocalForget,
+                      icon: const Icon(Icons.phonelink_erase_outlined),
+                      label: const Text('Forget enrollment locally'),
+                    ),
+                  if (controller.deviceEnrolled &&
+                      !controller.recovering &&
+                      !controller.needsLogin &&
+                      !controller.recoveryBlocked &&
+                      !controller.policyBlocked)
                     OutlinedButton.icon(
                       onPressed: controller.busy
                           ? null
@@ -1791,6 +2139,27 @@ class ErrorBanner extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE2A0A0)),
       ),
       child: Text(text, style: const TextStyle(color: Color(0xFF8A1F1F))),
+    );
+  }
+}
+
+class RecoveryBanner extends StatelessWidget {
+  const RecoveryBanner({super.key, required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF5FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF9DBCE8)),
+      ),
+      child: Text(text, style: const TextStyle(color: Color(0xFF153B6B))),
     );
   }
 }
@@ -2017,7 +2386,7 @@ Future<void> showMessageBox(String title, String message) async {
 
 Future<bool> showServerIdentityChangeDialog(
   BuildContext context, {
-  required String serverURL,
+  required String controlOrigin,
   required String trustedKeyID,
   required String announcedKeyID,
 }) async {
@@ -2031,8 +2400,9 @@ Future<bool> showServerIdentityChangeDialog(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'The signing identity for $serverURL differs from the identity previously trusted by this device.',
+                const Text(
+                  'The server signing identity differs from the identity '
+                  'previously trusted by this device.',
                 ),
                 const SizedBox(height: 12),
                 const Text(
@@ -2040,7 +2410,11 @@ Future<bool> showServerIdentityChangeDialog(
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 12),
-                SelectableText('Previously trusted:\n$trustedKeyID'),
+                SelectableText('Control origin:\n$controlOrigin'),
+                const SizedBox(height: 8),
+                SelectableText(
+                  'Previously trusted:\n${trustedKeyID.isEmpty ? '(none)' : trustedKeyID}',
+                ),
                 const SizedBox(height: 8),
                 SelectableText('Now announced:\n$announcedKeyID'),
               ],
@@ -2063,6 +2437,8 @@ Future<bool> showServerIdentityChangeDialog(
 
 Future<bool> showServerTrustAdministratorRequiredDialog(
   BuildContext context, {
+  required String controlOrigin,
+  required String trustedKeyID,
   required String announcedKeyID,
 }) async {
   return await showDialog<bool>(
@@ -2085,7 +2461,13 @@ Future<bool> showServerTrustAdministratorRequiredDialog(
                   'desktop app will remain unprivileged.',
                 ),
                 const SizedBox(height: 12),
-                SelectableText('Key to trust:\n$announcedKeyID'),
+                SelectableText('Control origin:\n$controlOrigin'),
+                const SizedBox(height: 8),
+                SelectableText(
+                  'Previously trusted:\n${trustedKeyID.isEmpty ? '(none)' : trustedKeyID}',
+                ),
+                const SizedBox(height: 8),
+                SelectableText('Now announced:\n$announcedKeyID'),
               ],
             ),
           ),
@@ -2098,6 +2480,64 @@ Future<bool> showServerTrustAdministratorRequiredDialog(
               onPressed: () => Navigator.of(context).pop(true),
               icon: const Icon(Icons.admin_panel_settings_outlined),
               label: const Text('Confirm as administrator'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+}
+
+Future<bool> showLocalForgetConfirmation(String remoteRequestID) async {
+  final context = navigatorKey.currentContext;
+  if (context == null || !context.mounted) {
+    return false;
+  }
+  return await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Forget enrollment on this device?'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'EndlessNet could not confirm removal of this device from '
+                  'the server. You can remove the local enrollment with '
+                  'administrator approval and enroll again.',
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'The old remote credential may remain active. Revoke this '
+                  'device in the Management console after continuing.',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Local forget removes the node credential, session, cached '
+                  'network map, and resets connection intent to disconnected. '
+                  'This device’s identity '
+                  'keys, local owner, and trusted server key are preserved.',
+                ),
+                if (remoteRequestID.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    'Support request ID: ${remoteRequestID.trim()}',
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Keep enrollment'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).pop(true),
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              label: const Text('Forget locally as administrator'),
             ),
           ],
         ),
@@ -2413,7 +2853,75 @@ Object redactDiagnostics(Object? value) {
 }
 
 String safeErrorText(Object err) {
-  return redactText(err.toString().replaceFirst('Bad state: ', '').trim());
+  if (err is ServiceIPCException) {
+    final message = switch (err.errorCode) {
+      ServiceIPCErrorCode.ownerRequired ||
+      ServiceIPCErrorCode.administratorRequired =>
+        'Administrator approval is required to continue.',
+      ServiceIPCErrorCode.remoteCleanupRequired =>
+        'EndlessNet could not confirm removal of this device from the server. '
+            'The local enrollment was preserved.',
+      ServiceIPCErrorCode.serverIdentityConfirmationMismatch =>
+        'The server identity changed again before confirmation. Review the '
+            'current origin and key IDs before trying again.',
+      'ipc_version_required' ||
+      'ipc_protocol_unsupported' ||
+      'ipc_version_unsupported' ||
+      'invalid_ipc_version_range' =>
+        'This EndlessNet app and service are not compatible. Repair or update '
+            'the installed EndlessNet package.',
+      'authentication_required' =>
+        'Sign in to continue connecting this device.',
+      'authorization_denied' =>
+        'Server policy currently prevents this operation. Your local '
+            'enrollment was preserved.',
+      'temporarily_unavailable' =>
+        'The control service is temporarily unavailable. Your local '
+            'enrollment was preserved; try again later.',
+      _ =>
+        'EndlessNet could not complete this request. Your local security '
+            'settings were not changed.',
+    };
+    final suffix = err.requestID.trim().isEmpty
+        ? ''
+        : ' Support request ID: ${err.requestID.trim()}';
+    return '$message$suffix';
+  }
+  if (err is TimeoutException || err is SocketException) {
+    return 'The EndlessNet service is not responding. Try again shortly.';
+  }
+  if (err is StateError) {
+    return redactText(err.message.toString().trim());
+  }
+  if (err is UnsupportedError) {
+    return redactText(
+      err.message?.toString().trim() ?? 'Unsupported operation.',
+    );
+  }
+  return 'EndlessNet could not complete this request. Try again or copy '
+      'diagnostics for support.';
+}
+
+String? recoveryStateMessage(ServiceStatus status) {
+  if (status.recovering) {
+    return 'EndlessNet trusted the confirmed server identity and is safely '
+        'renewing this device credential. The existing enrollment is being '
+        'preserved while recovery completes.';
+  }
+  if (status.needsLogin) {
+    return 'Sign in to continue recovery. Device keys, server trust, and the '
+        'existing enrollment remain protected.';
+  }
+  if (status.recoveryBlocked) {
+    return 'Automatic recovery stopped because the device identity could not '
+        'be verified. The existing enrollment was preserved. Only forget it '
+        'locally if you intend to enroll this device again.';
+  }
+  if (status.policyBlocked) {
+    return 'Server policy currently prevents recovery. The existing enrollment '
+        'was preserved; retry after the policy or approval is updated.';
+  }
+  return null;
 }
 
 Future<bool> launchExternalURL(Uri uri) =>

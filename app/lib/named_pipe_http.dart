@@ -54,11 +54,25 @@ class NamedPipeHttpClient {
         ]),
         message: _firstNonEmpty([
           payload['error']?.toString(),
-          payload['message']?.toString(),
           'EndlessNet service request failed with HTTP ${parsed.statusCode}.',
         ]),
+        requestID: payload['request_id']?.toString().trim() ?? '',
       );
     }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> eventStatusSnapshot({
+    Duration? requestTimeout,
+  }) async {
+    final effectiveTimeout = requestTimeout ?? timeout;
+    final payload = await Isolate.run(
+      () => namedPipeHttpEventStatusSnapshot(
+        pipePath,
+        effectiveTimeout.inMilliseconds,
+      ),
+    ).timeout(effectiveTimeout + const Duration(seconds: 1));
+    validateIPCEnvelope(payload, requireNegotiated: true);
     return payload;
   }
 }
@@ -68,11 +82,13 @@ class ServiceIPCException implements Exception {
     required this.statusCode,
     required this.errorCode,
     required this.message,
+    this.requestID = '',
   });
 
   final int statusCode;
   final String errorCode;
   final String message;
+  final String requestID;
 
   String get code => errorCode;
 
@@ -124,6 +140,40 @@ Uint8List namedPipeHttpExchange(
     ]);
     _writeAll(handle, request);
     return _readAll(handle);
+  } finally {
+    CloseHandle(handle);
+  }
+}
+
+Map<String, dynamic> namedPipeHttpEventStatusSnapshot(
+  String pipePath,
+  int timeoutMilliseconds,
+) {
+  final handle = _openPipe(
+    pipePath,
+    Duration(milliseconds: timeoutMilliseconds),
+  );
+  try {
+    final headers = StringBuffer()
+      ..write('GET ${ServiceIPCPath.events} HTTP/1.1\r\n')
+      ..write('Host: endlessnet.local\r\n')
+      ..write('Accept: application/x-ndjson\r\n')
+      ..write(
+        '${ServiceIPCMetadata.protocolHeader}: '
+        '${ServiceIPCMetadata.protocol}\r\n',
+      )
+      ..write(
+        '${ServiceIPCMetadata.versionHeader}: '
+        '${ServiceIPCMetadata.version}\r\n',
+      )
+      ..write(
+        '${ServiceIPCMetadata.minimumVersionHeader}: '
+        '${ServiceIPCMetadata.minimumSupportedVersion}\r\n',
+      )
+      ..write('Connection: close\r\n')
+      ..write('Content-Length: 0\r\n\r\n');
+    _writeAll(handle, Uint8List.fromList(ascii.encode(headers.toString())));
+    return _readEventStatusSnapshot(handle);
   } finally {
     CloseHandle(handle);
   }
@@ -253,6 +303,135 @@ Uint8List _readAll(HANDLE handle) {
     calloc.free(read);
     calloc.free(buffer);
   }
+}
+
+Map<String, dynamic> _readEventStatusSnapshot(HANDLE handle) {
+  final chunks = BytesBuilder(copy: false);
+  final buffer = calloc<Uint8>(_readBufferSize);
+  final read = calloc<Uint32>();
+  try {
+    while (true) {
+      final result = ReadFile(handle, buffer, _readBufferSize, read, null);
+      if (read.value > 0) {
+        chunks.add(Uint8List.fromList(buffer.asTypedList(read.value)));
+        if (chunks.length > _maxResponseBytes) {
+          throw const FormatException(
+            'EndlessNet service event snapshot is too large.',
+          );
+        }
+        final snapshot = tryParseEventStatusSnapshot(chunks.toBytes());
+        if (snapshot != null) {
+          return snapshot;
+        }
+      }
+      if (result.value && read.value > 0) {
+        continue;
+      }
+      if (!result.value && result.error == ERROR_MORE_DATA) {
+        continue;
+      }
+      throw const FormatException(
+        'EndlessNet service event stream ended before its status snapshot.',
+      );
+    }
+  } finally {
+    calloc.free(read);
+    calloc.free(buffer);
+  }
+}
+
+Map<String, dynamic>? tryParseEventStatusSnapshot(Uint8List raw) {
+  final headerEnd = _indexOf(raw, const [13, 10, 13, 10]);
+  if (headerEnd < 0) {
+    return null;
+  }
+  final headerText = ascii.decode(
+    raw.sublist(0, headerEnd),
+    allowInvalid: false,
+  );
+  final lines = headerText.split('\r\n');
+  final status = RegExp(
+    r'^HTTP/1\.[01] ([0-9]{3})(?: |$)',
+  ).firstMatch(lines.first);
+  if (status == null || status.group(1) != '200') {
+    throw const FormatException(
+      'EndlessNet service rejected the event stream.',
+    );
+  }
+  final headers = <String, String>{};
+  for (final line in lines.skip(1)) {
+    final separator = line.indexOf(':');
+    if (separator <= 0) {
+      throw const FormatException('Invalid EndlessNet service event header.');
+    }
+    headers[line.substring(0, separator).trim().toLowerCase()] = line
+        .substring(separator + 1)
+        .trim();
+  }
+  final encodedBody = Uint8List.fromList(raw.sublist(headerEnd + 4));
+  final body = headers['transfer-encoding']?.toLowerCase() == 'chunked'
+      ? _decodeAvailableChunkedBody(encodedBody)
+      : encodedBody;
+  final text = utf8.decode(body, allowMalformed: true);
+  final completeTextLines = text.split('\n');
+  if (!text.endsWith('\n') && completeTextLines.isNotEmpty) {
+    completeTextLines.removeLast();
+  }
+  final eventLines = completeTextLines
+      .where((line) => line.trim().isNotEmpty)
+      .toList(growable: false);
+  if (eventLines.length < 2) {
+    return null;
+  }
+  final hello = jsonDecode(eventLines.first.trim());
+  if (hello is! Map<String, dynamic> || hello['event_type'] != 'hello') {
+    throw const FormatException(
+      'EndlessNet service event stream did not start with hello.',
+    );
+  }
+  for (final line in eventLines.skip(1)) {
+    final decoded = jsonDecode(line.trim());
+    if (decoded is Map<String, dynamic> &&
+        decoded['event_type'] == 'status_changed' &&
+        decoded['status'] is Map<String, dynamic>) {
+      return decoded['status'] as Map<String, dynamic>;
+    }
+  }
+  return null;
+}
+
+Uint8List _decodeAvailableChunkedBody(Uint8List encoded) {
+  final decoded = BytesBuilder(copy: false);
+  var offset = 0;
+  while (offset < encoded.length) {
+    final lineEnd = _indexOf(encoded, const [13, 10], start: offset);
+    if (lineEnd < 0) {
+      break;
+    }
+    final sizeText = ascii
+        .decode(encoded.sublist(offset, lineEnd))
+        .split(';')
+        .first
+        .trim();
+    final size = int.tryParse(sizeText, radix: 16);
+    if (size == null || size < 0) {
+      throw const FormatException(
+        'Invalid chunk size from EndlessNet service event stream.',
+      );
+    }
+    offset = lineEnd + 2;
+    if (size == 0 || offset + size + 2 > encoded.length) {
+      break;
+    }
+    if (encoded[offset + size] != 13 || encoded[offset + size + 1] != 10) {
+      throw const FormatException(
+        'Invalid EndlessNet service event stream chunk.',
+      );
+    }
+    decoded.add(encoded.sublist(offset, offset + size));
+    offset += size + 2;
+  }
+  return decoded.takeBytes();
 }
 
 int? _contentLengthResponseBytes(Uint8List raw) {

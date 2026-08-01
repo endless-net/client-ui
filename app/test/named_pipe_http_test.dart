@@ -45,6 +45,60 @@ void main() {
     expect(utf8.decode(response.body), '$first$second');
   });
 
+  test('reads hello then immediate status_changed from event snapshot', () {
+    final hello = jsonEncode({
+      'ipc_protocol': ServiceIPCMetadata.protocol,
+      'ipc_version': ServiceIPCMetadata.version,
+      'ipc_min_supported_version': ServiceIPCMetadata.minimumSupportedVersion,
+      'ipc_negotiated_version': ServiceIPCMetadata.version,
+      'event_type': 'hello',
+      'sequence': 1,
+    });
+    final status = {
+      'ipc_protocol': ServiceIPCMetadata.protocol,
+      'ipc_version': ServiceIPCMetadata.version,
+      'ipc_min_supported_version': ServiceIPCMetadata.minimumSupportedVersion,
+      'ipc_negotiated_version': ServiceIPCMetadata.version,
+      'state': ServiceState.recovering,
+      'control_state': ControlState.recovering,
+    };
+    final changed = jsonEncode({
+      'ipc_protocol': ServiceIPCMetadata.protocol,
+      'ipc_version': ServiceIPCMetadata.version,
+      'ipc_min_supported_version': ServiceIPCMetadata.minimumSupportedVersion,
+      'ipc_negotiated_version': ServiceIPCMetadata.version,
+      'event_type': 'status_changed',
+      'sequence': 2,
+      'status': status,
+    });
+    final body = '$hello\n$changed\n';
+    final raw = Uint8List.fromList(
+      utf8.encode(
+        'HTTP/1.1 200 OK\r\n'
+        'Content-Type: application/x-ndjson\r\n'
+        'Content-Length: ${utf8.encode(body).length}\r\n'
+        '\r\n'
+        '$body',
+      ),
+    );
+
+    expect(tryParseEventStatusSnapshot(raw), status);
+  });
+
+  test('event snapshot waits for a complete status line', () {
+    const hello = '{"event_type":"hello"}\n';
+    const partial = '{"event_type":"status_changed","status":';
+    final raw = Uint8List.fromList(
+      utf8.encode(
+        'HTTP/1.1 200 OK\r\n'
+        'Content-Type: application/x-ndjson\r\n\r\n'
+        '$hello$partial',
+      ),
+    );
+
+    expect(tryParseEventStatusSnapshot(raw), isNull);
+  });
+
   test('rejects truncated response body', () {
     final raw = Uint8List.fromList(
       ascii.encode(
@@ -82,9 +136,9 @@ void main() {
     expect(
       () => validateIPCEnvelope({
         'ipc_protocol': ServiceIPCMetadata.protocol,
-        'ipc_version': 2,
-        'ipc_min_supported_version': 2,
-        'ipc_negotiated_version': 2,
+        'ipc_version': 1,
+        'ipc_min_supported_version': 1,
+        'ipc_negotiated_version': 1,
       }, requireNegotiated: true),
       throwsA(isA<FormatException>()),
     );
@@ -115,7 +169,8 @@ void main() {
     await bridge.disconnect();
     await bridge.diagnosticsBundle(logLimit: 100);
     await bridge.selectNetwork('net-1');
-    await bridge.trustServer('key-1');
+    await bridge.trustServer('https://api.example.test', 'key-1');
+    await bridge.localForget();
     await bridge.enroll(
       EnrollmentRequest(
         token: 'join-secret',
@@ -138,9 +193,10 @@ void main() {
         'network_id': 'net-1',
       }),
       const _IPCCall('POST', ServiceIPCPath.trustServer, {
-        'confirmed': true,
+        'confirmed_control_origin': 'https://api.example.test',
         'confirmed_key_id': 'key-1',
       }),
+      const _IPCCall('POST', ServiceIPCPath.localForget, {'confirmed': true}),
       const _IPCCall('POST', ServiceIPCPath.enroll, {
         'enroll_token': 'join-secret',
         'server': 'https://api.example.test',

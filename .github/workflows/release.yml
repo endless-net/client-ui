@@ -147,6 +147,7 @@ jobs:
           -UIVersion $env:UI_VERSION
           -CoreVersion $env:CORE_VERSION
           -ClientExe "${{ steps.core.outputs.client_exe }}"
+          -RecoveryHelperExe "${{ steps.core.outputs.recovery_helper_exe }}"
           -CoreMetadataDir "$env:RUNNER_TEMP/client-core"
           -UISourceSBOM "$env:RUNNER_TEMP/ui-source-sbom.spdx.json"
           -OutputDir "$env:RUNNER_TEMP/release"
@@ -159,6 +160,7 @@ jobs:
         run: |
           $endlessNetPaths = @(
             "$env:RUNNER_TEMP/release/endlessnet-client.exe",
+            "$env:RUNNER_TEMP/release/endlessnet-client-recovery-helper.exe",
             "$env:RUNNER_TEMP/release/app/endlessnet.exe",
             "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:UI_VERSION.msi"
           )

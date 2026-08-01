@@ -12,7 +12,7 @@ import (
 )
 
 func TestContractRoutesMatchCheckedInOpenAPI(t *testing.T) {
-	contractPath := filepath.Join("..", "..", "contracts", "upstream", "client-ipc-v1.openapi.yaml")
+	contractPath := filepath.Join("..", "..", "contracts", "upstream", "client-ipc-v2.openapi.yaml")
 	raw, err := os.ReadFile(contractPath)
 	if err != nil {
 		t.Fatalf("read IPC contract: %v", err)
@@ -52,6 +52,7 @@ func TestContractRoutesMatchCheckedInOpenAPI(t *testing.T) {
 		"/server-identity/trust": "administrator",
 		"/disconnect":            "owner",
 		"/logout":                "owner",
+		"/logout/local":          "administrator",
 		"/networks":              "observer",
 		"/network/select":        "owner",
 		"/diagnostics":           "owner",
@@ -116,10 +117,14 @@ func TestDefaultEngineImplementsContractSurface(t *testing.T) {
 
 	identity := decodeResult(t, engine.Handle(http.MethodGet, "/server-identity", nil))
 	assertEnvelope(t, identity)
+	controlOrigin := identity["control_origin"].(string)
 	keyID := identity["announced_key_id"].(string)
-	trusted := decodeResult(t, engine.Handle(http.MethodPost, "/server-identity/trust", []byte(`{"confirmed":true,"confirmed_key_id":"`+keyID+`"}`)))
+	trusted := decodeResult(t, engine.Handle(http.MethodPost, "/server-identity/trust", []byte(`{"confirmed_control_origin":"`+controlOrigin+`","confirmed_key_id":"`+keyID+`"}`)))
 	if got := trusted["state"]; got != "Connected" {
 		t.Fatalf("trusted state = %v, want Connected", got)
+	}
+	if trusted["operation"] != "trust_server_identity" || trusted["outcome"] != "completed" {
+		t.Fatalf("trust response omitted typed operation result: %#v", trusted)
 	}
 
 	diagnostics := decodeResult(t, engine.Handle(http.MethodGet, "/diagnostics", nil))
@@ -145,6 +150,16 @@ func TestDefaultEngineImplementsContractSurface(t *testing.T) {
 	if got := loggedOut["state"]; got != "NeedsEnrollment" {
 		t.Fatalf("logout state = %v, want NeedsEnrollment", got)
 	}
+	if loggedOut["outcome"] != "remote_cleanup_confirmed" {
+		t.Fatalf("logout outcome = %v", loggedOut["outcome"])
+	}
+	statusAfterLogout := decodeResult(t, engine.Handle(http.MethodGet, "/status", nil))
+	if statusAfterLogout["identity_private_key_present"] != true ||
+		statusAfterLogout["device_fingerprint_present"] != true ||
+		statusAfterLogout["map_signing_trust_present"] != true ||
+		statusAfterLogout["node_credential_present"] != false {
+		t.Fatalf("logout retention contract = %#v", statusAfterLogout)
+	}
 	enrolled := decodeResult(t, engine.Handle(http.MethodPost, "/enroll", []byte(`{"enroll_token":"enr_secret","mode":"workstation"}`)))
 	if got := enrolled["state"]; got != "Connected" {
 		t.Fatalf("enrolled state = %v, want Connected", got)
@@ -168,6 +183,31 @@ func TestDefaultEngineImplementsContractSurface(t *testing.T) {
 			t.Fatalf("decode event: %v", err)
 		}
 		assertEnvelope(t, event)
+	}
+	secondEvents := engine.Handle(http.MethodGet, "/events", nil)
+	var secondHello map[string]any
+	if err := json.Unmarshal(bytesBeforeNewline(secondEvents.Body), &secondHello); err != nil {
+		t.Fatal(err)
+	}
+	if secondHello["event_type"] != "hello" || secondHello["sequence"] != float64(1) {
+		t.Fatalf("event reconnect did not start a new stream: %#v", secondHello)
+	}
+}
+
+func TestLocalForgetRequiresExplicitConfirmation(t *testing.T) {
+	engine := newTestEngine(t, DefaultScenario(), nil)
+	rejected := engine.Handle(http.MethodPost, "/logout/local", []byte(`{"confirmed":false}`))
+	if rejected.StatusCode != http.StatusBadRequest {
+		t.Fatalf("unconfirmed local forget status = %d", rejected.StatusCode)
+	}
+	payload := decodeResult(t, rejected)
+	if payload["error_code"] != "local_forget_confirmation_required" {
+		t.Fatalf("unconfirmed local forget = %#v", payload)
+	}
+
+	forgotten := decodeResult(t, engine.Handle(http.MethodPost, "/logout/local", []byte(`{"confirmed":true}`)))
+	if forgotten["state"] != "NeedsEnrollment" || forgotten["outcome"] != "remote_cleanup_unconfirmed" {
+		t.Fatalf("local forget response = %#v", forgotten)
 	}
 }
 
@@ -212,6 +252,56 @@ func TestOwnerRequiredFixtureReturnsStableContractError(t *testing.T) {
 	if result.StatusCode != http.StatusForbidden || payload["error_code"] != "owner_required" {
 		t.Fatalf("owner-required response = status %d payload %#v", result.StatusCode, payload)
 	}
+}
+
+func TestRecoveryScenarioFixturesExposeTypedTransitions(t *testing.T) {
+	t.Run("planned signing rotation", func(t *testing.T) {
+		engine := newTestEngine(t, loadScenarioFixture(t, "planned-signing-rotation.json"), nil)
+		request := []byte(`{"confirmed_control_origin":"https://api.example.test","confirmed_key_id":"ed25519:new"}`)
+		admin := engine.Handle(http.MethodPost, "/server-identity/trust", request)
+		adminPayload := decodeResult(t, admin)
+		if admin.StatusCode != http.StatusForbidden || adminPayload["error_code"] != "administrator_required" {
+			t.Fatalf("administrator transition = status %d payload %#v", admin.StatusCode, adminPayload)
+		}
+		accepted := decodeResult(t, engine.Handle(http.MethodPost, "/server-identity/trust", request))
+		if accepted["outcome"] != "accepted" || accepted["state"] != "Recovering" {
+			t.Fatalf("accepted recovery = %#v", accepted)
+		}
+	})
+
+	t.Run("remote cleanup request ID", func(t *testing.T) {
+		engine := newTestEngine(t, loadScenarioFixture(t, "remote-cleanup-unconfirmed.json"), nil)
+		remote := engine.Handle(http.MethodPost, "/logout", []byte(`{}`))
+		remotePayload := decodeResult(t, remote)
+		if remote.StatusCode != http.StatusConflict ||
+			remotePayload["error_code"] != "remote_cleanup_required" ||
+			remotePayload["request_id"] != "req-remote-cleanup" {
+			t.Fatalf("remote cleanup failure = status %d payload %#v", remote.StatusCode, remotePayload)
+		}
+		forgotten := decodeResult(t, engine.Handle(http.MethodPost, "/logout/local", []byte(`{"confirmed":true}`)))
+		if forgotten["outcome"] != "remote_cleanup_unconfirmed" || forgotten["state"] != "NeedsEnrollment" {
+			t.Fatalf("local forget = %#v", forgotten)
+		}
+	})
+
+	t.Run("identity TOCTOU", func(t *testing.T) {
+		engine := newTestEngine(t, loadScenarioFixture(t, "server-identity-toctou.json"), nil)
+		result := engine.Handle(http.MethodPost, "/server-identity/trust", []byte(`{"confirmed_control_origin":"https://api.example.test","confirmed_key_id":"ed25519:new"}`))
+		payload := decodeResult(t, result)
+		if result.StatusCode != http.StatusConflict || payload["error_code"] != "server_identity_confirmation_mismatch" {
+			t.Fatalf("TOCTOU response = status %d payload %#v", result.StatusCode, payload)
+		}
+	})
+
+	t.Run("control plane reset", func(t *testing.T) {
+		engine := newTestEngine(t, loadScenarioFixture(t, "control-plane-reset-recovery.json"), nil)
+		for _, want := range []string{"Recovering", "NeedsLogin", "NeedsEnrollment", "Connected"} {
+			payload := decodeResult(t, engine.Handle(http.MethodGet, "/status", nil))
+			if payload["state"] != want {
+				t.Fatalf("recovery state = %v, want %s", payload["state"], want)
+			}
+		}
+	})
 }
 
 func TestScriptedRouteChecksBodyPatchesStatusAndRepeats(t *testing.T) {
@@ -336,6 +426,20 @@ func newTestEngine(t *testing.T, scenario Scenario, observer Observer) *Engine {
 	return engine
 }
 
+func loadScenarioFixture(t *testing.T, name string) Scenario {
+	t.Helper()
+	file, err := os.Open(filepath.Join("scenarios", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	scenario, err := LoadScenario(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return scenario
+}
+
 func decodeResult(t *testing.T, result Result) map[string]any {
 	t.Helper()
 	var payload map[string]any
@@ -350,4 +454,11 @@ func assertEnvelope(t *testing.T, payload map[string]any) {
 	if payload["ipc_protocol"] != IPCProtocol || payload["ipc_version"] != float64(IPCVersion) || payload["ipc_min_supported_version"] != float64(IPCVersion) || payload["ipc_negotiated_version"] != float64(IPCVersion) {
 		t.Fatalf("invalid IPC envelope: %#v", payload)
 	}
+}
+
+func bytesBeforeNewline(value []byte) []byte {
+	if index := strings.IndexByte(string(value), '\n'); index >= 0 {
+		return value[:index]
+	}
+	return value
 }

@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "name": "planned-signing-rotation",
+  "initial_status": {
+    "state": "ServerIdentityChanged",
+    "control_state": "server_identity_changed",
+    "desired_state": "connected"
+  },
+  "server_identity": {
+    "control_origin": "https://api.example.test",
+    "trusted_key_id": "ed25519:old",
+    "announced_key_id": "ed25519:new",
+    "changed": true
+  },
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/server-identity/trust",
+      "responses": [
+        {
+          "expect_body": {
+            "confirmed_control_origin": "https://api.example.test",
+            "confirmed_key_id": "ed25519:new"
+          },
+          "status": 403,
+          "body": {
+            "error_code": "administrator_required",
+            "error": "privileged helper required",
+            "request_id": "req-rotation-admin"
+          }
+        },
+        {
+          "expect_body": {
+            "confirmed_control_origin": "https://api.example.test",
+            "confirmed_key_id": "ed25519:new"
+          },
+          "status": 200,
+          "body": {
+            "operation_id": "op-rotation",
+            "operation": "trust_server_identity",
+            "outcome": "accepted",
+            "state": "Recovering",
+            "control_state": "recovering",
+            "trusted_key_id": "ed25519:new"
+          },
+          "status_patch": {
+            "state": "Recovering",
+            "control_state": "recovering",
+            "recovery": {
+              "operation_id": "op-rotation",
+              "state": "Recovering",
+              "retryable": true
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -53,7 +53,7 @@ flowchart LR
     User["Пользователь Windows"]
     Browser["Admin console в браузере"]
     UI["endlessnet.exe<br/>Flutter UI"]
-    Pipe["Защищённый local named pipe<br/>HTTP + JSON, IPC v1"]
+    Pipe["Защищённый local named pipe<br/>HTTP + JSON, IPC v2"]
     Service["endlessnet-client.exe<br/>Windows service / Go runtime"]
     State["C:\\ProgramData\\EndlessNet<br/>приватное состояние"]
     Tunnel["Wintun / overlay network"]
@@ -81,7 +81,7 @@ flowchart LR
 | `app/` | Flutter/Dart | Окно, tray, enrollment, connect/disconnect, диагностика и UX ошибок |
 | `named_pipe_http.dart` | Dart FFI + Win32 | HTTP/1.1 обмен поверх локального Windows named pipe |
 | `service_contract.dart` | Dart | Пути IPC и интерпретация service state для UI |
-| `contracts/upstream/` | OpenAPI 3.1 | Проверенная копия producer-контракта IPC v1 |
+| `contracts/upstream/` | OpenAPI 3.1 | Проверенная копия producer-контракта IPC v2 |
 | `tools/service-emulator/` | Go | Герметичная реализация IPC для тестов и fault injection |
 | `tools/windows-packaging/` | Go + WiX | Генерация MSI и WinGet-манифестов |
 | `scripts/` | PowerShell | Получение core, сборка, подписание и provenance |
@@ -123,26 +123,28 @@ UI:
 Обычный timeout составляет 8 секунд, enrollment может выполняться до 2 минут.
 
 Клиент отправляет обязательные protocol/current/minimum-version headers,
-ограничивает ответ одним MiB и проверяет negotiated v1 envelope, HTTP status
+ограничивает ответ одним MiB и проверяет negotiated v2 envelope, HTTP status
 line, `Content-Length` или chunked encoding и JSON object. Работа с
 Win32 pipe вынесена в отдельный Dart isolate, чтобы блокирующий системный ввод-
 вывод не останавливал Flutter UI.
 
 Контракт описан в
-[`contracts/upstream/client-ipc-v1.openapi.yaml`](../contracts/upstream/client-ipc-v1.openapi.yaml).
-Его vendored-копия и provenance синхронизированы с immutable core release,
-закреплённым в `client-core.lock.json`.
+[`contracts/upstream/client-ipc-v2.openapi.yaml`](../contracts/upstream/client-ipc-v2.openapi.yaml).
+Его vendored-копия точно соответствует producer commit
+`517780f5d748a241ca9975fe75d02de2cd074182` и immutable release `v0.4.1`,
+закреплённому в `client-core.lock.json`.
 
 | Endpoint | Назначение | Текущее использование UI |
 | --- | --- | --- |
 | `GET /status` | Текущее состояние service | Основной источник состояния, polling |
-| `GET /events` | NDJSON-поток изменений | Описан контрактом, UI пока не подписывается |
+| `GET /events` | NDJSON-поток изменений | Recovery reconnect: `hello`, затем immediate `status_changed`; fallback на `/status` |
 | `POST /enroll` | Enrollment устройства | Текущий локальный владелец; elevated worker только для миграции ownerless state |
 | `POST /connect` | Поднять туннель | Кнопка и tray |
 | `POST /disconnect` | Сохранить disconnect intent и опустить туннель | Кнопка и tray |
 | `GET /server-identity` | Сравнить закреплённый и объявленный signing key | Recovery при смене identity |
 | `POST /server-identity/trust` | Явно подтвердить новый signing key | Только после подтверждения пользователя |
-| `POST /logout` | Удалить локальное enrollment-состояние | Sign out / remove this device |
+| `POST /logout` | Bounded remote cleanup | Sign out / remove this device; typed cleanup outcome |
+| `POST /logout/local` | Явно забыть local enrollment | Только signed recovery helper после отдельного подтверждения |
 | `GET /networks` | Получить доступные сети | Просмотр списка |
 | `POST /network/select` | Выбрать уже enrolled сеть | Bridge готов, полноценного UI выбора пока нет |
 | `GET /diagnostics` | Получить redacted diagnostics | Копирование в clipboard с дополнительной redaction |
@@ -160,7 +162,7 @@ disconnect, logout, выбор сети и redacted diagnostics. Другой о
 
 UI принимает `endlessnet://enroll?enroll_token=...` или `enr_` токен из
 командной строки и сначала отправляет `/enroll` от текущего пользователя. На
-чистой установке core 0.3.1 закрепляет этого пользователя как локального
+чистой установке core 0.4.1 закрепляет этого пользователя как локального
 владельца без UAC. Только ответы `owner_required` и `administrator_required`
 означают миграцию ownerless legacy state и запускают собственный executable
 через `ShellExecute` с verb `runas`. Короткоживущий процесс с
@@ -182,15 +184,24 @@ deep link и значения авторизации редактируются 
 
 Обычный connect напрямую вызывает `/connect`. Если service сообщает об изменении
 ключа подписи server map, автоматическое подключение блокируется. UI получает
-trusted и announced key IDs, показывает пользователю предупреждение и вызывает
-`/server-identity/trust` только после явного подтверждения ожидаемой смены ключа.
+точные control origin, trusted key ID и announced key ID, показывает все три
+значения и вызывает `/server-identity/trust` только после явного
+подтверждения.
 
 Если service отвечает `administrator_required`, UI объясняет необходимость
 повышенных прав и предлагает отдельную кнопку подтверждения через Windows UAC.
-Основной desktop-процесс остаётся без повышения прав. Короткоживущий скрытый
-worker с `--elevated-trust-server` заново читает announced key ID, проверяет его
-совпадение с подтверждённым пользователем значением и отправляет trust-запрос
-напрямую в protected pipe. UI ждёт завершения worker и перечитывает `/status`.
+Основной desktop-процесс остаётся без повышения прав. Через `ShellExecute`
+с verb `runas` запускается только установленный signed helper
+`C:\Program Files\EndlessNet\endlessnet-client-recovery-helper.exe`. Helper
+принимает только fixed operation, confirmed origin и key ID; UI не передаёт
+ему executable, IPC endpoint, credentials, tokens или state paths. Совпадение
+подтверждения с текущей identity проверяет service, что закрывает TOCTOU.
+Отмена UAC не меняет trust.
+
+После helper UI игнорирует его stdout и следует только typed
+`/events`/`/status` через `Recovering`, `NeedsLogin`, `NeedsEnrollment`
+до `Connected`, либо до safe blocked-state. Backend diagnostics никогда не
+становятся UI-текстом.
 
 Это защитный recovery flow, а не обычная кнопка обхода проверки identity.
 
@@ -273,7 +284,7 @@ packaging smoke test. Публичные core assets читаются встро
 Перед публикацией workflow:
 
 1. запускает Go и Flutter tests;
-2. тестирует UI против `client-ipc-v1.openapi.yaml` из client release;
+2. тестирует UI против `client-ipc-v2.openapi.yaml` из client release;
 3. проверяет SHA-256 и исходную Authenticode-подпись `wintun.dll`;
 4. подписывает оба executable и итоговый MSI, затем проверяет все подписи;
 5. тестирует install, repair, upgrade и uninstall;

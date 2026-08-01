@@ -9,6 +9,7 @@
     }
   },
   "server_identity": {
+    "control_origin": "https://api.example.test",
     "trusted_key_id": "ed25519:old",
     "announced_key_id": "ed25519:new",
     "changed": true

@@ -1,11 +1,11 @@
 # EndlessNet service emulator
 
 The emulator is a standalone test process for the Windows desktop UI. It serves
-the checked-in v1 HTTP contract directly over a local Windows named pipe and
+the checked-in v2 HTTP contract directly over a local Windows named pipe and
 does not start the Go runtime client, read runtime state, or expose a TCP port.
 
 The built-in stateful model implements every path in
-`contracts/upstream/client-ipc-v1.openapi.yaml`:
+`contracts/upstream/client-ipc-v2.openapi.yaml`:
 
 - status and finite `application/x-ndjson` event snapshots;
 - connect, disconnect, logout, and enrollment transitions, including the
@@ -17,8 +17,8 @@ The built-in stateful model implements every path in
 
 The OpenAPI privilege metadata is verified by tests: status/events/identity and
 network reads are observers; enrollment, connect/disconnect, logout, and network
-selection and redacted diagnostics are owner operations; identity trust is an
-administrator operation. The emulator does not impersonate Windows SIDs;
+selection and redacted diagnostics are owner operations; identity trust and
+explicit local forget are administrator operations. The emulator does not impersonate Windows SIDs;
 authorization failures can be injected as scripted contract errors.
 
 ## Quick start
@@ -102,6 +102,10 @@ Ready-to-use examples live in `scenarios/`:
 - `enrollment-approval.json` models pending approval followed by enrollment;
 - `owner-required.json` rejects an owner operation for a different local user;
 - `server-identity-changed.json` drives explicit signing-key recovery;
+- `planned-signing-rotation.json` requires administrator trust and enters recovery;
+- `server-identity-toctou.json` changes the announced key before confirmation;
+- `control-plane-reset-recovery.json` walks the typed recovery states;
+- `remote-cleanup-unconfirmed.json` exercises safe explicit local forget;
 - `connect-failure.json` injects a delayed control-plane failure.
 
 ## Process coordination and request journal

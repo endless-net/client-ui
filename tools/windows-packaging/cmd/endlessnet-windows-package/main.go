@@ -34,6 +34,7 @@ func renderMSI(args []string) error {
 	outputDir := fs.String("output-dir", "", "directory for WiX source and build script")
 	version := fs.String("version", "", "MSI product version")
 	clientExe := fs.String("client-exe", "", "path to the verified Go client executable")
+	recoveryHelperExe := fs.String("recovery-helper-exe", "", "path to the verified recovery helper executable")
 	wintunDLL := fs.String("wintun-dll", "", "path to the verified official Wintun DLL")
 	wintunLicense := fs.String("wintun-license", "", "path to the official Wintun prebuilt-binary license")
 	appExe := fs.String("app-exe", "", "path to the Flutter application executable")
@@ -45,14 +46,15 @@ func renderMSI(args []string) error {
 		return err
 	}
 	for name, value := range map[string]string{
-		"output-dir":     *outputDir,
-		"version":        *version,
-		"client-exe":     *clientExe,
-		"wintun-dll":     *wintunDLL,
-		"wintun-license": *wintunLicense,
-		"app-exe":        *appExe,
-		"app-bundle-dir": *appBundleDir,
-		"msi":            *msi,
+		"output-dir":          *outputDir,
+		"version":             *version,
+		"client-exe":          *clientExe,
+		"recovery-helper-exe": *recoveryHelperExe,
+		"wintun-dll":          *wintunDLL,
+		"wintun-license":      *wintunLicense,
+		"app-exe":             *appExe,
+		"app-bundle-dir":      *appBundleDir,
+		"msi":                 *msi,
 	} {
 		if strings.TrimSpace(value) == "" {
 			return fmt.Errorf("--%s is required", name)
@@ -64,6 +66,7 @@ func renderMSI(args []string) error {
 		Version:             *version,
 		UpgradeCode:         defaults.UpgradeCode,
 		ClientExe:           *clientExe,
+		RecoveryHelperExe:   *recoveryHelperExe,
 		WintunDLL:           *wintunDLL,
 		WintunLicense:       *wintunLicense,
 		AppExe:              *appExe,

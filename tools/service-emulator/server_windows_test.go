@@ -58,16 +58,16 @@ func TestNamedPipeServerRoundTrip(t *testing.T) {
 	if missingHeaders.StatusCode != http.StatusUpgradeRequired || missingHeaders.Payload["error_code"] != "ipc_version_required" {
 		t.Fatalf("missing IPC headers response = %#v", missingHeaders)
 	}
-	version2Headers := fmt.Sprintf(
-		"%s: %s\r\n%s: 2\r\n%s: 2\r\n",
+	version1Headers := fmt.Sprintf(
+		"%s: %s\r\n%s: 1\r\n%s: 1\r\n",
 		IPCProtocolHeader,
 		IPCProtocol,
 		IPCVersionHeader,
 		IPCMinVersionHeader,
 	)
-	version2 := pipeRequestWithRawIPCHeaders(t, pipePath, http.MethodGet, "/status", nil, version2Headers)
-	if version2.StatusCode != http.StatusUpgradeRequired || version2.Payload["error_code"] != "ipc_version_unsupported" {
-		t.Fatalf("IPC version 2 response = %#v", version2)
+	version1 := pipeRequestWithRawIPCHeaders(t, pipePath, http.MethodGet, "/status", nil, version1Headers)
+	if version1.StatusCode != http.StatusUpgradeRequired || version1.Payload["error_code"] != "ipc_version_unsupported" {
+		t.Fatalf("IPC version 1 response = %#v", version1)
 	}
 }
 

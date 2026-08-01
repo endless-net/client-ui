@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "name": "remote-cleanup-unconfirmed",
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/logout",
+      "repeat_last": true,
+      "responses": [
+        {
+          "expect_body": {},
+          "status": 409,
+          "body": {
+            "error_code": "remote_cleanup_required",
+            "error": "remote cleanup could not be confirmed",
+            "request_id": "req-remote-cleanup"
+          }
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/logout/local",
+      "repeat_last": true,
+      "responses": [
+        {
+          "expect_body": {
+            "confirmed": true
+          },
+          "body": {
+            "state": "NeedsEnrollment",
+            "control_state": "not_registered",
+            "outcome": "remote_cleanup_unconfirmed"
+          },
+          "status_patch": {
+            "state": "NeedsEnrollment",
+            "control_state": "not_registered",
+            "desired_state": "disconnected",
+            "user_disconnected": true,
+            "node_credential_present": false,
+            "cached_map_present": false,
+            "cached_map_valid": false
+          }
+        }
+      ]
+    }
+  ]
+}

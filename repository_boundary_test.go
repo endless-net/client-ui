@@ -21,6 +21,7 @@ func TestWindowsReleaseUsesUITagAndReviewedCoreLock(t *testing.T) {
 		`GH_TOKEN: ${{ github.token }}`,
 		`-UIVersion $env:UI_VERSION`,
 		`-CoreVersion $env:CORE_VERSION`,
+		`-RecoveryHelperExe "${{ steps.core.outputs.recovery_helper_exe }}"`,
 		`windows-distribution-sbom.spdx.json`,
 	} {
 		if !strings.Contains(workflow, required) {
@@ -70,6 +71,14 @@ func TestCoreResolverConsumesOnlyReviewedLock(t *testing.T) {
 		`/git/tags/$tagObjectSHA`,
 		`client core tag does not resolve to the reviewed commit`,
 		`$manifest.artifacts.ipc_contract.sha256`,
+		`$manifest.artifacts.recovery_helper.sha256`,
+		`endlessnet-client-recovery-helper_windows_amd64.exe`,
+		`endlessnet-client-recovery-helper.exe`,
+		`"attestation", "verify"`,
+		`--signer-workflow`,
+		`--source-ref`,
+		`--source-digest`,
+		`--deny-self-hosted-runners`,
 		`checked-in IPC contract does not match`,
 	} {
 		if !strings.Contains(resolver, required) {
@@ -84,6 +93,7 @@ func TestCoreResolverConsumesOnlyReviewedLock(t *testing.T) {
 		"ui_source_sha256",
 		"windows_distribution_sha256",
 		"client = [ordered]@{",
+		"recovery_helper = [ordered]@{",
 	} {
 		if !strings.Contains(provenance, required) {
 			t.Errorf("release provenance is missing %q", required)
@@ -91,14 +101,15 @@ func TestCoreResolverConsumesOnlyReviewedLock(t *testing.T) {
 	}
 }
 
-func TestVendoredIPCContractTracksReviewedRelease(t *testing.T) {
+func TestVendoredIPCContractTracksPublishedProducerRevision(t *testing.T) {
 	provenance := readRepositoryFile(t, "contracts/upstream/README.md")
 	lock := readRepositoryFile(t, "client-core.lock.json")
 	for _, required := range []string{
-		"v0.3.1",
-		"adcb14d68cb91d63a34ade51c762935f281d69b4",
-		"client-ipc-v1.openapi.yaml",
-		"266ec8c3c8fd9a775c0303316b70102a3ccbcc72928a3b30ba16454ff71054a6",
+		"v0.4.1",
+		"517780f5d748a241ca9975fe75d02de2cd074182",
+		"client-ipc-v2.openapi.yaml",
+		"996103b8bfc8ed60ec9cd5ea9407662388e48bf35e75d70f96cef3c159971eca",
+		"6c9013ed51810ec65606358f81f5eb6750aeb638",
 	} {
 		if !strings.Contains(provenance, required) {
 			t.Errorf("vendored IPC provenance is missing %q", required)
@@ -106,8 +117,8 @@ func TestVendoredIPCContractTracksReviewedRelease(t *testing.T) {
 	}
 	for _, required := range []string{
 		`"repository": "endless-net/client"`,
-		`"version": "0.3.1"`,
-		`"commit": "adcb14d68cb91d63a34ade51c762935f281d69b4"`,
+		`"version": "0.4.1"`,
+		`"commit": "517780f5d748a241ca9975fe75d02de2cd074182"`,
 	} {
 		if !strings.Contains(lock, required) {
 			t.Errorf("reviewed client core lock is missing %q", required)
@@ -115,11 +126,10 @@ func TestVendoredIPCContractTracksReviewedRelease(t *testing.T) {
 	}
 }
 
-func TestProductionTreeHasNoIPCVersion2References(t *testing.T) {
+func TestProductionTreeHasNoIPCVersion1References(t *testing.T) {
 	forbidden := []string{
-		strings.Join([]string{"client-ipc", "v2"}, "-"),
-		strings.Join([]string{"ipc", "v2"}, "/"),
-		strings.Join([]string{"IPC", "v2"}, " "),
+		strings.Join([]string{"client-ipc", "v1"}, "-"),
+		strings.Join([]string{"ipc", "v1"}, "/"),
 	}
 	err := filepath.WalkDir(".", func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -143,7 +153,7 @@ func TestProductionTreeHasNoIPCVersion2References(t *testing.T) {
 		text := string(raw)
 		for _, removed := range forbidden {
 			if strings.Contains(text, removed) {
-				t.Errorf("%s retains IPC version 2 reference %q", path, removed)
+				t.Errorf("%s retains IPC version 1 reference %q", path, removed)
 			}
 		}
 		return nil
@@ -159,7 +169,6 @@ func TestPublicTreeHasNoLegacyReleaseCoupling(t *testing.T) {
 		strings.Join([]string{"FRONT", "RELEASE", "TOKEN"}, "_"),
 		strings.Join([]string{"windows", "client", "ui", "published"}, "-"),
 		strings.Join([]string{"CLIENT", "CORE", "RELEASE", "TOKEN"}, "_"),
-		strings.Join([]string{"self", "hosted"}, "-"),
 		strings.Join([]string{"repository", "dispatch"}, "_"),
 		strings.Join([]string{"client", "core", "published"}, "-"),
 		strings.Join([]string{"private", "release"}, " "),

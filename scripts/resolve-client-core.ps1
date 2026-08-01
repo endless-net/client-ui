@@ -3,7 +3,7 @@ param(
     [string]$LockFile = (Join-Path $PSScriptRoot "..\client-core.lock.json"),
     [Parameter(Mandatory = $true)]
     [string]$OutputDir,
-    [string]$ExpectedContract = (Join-Path $PSScriptRoot "..\contracts\upstream\client-ipc-v1.openapi.yaml"),
+    [string]$ExpectedContract = (Join-Path $PSScriptRoot "..\contracts\upstream\client-ipc-v2.openapi.yaml"),
     [string]$GitHubEnv = $env:GITHUB_ENV,
     [string]$GitHubOutput = $env:GITHUB_OUTPUT,
     [string]$GitHubCLI = "gh",
@@ -157,13 +157,13 @@ $manifestPath = Join-Path $OutputDir "client-core-manifest.json"
 Copy-VerifiedAsset $lock.manifest $manifestPath $lock.repository $lock.tag $AssetSourceDir
 
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.schema_version -ne 1 -or $manifest.repository -cne $lock.repository) {
+if ($manifest.schema_version -ne 2 -or $manifest.repository -cne $lock.repository) {
     throw "unsupported client core manifest producer or schema"
 }
 if ($manifest.version -cne $lock.version -or $manifest.commit -cne $lock.commit) {
     throw "client core manifest does not match the reviewed lock"
 }
-if ($manifest.target -cne "windows/amd64" -or $manifest.ipc_version -cne "v1") {
+if ($manifest.target -cne "windows/amd64" -or $manifest.ipc_version -cne "v2") {
     throw "client core manifest target or IPC version mismatch"
 }
 
@@ -173,23 +173,53 @@ $clientAsset = [pscustomobject]@{
     sha256 = [string]$manifest.artifacts.client.sha256
 }
 $contractAsset = [pscustomobject]@{
-    name = "client-ipc-v1.openapi.yaml"
-    url = "$releaseBase/client-ipc-v1.openapi.yaml"
+    name = "client-ipc-v2.openapi.yaml"
+    url = "$releaseBase/client-ipc-v2.openapi.yaml"
     sha256 = [string]$manifest.artifacts.ipc_contract.sha256
+}
+
+function Assert-BuildAttestation(
+    [string]$Path,
+    [string]$Repository,
+    [string]$Tag,
+    [string]$Commit
+) {
+    Invoke-GitHubCLI @(
+        "attestation", "verify", $Path,
+        "--repo", $Repository,
+        "--signer-workflow", "$Repository/.github/workflows/publish-client-core.yml",
+        "--source-ref", "refs/tags/$Tag",
+        "--source-digest", $Commit,
+        "--predicate-type", "https://slsa.dev/provenance/v1",
+        "--deny-self-hosted-runners"
+    ) | Out-Null
+}
+$recoveryHelperAsset = [pscustomobject]@{
+    name = "endlessnet-client-recovery-helper_windows_amd64.exe"
+    url = "$releaseBase/endlessnet-client-recovery-helper_windows_amd64.exe"
+    sha256 = [string]$manifest.artifacts.recovery_helper.sha256
 }
 Assert-Asset $clientAsset "manifest.artifacts.client" $clientAsset.name $releaseBase
 Assert-Asset $contractAsset "manifest.artifacts.ipc_contract" $contractAsset.name $releaseBase
+Assert-Asset $recoveryHelperAsset "manifest.artifacts.recovery_helper" $recoveryHelperAsset.name $releaseBase
 if ($manifest.artifacts.client.name -cne $clientAsset.name -or
     $manifest.artifacts.client.url -cne $clientAsset.url -or
     $manifest.artifacts.ipc_contract.name -cne $contractAsset.name -or
-    $manifest.artifacts.ipc_contract.url -cne $contractAsset.url) {
+    $manifest.artifacts.ipc_contract.url -cne $contractAsset.url -or
+    $manifest.artifacts.recovery_helper.name -cne $recoveryHelperAsset.name -or
+    $manifest.artifacts.recovery_helper.url -cne $recoveryHelperAsset.url -or
+    $manifest.artifacts.recovery_helper.installed_name -cne "endlessnet-client-recovery-helper.exe") {
     throw "client core manifest contains unexpected artifact metadata"
 }
 
 $clientPath = Join-Path $OutputDir $clientAsset.name
 $contractPath = Join-Path $OutputDir $contractAsset.name
+$recoveryHelperPath = Join-Path $OutputDir $recoveryHelperAsset.name
 Copy-VerifiedAsset $clientAsset $clientPath $lock.repository $lock.tag $AssetSourceDir
 Copy-VerifiedAsset $contractAsset $contractPath $lock.repository $lock.tag $AssetSourceDir
+Copy-VerifiedAsset $recoveryHelperAsset $recoveryHelperPath $lock.repository $lock.tag $AssetSourceDir
+Assert-BuildAttestation $clientPath $lock.repository $lock.tag $lock.commit
+Assert-BuildAttestation $recoveryHelperPath $lock.repository $lock.tag $lock.commit
 
 $checkedInContract = [System.IO.File]::ReadAllText($ExpectedContract).Replace("`r`n", "`n")
 $releasedContract = [System.IO.File]::ReadAllText($contractPath).Replace("`r`n", "`n")
@@ -216,6 +246,7 @@ $outputs = [ordered]@{
     manifest_sha256 = $lock.manifest.sha256
     manifest = $manifestPath
     client_exe = $clientPath
+    recovery_helper_exe = $recoveryHelperPath
     ipc_contract = $contractPath
     license = $compliancePaths.license
     notice = $compliancePaths.notice
@@ -243,5 +274,6 @@ Write-Host "CoreVersion=$($outputs.core_version)"
 Write-Host "ClientCommit=$($outputs.client_commit)"
 Write-Host "Manifest=$manifestPath"
 Write-Host "ClientExe=$clientPath"
+Write-Host "RecoveryHelperExe=$recoveryHelperPath"
 Write-Host "IPCContract=$contractPath"
 Write-Host "Compliance=$OutputDir"
