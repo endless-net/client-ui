@@ -58,11 +58,16 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`/IM endlessnet.exe`,
 		`Custom Action="KillEndlessNetApp" Before="InstallValidate"`,
 		`StandardDirectory Id="SystemFolder"`,
+		`StandardDirectory Id="System64Folder"`,
 		`Directory Id="ApplicationProgramsFolder" Name="EndlessNet"`,
+		`ComponentGroupRef Id="EndlessNetShortcutComponents"`,
+		`ComponentGroup Id="EndlessNetShortcutComponents" Directory="ApplicationProgramsFolder"`,
+		`Component Id="ApplicationShortcut" Guid="*"`,
 		`Shortcut Id="EndlessNetShortcut"`,
 		`Arguments="--show-window --debug --debug-log-dir ~\.endlessnet\logs"`,
 		`Icon="EndlessNetIcon"`,
 		`RemoveFolder Id="RemoveEndlessNetProgramMenuFolder"`,
+		`Name="StartMenuShortcut"`,
 		`Component Id="ClientExecutable" Guid="*" Bitness="always64"`,
 		`Component Id="AppExecutable" Guid="*" Bitness="always64"`,
 		`Component Id="AppIcon" Guid="*" Bitness="always64"`,
@@ -82,10 +87,8 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`<ServiceInstall`,
 		`Name="endlessnet-client"`,
 		`--windows-service`,
-		`--ipc-pipe`,
 		`--diagnostics-dir`,
-		`--event-log-source`,
-		`--debug-log-dir`,
+		`--timeout`,
 		`<util:ServiceConfig`,
 		`FirstFailureActionType="restart"`,
 		`SecondFailureActionType="restart"`,
@@ -96,7 +99,7 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`Start="install"`,
 		`<Component Id="EventLogSource"`,
 		`SYSTEM\CurrentControlSet\Services\EventLog\Application\EndlessNet Client`,
-		`EventMessageFile`,
+		`EventMessageFile" Type="expandable" Value="[System64Folder]EventCreate.exe"`,
 		`TypesSupported`,
 		`Component Id="RemoveStateOnUninstall"`,
 		`util:RemoveFolderEx Id="RemoveEndlessNetStateRoot"`,
@@ -135,6 +138,9 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`--apply-wireguard`,
 		`--apply-wg-quick`,
 		`--wireguard-windows`,
+		`--output`,
+		`--ipc-pipe`,
+		`--event-log-source`,
 		`Directory Id="AppDataFolder"`,
 	} {
 		if strings.Contains(artifacts.WixSource, forbidden) {
@@ -164,6 +170,15 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		if strings.Contains(artifacts.WixSource, leak) || strings.Contains(artifacts.BuildScript, leak) {
 			t.Fatalf("installer artifacts leaked %q", leak)
 		}
+	}
+}
+
+func TestRenderWindowsInstallerArtifactsRejectsOversizedServiceArguments(t *testing.T) {
+	opts := DefaultWindowsInstallerOptions()
+	opts.ServiceOptions.ConfigPath = `C:\ProgramData\EndlessNet\` + strings.Repeat("x", 200) + `.json`
+	_, err := RenderWindowsInstallerArtifacts(opts)
+	if err == nil || !strings.Contains(err.Error(), "at most 255") {
+		t.Fatalf("error = %v, want Windows Installer service argument limit", err)
 	}
 }
 

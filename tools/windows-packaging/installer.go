@@ -143,6 +143,7 @@ func validateWindowsInstallerOptions(opts WindowsInstallerOptions) error {
 		"config path":    opts.ServiceOptions.ConfigPath,
 		"agent state":    opts.ServiceOptions.StatePath,
 		"diagnostics":    opts.ServiceOptions.DiagnosticsDir,
+		"IPC pipe":       opts.ServiceOptions.IPCPipe,
 		"event source":   opts.ServiceOptions.EventLogSource,
 	} {
 		if strings.TrimSpace(value) == "" {
@@ -157,6 +158,10 @@ func validateWindowsInstallerOptions(opts WindowsInstallerOptions) error {
 	}
 	if windowsParentPath(opts.ServiceOptions.ConfigPath) == "" {
 		return errors.New("config path must include a parent directory")
+	}
+	serviceArgs := strings.Join(windowsServiceAgentArgs(opts.ServiceOptions), " ")
+	if len(serviceArgs) > 255 {
+		return fmt.Errorf("service arguments are %d characters; Windows Installer allows at most 255", len(serviceArgs))
 	}
 	return nil
 }
@@ -222,8 +227,10 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       <ComponentGroupRef Id="EndlessNetClientComponents" />
       <ComponentGroupRef Id="EndlessNetAppBundleFiles" />
       <ComponentGroupRef Id="EndlessNetAppDataFiles" />
+      <ComponentGroupRef Id="EndlessNetShortcutComponents" />
     </Feature>
     <StandardDirectory Id="SystemFolder" />
+    <StandardDirectory Id="System64Folder" />
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ApplicationProgramsFolder" Name="EndlessNet" />
     </StandardDirectory>
@@ -250,8 +257,6 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       </Component>
       <Component Id="AppExecutable" Guid="*" Bitness="always64">
         <File Id="AppExeFile" Source="$(var.AppExe)" Name="endlessnet.exe" KeyPath="yes" />
-        <Shortcut Id="EndlessNetShortcut" Directory="ApplicationProgramsFolder" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet.exe" Arguments="--show-window --debug --debug-log-dir %s" WorkingDirectory="INSTALLFOLDER" Icon="EndlessNetIcon" />
-        <RemoveFolder Id="RemoveEndlessNetProgramMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
       </Component>
       <Component Id="AppIcon" Guid="*" Bitness="always64">
         <File Id="AppIconFile" Source="$(var.IconFile)" Name="endlessnet.ico" KeyPath="yes" />
@@ -271,7 +276,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       </Component>
       <Component Id="EventLogSource" Guid="*" Bitness="always64">
         <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\EventLog\Application\%s">
-          <RegistryValue Name="EventMessageFile" Type="expandable" Value="[SystemFolder]EventCreate.exe" KeyPath="yes" />
+          <RegistryValue Name="EventMessageFile" Type="expandable" Value="[System64Folder]EventCreate.exe" KeyPath="yes" />
           <RegistryValue Name="TypesSupported" Type="integer" Value="7" />
           <RegistryValue Name="CustomSource" Type="integer" Value="1" />
         </RegistryKey>
@@ -291,6 +296,13 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
         <RemoveFile Id="RemoveAgentStateBeforeInstall" Name="agent-state.json" On="install" />
         <RemoveFile Id="RemoveAgentLockBeforeInstall" Name="client.json.agent.lock" On="install" />
         <RegistryValue Root="HKLM" Key="Software\EndlessNet\Client" Name="StateResetMarker" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+    <ComponentGroup Id="EndlessNetShortcutComponents" Directory="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcut" Guid="*">
+        <Shortcut Id="EndlessNetShortcut" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet.exe" Arguments="--show-window --debug --debug-log-dir %s" WorkingDirectory="INSTALLFOLDER" Icon="EndlessNetIcon" />
+        <RemoveFolder Id="RemoveEndlessNetProgramMenuFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\EndlessNet\Client" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </ComponentGroup>
     <ComponentGroup Id="EndlessNetAppBundleFiles" Directory="INSTALLFOLDER">
@@ -323,8 +335,8 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 		xmlAttrEscape(opts.ServiceOptions.ServiceName),
 		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
 		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
-		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
 		xmlAttrEscape(opts.ServiceOptions.EventLogSource),
+		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
 	)
 }
 

@@ -208,6 +208,7 @@ func validateWindowsWingetOptions(opts WindowsWingetOptions) error {
 
 func renderWindowsWingetVersionManifest(opts WindowsWingetOptions) string {
 	return strings.Join([]string{
+		"# yaml-language-server: $schema=https://aka.ms/winget-manifest.version." + opts.ManifestVersion + ".schema.json",
 		"PackageIdentifier: " + yamlScalar(opts.PackageIdentifier),
 		"PackageVersion: " + yamlScalar(opts.Version),
 		"DefaultLocale: en-US",
@@ -219,6 +220,7 @@ func renderWindowsWingetVersionManifest(opts WindowsWingetOptions) string {
 
 func renderWindowsWingetInstallerManifest(opts WindowsWingetOptions) string {
 	lines := []string{
+		"# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer." + opts.ManifestVersion + ".schema.json",
 		"PackageIdentifier: " + yamlScalar(opts.PackageIdentifier),
 		"PackageVersion: " + yamlScalar(opts.Version),
 		"InstallerType: wix",
@@ -252,6 +254,7 @@ func renderWindowsWingetInstallerManifest(opts WindowsWingetOptions) string {
 
 func renderWindowsWingetLocaleManifest(opts WindowsWingetOptions) string {
 	return strings.Join([]string{
+		"# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale." + opts.ManifestVersion + ".schema.json",
 		"PackageIdentifier: " + yamlScalar(opts.PackageIdentifier),
 		"PackageVersion: " + yamlScalar(opts.Version),
 		"PackageLocale: en-US",

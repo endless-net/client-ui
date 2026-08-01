@@ -47,6 +47,7 @@ func TestReleaseConsumesStandalonePublicClientCore(t *testing.T) {
 		"BACKEND_RELEASE_TOKEN",
 		"unng-lab/endlessnet/releases/download",
 		"windows-client-ipc.openapi.yaml",
+		"client-ipc-v2.openapi.yaml",
 		"client_core",
 		"$env:VERSION",
 		"[string]$Version",

@@ -25,6 +25,7 @@ func TestRenderWindowsWingetArtifacts(t *testing.T) {
 		t.Fatalf("version manifest file = %q", artifacts.VersionManifestFile)
 	}
 	for _, want := range []string{
+		"# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.12.0.schema.json",
 		"PackageIdentifier: 'EndlessNet.Client'",
 		"PackageVersion: '1.2.3'",
 		"DefaultLocale: en-US",
@@ -36,6 +37,7 @@ func TestRenderWindowsWingetArtifacts(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
+		"# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json",
 		"InstallerType: wix",
 		"Scope: machine",
 		"UpgradeBehavior: install",
@@ -53,6 +55,7 @@ func TestRenderWindowsWingetArtifacts(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
+		"# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json",
 		"PackageLocale: en-US",
 		"Publisher: 'UNNG'",
 		"PackageName: 'EndlessNet Client'",
