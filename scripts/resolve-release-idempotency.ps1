@@ -8,7 +8,7 @@ param(
     [string]$ClientCommit,
     [Parameter(Mandatory = $true)]
     [string]$CoreManifestSHA256,
-    [string]$Repository = "unng-lab/endlessnet-client-ui",
+    [string]$Repository = "endless-net/client-ui",
     [string]$GitHubOutput = $env:GITHUB_OUTPUT,
     [string]$RunnerTemp = $env:RUNNER_TEMP,
     [string]$GitHubCLI = "gh"

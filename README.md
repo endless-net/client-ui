@@ -3,7 +3,7 @@
 This repository owns the Flutter Windows desktop application and the complete
 Windows distribution pipeline for EndlessNet Client. The Go runtime client and
 the versioned local IPC producer contract are owned by
-[`unng-lab/endlessnet-client`](https://github.com/unng-lab/endlessnet-client).
+[`endless-net/client`](https://github.com/endless-net/client).
 
 Architecture, accepted decisions, known limitations, and possible development
 directions are documented in
@@ -67,13 +67,13 @@ Build an unsigned validation MSI from a previously verified Go-core artifact:
 ```
 
 Production releases are initiated by an immutable `client-core-published`
-`repository_dispatch` from the `unng-lab/endlessnet-client` release workflow.
+`repository_dispatch` from the `endless-net/client` release workflow.
 The client-core version identifies only the verified runtime input. The UI owns
 an independent stable SemVer in `app/pubspec.yaml`; that version determines the
 MSI version, GitHub tag, WinGet manifests, and public mirror payload. Releases
 sign both executables and the final MSI,
 publish private release provenance, mirror public artifacts through
-`unng-lab/endlessnetfront`, and trigger `unng-lab/endlessnet-system-tests`.
+`endless-net/front`, and trigger `endless-net/system-tests`.
 Provenance schema v2 records the UI version at the top level and preserves the
 client-core version separately under `client.version`.
 The owning workflow uses `scripts/resolve-release-idempotency.ps1` to distinguish
@@ -112,8 +112,8 @@ checks, Wintun verification, provenance, and publication gates.
 Configure these repository secrets with separate fine-grained tokens:
 
 - `CLIENT_CORE_RELEASE_TOKEN`: read-only Contents access to
-  `unng-lab/endlessnet-client`;
+  `endless-net/client`;
 - `FRONT_RELEASE_TOKEN`: Contents write access only to
-  `unng-lab/endlessnetfront`, for `repository_dispatch`.
+  `endless-net/front`, for `repository_dispatch`.
 
 No signing material is referenced by pull-request CI.

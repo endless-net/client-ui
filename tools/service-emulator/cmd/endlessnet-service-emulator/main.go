@@ -13,7 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	serviceemulator "github.com/unng-lab/endlessnet-client-ui/tools/service-emulator"
+	serviceemulator "github.com/endless-net/client-ui/tools/service-emulator"
 )
 
 func main() {

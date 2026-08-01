@@ -1,7 +1,7 @@
 # EndlessNet Client for Windows: архитектура, решения и развитие
 
 - Статус: действующая архитектура и ориентиры развития
-- Владелец: `unng-lab/endlessnet-client-ui`
+- Владелец: `endless-net/client-ui`
 - Последняя сверка с реализацией: 2026-07-22
 
 ## 1. Назначение документа
@@ -18,7 +18,7 @@
 Документ отвечает на вопросы «за что отвечает этот репозиторий», «почему
 система устроена именно так» и «что имеет смысл развивать дальше». Детали
 внутренней реализации Go runtime остаются в
-[`unng-lab/endlessnet-client`](https://github.com/unng-lab/endlessnet-client).
+[`endless-net/client`](https://github.com/endless-net/client).
 
 ## 2. Границы ответственности
 
@@ -42,7 +42,7 @@
 - backend API и административную web-консоль;
 - исходный код `endlessnet-client.exe`.
 
-Go runtime и producer-контракт принадлежат `unng-lab/endlessnet-client`. UI не должен
+Go runtime и producer-контракт принадлежат `endless-net/client`. UI не должен
 копировать runtime-код, запускать `endlessnet-client.exe` как IPC-адаптер или
 читать его приватные state-файлы.
 
@@ -238,7 +238,7 @@ flowchart TD
     UIVersion --> Build
 ```
 
-Релиз инициирует публикация core из `unng-lab/endlessnet-client`, потому что MSI должен объединить
+Релиз инициирует публикация core из `endless-net/client`, потому что MSI должен объединить
 совместимые версии Go runtime, IPC-контракта и UI. Workflow принимает только
 immutable release URLs, сверяет полный client commit, версию, имена и SHA-256 каждого
 артефакта. Версия core при этом не становится версией UI: собственный стабильный
@@ -285,7 +285,7 @@ runtime-реализацию.
 Статус: принято.
 
 UI, Windows packaging и Windows release automation находятся здесь; Go runtime
-и producer IPC contract — в `unng-lab/endlessnet-client`.
+и producer IPC contract — в `endless-net/client`.
 
 Причины: разные циклы изменений, явное владение signing/release поверхностью и
 невозможность случайно связать UI с внутренностями runtime.
@@ -361,7 +361,7 @@ identity и отправляет подтверждённый announced key ID �
 Статус: принято.
 
 Windows release запускается `client-core-published` dispatch и принимает core
-только из immutable GitHub release path `unng-lab/endlessnet-client` с
+только из immutable GitHub release path `endless-net/client` с
 проверенными manifest, именами артефактов и SHA-256. UI release tag и версия MSI
 берутся независимо из `app/pubspec.yaml`, а версия core сохраняется отдельно в
 provenance.

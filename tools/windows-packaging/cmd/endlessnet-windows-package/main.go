@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	packaging "github.com/unng-lab/endlessnet-client-ui/tools/windows-packaging"
+	packaging "github.com/endless-net/client-ui/tools/windows-packaging"
 )
 
 func main() {

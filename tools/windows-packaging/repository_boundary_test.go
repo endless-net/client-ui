@@ -33,7 +33,7 @@ func TestReleaseConsumesStandaloneClientCore(t *testing.T) {
 		"UI_VERSION",
 		"app\\pubspec.yaml",
 		"CLIENT_CORE_RELEASE_TOKEN",
-		"unng-lab/endlessnet-client/releases/download",
+		"endless-net/client/releases/download",
 		"client-ipc-v1.openapi.yaml",
 		"client = [ordered]@{",
 	} {
@@ -45,7 +45,6 @@ func TestReleaseConsumesStandaloneClientCore(t *testing.T) {
 		"backend-client-core-published",
 		"backend_commit",
 		"BACKEND_RELEASE_TOKEN",
-		"unng-lab/endlessnet/releases/download",
 		"windows-client-ipc.openapi.yaml",
 		"client_core",
 		"$env:VERSION",

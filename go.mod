@@ -1,4 +1,4 @@
-module github.com/unng-lab/endlessnet-client-ui
+module github.com/endless-net/client-ui
 
 go 1.26.0
 

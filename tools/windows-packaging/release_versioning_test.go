@@ -65,7 +65,7 @@ func TestReleaseProvenanceKeepsUIAndCoreVersionsIndependent(t *testing.T) {
 		"version":     "0.2.0",
 		"target":      "windows/amd64",
 		"ipc_version": "v1",
-		"repository":  "unng-lab/endlessnet-client",
+		"repository":  "endless-net/client",
 		"commit":      strings.Repeat("a", 40),
 		"artifacts": map[string]any{
 			"client":       map[string]any{"sha256": strings.Repeat("b", 64)},

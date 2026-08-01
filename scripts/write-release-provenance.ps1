@@ -54,7 +54,7 @@ $provenance = [ordered]@{
     }
     ui = [ordered]@{
         version = $build.version
-        repository = "unng-lab/endlessnet-client-ui"
+        repository = "endless-net/client-ui"
         commit = $build.ui_commit
     }
     signing = [ordered]@{

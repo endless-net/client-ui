@@ -45,9 +45,9 @@ func TestCoreResolverPinsManifestAndArtifactsToClientRepository(t *testing.T) {
 	for _, required := range []string{
 		"[string]$CoreVersion",
 		"[string]$ClientCommit",
-		"unng-lab/endlessnet-client/releases/download/$tag/$manifestAsset",
-		"--repo unng-lab/endlessnet-client",
-		"/repos/unng-lab/endlessnet-client/releases/tags/$tag",
+		"endless-net/client/releases/download/$tag/$manifestAsset",
+		"--repo endless-net/client",
+		"/repos/endless-net/client/releases/tags/$tag",
 		"$contractAsset = \"client-ipc-v1.openapi.yaml\"",
 		"$manifest.artifacts.ipc_contract.sha256",
 		"$manifest.artifacts.ipc_contract.name -ne $contractAsset",
@@ -59,8 +59,6 @@ func TestCoreResolverPinsManifestAndArtifactsToClientRepository(t *testing.T) {
 	for _, removed := range []string{
 		"[string]$Version",
 		"[string]$BackendCommit",
-		"unng-lab/endlessnet/releases/download",
-		"--repo unng-lab/endlessnet ",
 		"windows-client-ipc.openapi.yaml",
 	} {
 		if strings.Contains(resolver, removed) {
