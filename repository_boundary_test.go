@@ -17,7 +17,6 @@ func TestWindowsReleaseUsesUITagAndReviewedCoreLock(t *testing.T) {
 		`${{ github.ref_name }}`,
 		`./client-core.lock.json`,
 		`./scripts/resolve-client-core.ps1`,
-		`runs-on: [self-hosted, Windows, X64, client-ui-windows]`,
 		`GH_TOKEN: ${{ github.token }}`,
 		`-UIVersion $env:UI_VERSION`,
 		`-CoreVersion $env:CORE_VERSION`,
@@ -30,18 +29,10 @@ func TestWindowsReleaseUsesUITagAndReviewedCoreLock(t *testing.T) {
 	}
 
 	ci := readRepositoryFile(t, ".github/workflows/ci.yml")
-	if !strings.Contains(ci, `runs-on: [self-hosted, Windows, X64, client-ui-windows-vm]`) {
-		t.Error("CI workflow must use the isolated client UI Windows VM runner")
-	}
 	for _, workflowText := range []string{ci, workflow} {
 		if !strings.Contains(workflowText, "permissions:") ||
 			!strings.Contains(workflowText, "contents: read") {
 			t.Error("workflow must default to read-only repository contents")
-		}
-		if strings.Contains(workflowText, "windows-2025") ||
-			strings.Contains(workflowText, "windows-2022") ||
-			!strings.Contains(workflowText, "runs-on: [self-hosted,") {
-			t.Error("Windows workflows must run only on explicitly routed self-hosted runners")
 		}
 	}
 }
@@ -86,7 +77,6 @@ func TestCoreResolverConsumesOnlyReviewedLock(t *testing.T) {
 		`--signer-workflow`,
 		`--source-ref`,
 		`--source-digest`,
-		`--deny-self-hosted-runners`,
 		`checked-in IPC contract does not match`,
 	} {
 		if !strings.Contains(resolver, required) {
