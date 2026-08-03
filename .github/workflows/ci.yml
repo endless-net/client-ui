@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   windows:
-    runs-on: windows-2025
+    runs-on: [self-hosted, Windows, X64, client-ui-windows-vm]
     timeout-minutes: 60
     env:
       GH_TOKEN: ${{ github.token }}

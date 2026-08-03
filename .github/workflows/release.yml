@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: windows-2025
+    runs-on: [self-hosted, Windows, X64, client-ui-windows]
     environment: release
     timeout-minutes: 120
     permissions:
