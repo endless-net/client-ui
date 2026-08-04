@@ -8,6 +8,12 @@
 - Format every commit message according to Conventional Commits, for example
   `feat: ...`, `fix: ...`, `docs: ...`, or `chore: ...`.
 
+## Development policy
+
+- Do not preserve legacy behavior, deprecated interfaces, or backward
+  compatibility. Remove or replace obsolete paths rather than maintaining
+  compatibility shims.
+
 ## Repository boundary
 
 - Work only within this repository.
