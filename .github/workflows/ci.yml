@@ -19,18 +19,18 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
 
       - name: Resolve independent UI version
         shell: pwsh
         run: ./scripts/resolve-ui-version.ps1
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: false
 
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+      - uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: 3.38.1
@@ -82,7 +82,7 @@ jobs:
         working-directory: app
         run: flutter build windows --release
 
-      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+      - uses: anchore/sbom-action@v0
         with:
           path: .
           format: spdx-json
@@ -124,7 +124,7 @@ jobs:
           go test -tags e2e ./tests -run TestWindowsClientMSIInstallUpgradeUninstall -count=1 -timeout 20m
 
       - name: Upload unsigned packaging-smoke MSI
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@v6
         with:
           name: unsigned-msi-packaging-smoke
           path: |

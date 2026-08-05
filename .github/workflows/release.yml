@@ -26,7 +26,7 @@ jobs:
       WINDOWS_CODESIGN_MODE: ${{ vars.WINDOWS_CODESIGN_MODE || 'temporary-self-signed' }}
       WINDOWS_CODESIGN_EXPECTED_THUMBPRINT: ${{ vars.WINDOWS_CODESIGN_EXPECTED_THUMBPRINT }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -42,12 +42,12 @@ jobs:
             throw "release tag must exactly match app/pubspec.yaml UI version"
           }
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: false
 
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+      - uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: 3.38.1
@@ -109,7 +109,7 @@ jobs:
         working-directory: app
         run: flutter test test/ui_contract_e2e_test.dart
 
-      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+      - uses: anchore/sbom-action@v0
         if: steps.idempotency.outputs.noop != 'true'
         with:
           path: .
@@ -254,7 +254,7 @@ jobs:
             Copy-Item (Join-Path $source $name) (Join-Path $target $name)
           }
 
-      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+      - uses: anchore/sbom-action@v0
         if: steps.idempotency.outputs.noop != 'true'
         with:
           path: ${{ runner.temp }}/distribution-sbom-input
@@ -280,7 +280,7 @@ jobs:
             -DistributionSBOM "$env:RUNNER_TEMP/release/windows-distribution-sbom.spdx.json" `
             -Output "$env:RUNNER_TEMP/release/release-provenance.json"
 
-      - uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
+      - uses: actions/attest-build-provenance@v5
         if: steps.idempotency.outputs.noop != 'true'
         with:
           subject-path: |

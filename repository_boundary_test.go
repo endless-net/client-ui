@@ -37,9 +37,9 @@ func TestWindowsReleaseUsesUITagAndReviewedCoreLock(t *testing.T) {
 	}
 }
 
-func TestActionsArePinnedToFullCommitSHAs(t *testing.T) {
-	actionUse := regexp.MustCompile(`(?m)^\s*-\s+uses:\s+[^@\s]+@([^\s#]+)`)
-	fullSHA := regexp.MustCompile(`^[0-9a-f]{40}$`)
+func TestActionsUseStableMajorTags(t *testing.T) {
+	actionUse := regexp.MustCompile(`(?m)^\s*(?:-\s+)?uses:\s+[^@\s]+@([^\s#]+)`)
+	stableMajorTag := regexp.MustCompile(`^v[0-9]+$`)
 	for _, path := range []string{
 		".github/workflows/ci.yml",
 		".github/workflows/release.yml",
@@ -50,8 +50,8 @@ func TestActionsArePinnedToFullCommitSHAs(t *testing.T) {
 			t.Fatalf("%s has no actions to validate", path)
 		}
 		for _, match := range matches {
-			if !fullSHA.MatchString(match[1]) {
-				t.Errorf("%s contains an action not pinned to a full commit SHA: %s", path, match[0])
+			if !stableMajorTag.MatchString(match[1]) {
+				t.Errorf("%s contains an action without a stable major tag: %s", path, match[0])
 			}
 		}
 	}
