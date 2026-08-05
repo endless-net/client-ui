@@ -280,7 +280,7 @@ jobs:
             -DistributionSBOM "$env:RUNNER_TEMP/release/windows-distribution-sbom.spdx.json" `
             -Output "$env:RUNNER_TEMP/release/release-provenance.json"
 
-      - uses: actions/attest-build-provenance@v5
+      - uses: actions/attest-build-provenance@v4
         if: steps.idempotency.outputs.noop != 'true'
         with:
           subject-path: |
