@@ -54,6 +54,13 @@ $records = [Collections.Generic.List[object]]::new()
 
 Push-Location $RepoRoot
 try {
+    # `go list -m` reports an empty .Dir for modules that have not yet been
+    # extracted into an otherwise clean module cache (as on GitHub Actions).
+    # Download the graph first so every dependency can be checked locally.
+    & go mod download
+    if ($LASTEXITCODE -ne 0) {
+        throw "go mod download failed"
+    }
     $moduleRows = & go list -m -f '{{if not .Main}}{{.Path}}|{{.Version}}|{{.Dir}}{{end}}' all
     if ($LASTEXITCODE -ne 0) {
         throw "go list -m failed"
