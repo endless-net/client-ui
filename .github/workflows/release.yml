@@ -211,16 +211,6 @@ jobs:
           $path = (Get-ChildItem $dir -Filter "*.msi" | Select-Object -First 1).FullName
           "path=$path" >> $env:GITHUB_OUTPUT
 
-      - name: Exercise install, repair, upgrade and uninstall
-        if: steps.idempotency.outputs.noop != 'true'
-        env:
-          ENDLESSNET_E2E_WINDOWS_MSI: "1"
-          ENDLESSNET_E2E_WINDOWS_PREVIOUS_MSI_PATH: ${{ steps.previous.outputs.path }}
-        shell: pwsh
-        run: |
-          $env:ENDLESSNET_E2E_WINDOWS_MSI_PATH = "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:UI_VERSION.msi"
-          go test -tags e2e ./tests -run TestWindowsClientMSIInstallUpgradeUninstall -count=1 -timeout 20m
-
       - name: Test Flutter against installed Go service
         if: steps.idempotency.outputs.noop != 'true'
         shell: pwsh
@@ -236,6 +226,16 @@ jobs:
             $uninstall = Start-Process msiexec.exe -ArgumentList @('/x', $msi, '/qn', '/norestart') -Wait -PassThru
             if ($uninstall.ExitCode -ne 0) { throw "MSI uninstall failed with $($uninstall.ExitCode)" }
           }
+
+      - name: Exercise install, repair, upgrade and uninstall
+        if: steps.idempotency.outputs.noop != 'true'
+        env:
+          ENDLESSNET_E2E_WINDOWS_MSI: "1"
+          ENDLESSNET_E2E_WINDOWS_PREVIOUS_MSI_PATH: ${{ steps.previous.outputs.path }}
+        shell: pwsh
+        run: |
+          $env:ENDLESSNET_E2E_WINDOWS_MSI_PATH = "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:UI_VERSION.msi"
+          go test -tags e2e ./tests -run TestWindowsClientMSIInstallUpgradeUninstall -count=1 -timeout 20m
 
       - name: Prepare installed distribution for SBOM
         if: steps.idempotency.outputs.noop != 'true'
