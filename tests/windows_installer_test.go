@@ -68,7 +68,9 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	stateRoot := filepath.Join(os.Getenv("ProgramData"), "EndlessNet")
 	assertWindowsPathExists(t, stateRoot)
 	assertWindowsProgramDataACL(t, stateRoot)
-	sentinel := filepath.Join(stateRoot, "client.json")
+	// Keep a separate state fixture so the lifecycle test never replaces the
+	// service's live client.json with an incomplete configuration before repair.
+	sentinel := filepath.Join(stateRoot, "msi-e2e-state.json")
 	if err := os.WriteFile(sentinel, []byte(`{"node_id":"node_msi_e2e"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +122,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	}
 
 	installMSI(t, msi)
-	if err := os.WriteFile(sentinel, []byte(`{"node_id":"node_remove_state_e2e"}`), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(stateRoot, "msi-e2e-remove-state.json"), []byte(`{"node_id":"node_remove_state_e2e"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	uninstallMSIRemoveState(t, msi)
