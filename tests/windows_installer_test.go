@@ -338,41 +338,29 @@ if ([Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('Software\Classes\endles
 
 func assertWindowsProgramDataACL(t *testing.T, path string) {
 	t.Helper()
-	script := `
-$targetPath = $env:ENDLESSNET_E2E_ACL_PATH
-if ([string]::IsNullOrWhiteSpace($targetPath)) {
-  Write-Error "ENDLESSNET_E2E_ACL_PATH is required"
-  exit 1
-}
-$acl = Get-Acl -LiteralPath $targetPath
-if (-not $acl.AreAccessRulesProtected) {
-  Write-Error "inheritance is enabled"
-  exit 1
-}
-$writeRights = [System.Security.AccessControl.FileSystemRights]::Write -bor
-  [System.Security.AccessControl.FileSystemRights]::Modify -bor
-  [System.Security.AccessControl.FileSystemRights]::FullControl -bor
-  [System.Security.AccessControl.FileSystemRights]::CreateFiles -bor
-  [System.Security.AccessControl.FileSystemRights]::CreateDirectories -bor
-  [System.Security.AccessControl.FileSystemRights]::WriteData
-$bad = @($acl.Access | Where-Object {
-  $_.AccessControlType -eq 'Allow' -and
-  (($_.IdentityReference.Value -match '(^|\\)(Users|Everyone|Authenticated Users)$') -or ($_.IdentityReference.Value -match '^Everyone$')) -and
-  (($_.FileSystemRights -band $writeRights) -ne 0)
-})
-if ($bad.Count -gt 0) {
-  $bad | Format-List | Out-String | Write-Error
-  exit 1
-}
-`
-	// The PowerShell 7 shim on hosted runners cannot always auto-load the
-	// Windows-only Microsoft.PowerShell.Security module that provides Get-Acl.
-	// Use the inbox Windows PowerShell executable for this OS-level assertion.
-	windowsPowerShell := filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
-	cmd := exec.Command(windowsPowerShell, "-NoProfile", "-Command", script)
-	cmd.Env = append(os.Environ(), "ENDLESSNET_E2E_ACL_PATH="+path)
-	out, err := cmd.CombinedOutput()
+	out, err := exec.Command("icacls.exe", path).CombinedOutput()
 	if err != nil {
-		t.Fatalf("ProgramData ACL allows broad writes or inherited access: %v\n%s", err, out)
+		t.Fatalf("read ProgramData ACL: %v\n%s", err, out)
+	}
+	for _, rule := range strings.Split(string(out), "\n") {
+		rule = strings.TrimSpace(rule)
+		if rule == "" {
+			continue
+		}
+		if strings.Contains(rule, "(I)") {
+			t.Fatalf("ProgramData ACL retains inherited access: %s", rule)
+		}
+		principal := strings.ToLower(rule)
+		isBroadPrincipal := strings.Contains(principal, `\users:`) ||
+			strings.Contains(principal, `everyone:`) ||
+			strings.Contains(principal, `authenticated users:`)
+		if !isBroadPrincipal {
+			continue
+		}
+		for _, right := range []string{"(F)", "(M)", "(W)", "(WD)", "(AD)", "(DC)", "(GW)", "(GA)"} {
+			if strings.Contains(strings.ToUpper(rule), right) {
+				t.Fatalf("ProgramData ACL grants broad write access: %s", rule)
+			}
+		}
 	}
 }
