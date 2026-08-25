@@ -1,5 +1,5 @@
 module github.com/endless-net/client-ui
 
-go 1.26.0
+go 1.27.0
 
 require golang.org/x/sys v0.46.0
