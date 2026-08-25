@@ -365,7 +365,11 @@ if ($bad.Count -gt 0) {
   exit 1
 }
 `
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-Command", script)
+	// The PowerShell 7 shim on hosted runners cannot always auto-load the
+	// Windows-only Microsoft.PowerShell.Security module that provides Get-Acl.
+	// Use the inbox Windows PowerShell executable for this OS-level assertion.
+	windowsPowerShell := filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+	cmd := exec.Command(windowsPowerShell, "-NoProfile", "-Command", script)
 	cmd.Env = append(os.Environ(), "ENDLESSNET_E2E_ACL_PATH="+path)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
