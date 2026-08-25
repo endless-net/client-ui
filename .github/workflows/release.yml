@@ -216,15 +216,15 @@ jobs:
         shell: pwsh
         run: |
           $msi = "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:UI_VERSION.msi"
-          $install = Start-Process msiexec.exe -ArgumentList @('/i', $msi, '/qn', '/norestart') -Wait -PassThru
-          if ($install.ExitCode -ne 0) { throw "MSI install failed with $($install.ExitCode)" }
+          & msiexec.exe /i $msi /qn /norestart
+          if ($LASTEXITCODE -ne 0) { throw "MSI install failed with $LASTEXITCODE" }
           try {
             $env:ENDLESSNET_LIVE_PIPE_TEST = "1"
             Push-Location app
             try { flutter test test/named_pipe_live_test.dart } finally { Pop-Location }
           } finally {
-            $uninstall = Start-Process msiexec.exe -ArgumentList @('/x', $msi, '/qn', '/norestart') -Wait -PassThru
-            if ($uninstall.ExitCode -ne 0) { throw "MSI uninstall failed with $($uninstall.ExitCode)" }
+            & msiexec.exe /x $msi /qn /norestart
+            if ($LASTEXITCODE -ne 0) { throw "MSI uninstall failed with $LASTEXITCODE" }
           }
 
       - name: Exercise install, repair, upgrade and uninstall
