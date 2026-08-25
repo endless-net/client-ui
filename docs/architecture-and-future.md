@@ -461,7 +461,7 @@ service.
   отдельного transport adapter и отдельной packaging/release модели.
 - Debug logging включён текущими installer defaults. До расширения аудитории
   нужно определить retention, объём и пользовательское управление логированием.
-- Release зависит от GitHub-hosted `windows-2025`, certificate lifecycle и
+- Release зависит от GitHub-hosted `windows-2022`, certificate lifecycle и
   доступности timestamp service.
 
 ## 11. Возможное будущее
