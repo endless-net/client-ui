@@ -124,7 +124,7 @@ jobs:
           go test -tags e2e ./tests -run TestWindowsClientMSIInstallUpgradeUninstall -count=1 -timeout 20m
 
       - name: Upload unsigned packaging-smoke MSI
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: unsigned-msi-packaging-smoke
           path: |
