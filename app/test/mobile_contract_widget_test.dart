@@ -69,6 +69,36 @@ void main() {
       source.add(snapshot);
       await tester.pump();
       expect(find.text('Profile: synthetic-profile'), findsOneWidget);
+      expect(find.text('Session expiry: Unknown'), findsOneWidget);
+      expect(find.text('Credential expiry: Unknown'), findsOneWidget);
+      // US-09: the two clocks are independent and never synthesize connection
+      // state. This same widget suite runs in Android/iOS native test hosts.
+      snapshot.sequence += 1;
+      snapshot.snapshot.status.ensureSession().mergeFromProto3Json({
+        'expiresAt': '2030-01-01T00:00:00Z',
+      });
+      snapshot.snapshot.status.ensureCredential().mergeFromProto3Json({
+        'expiresAt': '2031-02-03T04:05:06Z',
+      });
+      source.add(snapshot);
+      await tester.pump();
+      expect(
+        find.text('Session expiry: 2030-01-01T00:00:00.000Z'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Credential expiry: 2031-02-03T04:05:06.000Z'),
+        findsOneWidget,
+      );
+      snapshot.sequence += 1;
+      snapshot.snapshot.status.session.clearExpiresAt();
+      source.add(snapshot);
+      await tester.pump();
+      expect(find.text('Session expiry: Unknown'), findsOneWidget);
+      expect(
+        find.text('Credential expiry: 2031-02-03T04:05:06.000Z'),
+        findsOneWidget,
+      );
       expect(
         state.snapshot!.status.connectionPhase,
         api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED,
@@ -97,9 +127,13 @@ void main() {
       snapshot.snapshot.status.metadata.revision += 1;
       snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
       snapshot.snapshot.status.clearActiveProfileId();
+      snapshot.snapshot.status.clearSession();
+      snapshot.snapshot.status.clearCredential();
       source.add(snapshot);
       await tester.pump();
       expect(find.text('Profile: synthetic-profile'), findsNothing);
+      expect(find.byKey(const Key('client-session-expiry')), findsNothing);
+      expect(find.byKey(const Key('client-credential-expiry')), findsNothing);
       expect(
         tester
             .widget<FilledButton>(find.byKey(const Key('client-connect')))

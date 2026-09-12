@@ -120,6 +120,16 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                 ),
               if (owner && profile)
                 Text('Profile: ${snapshot.status.activeProfileId}'),
+              if (owner && profile) ...[
+                Text(
+                  'Session expiry: ${snapshot.status.session.hasExpiresAt() ? _deadline(snapshot.status.session.expiresAt.seconds.toInt(), snapshot.status.session.expiresAt.nanos) : 'Unknown'}',
+                  key: const Key('client-session-expiry'),
+                ),
+                Text(
+                  'Credential expiry: ${snapshot.status.credential.hasExpiresAt() ? _deadline(snapshot.status.credential.expiresAt.seconds.toInt(), snapshot.status.credential.expiresAt.nanos) : 'Unknown'}',
+                  key: const Key('client-credential-expiry'),
+                ),
+              ],
               const SizedBox(height: 12),
               Wrap(
                 spacing: 12,
@@ -154,6 +164,21 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
       );
     },
   );
+}
+
+// Display authoritative UTC deadlines independently. Never infer runtime state
+// from the UI clock or substitute one deadline for the other.
+String _deadline(int seconds, int nanos) {
+  if (seconds < -62135596800 ||
+      seconds > 253402300799 ||
+      nanos < 0 ||
+      nanos > 999999999) {
+    return 'Unknown';
+  }
+  return DateTime.fromMicrosecondsSinceEpoch(
+    seconds * 1000000 + nanos ~/ 1000,
+    isUtc: true,
+  ).toIso8601String();
 }
 
 String _statusLabel(ClientStateController state) {

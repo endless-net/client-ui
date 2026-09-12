@@ -240,8 +240,13 @@
         "UI-AC-18",
         "UI-AC-26"
       ],
-      "implementation": "missing",
-      "testEvidence": [],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/mobile_contract_widget_test.dart",
+          "scope": "Independent authoritative session/credential deadlines, unknown values and caller cleanup in shared panel; not renewal or production shell acceptance"
+        }
+      ],
       "acceptanceEvidence": []
     },
     {
