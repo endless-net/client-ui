@@ -45,6 +45,15 @@ Do not hide it with sleeps, mutation replay, or channel-per-call replacement.
 No dependency version increase is authorized; upstream correction must be
 evaluated within that constraint before changing the pinned transport.
 
+The socket-free
+[`probe_late_headers.dart`](../packages/local_client_rpc/tool/probe_late_headers.dart)
+now reproduces this deterministically with pinned `http2` 2.3.1: cancel stream 1,
+deliver its already-in-flight HEADERS, observe `ProtocolError` and closed shared
+connection. Run `dart run tool/probe_late_headers.dart` from
+`packages/local_client_rpc`. Current exit is **1**, not a passing regression;
+the corrected transport must return 0. This isolates the dependency defect but
+does not replace the producer interoperability jobs or prove their fix.
+
 The [Android job](https://github.com/endless-net/client-ui/actions/runs/34723624391/job/103633802852)
 for the same consumer commit failed before Flutter tests started: software-only
 emulation took about 12 minutes to boot, then `adb shell input keyevent 82`
