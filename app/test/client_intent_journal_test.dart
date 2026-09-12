@@ -23,6 +23,7 @@ void main() {
       id: 'operation-a',
       requestId: intent.requestId,
       kind: intent.kind,
+      continuity: api.ConnectionContinuity.CONNECTION_CONTINUITY_UNKNOWN,
       state: terminal
           ? api.OperationState.OPERATION_STATE_SUCCEEDED
           : api.OperationState.OPERATION_STATE_PENDING,

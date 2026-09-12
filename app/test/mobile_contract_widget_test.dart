@@ -30,6 +30,7 @@ void main() {
           'requestId': 'request-done',
           'kind': 'OPERATION_KIND_DISCONNECT',
           'state': 'OPERATION_STATE_SUCCEEDED',
+          'continuity': 'CONNECTION_CONTINUITY_UNKNOWN',
           'change': {'changed': true},
         }),
       );

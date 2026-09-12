@@ -78,6 +78,19 @@ successful compilation as simulator execution or extend the timeout as proof.
 
 ## Validation
 
+### Operation envelope checks (2026-09-13)
+
+The mutation boundary rejects nil/malformed request UUIDs before submission or
+recovery lookup and compares valid UUID identities case-insensitively, matching
+native normalization. Successful operation envelopes require explicit continuity;
+unknown continuity must be UNKNOWN, not omitted. UserAction is valid only in
+WAITING_FOR_USER. Consumer vectors and journal/mobile fixtures now express these
+accepted v0 requirements explicitly.
+
+Local checks passed: Go tests, Flutter analysis and Flutter tests (146 passed,
+7 skipped). This strengthens consumer validation; it is not evidence of full
+runtime/UI cutover or production system acceptance.
+
 ### Snapshot/acceptance race (2026-09-13)
 
 The native producer may publish a full refreshed Snapshot before its mutation

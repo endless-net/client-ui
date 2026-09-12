@@ -56,6 +56,7 @@ void main() {
       'id': 'operation-a',
       'kind': 'OPERATION_KIND_$kind',
       'state': 'OPERATION_STATE_$state',
+      if (state == 'SUCCEEDED') 'continuity': 'CONNECTION_CONTINUITY_UNKNOWN',
       ...fields,
     });
 
@@ -157,4 +158,28 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test(
+    'success requires continuity and nonwaiting states reject user actions',
+    () {
+      final missing = operation('CONNECT', 'SUCCEEDED', {'change': {}})
+        ..clearContinuity();
+      expect(() => ClientOperation.fromProto(missing), throwsFormatException);
+      for (final state in [
+        'PENDING',
+        'RUNNING',
+        'SUCCEEDED',
+        'FAILED',
+        'CANCELLED',
+      ]) {
+        final value = operation('CONNECT', state, {
+          if (state == 'SUCCEEDED') 'change': {},
+          if (state == 'FAILED' || state == 'CANCELLED')
+            'failure': {'code': 'ERROR_CODE_CANCELLED'},
+          'userAction': {'kind': 'KIND_WAIT_FOR_APPROVAL'},
+        });
+        expect(() => ClientOperation.fromProto(value), throwsFormatException);
+      }
+    },
+  );
 }

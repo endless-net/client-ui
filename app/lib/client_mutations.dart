@@ -11,10 +11,14 @@ final class ClientMutations {
   final api.ClientServiceClient _client;
   final String instanceId;
 
+  static bool _validRequestId(String value) =>
+      RegExp(
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+      ).hasMatch(value) &&
+      value != '00000000-0000-0000-0000-000000000000';
+
   void _validate(api.MutationContext mutation) {
-    if (!RegExp(
-          r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-        ).hasMatch(mutation.requestId) ||
+    if (!_validRequestId(mutation.requestId) ||
         instanceId.isEmpty ||
         mutation.expectedInstanceId != instanceId ||
         mutation.expectedRevision <= 0) {
@@ -30,7 +34,10 @@ final class ClientMutations {
     api.OperationKind kind,
   ) {
     final result = ClientOperation.fromProto(operation);
-    if (result.value.requestId != requestId || result.value.kind != kind) {
+    if (!_validRequestId(requestId) ||
+        !_validRequestId(result.value.requestId) ||
+        result.value.requestId.toLowerCase() != requestId.toLowerCase() ||
+        result.value.kind != kind) {
       throw const FormatException(
         'Operation does not match submitted intention',
       );
@@ -42,6 +49,9 @@ final class ClientMutations {
     String requestId,
     api.OperationKind kind,
   ) async {
+    if (!_validRequestId(requestId)) {
+      throw const FormatException('Invalid recovery request identity');
+    }
     final response = await _client.getOperation(
       api.GetOperationRequest(requestId: requestId),
     );

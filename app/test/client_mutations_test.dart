@@ -10,6 +10,7 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 void main() {
+  const requestId = 'abcdef12-1234-4567-89ab-123456789abc';
   final commands = ClientMutations(NoCallsClient(), instanceId: 'runtime-a');
   test('Enroll: missing mutation context fails before transport', () async {
     await expectLater(
@@ -173,7 +174,7 @@ void main() {
 
   api.Operation accepted() => api.Operation(
     id: 'operation-a',
-    requestId: 'request-a',
+    requestId: requestId,
     kind: api.OperationKind.OPERATION_KIND_CONNECT,
     state: api.OperationState.OPERATION_STATE_PENDING,
   );
@@ -182,17 +183,17 @@ void main() {
     final response = accepted();
     final result = ClientMutations.validateAcceptance(
       response,
-      'request-a',
+      requestId,
       api.OperationKind.OPERATION_KIND_CONNECT,
     );
     expect(result.succeeded, isFalse);
     expect(result.terminal, isFalse);
     response.requestId = 'another-request';
-    expect(result.value.requestId, 'request-a');
+    expect(result.value.requestId, requestId);
     expect(
       () => ClientMutations.validateAcceptance(
         response,
-        'request-a',
+        requestId,
         api.OperationKind.OPERATION_KIND_CONNECT,
       ),
       throwsFormatException,
@@ -200,10 +201,49 @@ void main() {
     expect(
       () => ClientMutations.validateAcceptance(
         accepted(),
-        'request-a',
+        requestId,
         api.OperationKind.OPERATION_KIND_DISCONNECT,
       ),
       throwsFormatException,
     );
   });
+
+  test(
+    'UUID identity is case-insensitive; nil UUID never reaches transport',
+    () async {
+      final response = api.Operation(
+        id: 'op',
+        requestId: requestId,
+        kind: api.OperationKind.OPERATION_KIND_CONNECT,
+        state: api.OperationState.OPERATION_STATE_PENDING,
+      );
+      expect(
+        ClientMutations.validateAcceptance(
+          response,
+          requestId.toUpperCase(),
+          api.OperationKind.OPERATION_KIND_CONNECT,
+        ).value.requestId,
+        requestId,
+      );
+      await expectLater(
+        commands.connect(
+          api.ConnectRequest()..mergeFromProto3Json({
+            'mutation': {
+              'requestId': '00000000-0000-0000-0000-000000000000',
+              'expectedInstanceId': 'runtime-a',
+              'expectedRevision': '1',
+            },
+          }),
+        ),
+        throwsFormatException,
+      );
+      await expectLater(
+        commands.recoverByRequestId(
+          '00000000-0000-0000-0000-000000000000',
+          api.OperationKind.OPERATION_KIND_CONNECT,
+        ),
+        throwsFormatException,
+      );
+    },
+  );
 }

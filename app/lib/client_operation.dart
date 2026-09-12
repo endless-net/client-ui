@@ -50,6 +50,10 @@ final class ClientOperation {
       throw const FormatException('Invalid v0 operation identity or kind');
     }
     final outcome = value.whichOutcome();
+    if (value.hasUserAction() &&
+        value.state != api.OperationState.OPERATION_STATE_WAITING_FOR_USER) {
+      throw const FormatException('User action is only valid while waiting');
+    }
     switch (value.state) {
       case api.OperationState.OPERATION_STATE_PENDING:
       case api.OperationState.OPERATION_STATE_RUNNING:
@@ -71,6 +75,10 @@ final class ClientOperation {
           throw const FormatException('Failed operation lacks a typed failure');
         }
       case api.OperationState.OPERATION_STATE_SUCCEEDED:
+        if (value.continuity ==
+            api.ConnectionContinuity.CONNECTION_CONTINUITY_UNSPECIFIED) {
+          throw const FormatException('Success lacks explicit continuity');
+        }
         if (outcome != _successOutcomes[value.kind]) {
           throw const FormatException(
             'Success outcome does not match operation kind',
