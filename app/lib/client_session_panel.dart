@@ -64,6 +64,15 @@ class ClientSessionPanel extends StatelessWidget {
       ClientProfilesPanel(
         state: session.state,
         load: session.listProfiles,
+        remove: (id) => session.submit(
+          api.OperationKind.OPERATION_KIND_REMOVE_PROFILE,
+          (commands, mutation) => commands.removeProfile(
+            api.RemoveProfileRequest(
+              mutation: mutation,
+              profile: api.ProfileRef(profileId: id),
+            ),
+          ),
+        ),
         rename: (id, name) => session.submit(
           api.OperationKind.OPERATION_KIND_RENAME_PROFILE,
           (commands, mutation) => commands.renameProfile(

@@ -25,18 +25,29 @@ api.ListProfilesResponse page(
 
 void main() {
   testWidgets(
-    'US-08: selection uses profile ID and never synthesizes active state',
+    'US-08: profile mutations use IDs and require fresh catalog and confirmation',
     (tester) async {
       final state = ClientStateController();
       final events = StreamController<api.WatchEventsResponse>();
       await state.attach(events.stream);
       final selected = <String>[];
       final renamed = <(String, String)>[];
+      final removed = <String>[];
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: ClientProfilesPanel(
               state: state,
+              remove: (id) async {
+                removed.add(id);
+                return ClientOperation.fromProto(
+                  api.Operation(
+                    id: 'removal',
+                    kind: api.OperationKind.OPERATION_KIND_REMOVE_PROFILE,
+                    state: api.OperationState.OPERATION_STATE_PENDING,
+                  ),
+                );
+              },
               rename: (id, name) async {
                 renamed.add((id, name));
                 return ClientOperation.fromProto(
@@ -53,6 +64,7 @@ void main() {
                   api.Profile(
                     id: 'b',
                     displayName: 'Profile b',
+                    state: api.ProfileState.PROFILE_STATE_EMPTY,
                     selection: api.Restriction(
                       availability: api.Availability.AVAILABILITY_AVAILABLE,
                     ),
@@ -96,6 +108,27 @@ void main() {
       await tester.tap(find.byKey(const Key('client-load-profiles')));
       await tester.pump();
       expect(find.text('Profile b'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextButton>(find.byKey(const Key('remove-profile-a')))
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const Key('remove-profile-b')));
+      await tester.pump();
+      expect(removed, isEmpty);
+      await tester.tap(find.byKey(const Key('cancel-profile-removal')));
+      await tester.pump();
+      expect(removed, isEmpty);
+      await tester.tap(find.byKey(const Key('remove-profile-b')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('confirm-profile-removal')));
+      await tester.pump();
+      expect(removed, ['b']);
+      expect(find.text('Profile b'), findsNothing);
+      expect(state.snapshot!.status.activeProfileId, 'a');
+      await tester.tap(find.byKey(const Key('client-load-profiles')));
+      await tester.pump();
       final renameButton = find.byKey(const Key('rename-profile-b'));
       expect(tester.widget<TextButton>(renameButton).onPressed, isNull);
       await tester.enterText(
@@ -123,6 +156,12 @@ void main() {
       await tester.tap(find.byKey(const Key('client-load-profiles')));
       await tester.pump();
       for (var repeat = 0; repeat < 2; repeat++) {
+        await tester.tap(find.byKey(const Key('remove-profile-b')));
+        await tester.pump();
+        expect(
+          find.byKey(const Key('confirm-profile-removal')),
+          findsOneWidget,
+        );
         snapshot.sequence += 1;
         events.add(
           api.WatchEventsResponse()..mergeFromProto3Json({
@@ -133,6 +172,8 @@ void main() {
         );
         await tester.pump();
         expect(find.text('Profile b'), findsNothing);
+        expect(find.byKey(const Key('confirm-profile-removal')), findsNothing);
+        expect(removed, ['b']);
         expect(find.byKey(const Key('select-profile-b')), findsNothing);
         await tester.tap(find.byKey(const Key('client-load-profiles')));
         await tester.pump();

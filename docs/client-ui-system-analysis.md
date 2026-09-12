@@ -256,6 +256,12 @@ ID и не подменяет authoritative catalog локальным имен�
 это не доказывает runtime/profile lifecycle acceptance на платформах.
 Повторные DOMAIN_PROFILES invalidations скрывают каталог и отклоняют запросы,
 начатые до события, даже если domain/profile уже встречался в invalidation set.
+RemoveProfile подключён отдельно от logout/local forget: кнопка доступна только
+для inactive EMPTY profile, требует отдельного подтверждения и journaled dispatch.
+Invalidation скрывает устаревшее подтверждение; callback повторно проверяет каталог.
+Producer окончательно проверяет отсутствие registration/session; UI не выполняет
+автоматический logout или local forget при отказе удаления. Shared widget-тест
+проверяет cancel/confirm, запрет active profile и сброс подтверждения при invalidation.
 Выбор профиля подключён
 к общей session panel. Выбор использует opaque ID и profile.selection restriction;
 acceptance очищает каталог, но не синтезирует active profile. Widget-тест включён

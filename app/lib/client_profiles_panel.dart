@@ -14,11 +14,13 @@ class ClientProfilesPanel extends StatefulWidget {
     required this.load,
     required this.select,
     required this.rename,
+    required this.remove,
   });
   final ClientStateController state;
   final Future<ClientProfileCatalog> Function() load;
   final Future<ClientOperation> Function(String profileId) select;
   final Future<ClientOperation> Function(String profileId, String name) rename;
+  final Future<ClientOperation> Function(String profileId) remove;
   @override
   State<ClientProfilesPanel> createState() => _ClientProfilesPanelState();
 }
@@ -44,18 +46,35 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
       _domainEpoch == widget.state.domainEpoch(api.Domain.DOMAIN_PROFILES);
   bool _busy = false;
   String? _notice;
+  String? _pendingRemoval;
   bool get _owner =>
       widget.state.link == ClientLinkState.ready &&
       widget.state.snapshot != null &&
       widget.state.snapshot!.runtime.callerAccess != api.Access.ACCESS_OBSERVER;
 
-  Future<void> _run([String? profileId, String? name]) async {
+  Future<void> _run({
+    String? profileId,
+    String? name,
+    bool remove = false,
+  }) async {
     if (_busy || !_owner) return;
+    if (profileId != null && !_catalogCurrent) return;
+    if (remove &&
+        !(_catalog?.profiles.any(
+              (p) =>
+                  p.id == profileId &&
+                  !p.active &&
+                  p.state == api.ProfileState.PROFILE_STATE_EMPTY,
+            ) ??
+            false)) {
+      return;
+    }
     final epoch = widget.state.cacheEpoch;
     final domainEpoch = widget.state.domainEpoch(api.Domain.DOMAIN_PROFILES);
     setState(() {
       _busy = true;
       _notice = null;
+      _pendingRemoval = null;
       _name.clear();
       if (profileId == null || _epoch != epoch) _catalog = null;
       _epoch = epoch;
@@ -67,14 +86,20 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
         if (!mounted || !_owner || !_catalogCurrent) return;
         setState(() => _catalog = catalog);
       } else {
-        final operation = name == null
+        final operation = remove
+            ? await widget.remove(profileId)
+            : name == null
             ? await widget.select(profileId)
             : await widget.rename(profileId, name);
         if (!mounted || !_owner || !_catalogCurrent) return;
         setState(() {
           // Neither acceptance nor success is a replacement runtime snapshot.
           _catalog = null;
-          final action = name == null ? 'Selection' : 'Rename';
+          final action = remove
+              ? 'Removal'
+              : name == null
+              ? 'Selection'
+              : 'Rename';
           _notice = operation.terminal
               ? '$action result received. Refresh profiles and runtime status.'
               : '$action accepted. Recover the operation to see its result.';
@@ -121,32 +146,76 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
             for (final profile in _catalog!.profiles)
               ListTile(
                 title: Text(profile.displayName),
-                subtitle: Text(profile.id),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextButton(
-                      key: ValueKey('rename-profile-${profile.id}'),
-                      onPressed: !_busy && _validName
-                          ? () => _run(profile.id, _name.text.trim())
-                          : null,
-                      child: const Text('Rename'),
+                    Text(profile.id),
+                    Wrap(
+                      children: [
+                        TextButton(
+                          key: ValueKey('rename-profile-${profile.id}'),
+                          onPressed: !_busy && _validName
+                              ? () => _run(
+                                  profileId: profile.id,
+                                  name: _name.text.trim(),
+                                )
+                              : null,
+                          child: const Text('Rename'),
+                        ),
+                        profile.active
+                            ? const Text('Active')
+                            : TextButton(
+                                key: ValueKey('select-profile-${profile.id}'),
+                                onPressed:
+                                    !_busy &&
+                                        profile.selection.availability ==
+                                            api
+                                                .Availability
+                                                .AVAILABILITY_AVAILABLE
+                                    ? () => _run(profileId: profile.id)
+                                    : null,
+                                child: const Text('Select'),
+                              ),
+                        TextButton(
+                          key: ValueKey('remove-profile-${profile.id}'),
+                          onPressed:
+                              !_busy &&
+                                  !profile.active &&
+                                  profile.state ==
+                                      api.ProfileState.PROFILE_STATE_EMPTY
+                              ? () =>
+                                    setState(() => _pendingRemoval = profile.id)
+                              : null,
+                          child: const Text('Remove'),
+                        ),
+                      ],
                     ),
-                    profile.active
-                        ? const Text('Active')
-                        : TextButton(
-                            key: ValueKey('select-profile-${profile.id}'),
-                            onPressed:
-                                !_busy &&
-                                    profile.selection.availability ==
-                                        api.Availability.AVAILABILITY_AVAILABLE
-                                ? () => _run(profile.id)
-                                : null,
-                            child: const Text('Select'),
-                          ),
                   ],
                 ),
               ),
+            if (_pendingRemoval != null) ...[
+              Text(
+                'Remove profile $_pendingRemoval? This does not log out or clean up a remote registration.',
+              ),
+              Wrap(
+                children: [
+                  TextButton(
+                    key: const Key('cancel-profile-removal'),
+                    onPressed: !_busy
+                        ? () => setState(() => _pendingRemoval = null)
+                        : null,
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    key: const Key('confirm-profile-removal'),
+                    onPressed: !_busy
+                        ? () => _run(profileId: _pendingRemoval, remove: true)
+                        : null,
+                    child: const Text('Confirm removal'),
+                  ),
+                ],
+              ),
+            ],
           ],
         ],
       );
