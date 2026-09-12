@@ -100,22 +100,23 @@ if (-not (Test-Path -LiteralPath $DartPackageConfig -PathType Leaf)) {
 $packageConfig = Get-Content -LiteralPath $DartPackageConfig -Raw | ConvertFrom-Json
 $flutterRoot = ([Uri]$packageConfig.flutterRoot).LocalPath
 $dartVersions = @{}
-Push-Location (Join-Path $RepoRoot "app")
-try {
-    $dartDeps = (& flutter pub deps --json | ConvertFrom-Json).packages
-    if ($LASTEXITCODE -ne 0) {
-        throw "flutter pub deps failed"
-    }
-    foreach ($dependency in $dartDeps) {
-        $dartVersions[$dependency.name] = $dependency.version
-    }
-} finally {
-    Pop-Location
+# Read the already resolved graph. `flutter pub deps` can run pub get and mutate
+# the lockfile when the local SDK differs from the pinned CI SDK.
+$packageGraphPath = Join-Path (Split-Path -Parent $DartPackageConfig) "package_graph.json"
+if (-not (Test-Path -LiteralPath $packageGraphPath -PathType Leaf)) {
+    throw "Resolved Dart package graph is missing; resolve dependencies explicitly first"
+}
+$packageGraph = Get-Content -LiteralPath $packageGraphPath -Raw | ConvertFrom-Json
+foreach ($dependency in $packageGraph.packages) {
+    $dartVersions[$dependency.name] = $dependency.version
 }
 
 foreach ($package in $packageConfig.packages) {
     if ($package.name -eq "endlessnet") {
         continue
+    }
+    if (-not $dartVersions.ContainsKey($package.name)) {
+        throw "Resolved Dart graph does not contain $($package.name)"
     }
     $rootUri = Resolve-DartPackageRootUri $DartPackageConfig $package.rootUri
     $root = $rootUri.LocalPath

@@ -16,3 +16,16 @@ $rootLicense = (Get-Content (Join-Path $repo "LICENSE") -Raw).Replace("`r`n", "`
 $packageLicense = (Get-Content (Join-Path $repo "packages/local_client_rpc/LICENSE") -Raw).Replace("`r`n", "`n").Trim()
 if ($rootLicense -cne $packageLicense) { throw "Local Dart package license differs from repository" }
 Write-Output "Dart package root and license regression checks passed"
+
+$taskProtectedFiles = @("app/pubspec.yaml", "app/pubspec.lock", "app/.dart_tool/package_config.json", "app/.dart_tool/package_graph.json")
+$taskBeforeHashes = @{}
+foreach ($taskPath in $taskProtectedFiles) {
+    $taskBeforeHashes[$taskPath] = (Get-FileHash -LiteralPath (Join-Path $repo $taskPath)).Hash
+}
+& (Join-Path $PSScriptRoot "check-dependency-licenses.ps1") -RepoRoot $repo
+foreach ($taskPath in $taskProtectedFiles) {
+    if ((Get-FileHash -LiteralPath (Join-Path $repo $taskPath)).Hash -ne $taskBeforeHashes[$taskPath]) {
+        throw "License check modified $taskPath"
+    }
+}
+Write-Output "License check preserves resolved dependency files"
