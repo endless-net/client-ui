@@ -19,6 +19,21 @@ void main() {
         'instanceId': 'runtime-a',
         'callerAccess': 'ACCESS_OWNER',
       };
+      const requestId = '12345678-1234-1234-1234-123456789abc';
+      final connectRequest = {
+        'mutation': {
+          'requestId': requestId,
+          'expectedInstanceId': 'runtime-a',
+          'expectedRevision': '8',
+        },
+        'profile': {'profileId': 'active'},
+      };
+      final accepted = {
+        'id': 'connect-operation',
+        'requestId': requestId,
+        'kind': 'OPERATION_KIND_CONNECT',
+        'state': 'OPERATION_STATE_PENDING',
+      };
       final host = await ScenarioHost.start(executable!, [
         {
           'method': 'GetRuntimeInfo',
@@ -70,6 +85,20 @@ void main() {
               },
             ],
           },
+        {
+          'method': 'Connect',
+          'request': connectRequest,
+          'responses': [
+            {'operation': accepted},
+          ],
+        },
+        {
+          'method': 'GetOperation',
+          'request': {'requestId': requestId},
+          'responses': [
+            {'operation': accepted},
+          ],
+        },
       ]);
       LocalClientEvents? source;
       try {
@@ -105,6 +134,16 @@ void main() {
             ]),
           );
         }
+        final request = api.ConnectRequest()
+          ..mergeFromProto3Json(connectRequest);
+        final operation = await source.mutations.connect(request);
+        expect(operation.terminal, isFalse);
+        expect(operation.succeeded, isFalse);
+        final recovered = await source.mutations.recoverByRequestId(
+          requestId,
+          api.OperationKind.OPERATION_KIND_CONNECT,
+        );
+        expect(recovered.value.id, operation.value.id);
         await source.close();
         await host.verify();
       } finally {

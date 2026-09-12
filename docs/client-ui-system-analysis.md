@@ -232,6 +232,12 @@ capabilities, stream ordering/context, typed overflow, observer session denial
 и независимый cursor новой подписки. EOF считается потерей подписки, а не
 подтверждением Connected; cache/reconnect orchestration остаётся application work.
 `local_client_events.dart` связывает bootstrap/local gRPC с проверенным потоком.
+`client_mutations.dart` предоставляет typed SDK вызовы всех 19 mutation RPC,
+проверяет UUID/instance/revision до отправки и соответствие kind/request ID
+принятой операции. Запрос копируется перед отправкой; автоматического retry и
+подмены UUID нет. GetOperation по request ID проверяет ту же идентичность.
+Сохранение UUID до отправки и восстановление UI после restart ещё требуют
+application journal; этот слой сам не заявляет durable client recovery.
 `client_operation.dart` проверяет state/outcome envelope всех 19 mutation kinds
 в snapshot и operation events. `client_operation_test.dart` содержит отдельные
 векторы по каждому kind и проверяет полноту относительно generated enum:
@@ -241,6 +247,8 @@ FAILED/CANCELLED — typed Failure, SUCCEEDED — соответствующий
 вложенного результата; эти проверки остаются отдельными сценариями.
 `local_client_events_test.dart` запускает отдельный pinned Go testserver,
 проверяет snapshot/typed overflow/повторную подписку и требует успешного Verify.
+Тот же process scenario проверяет Connect acceptance и lookup по исходному
+request ID; scripted lookup не является доказательством runtime deduplication.
 Workflow запускает unit и process integration на Windows/Linux/macOS с прежним
 закреплённым Flutter SDK. Без ENDLESSNET_TESTSERVER process test пропускается;
 такой локальный запуск не является interoperability evidence. До успешного CI
