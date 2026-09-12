@@ -39,7 +39,8 @@ final class ScenarioHost {
           // This child runs synthetic scripts only. Capture transport termination
           // reasons because grpc-dart's public error omits GOAWAY debug data.
           'GRPC_GO_LOG_SEVERITY_LEVEL': 'info',
-          'GRPC_GO_LOG_VERBOSITY_LEVEL': '2',
+        'GRPC_GO_LOG_VERBOSITY_LEVEL': '2',
+        'GODEBUG': 'http2debug=2',
         },
       );
       host = ScenarioHost._(
