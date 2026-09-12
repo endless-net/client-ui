@@ -222,6 +222,15 @@ evidence и не меняет датированные свидетельств�
 
 ## 7. Реализация и открытые platform решения
 
+Промежуточная consumer foundation: `app/lib/client_runtime_snapshot.dart`
+использует generated SDK, закреплённый в pubspec по immutable client revision.
+`app/test/client_runtime_snapshot_test.dart` проверяет часть US-01/03/10:
+первый snapshot, pairing, instance/revision, operation kind, immutable copy и
+capability availability. Workflow `contract-consumer.yml` запускает эти unit
+проверки на Windows/Linux/macOS с прежним закреплённым Flutter SDK. Этот слой
+ещё не подключён к production shell/transport и не подтверждает полный US,
+testserver integration, Android/iOS execution или UI/runtime cutover.
+
 1. client реализует новый snapshot, credential projection, operations и RPC
    authorization; backend owners предоставляют authoritative deadline/policy.
 2. client/client-ui проверяют local transport binding; Windows сохраняет прямой
