@@ -1,0 +1,17 @@
+name: endlessnet_contract_harness
+description: Native test host for the shared Client v0 consumer, not a VPN app.
+publish_to: none
+environment:
+  sdk: ^3.10.0
+dependencies:
+  flutter:
+    sdk: flutter
+  endlessnet:
+    path: ../../app
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+flutter:
+  uses-material-design: true

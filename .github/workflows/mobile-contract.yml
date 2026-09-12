@@ -1,0 +1,76 @@
+name: Mobile v0 consumer
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.38.1
+          cache: false
+      - name: Generate Android test host
+        working-directory: tests/mobile_contract
+        run: flutter create --platforms=android --project-name=endlessnet_contract_harness --no-pub .
+      - name: Resolve test-host dependencies
+        working-directory: tests/mobile_contract
+        run: flutter pub get
+      - name: Reject product or harness manifest drift
+        run: git diff --exit-code -- app/pubspec.yaml app/pubspec.lock tests/mobile_contract/pubspec.yaml
+      - name: Run contract widget in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -accel off
+          script: cd tests/mobile_contract && flutter test integration_test/contract_test.dart -d emulator-5554 --no-pub
+
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.38.1
+          cache: false
+      - name: Generate iOS test host
+        working-directory: tests/mobile_contract
+        run: flutter create --platforms=ios --project-name=endlessnet_contract_harness --no-pub .
+      - name: Resolve test-host dependencies
+        working-directory: tests/mobile_contract
+        run: flutter pub get
+      - name: Reject product or harness manifest drift
+        run: git diff --exit-code -- app/pubspec.yaml app/pubspec.lock tests/mobile_contract/pubspec.yaml
+      - name: Run contract widget in iOS simulator
+        shell: bash
+        working-directory: tests/mobile_contract
+        run: |
+          set -euo pipefail
+          read -r device state <<< "$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); a=[v for k,vs in d["devices"].items() if ".iOS-" in k for v in vs if v["name"].startswith("iPhone")]; assert a, "No available iPhone simulator"; print(a[0]["udid"], a[0]["state"])')"
+          if [ "$state" != Booted ]; then
+            xcrun simctl boot "$device"
+            trap 'xcrun simctl shutdown "$device"' EXIT
+          fi
+          xcrun simctl bootstatus "$device" -b
+          flutter test integration_test/contract_test.dart -d "$device" --no-pub

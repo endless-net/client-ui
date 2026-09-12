@@ -267,6 +267,14 @@ Workflow запускает unit и process integration на Windows/Linux/macOS
 свидетельство остаётся pending. Этот слой ещё не подключён к production shell и
 не подтверждает полный US, Android/iOS execution или UI/runtime cutover.
 
+Отдельный `mobile-contract.yml` запускает `tests/mobile_contract` внутри Android
+emulator и iOS simulator. Общий `mobile_contract_widget_test.dart` проверяет
+synthetic snapshot → typed controller → widget и очистку после stream loss.
+Сгенерированные native projects служат только тестовым host, не production app.
+До успешного CI native execution остаётся pending; даже успешный запуск не
+закрывает весь US-01/03, mobile native bridge, OS prompts, VPN/Network Extension,
+фоновые режимы, traffic acceptance или оставшиеся BA/SA сценарии.
+
 1. client реализует новый snapshot, credential projection, operations и RPC
    authorization; backend owners предоставляют authoritative deadline/policy.
 2. client/client-ui проверяют local transport binding; Windows сохраняет прямой
