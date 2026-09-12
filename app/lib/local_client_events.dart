@@ -12,7 +12,6 @@ final class LocalClientEvents {
   final LocalClientChannel _channel;
   final api.ClientServiceClient _client;
   final api.RuntimeInfo runtime;
-  bool _watching = false;
   bool _closed = false;
 
   ClientMutations get mutations {
@@ -32,23 +31,16 @@ final class LocalClientEvents {
     }
   }
 
-  Stream<api.WatchEventsResponse> watch() async* {
-    if (_closed || _watching) {
-      throw StateError('Local event source is closed or already subscribed');
-    }
-    _watching = true;
-    try {
-      await for (final event in validateClientEvents(
-        _client.watchEvents(api.WatchEventsRequest()),
-      )) {
-        if (event.metadata.instanceId != runtime.instanceId) {
-          throw const FormatException('Runtime changed after bootstrap');
-        }
-        yield event;
+  Stream<api.WatchEventsResponse> watch() {
+    if (_closed) throw StateError('Local event source is closed');
+    return validateClientEvents(
+      _client.watchEvents(api.WatchEventsRequest()),
+    ).map((event) {
+      if (event.metadata.instanceId != runtime.instanceId) {
+        throw const FormatException('Runtime changed after bootstrap');
       }
-    } finally {
-      _watching = false;
-    }
+      return event;
+    });
   }
 
   Future<void> close() async {

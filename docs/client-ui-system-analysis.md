@@ -232,6 +232,11 @@ capabilities, stream ordering/context, typed overflow, observer session denial
 и независимый cursor новой подписки. EOF считается потерей подписки, а не
 подтверждением Connected; cache/reconnect orchestration остаётся application work.
 `local_client_events.dart` связывает bootstrap/local gRPC с проверенным потоком.
+`client_state_controller.dart` содержит typed application state: ожидает первый
+snapshot, очищает данные при stream loss/reconnect, меняет cache epoch при смене
+profile/account/network, хранит caller-visible операции и domain invalidations.
+Отмена idle subscription передаётся source без ожидания следующего события.
+Тесты покрывают эти границы; прежний production controller ещё не заменён.
 `client_mutations.dart` предоставляет typed SDK вызовы всех 19 mutation RPC,
 проверяет UUID/instance/revision до отправки и соответствие kind/request ID
 принятой операции. Запрос копируется перед отправкой; автоматического retry и
