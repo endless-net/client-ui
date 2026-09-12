@@ -47,6 +47,9 @@ jobs:
       - name: Analyze transport
         working-directory: packages/local_client_rpc
         run: dart analyze --fatal-infos
+      - name: Verify canceled-stream connection survival
+        working-directory: packages/local_client_rpc
+        run: dart run tool/probe_late_headers.dart
       - name: Test actual local Go-Dart transport
         working-directory: packages/local_client_rpc
         run: dart test --reporter expanded

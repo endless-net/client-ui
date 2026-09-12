@@ -32,7 +32,19 @@ Future<void> main() async {
   // Headers were already in flight when the peer received our RST_STREAM.
   incoming.add([0, 0, 1, 1, 5, 0, 0, 0, stream.id, 0x88]);
   await frames.moveNext().timeout(const Duration(seconds: 2));
-  final survived = client.isOpen;
+  var survived = client.isOpen;
+  if (survived) {
+    final next = client.makeRequest([
+      Header.ascii(':method', 'POST'),
+      Header.ascii(':scheme', 'http'),
+      Header.ascii(':authority', 'synthetic.local'),
+      Header.ascii(':path', '/next'),
+    ], endStream: true);
+    final response = next.incomingMessages.toList();
+    incoming.add([0, 0, 1, 1, 5, 0, 0, 0, next.id, 0x88]);
+    final messages = await response.timeout(const Duration(seconds: 2));
+    survived = messages.length == 1 && messages.single is HeadersStreamMessage;
+  }
   await client.terminate();
   await frames.cancel();
   await incoming.close();

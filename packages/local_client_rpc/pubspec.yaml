@@ -17,3 +17,7 @@ dependencies:
   win32: 6.3.0
 dev_dependencies:
   test: ^1.26.3
+
+dependency_overrides:
+  http2:
+    path: ../http2

@@ -54,6 +54,13 @@ connection. Run `dart run tool/probe_late_headers.dart` from
 the corrected transport must return 0. This isolates the dependency defect but
 does not replace the producer interoperability jobs or prove their fix.
 
+Local correction now uses the explicitly documented
+[`http2` backport](../packages/http2/ENDLESSNET_BACKPORT.md), retaining version
+2.3.1 and upstream license. The same probe returns 0 and completes a subsequent
+response on the same connection. It is required in the local-RPC desktop CI
+workflow. App, transport package and mobile harness select this same source;
+runner results for the corrected source still need inspection.
+
 The [Android job](https://github.com/endless-net/client-ui/actions/runs/34723624391/job/103633802852)
 for the same consumer commit failed before Flutter tests started: software-only
 emulation took about 12 minutes to boot, then `adb shell input keyevent 82`
