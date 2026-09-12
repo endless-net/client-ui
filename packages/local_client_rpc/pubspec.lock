@@ -93,8 +93,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/client_api"
-      ref: dc560f82a12f909b14ab2d6e5e584366a1a2893a
-      resolved-ref: dc560f82a12f909b14ab2d6e5e584366a1a2893a
+      ref: a5d7be8e8ec7468a7fe4754818827f976b39addf
+      resolved-ref: a5d7be8e8ec7468a7fe4754818827f976b39addf
       url: "https://github.com/endless-net/client.git"
     source: git
     version: "0.0.0"
@@ -283,7 +283,7 @@ packages:
     source: hosted
     version: "1.5.3"
   protobuf:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: protobuf
       sha256: "75ec242d22e950bdcc79ee38dd520ce4ee0bc491d7fadc4ea47694604d22bf06"

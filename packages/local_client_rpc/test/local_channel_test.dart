@@ -5,9 +5,50 @@ import 'dart:io';
 import 'package:endlessnet_client_api/client_api.dart' hide Platform;
 import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
 import 'package:grpc/grpc.dart';
+import 'package:protobuf/well_known_types/google/protobuf/any.pb.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test(
+    'decodes only typed Failure and rejects malformed or ambiguous details',
+    () {
+      final failure = Failure(code: ErrorCode.ERROR_CODE_OWNER_REQUIRED);
+      final detail = Any(
+        typeUrl: 'type.googleapis.com/client.v0.Failure',
+        value: failure.writeToBuffer(),
+      );
+      expect(
+        failureFromLocalRPCError(
+          GrpcError.permissionDenied('untrusted diagnostic', [detail]),
+        )?.code,
+        ErrorCode.ERROR_CODE_OWNER_REQUIRED,
+      );
+      expect(
+        failureFromLocalRPCError(
+          const GrpcError.permissionDenied('ERROR_CODE_OWNER_REQUIRED'),
+        ),
+        isNull,
+      );
+      expect(
+        failureFromLocalRPCError(
+          GrpcError.permissionDenied('', [detail, detail]),
+        ),
+        isNull,
+      );
+      expect(
+        failureFromLocalRPCError(
+          GrpcError.permissionDenied('', [
+            Any(typeUrl: detail.typeUrl, value: [255]),
+          ]),
+        ),
+        isNull,
+      );
+      expect(
+        failureFromLocalRPCError(GrpcError.permissionDenied('', [Failure()])),
+        isNull,
+      );
+    },
+  );
   test('only local desktop endpoints are accepted', () {
     for (final os in ['windows', 'linux', 'macos']) {
       for (final endpoint in [
@@ -157,11 +198,18 @@ void main() {
         await expectLater(
           client.getStatus(GetStatusRequest()),
           throwsA(
-            isA<GrpcError>().having(
-              (e) => e.code,
-              'code',
-              StatusCode.unavailable,
-            ),
+            isA<GrpcError>()
+                .having((e) => e.code, 'code', StatusCode.unavailable)
+                .having(
+                  (e) => failureFromLocalRPCError(e)?.code,
+                  'typed failure',
+                  ErrorCode.ERROR_CODE_UNAVAILABLE,
+                )
+                .having(
+                  (e) => failureFromLocalRPCError(e)?.retryable,
+                  'retryable',
+                  true,
+                ),
           ),
         );
         await channel.shutdown();

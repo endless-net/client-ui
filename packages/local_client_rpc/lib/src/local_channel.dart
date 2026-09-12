@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:endlessnet_client_api/client_api.dart' hide Platform;
 import 'package:grpc/grpc.dart';
-import 'package:http2/transport.dart';
+import 'package:http2/transport.dart' show ClientTransportConnection;
 
 import 'windows_pipe.dart';
 
@@ -39,6 +39,36 @@ Future<RuntimeInfo> bootstrapLocalClient(ClientServiceClient client) async {
     throw const GrpcError.failedPrecondition('ERROR_CODE_CONTRACT_MISMATCH');
   }
   return info;
+}
+
+/// Decode only producer Failure details, never the transport diagnostic text.
+/// gRPC returns unknown detail types as google.protobuf.Any. Reflection keeps
+/// this independent of the gRPC package's private generated Any implementation.
+Failure? failureFromLocalRPCError(Object error) {
+  if (error is! GrpcError) return null;
+  Failure? result;
+  for (final detail in error.details ?? []) {
+    Failure? failure;
+    if (detail is Failure) {
+      failure = Failure.fromBuffer(detail.writeToBuffer());
+    } else if (detail.info_.qualifiedMessageName == 'google.protobuf.Any') {
+      final typeUrl = detail.getField(1);
+      final value = detail.getField(2);
+      if (typeUrl != 'type.googleapis.com/client.v0.Failure') continue;
+      if (value is! List<int> || value.length > 64 * 1024) return null;
+      try {
+        failure = Failure.fromBuffer(value);
+      } catch (_) {
+        return null;
+      }
+    }
+    if (failure == null) continue;
+    if (result != null || failure.code == ErrorCode.ERROR_CODE_UNSPECIFIED) {
+      return null;
+    }
+    result = failure..freeze();
+  }
+  return result;
 }
 
 String validateLocalEndpoint(String? requested, {String? operatingSystem}) {
