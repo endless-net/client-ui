@@ -232,6 +232,11 @@ capabilities, stream ordering/context, typed overflow, observer session denial
 и независимый cursor новой подписки. EOF считается потерей подписки, а не
 подтверждением Connected; cache/reconnect orchestration остаётся application work.
 `local_client_events.dart` связывает bootstrap/local gRPC с проверенным потоком.
+`client_session.dart` объединяет connection, typed state и intention journal:
+до snapshot команды запрещены, запись предшествует отправке, поздний ответ после
+смены контекста требует recovery. Pending recovery выполняет только GetOperation,
+без replay payload и автоматической смены UUID. Session-тесты проверяют эти
+границы. Перевод существующих экранов на этот session ещё не выполнен.
 `client_state_controller.dart` содержит typed application state: ожидает первый
 snapshot, очищает данные при stream loss/reconnect, меняет cache epoch при смене
 profile/account/network, хранит caller-visible операции и domain invalidations.

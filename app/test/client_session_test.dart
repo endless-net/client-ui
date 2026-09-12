@@ -1,0 +1,148 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:endlessnet/client_intent_journal.dart';
+import 'package:endlessnet/client_mutations.dart';
+import 'package:endlessnet/client_operation.dart';
+import 'package:endlessnet/client_session.dart';
+import 'package:endlessnet/client_state_controller.dart';
+import 'package:endlessnet_client_api/client_api.dart' as api;
+import 'package:flutter_test/flutter_test.dart';
+
+class NoCallsClient implements api.ClientServiceClient {
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected RPC');
+}
+
+class FakeConnection implements ClientConnection {
+  final events = StreamController<api.WatchEventsResponse>();
+  bool closed = false;
+  @override
+  final mutations = ClientMutations(NoCallsClient(), instanceId: 'runtime-a');
+  @override
+  Stream<api.WatchEventsResponse> watch() => events.stream;
+  @override
+  Future<void> close() async {
+    closed = true;
+    await events.close();
+  }
+}
+
+api.WatchEventsResponse snapshot() =>
+    api.WatchEventsResponse()..mergeFromProto3Json({
+      'sequence': '1',
+      'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+      'snapshot': {
+        'runtime': {
+          'protocol': api.ClientContract.protocol,
+          'contractSha256': api.ClientContract.sha256,
+          'instanceId': 'runtime-a',
+          'callerAccess': 'ACCESS_OWNER',
+        },
+        'status': {
+          'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+        },
+      },
+    });
+
+ClientOperation accepted(api.MutationContext context) =>
+    ClientOperation.fromProto(
+      api.Operation(
+        id: 'operation-a',
+        requestId: context.requestId,
+        kind: api.OperationKind.OPERATION_KIND_CONNECT,
+        state: api.OperationState.OPERATION_STATE_PENDING,
+      ),
+    );
+
+void main() {
+  late Directory directory;
+  late FakeConnection connection;
+  late ClientSession session;
+  setUp(() async {
+    directory = await Directory.systemTemp.createTemp('en-session-');
+    connection = FakeConnection();
+    session = ClientSession(
+      journal: ClientIntentJournal(directory),
+      open: () async => connection,
+    );
+    await session.connect();
+  });
+  tearDown(() async {
+    await session.close();
+    await directory.delete(recursive: true);
+  });
+
+  test(
+    'US-01/03: bootstrap alone cannot submit; snapshot context is journaled before send',
+    () async {
+      await expectLater(
+        session.submit(
+          api.OperationKind.OPERATION_KIND_CONNECT,
+          (_, context) async => accepted(context),
+        ),
+        throwsStateError,
+      );
+      expect(await session.journal.pending(), isEmpty);
+      connection.events.add(snapshot());
+      await pumpEventQueue();
+      final result = await session.submit(
+        api.OperationKind.OPERATION_KIND_CONNECT,
+        (_, context) async {
+          expect(context.expectedInstanceId, 'runtime-a');
+          expect(context.expectedRevision.toString(), '7');
+          expect(
+            (await ClientIntentJournal(directory).pending()).single.requestId,
+            context.requestId,
+          );
+          return accepted(context);
+        },
+      );
+      expect(result.terminal, isFalse);
+      expect(await session.journal.pending(), hasLength(1));
+    },
+  );
+
+  test(
+    'US-03: transport timeout preserves request identity without resubmitting',
+    () async {
+      connection.events.add(snapshot());
+      await pumpEventQueue();
+      var calls = 0;
+      await expectLater(
+        session.submit(api.OperationKind.OPERATION_KIND_CONNECT, (
+          _,
+          context,
+        ) async {
+          calls++;
+          throw TimeoutException('synthetic');
+        }),
+        throwsA(isA<TimeoutException>()),
+      );
+      expect(calls, 1);
+      expect(await session.journal.pending(), hasLength(1));
+    },
+  );
+
+  test(
+    'US-03: late acceptance after stream loss is not shown in the current context',
+    () async {
+      connection.events.add(snapshot());
+      await pumpEventQueue();
+      await expectLater(
+        session.submit(api.OperationKind.OPERATION_KIND_CONNECT, (
+          _,
+          context,
+        ) async {
+          await connection.events.close();
+          await pumpEventQueue();
+          return accepted(context);
+        }),
+        throwsStateError,
+      );
+      expect(session.state.link, ClientLinkState.unavailable);
+      expect(await session.journal.pending(), hasLength(1));
+    },
+  );
+}
