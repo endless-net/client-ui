@@ -22,6 +22,10 @@ class ClientProfilesPanel extends StatefulWidget {
 class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
   ClientProfileCatalog? _catalog;
   int? _epoch;
+  int? _domainEpoch;
+  bool get _catalogCurrent =>
+      _epoch == widget.state.cacheEpoch &&
+      _domainEpoch == widget.state.domainEpoch(api.Domain.DOMAIN_PROFILES);
   bool _busy = false;
   String? _notice;
   bool get _owner =>
@@ -32,20 +36,22 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
   Future<void> _run([String? profileId]) async {
     if (_busy || !_owner) return;
     final epoch = widget.state.cacheEpoch;
+    final domainEpoch = widget.state.domainEpoch(api.Domain.DOMAIN_PROFILES);
     setState(() {
       _busy = true;
       _notice = null;
       if (profileId == null || _epoch != epoch) _catalog = null;
       _epoch = epoch;
+      _domainEpoch = domainEpoch;
     });
     try {
       if (profileId == null) {
         final catalog = await widget.load();
-        if (!mounted || !_owner || epoch != widget.state.cacheEpoch) return;
+        if (!mounted || !_owner || !_catalogCurrent) return;
         setState(() => _catalog = catalog);
       } else {
         final operation = await widget.select(profileId);
-        if (!mounted || !_owner || epoch != widget.state.cacheEpoch) return;
+        if (!mounted || !_owner || !_catalogCurrent) return;
         setState(() {
           // Neither acceptance nor success is a replacement runtime snapshot.
           _catalog = null;
@@ -55,7 +61,7 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
         });
       }
     } catch (_) {
-      if (!mounted || !_owner || epoch != widget.state.cacheEpoch) return;
+      if (!mounted || !_owner || !_catalogCurrent) return;
       setState(() {
         _catalog = null;
         _notice =
@@ -70,7 +76,7 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.state,
     builder: (context, _) {
-      final visible = _owner && _epoch == widget.state.cacheEpoch;
+      final visible = _owner && _catalogCurrent;
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [

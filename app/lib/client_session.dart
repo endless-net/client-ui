@@ -150,10 +150,12 @@ final class ClientSession {
     }
     final epoch = _epoch;
     final cacheEpoch = state.cacheEpoch;
+    final profilesEpoch = state.domainEpoch(api.Domain.DOMAIN_PROFILES);
     final catalog = await connection.listProfiles();
     if (_closed ||
         epoch != _epoch ||
         cacheEpoch != state.cacheEpoch ||
+        profilesEpoch != state.domainEpoch(api.Domain.DOMAIN_PROFILES) ||
         state.link != ClientLinkState.ready ||
         state.snapshot == null ||
         catalog.metadata.instanceId != snapshot.runtime.instanceId ||

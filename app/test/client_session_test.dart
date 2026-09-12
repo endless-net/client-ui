@@ -200,6 +200,40 @@ void main() {
   );
 
   test(
+    'US-08: each profiles invalidation rejects an in-flight catalog',
+    () async {
+      connection.events.add(snapshot());
+      await pumpEventQueue();
+      final catalog = await readClientProfiles(
+        (_) async => api.ListProfilesResponse()
+          ..mergeFromProto3Json({
+            'page': {
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            },
+          }),
+        instanceId: 'runtime-a',
+      );
+      for (var repeat = 0; repeat < 2; repeat++) {
+        final result = Completer<ClientProfileCatalog>();
+        connection.profiles = () => result.future;
+        final rejected = expectLater(session.listProfiles(), throwsStateError);
+        connection.events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '${repeat + 2}',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'invalidated': {'domain': 'DOMAIN_PROFILES'},
+          }),
+        );
+        await pumpEventQueue();
+        result.complete(catalog);
+        await rejected;
+        connection.profiles = () async => catalog;
+        expect(await session.listProfiles(), same(catalog));
+      }
+    },
+  );
+
+  test(
     'US-01: failed watch releases bootstrapped channel before retry',
     () async {
       await session.close();

@@ -15,6 +15,8 @@ final class ClientStateController extends ChangeNotifier {
   ClientRuntimeSnapshot? _snapshot;
   final _operations = <String, api.Operation>{};
   final _invalidated = <(api.Domain, String)>{};
+  final _domainEpochs = <api.Domain, int>{};
+  int _invalidationSerial = 0;
   StreamSubscription<api.WatchEventsResponse>? _subscription;
   int _epoch = 0;
   int _cacheEpoch = 0;
@@ -28,6 +30,7 @@ final class ClientStateController extends ChangeNotifier {
   Map<String, api.Operation> get operations => Map.unmodifiable(_operations);
   Set<(api.Domain, String)> get invalidated => Set.unmodifiable(_invalidated);
   int get cacheEpoch => _cacheEpoch;
+  int domainEpoch(api.Domain domain) => _domainEpochs[domain] ?? 0;
 
   /// Caller/profile identity lifetime, independent of full snapshot refreshes.
   int get contextEpoch => _contextEpoch;
@@ -38,6 +41,7 @@ final class ClientStateController extends ChangeNotifier {
     _snapshot = null;
     _operations.clear();
     _invalidated.clear();
+    _domainEpochs.clear();
     _failure = null;
     _invalidContract = false;
     _cacheEpoch++;
@@ -124,6 +128,9 @@ final class ClientStateController extends ChangeNotifier {
       );
     } else if (event.hasInvalidated()) {
       _invalidated.add((event.invalidated.domain, event.invalidated.profileId));
+      // Repeated invalidations remain meaningful even if the set already
+      // contains this domain/profile. A query may have completed in between.
+      _domainEpochs[event.invalidated.domain] = ++_invalidationSerial;
     }
   }
 

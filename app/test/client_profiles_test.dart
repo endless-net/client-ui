@@ -85,6 +85,22 @@ void main() {
       await tester.tap(find.byKey(const Key('client-load-profiles')));
       await tester.pump();
       expect(find.text('Profile b'), findsOneWidget);
+      for (var repeat = 0; repeat < 2; repeat++) {
+        snapshot.sequence += 1;
+        events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': snapshot.sequence.toString(),
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'invalidated': {'domain': 'DOMAIN_PROFILES'},
+          }),
+        );
+        await tester.pump();
+        expect(find.text('Profile b'), findsNothing);
+        expect(find.byKey(const Key('select-profile-b')), findsNothing);
+        await tester.tap(find.byKey(const Key('client-load-profiles')));
+        await tester.pump();
+        expect(find.text('Profile b'), findsOneWidget);
+      }
       await tester.tap(find.byKey(const Key('select-profile-b')));
       await tester.pump();
       expect(selected, ['b']);
