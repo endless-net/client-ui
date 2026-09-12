@@ -282,7 +282,12 @@ UI и обработка unresolved NOT_FOUND ещё требуют интегр
 закреплённым на `ac30bfe0e959f3c93ef1059495f2356fa5476b06`: WatchEvents с
 hold_open, snapshot-gated Connect, pending acceptance, lookup и journal
 acknowledgement после terminal result. Подготовка ID в fixture выполняется заранее
-для exact request matching; хранение и session остаются настоящими. Native RPC
+для exact request matching через injected UUID factory; запись в outbox происходит
+только в обычном submit перед RPC. Production factory использует Random.secure.
+Session отклоняет параллельный submit одного kind и новый UUID при сохранённом
+намерении того же kind: сначала lookup/terminal acknowledgement. Другие kinds
+не блокируются этим guard, поэтому Disconnect не ожидает завершения Connect.
+Это не cross-process lock нескольких UI instances. Native RPC
 execution этого сценария требует успешного CI, локальный skip его не доказывает.
 `client_operation.dart` проверяет state/outcome envelope всех 19 mutation kinds
 в snapshot и operation events. `client_operation_test.dart` содержит отдельные

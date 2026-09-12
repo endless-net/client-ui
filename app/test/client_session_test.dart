@@ -140,6 +140,16 @@ void main() {
       );
       expect(result.terminal, isFalse);
       expect(await session.journal.pending(), hasLength(1));
+      await expectLater(
+        session.submit(api.OperationKind.OPERATION_KIND_CONNECT, (
+          _,
+          context,
+        ) async {
+          fail('Accepted work must be recovered, not submitted again');
+        }),
+        throwsStateError,
+      );
+      expect(await session.journal.pending(), hasLength(1));
     },
   );
 
@@ -160,6 +170,43 @@ void main() {
         throwsA(isA<TimeoutException>()),
       );
       expect(calls, 1);
+      expect(await session.journal.pending(), hasLength(1));
+      await expectLater(
+        session.submit(api.OperationKind.OPERATION_KIND_CONNECT, (
+          _,
+          context,
+        ) async {
+          calls++;
+          return accepted(context);
+        }),
+        throwsStateError,
+      );
+      expect(calls, 1);
+    },
+  );
+
+  test(
+    'US-03: overlapping submissions do not allocate a second intention',
+    () async {
+      connection.events.add(snapshot());
+      await pumpEventQueue();
+      final release = Completer<void>();
+      final first = session.submit(api.OperationKind.OPERATION_KIND_CONNECT, (
+        _,
+        context,
+      ) async {
+        await release.future;
+        return accepted(context);
+      });
+      await expectLater(
+        session.submit(
+          api.OperationKind.OPERATION_KIND_CONNECT,
+          (_, context) async => accepted(context),
+        ),
+        throwsStateError,
+      );
+      release.complete();
+      await first;
       expect(await session.journal.pending(), hasLength(1));
     },
   );

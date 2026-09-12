@@ -9,21 +9,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/scenario_host.dart';
 
-// Reserve a real persisted ID before serializing the exact producer script.
-// Only preparation timing is controlled; storage and session code are real.
-final class ScriptJournal extends ClientIntentJournal {
-  ScriptJournal(super.directory);
-  PendingClientIntent? reserved;
-  @override
-  Future<PendingClientIntent> prepare(api.OperationKind kind) async {
-    final intent = reserved;
-    if (intent == null) return super.prepare(kind);
-    reserved = null;
-    expect(intent.kind, kind);
-    return intent;
-  }
-}
-
 void main() {
   final executable = Platform.environment['ENDLESSNET_TESTSERVER'];
   test(
@@ -33,11 +18,16 @@ void main() {
         'en-session-rpc-',
       );
       addTearDown(() => directory.delete(recursive: true));
-      final journal = ScriptJournal(directory);
-      final intent = await journal.prepare(
+      const intent = PendingClientIntent(
+        'c06bd29f-7c77-4b27-943a-620081f313df',
         api.OperationKind.OPERATION_KIND_CONNECT,
       );
-      journal.reserved = intent;
+      // Only UUID generation is deterministic. Preparation, persistence and
+      // submission ordering are production code, not a pre-seeded outbox.
+      final journal = ClientIntentJournal(
+        directory,
+        requestIdFactory: () => intent.requestId,
+      );
       final runtime = {
         'protocol': api.ClientContract.protocol,
         'contractSha256': api.ClientContract.sha256,
@@ -110,7 +100,8 @@ void main() {
       try {
         final ready = Completer<void>();
         session.state.addListener(() {
-          if (session.state.link == ClientLinkState.ready && !ready.isCompleted) {
+          if (session.state.link == ClientLinkState.ready &&
+              !ready.isCompleted) {
             ready.complete();
           }
         });

@@ -42,6 +42,7 @@ final class ClientSession {
   ClientConnection? _connection;
   int _epoch = 0;
   bool _closed = false;
+  final _submitting = <api.OperationKind>{};
 
   Future<void> connect() async {
     if (_closed) throw StateError('Client session is closed');
@@ -95,27 +96,41 @@ final class ClientSession {
     }
     final epoch = _epoch;
     final cacheEpoch = state.cacheEpoch;
-    return journal.submit(kind, (intent) async {
-      if (_closed ||
-          epoch != _epoch ||
-          state.link != ClientLinkState.ready ||
-          state.cacheEpoch != cacheEpoch) {
-        throw StateError('Client context changed before submission');
-      }
-      final operation = await send(
-        connection.mutations,
-        snapshot.mutationContext(intent.requestId),
-      );
-      if (_closed ||
-          epoch != _epoch ||
-          state.cacheEpoch != cacheEpoch ||
-          state.link != ClientLinkState.ready) {
+    if (!_submitting.add(kind)) {
+      throw StateError('A submission of this kind is already in progress');
+    }
+    try {
+      // The outbox survives reconnect/restart. A fresh UUID is not a retry of
+      // an accepted or uncertain command, even if the transport is ready again.
+      if ((await journal.pending()).any((intent) => intent.kind == kind)) {
         throw StateError(
-          'Client context changed after submission; recover the intention',
+          'Recover the existing intention before submitting again',
         );
       }
-      return operation;
-    });
+      return await journal.submit(kind, (intent) async {
+        if (_closed ||
+            epoch != _epoch ||
+            state.link != ClientLinkState.ready ||
+            state.cacheEpoch != cacheEpoch) {
+          throw StateError('Client context changed before submission');
+        }
+        final operation = await send(
+          connection.mutations,
+          snapshot.mutationContext(intent.requestId),
+        );
+        if (_closed ||
+            epoch != _epoch ||
+            state.cacheEpoch != cacheEpoch ||
+            state.link != ClientLinkState.ready) {
+          throw StateError(
+            'Client context changed after submission; recover the intention',
+          );
+        }
+        return operation;
+      });
+    } finally {
+      _submitting.remove(kind);
+    }
   }
 
   /// Lookup only. NOT_FOUND/authorization errors preserve the record and are
