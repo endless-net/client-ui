@@ -223,6 +223,10 @@
         {
           "path": "app/test/client_state_controller_test.dart",
           "scope": "Profile context replacement only; no profile lifecycle UI"
+        },
+        {
+          "path": "app/test/client_profiles_test.dart",
+          "scope": "Complete immutable single-revision catalog, opaque pagination and rejection of inconsistent pages; no profile lifecycle UI"
         }
       ],
       "acceptanceEvidence": []

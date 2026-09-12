@@ -3,6 +3,7 @@ import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
 
 import 'client_event_stream.dart';
 import 'client_mutations.dart';
+import 'client_profiles.dart';
 
 /// Production local transport binding for the typed event consumer. The shell
 /// must clear domain caches on disconnect and start a fresh subscription.
@@ -13,6 +14,14 @@ final class LocalClientEvents {
   final api.ClientServiceClient _client;
   final api.RuntimeInfo runtime;
   bool _closed = false;
+
+  Future<ClientProfileCatalog> listProfiles() {
+    if (_closed) throw StateError('Local client is closed');
+    return readClientProfiles(
+      (request) => _client.listProfiles(request),
+      instanceId: runtime.instanceId,
+    );
+  }
 
   ClientMutations get mutations {
     if (_closed) throw StateError('Local client is closed');

@@ -240,6 +240,11 @@ capabilities, stream ordering/context, typed overflow, observer session denial
 `local_client_events.dart` связывает bootstrap/local gRPC с проверенным потоком.
 `client_connection_panel.dart` — общий typed UI-компонент connection/status;
 `client_session_panel.dart` связывает его кнопки с journaled v0-командами.
+`client_profiles.dart` собирает полный immutable ListProfiles catalog с одной
+instance/revision, неизменным active ID и непрозрачными page tokens; несогласованные
+страницы не публикуются. LocalClientEvents предоставляет реальный typed RPC binding.
+Тесты пагинации включены в desktop и mobile harness; epoch guard сессии, profile
+lifecycle UI и platform execution evidence ещё нужны для полного US-08.
 Общая панель отдельно отображает authoritative session/credential expires_at в
 UTC; отсутствие срока означает Unknown. Observer не видит эти поля, смена
 контекста заменяет сроки, UI clock не синтезирует expired/connected state.
