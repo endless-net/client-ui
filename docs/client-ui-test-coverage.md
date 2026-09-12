@@ -32,6 +32,15 @@ These jobs exercise producer mock interoperability and consumer foundations,
 not the installed daemon, VPN dataplane, full production UI, or mobile native
 bridges. No complete SA scenario or five-platform execution group is accepted.
 
+The [Android job](https://github.com/endless-net/client-ui/actions/runs/34723624391/job/103633802852)
+for the same consumer commit failed before Flutter tests started: software-only
+emulation took about 12 minutes to boot, then `adb shell input keyevent 82`
+failed with `Broken pipe` (exit 224). This is test-host failure, not consumer test
+failure or Android acceptance. The workflow now requires existing KVM access and
+hardware acceleration, without changing host permissions, udev rules or runner
+services. Missing access must be escalated to the runner owner; it must not be
+hidden by software-emulation fallback or a skipped green job.
+
 ## Validation
 
 Run from the repository root:

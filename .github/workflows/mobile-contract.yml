@@ -33,13 +33,20 @@ jobs:
         run: flutter pub get
       - name: Reject product or harness manifest drift
         run: git diff --exit-code -- app/pubspec.yaml app/pubspec.lock tests/mobile_contract/pubspec.yaml
+      - name: Verify existing emulator acceleration access
+        shell: bash
+        run: |
+          if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
+            echo '::error::Runner lacks usable KVM access. Runner-owner approval is required to change host permissions; software emulation is not acceptance evidence.'
+            exit 1
+          fi
       - name: Run contract widget in Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
           target: google_apis
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -accel off
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel on
           script: cd tests/mobile_contract && flutter test integration_test/contract_test.dart -d emulator-5554 --no-pub
 
   ios:
