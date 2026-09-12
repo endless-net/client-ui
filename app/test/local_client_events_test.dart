@@ -13,6 +13,9 @@ void main() {
   test(
     'US-01/03: Go host → local gRPC → validated snapshot and reconnect',
     () async {
+      // Exercise terminal-event cancellation repeatedly on the same channel.
+      // Two subscriptions alone have passed intermittently on Unix runners.
+      final revisions = List.generate(16, (index) => index + 7);
       final runtime = {
         'protocol': api.ClientContract.protocol,
         'ipcVersion': api.ClientContract.version,
@@ -33,7 +36,7 @@ void main() {
         'mutation': {
           'requestId': requestId,
           'expectedInstanceId': 'runtime-a',
-          'expectedRevision': '8',
+          'expectedRevision': '${revisions.first}',
         },
         'profile': {'profileId': 'active'},
       };
@@ -51,7 +54,7 @@ void main() {
             {'runtime': runtime},
           ],
         },
-        for (final revision in [7, 8])
+        for (final revision in revisions)
           {
             'method': 'WatchEvents',
             'request': {},
@@ -101,18 +104,19 @@ void main() {
             {'operation': accepted},
           ],
         },
-        {
-          'method': 'GetOperation',
-          'request': {'requestId': requestId},
-          'responses': [
-            {'operation': accepted},
-          ],
-        },
+        for (final _ in revisions)
+          {
+            'method': 'GetOperation',
+            'request': {'requestId': requestId},
+            'responses': [
+              {'operation': accepted},
+            ],
+          },
       ]);
       LocalClientEvents? source;
       try {
         source = await LocalClientEvents.open(endpoint: host.endpoint);
-        for (final revision in [7, 8]) {
+        for (final revision in revisions) {
           await expectLater(
             source.watch(),
             emitsInOrder([
@@ -142,23 +146,27 @@ void main() {
               emitsDone,
             ]),
           );
+          if (revision == revisions.first) {
+            final request = api.ConnectRequest()
+              ..mergeFromProto3Json(connectRequest);
+            final operation = await source.mutations.connect(request);
+            expect(operation.terminal, isFalse);
+            expect(operation.succeeded, isFalse);
+          }
+          // No sleeps, channel replacement or mutation replay may hide a broken
+          // connection. The next unary RPC must work after every terminal stream.
+          final recovered = await source.mutations.recoverByRequestId(
+            requestId,
+            api.OperationKind.OPERATION_KIND_CONNECT,
+          );
+          expect(recovered.value.id, 'connect-operation');
+          expect(
+            (await ClientIntentJournal(
+              journalDirectory,
+            ).pending()).single.requestId,
+            recovered.value.requestId,
+          );
         }
-        final request = api.ConnectRequest()
-          ..mergeFromProto3Json(connectRequest);
-        final operation = await source.mutations.connect(request);
-        expect(operation.terminal, isFalse);
-        expect(operation.succeeded, isFalse);
-        final recovered = await source.mutations.recoverByRequestId(
-          requestId,
-          api.OperationKind.OPERATION_KIND_CONNECT,
-        );
-        expect(recovered.value.id, operation.value.id);
-        expect(
-          (await ClientIntentJournal(
-            journalDirectory,
-          ).pending()).single.requestId,
-          recovered.value.requestId,
-        );
         await source.close();
         await host.verify();
       } finally {
