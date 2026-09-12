@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:endlessnet/client_state_controller.dart';
 import 'package:endlessnet/client_connection_panel.dart';
 import 'package:endlessnet/client_operation.dart';
+import 'package:endlessnet/client_operation_details.dart';
 import 'package:endlessnet/client_recovery_panel.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
@@ -10,6 +11,90 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Reused by the native integration-test host; no desktop channel is imported.
 void main() {
+  testWidgets(
+    'US-03/08: typed cleanup and failure keep remote and local outcomes distinct',
+    (tester) async {
+      for (final outcome in [
+        'REMOTE_CONFIRMED',
+        'REMOTE_UNCONFIRMED',
+        'NOT_REGISTERED',
+      ]) {
+        final operation = ClientOperation.fromProto(
+          api.Operation()..mergeFromProto3Json({
+            'id': 'cleanup',
+            'kind': 'OPERATION_KIND_FORGET_LOCAL_ENROLLMENT',
+            'state': 'OPERATION_STATE_SUCCEEDED',
+            'continuity': 'CONNECTION_CONTINUITY_UNKNOWN',
+            'cleanup': {
+              'outcome': 'CLEANUP_OUTCOME_$outcome',
+              'localRegistrationRemoved': true,
+              'controlRequestId': 'cleanup-correlation',
+            },
+          }),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(body: ClientOperationDetails(operation: operation)),
+          ),
+        );
+        expect(find.text('Local registration removed.'), findsOneWidget);
+        expect(
+          find.text('Control request: cleanup-correlation'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Remote cleanup confirmed.'),
+          outcome == 'REMOTE_CONFIRMED' ? findsOneWidget : findsNothing,
+        );
+        expect(
+          find.text('Remote cleanup NOT confirmed.'),
+          outcome == 'REMOTE_UNCONFIRMED' ? findsOneWidget : findsNothing,
+        );
+      }
+      final failure = ClientOperation.fromProto(
+        api.Operation()..mergeFromProto3Json({
+          'id': 'failed',
+          'kind': 'OPERATION_KIND_LOGOUT',
+          'state': 'OPERATION_STATE_FAILED',
+          'failure': {
+            'code': 'ERROR_CODE_REMOTE_CLEANUP_REQUIRED',
+            'reasonKey': 'do-not-render-raw-reason',
+            'controlRequestId': 'failure-correlation',
+          },
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: ClientOperationDetails(operation: failure)),
+        ),
+      );
+      expect(
+        find.text('Failure: ERROR_CODE_REMOTE_CLEANUP_REQUIRED'),
+        findsOneWidget,
+      );
+      expect(find.text('Control request: failure-correlation'), findsOneWidget);
+      expect(find.text('do-not-render-raw-reason'), findsNothing);
+      expect(find.text('Remote cleanup confirmed.'), findsNothing);
+      final waiting = ClientOperation.fromProto(
+        api.Operation()..mergeFromProto3Json({
+          'id': 'waiting',
+          'kind': 'OPERATION_KIND_ENROLL',
+          'state': 'OPERATION_STATE_WAITING_FOR_USER',
+          'userAction': {
+            'kind': 'KIND_OPEN_BROWSER',
+            'browserUrl': 'https://example.test/sensitive-token',
+          },
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: ClientOperationDetails(operation: waiting)),
+        ),
+      );
+      expect(find.text('Required action: KIND_OPEN_BROWSER'), findsOneWidget);
+      expect(find.textContaining('sensitive-token'), findsNothing);
+    },
+  );
   testWidgets(
     'US-03: recovery acknowledges only terminal results and clears caller context',
     (tester) async {

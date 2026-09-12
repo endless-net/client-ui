@@ -92,6 +92,14 @@ logout/local forget не снимают ownership. UI не обещает воз
 
 ## 3. Команды и восстановление
 
+`client_operation_details.dart` отображает typed outcome в recovery panel:
+remote cleanup confirmation отдельно от local registration removal, failure code,
+action owner и correlation ID, selection/enrollment IDs и connection continuity.
+Произвольные reason strings и browser URL не рендерятся. Shared mobile/desktop
+widget-тест проверяет cleanup distinction, failed logout и сокрытие browser URL.
+Это presentation foundation: открытие браузера, native permission/helper actions,
+загрузка bundle и полная outcome-specific UX ещё требуют реализации и acceptance.
+
 UI сохраняет request ID до отправки намерения, не сохраняя enrollment token в
 журнале операций. Mutations включают ожидаемые instance/revision из свежего
 состояния. Timeout оставляет исход неизвестным; GetOperation по request ID

@@ -2,6 +2,7 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 
 import 'client_operation.dart';
+import 'client_operation_details.dart';
 import 'client_state_controller.dart';
 
 /// Lookup and explicit acknowledgement only: this surface never replays work.
@@ -91,7 +92,7 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
             for (final operation in _results)
               ListTile(
                 title: Text(operation.value.kind.name),
-                subtitle: Text(operation.value.state.name),
+                subtitle: ClientOperationDetails(operation: operation),
                 trailing: operation.terminal
                     ? TextButton(
                         key: ValueKey('ack-${operation.value.requestId}'),
