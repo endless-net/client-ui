@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 
@@ -11,15 +13,29 @@ class ClientProfilesPanel extends StatefulWidget {
     required this.state,
     required this.load,
     required this.select,
+    required this.rename,
   });
   final ClientStateController state;
   final Future<ClientProfileCatalog> Function() load;
   final Future<ClientOperation> Function(String profileId) select;
+  final Future<ClientOperation> Function(String profileId, String name) rename;
   @override
   State<ClientProfilesPanel> createState() => _ClientProfilesPanelState();
 }
 
 class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
+  final _name = TextEditingController();
+  bool get _validName =>
+      _name.text.trim().isNotEmpty &&
+      utf8.encode(_name.text.trim()).length <= 128 &&
+      !RegExp(r'[\x00-\x1f\x7f-\x9f]').hasMatch(_name.text);
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
   ClientProfileCatalog? _catalog;
   int? _epoch;
   int? _domainEpoch;
@@ -33,13 +49,14 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
       widget.state.snapshot != null &&
       widget.state.snapshot!.runtime.callerAccess != api.Access.ACCESS_OBSERVER;
 
-  Future<void> _run([String? profileId]) async {
+  Future<void> _run([String? profileId, String? name]) async {
     if (_busy || !_owner) return;
     final epoch = widget.state.cacheEpoch;
     final domainEpoch = widget.state.domainEpoch(api.Domain.DOMAIN_PROFILES);
     setState(() {
       _busy = true;
       _notice = null;
+      _name.clear();
       if (profileId == null || _epoch != epoch) _catalog = null;
       _epoch = epoch;
       _domainEpoch = domainEpoch;
@@ -50,14 +67,17 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
         if (!mounted || !_owner || !_catalogCurrent) return;
         setState(() => _catalog = catalog);
       } else {
-        final operation = await widget.select(profileId);
+        final operation = name == null
+            ? await widget.select(profileId)
+            : await widget.rename(profileId, name);
         if (!mounted || !_owner || !_catalogCurrent) return;
         setState(() {
           // Neither acceptance nor success is a replacement runtime snapshot.
           _catalog = null;
+          final action = name == null ? 'Selection' : 'Rename';
           _notice = operation.terminal
-              ? 'Selection result received. Refresh profiles and runtime status.'
-              : 'Selection accepted. Recover the operation to see its result.';
+              ? '$action result received. Refresh profiles and runtime status.'
+              : '$action accepted. Recover the operation to see its result.';
         });
       }
     } catch (_) {
@@ -65,7 +85,7 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
       setState(() {
         _catalog = null;
         _notice =
-            'Profiles could not be updated. Recover any pending selection before retrying.';
+            'Profiles could not be updated. Recover any pending operation before retrying.';
       });
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -88,22 +108,44 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
           if (visible && _notice != null) Text(_notice!),
           if (visible && _catalog != null) ...[
             if (_catalog!.profiles.isEmpty) const Text('No profiles'),
+            if (_catalog!.profiles.isNotEmpty)
+              TextField(
+                key: const Key('client-profile-name'),
+                controller: _name,
+                enabled: !_busy,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'New profile name (1–128 UTF-8 bytes)',
+                ),
+              ),
             for (final profile in _catalog!.profiles)
               ListTile(
                 title: Text(profile.displayName),
                 subtitle: Text(profile.id),
-                trailing: profile.active
-                    ? const Text('Active')
-                    : TextButton(
-                        key: ValueKey('select-profile-${profile.id}'),
-                        onPressed:
-                            !_busy &&
-                                profile.selection.availability ==
-                                    api.Availability.AVAILABILITY_AVAILABLE
-                            ? () => _run(profile.id)
-                            : null,
-                        child: const Text('Select'),
-                      ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(
+                      key: ValueKey('rename-profile-${profile.id}'),
+                      onPressed: !_busy && _validName
+                          ? () => _run(profile.id, _name.text.trim())
+                          : null,
+                      child: const Text('Rename'),
+                    ),
+                    profile.active
+                        ? const Text('Active')
+                        : TextButton(
+                            key: ValueKey('select-profile-${profile.id}'),
+                            onPressed:
+                                !_busy &&
+                                    profile.selection.availability ==
+                                        api.Availability.AVAILABILITY_AVAILABLE
+                                ? () => _run(profile.id)
+                                : null,
+                            child: const Text('Select'),
+                          ),
+                  ],
+                ),
               ),
           ],
         ],

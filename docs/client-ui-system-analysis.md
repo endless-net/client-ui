@@ -249,6 +249,14 @@ instance или с revision старше текущего snapshot. Session test
 observer result и stale revision; profile lifecycle UI и platform execution
 evidence ещё нужны для полного US-08.
 `client_profiles_panel.dart` теперь подключает refresh и journaled SelectProfile
+и RenameProfile к общей session panel. Переименование проверяет непустое имя,
+лимит 128 UTF-8 bytes и отсутствие control characters, отправляет opaque profile
+ID и не подменяет authoritative catalog локальным именем. Общий widget-тест
+проверяет ограничения имени, dispatch и отсутствие optimistic результата;
+это не доказывает runtime/profile lifecycle acceptance на платформах.
+Повторные DOMAIN_PROFILES invalidations скрывают каталог и отклоняют запросы,
+начатые до события, даже если domain/profile уже встречался в invalidation set.
+Выбор профиля подключён
 к общей session panel. Выбор использует opaque ID и profile.selection restriction;
 acceptance очищает каталог, но не синтезирует active profile. Widget-тест включён
 в desktop/mobile suite и проверяет owner/observer cleanup. Create/rename/remove,

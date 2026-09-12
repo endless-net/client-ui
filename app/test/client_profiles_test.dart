@@ -31,11 +31,22 @@ void main() {
       final events = StreamController<api.WatchEventsResponse>();
       await state.attach(events.stream);
       final selected = <String>[];
+      final renamed = <(String, String)>[];
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: ClientProfilesPanel(
               state: state,
+              rename: (id, name) async {
+                renamed.add((id, name));
+                return ClientOperation.fromProto(
+                  api.Operation(
+                    id: 'rename',
+                    kind: api.OperationKind.OPERATION_KIND_RENAME_PROFILE,
+                    state: api.OperationState.OPERATION_STATE_PENDING,
+                  ),
+                );
+              },
               load: () => readClientProfiles((_) async {
                 final response = page('a');
                 response.profiles.add(
@@ -85,6 +96,32 @@ void main() {
       await tester.tap(find.byKey(const Key('client-load-profiles')));
       await tester.pump();
       expect(find.text('Profile b'), findsOneWidget);
+      final renameButton = find.byKey(const Key('rename-profile-b'));
+      expect(tester.widget<TextButton>(renameButton).onPressed, isNull);
+      await tester.enterText(
+        find.byKey(const Key('client-profile-name')),
+        'bad\u007fname',
+      );
+      await tester.pump();
+      expect(tester.widget<TextButton>(renameButton).onPressed, isNull);
+      await tester.enterText(
+        find.byKey(const Key('client-profile-name')),
+        'я' * 65,
+      );
+      await tester.pump();
+      expect(tester.widget<TextButton>(renameButton).onPressed, isNull);
+      await tester.enterText(
+        find.byKey(const Key('client-profile-name')),
+        'Новое имя',
+      );
+      await tester.pump();
+      await tester.tap(renameButton);
+      await tester.pump();
+      expect(renamed, [('b', 'Новое имя')]);
+      expect(find.text('Новое имя'), findsNothing);
+      expect(find.text('Profile b'), findsNothing);
+      await tester.tap(find.byKey(const Key('client-load-profiles')));
+      await tester.pump();
       for (var repeat = 0; repeat < 2; repeat++) {
         snapshot.sequence += 1;
         events.add(
