@@ -226,7 +226,7 @@
         },
         {
           "path": "app/test/client_profiles_test.dart",
-          "scope": "Complete immutable single-revision catalog, opaque pagination and rejection of inconsistent pages; no profile lifecycle UI"
+          "scope": "Complete immutable catalog, opaque pagination, shared profile selection by ID without optimistic activation and caller cleanup; not full profile lifecycle or production shell"
         }
       ],
       "acceptanceEvidence": []

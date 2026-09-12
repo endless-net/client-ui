@@ -1,4 +1,9 @@
 import 'package:endlessnet/client_profiles.dart';
+import 'dart:async';
+import 'package:endlessnet/client_profiles_panel.dart';
+import 'package:endlessnet/client_state_controller.dart';
+import 'package:endlessnet/client_operation.dart';
+import 'package:flutter/material.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,6 +24,97 @@ api.ListProfilesResponse page(
   });
 
 void main() {
+  testWidgets(
+    'US-08: selection uses profile ID and never synthesizes active state',
+    (tester) async {
+      final state = ClientStateController();
+      final events = StreamController<api.WatchEventsResponse>();
+      await state.attach(events.stream);
+      final selected = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ClientProfilesPanel(
+              state: state,
+              load: () => readClientProfiles((_) async {
+                final response = page('a');
+                response.profiles.add(
+                  api.Profile(
+                    id: 'b',
+                    displayName: 'Profile b',
+                    selection: api.Restriction(
+                      availability: api.Availability.AVAILABILITY_AVAILABLE,
+                    ),
+                  ),
+                );
+                return response;
+              }, instanceId: 'runtime-a'),
+              select: (id) async {
+                selected.add(id);
+                return ClientOperation.fromProto(
+                  api.Operation(
+                    id: 'selection',
+                    kind: api.OperationKind.OPERATION_KIND_SELECT_PROFILE,
+                    state: api.OperationState.OPERATION_STATE_PENDING,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      final snapshot = api.WatchEventsResponse()
+        ..mergeFromProto3Json({
+          'sequence': '1',
+          'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'runtime-a',
+              'callerAccess': 'ACCESS_OWNER',
+            },
+            'status': {
+              'activeProfileId': 'a',
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            },
+          },
+        });
+      events.add(snapshot);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('client-load-profiles')));
+      await tester.pump();
+      expect(find.text('Profile b'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('select-profile-b')));
+      await tester.pump();
+      expect(selected, ['b']);
+      expect(state.snapshot!.status.activeProfileId, 'a');
+      expect(find.text('Profile b'), findsNothing);
+      snapshot.sequence += 1;
+      snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      snapshot.snapshot.status.clearActiveProfileId();
+      events.add(snapshot);
+      await tester.pump();
+      expect(
+        find.text(
+          'Selection accepted. Recover the operation to see its result.',
+        ),
+        findsNothing,
+      );
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.byKey(const Key('client-load-profiles')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await events.close();
+      await tester.pumpWidget(const SizedBox());
+      state.dispose();
+    },
+  );
+
   test(
     'US-08: complete catalog preserves opaque page tokens and freezes entries',
     () async {

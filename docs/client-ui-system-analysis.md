@@ -248,6 +248,11 @@ owner snapshot и отклоняет результат после смены ep
 instance или с revision старше текущего snapshot. Session tests проверяют late
 observer result и stale revision; profile lifecycle UI и platform execution
 evidence ещё нужны для полного US-08.
+`client_profiles_panel.dart` теперь подключает refresh и journaled SelectProfile
+к общей session panel. Выбор использует opaque ID и profile.selection restriction;
+acceptance очищает каталог, но не синтезирует active profile. Widget-тест включён
+в desktop/mobile suite и проверяет owner/observer cleanup. Create/rename/remove,
+logout/forget, domain invalidation refresh и production shell ещё не перенесены.
 Общая панель отдельно отображает authoritative session/credential expires_at в
 UTC; отсутствие срока означает Unknown. Observer не видит эти поля, смена
 контекста заменяет сроки, UI clock не синтезирует expired/connected state.
