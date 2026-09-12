@@ -5,9 +5,11 @@ Windows distribution pipeline for EndlessNet Client. The Go runtime client and
 the versioned local IPC producer contract are owned by
 [`endless-net/client`](https://github.com/endless-net/client).
 
-Architecture, accepted decisions, known limitations, and possible development
-directions are documented in
-[`docs/architecture-and-future.md`](docs/architecture-and-future.md).
+The target multiplatform design, BA traceability and acceptance scenarios for
+Client Protobuf v0 are documented in
+[`docs/client-ui-system-analysis.md`](docs/client-ui-system-analysis.md).
+[`docs/architecture-and-future.md`](docs/architecture-and-future.md) preserves the
+dated Windows HTTP v2 implementation description; runtime/UI cutover is pending.
 
 ## Local checks
 

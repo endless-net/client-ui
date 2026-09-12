@@ -1,8 +1,14 @@
-# EndlessNet Client for Windows: архитектура, решения и развитие
+# Windows Client HTTP IPC v2: as-is архитектура
 
-- Статус: действующая архитектура и ориентиры развития
+- Статус: as-is; целевой дизайн заменён Client UI SA v0
 - Владелец: `endless-net/client-ui`
 - Последняя сверка с реализацией: 2026-07-22
+
+Целевая архитектура и системные сценарии описаны в
+[Client UI SA v0](client-ui-system-analysis.md), актуализированном 2026-09-13.
+Ниже сохранено описание HTTP v2 реализации на указанную дату сверки.
+ADR-002/004/010 относятся к этой реализации; они не задают целевой протокол,
+SDK или emulator для v0. Переход ещё не реализован и не перепроверен.
 
 ## 1. Назначение документа
 
@@ -464,52 +470,12 @@ service.
 - Release зависит от GitHub-hosted `windows-2022`, certificate lifecycle и
   доступности timestamp service.
 
-## 11. Возможное будущее
+## 11. Целевое развитие
 
-Этот раздел — направления для обсуждения, а не утверждённые обязательства.
-Каждый пункт требует отдельного issue/ADR, владельца и критериев готовности.
-
-### Ближайший горизонт
-
-1. **Перейти на event-driven status.** Реализовать клиент `/events`, обновлять UI
-   и tray сразу после изменения service state, сохранив `/status` как initial
-   snapshot и fallback после разрыва потока.
-2. **Типизировать IPC.** Генерировать или проверять Dart models и routes из
-   OpenAPI, чтобы уменьшить ручной mapping и раньше обнаруживать breaking drift.
-3. **Разделить Flutter-код по слоям.** Вынести transport, generated/typed
-   contract, application controller, desktop integration и presentation из
-   `main.dart` без изменения пользовательского поведения.
-4. **Завершить multi-network UX.** Добавить выбор сети через `/network/select`,
-   состояния переключения и понятное отображение ошибок.
-5. **Определить политику debug logs.** Добавить retention/size limits и решить,
-   должен ли debug оставаться включённым по умолчанию в production MSI.
-
-### Средний горизонт
-
-1. **Развить exit-node UX.** Сначала расширить producer contract, затем заменить
-   placeholder на обнаружение, выбор и отключение exit node.
-2. **Улучшить обновления.** Публиковать проверяемые WinGet manifests как часть
-   public release и, при необходимости, показывать уведомление о доступной
-   версии. Фоновый self-updater не следует добавлять без отдельной security
-   модели.
-3. **Усилить supply-chain metadata.** Добавить SBOM и подписанную/проверяемую
-   provenance-аттестацию поверх текущего `release-provenance.json`.
-4. **Расширить contract compatibility tests.** Проверять поддерживаемый диапазон
-   версий core, reconnect `/events`, malformed responses и сценарии частичного
-   обновления UI/service.
-5. **Улучшить desktop UX.** Локализация, accessibility, настройки автозапуска,
-   более структурированные diagnostics и явные состояния offline/degraded.
-
-### Дальний горизонт
-
-1. **Windows on Arm.** Добавлять ARM64 только вместе с соответствующими Flutter,
-   Go core, Wintun, signing и MSI E2E артефактами.
-2. **Другие desktop-платформы.** OpenAPI уже описывает Unix sockets, но этот
-   репозиторий владеет Windows distribution. Поддержка macOS/Linux потребует
-   явного решения о владении, установке, privilege separation и signing.
-3. **Управляемые enterprise deployment policies.** Рассмотреть machine-wide
-   параметры для server URL, автозапуска, логирования и обновлений, не помещая
-   secrets в MSI properties или пользовательский реестр.
+Направления развития заменены [системным анализом v0](client-ui-system-analysis.md).
+Он охватывает мультиплатформенную модель, generated Dart SDK, profiles, exit node,
+renewal, preferences/resources, managed settings, lifecycle и update projection.
+Текущие Windows release/installer evidence сохраняют свои исходные ограничения.
 
 ## 12. Правила изменения архитектуры
 
