@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:endlessnet/client_intent_journal.dart';
+import 'package:endlessnet/client_operation.dart';
 import 'package:endlessnet/client_session.dart';
 import 'package:endlessnet/client_state_controller.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
@@ -9,8 +10,32 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/scenario_host.dart';
 
+Map<String, Object> recoveredOperation(Map<String, Object> accepted) => {
+  ...accepted,
+  'state': 'OPERATION_STATE_SUCCEEDED',
+  'continuity': 'CONNECTION_CONTINUITY_UNKNOWN',
+  'change': {'changed': true},
+};
+
 void main() {
   final executable = Platform.environment['ENDLESSNET_TESTSERVER'];
+  test('US-03: process recovery fixture satisfies operation contract', () {
+    final operation = ClientOperation.fromProto(
+      api.Operation()..mergeFromProto3Json(
+        recoveredOperation({
+          'id': 'operation-a',
+          'requestId': 'c06bd29f-7c77-4b27-943a-620081f313df',
+          'kind': 'OPERATION_KIND_CONNECT',
+          'state': 'OPERATION_STATE_PENDING',
+        }),
+      ),
+    );
+    expect(operation.succeeded, isTrue);
+    expect(
+      operation.value.continuity,
+      api.ConnectionContinuity.CONNECTION_CONTINUITY_UNKNOWN,
+    );
+  });
   test(
     'US-01/03: live session submits and recovers while WatchEvents stays open',
     () async {
@@ -86,13 +111,7 @@ void main() {
           'method': 'GetOperation',
           'request': {'requestId': intent.requestId},
           'responses': [
-            {
-              'operation': {
-                ...accepted,
-                'state': 'OPERATION_STATE_SUCCEEDED',
-                'change': {'changed': true},
-              },
-            },
+            {'operation': recoveredOperation(accepted)},
           ],
         },
       ]);
