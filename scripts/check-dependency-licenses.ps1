@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "lib/dart-package-root.ps1")
 $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
 $DartPackageConfig = [System.IO.Path]::GetFullPath($DartPackageConfig)
 $allowed = @("Apache-2.0", "MIT", "BSD-2-Clause", "BSD-3-Clause")
@@ -116,10 +117,7 @@ foreach ($package in $packageConfig.packages) {
     if ($package.name -eq "endlessnet") {
         continue
     }
-    $rootUri = [Uri]$package.rootUri
-    if (-not $rootUri.IsAbsoluteUri -or -not $rootUri.IsFile) {
-        throw "Dart package $($package.name) does not use a local resolved root"
-    }
+    $rootUri = Resolve-DartPackageRootUri $DartPackageConfig $package.rootUri
     $root = $rootUri.LocalPath
     $stopAt = if ($root.StartsWith($flutterRoot, [StringComparison]::OrdinalIgnoreCase)) { $flutterRoot } else { $root }
     $licenseFile = Find-LicenseFile $root $stopAt

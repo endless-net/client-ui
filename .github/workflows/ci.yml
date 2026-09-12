@@ -56,9 +56,9 @@ jobs:
 
       - name: Validate dependency licenses
         shell: pwsh
-        run: >-
-          ./scripts/check-dependency-licenses.ps1
-          -Output "$env:RUNNER_TEMP/dependency-licenses.json"
+        run: |
+          ./scripts/check-dependency-licenses.test.ps1
+          ./scripts/check-dependency-licenses.ps1 -Output "$env:RUNNER_TEMP/dependency-licenses.json"
 
       - name: Test Go tools
         run: go test ./...

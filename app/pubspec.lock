@@ -61,8 +61,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/client_api"
-      ref: a5d7be8e8ec7468a7fe4754818827f976b39addf
-      resolved-ref: a5d7be8e8ec7468a7fe4754818827f976b39addf
+      ref: cd05fcddb858877b10ecefe7b0b4a3819d2c6f3b
+      resolved-ref: cd05fcddb858877b10ecefe7b0b4a3819d2c6f3b
       url: "https://github.com/endless-net/client.git"
     source: git
     version: "0.0.0"
