@@ -12,6 +12,8 @@ final class ScenarioHost {
   final Process _process;
   final StreamIterator<String> _output;
   final String endpoint;
+  final List<String> _protocolDiagnostics = [];
+  Future<void>? _stderrDone;
   static const _timeout = Duration(seconds: 10);
 
   static Future<ScenarioHost> start(
@@ -30,16 +32,16 @@ final class ScenarioHost {
     ScenarioHost? host;
     try {
       await script.writeAsString(jsonEncode({'steps': steps}));
-      process = await Process.start(executable, [
-        '--script',
-        script.path,
-        '--endpoint',
-        endpoint,
-        '--access',
-        'owner',
-      ]);
-      // Drain without logging payloads or blocking process termination.
-      unawaited(process.stderr.drain<void>());
+      process = await Process.start(
+        executable,
+        ['--script', script.path, '--endpoint', endpoint, '--access', 'owner'],
+        environment: {
+          // This child runs synthetic scripts only. Capture transport termination
+          // reasons because grpc-dart's public error omits GOAWAY debug data.
+          'GRPC_GO_LOG_SEVERITY_LEVEL': 'info',
+          'GRPC_GO_LOG_VERBOSITY_LEVEL': '2',
+        },
+      );
       host = ScenarioHost._(
         directory,
         process,
@@ -50,6 +52,18 @@ final class ScenarioHost {
         ),
         endpoint,
       );
+      final diagnostics = host._protocolDiagnostics;
+      host._stderrDone = process.stderr
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .forEach((line) {
+            // Never retain request/response/header dumps, even for fixtures.
+            if (!line.contains('GOAWAY')) return;
+            if (diagnostics.length == 8) diagnostics.removeAt(0);
+            diagnostics.add(
+              line.length > 1024 ? line.substring(0, 1024) : line,
+            );
+          });
       final ready = await host._event();
       if (ready['event'] != 'ready' ||
           ready['contract_sha256'] != ClientContract.sha256) {
@@ -88,6 +102,11 @@ final class ScenarioHost {
   Future<void> close() async {
     _process.kill();
     await _process.exitCode.timeout(_timeout);
+    await _stderrDone?.timeout(_timeout);
+    for (final diagnostic in _protocolDiagnostics) {
+      // ignore: avoid_print
+      print('Synthetic testserver transport: $diagnostic');
+    }
     await _output.cancel();
     // Only our unique test directory; a killed Unix host may leave its socket.
     await _directory.delete(recursive: true);
