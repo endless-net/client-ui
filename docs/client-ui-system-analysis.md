@@ -250,6 +250,12 @@ owner/profile, доступной capability и session.renewal; renewing отк
 Принятие операции не меняет сроки; credential renewal не вызывается из UI.
 Shared widget suite проверяет gating и сохранение deadlines после acceptance.
 Browser action, terminal-result recovery и production shell wiring ещё требуются.
+`client_recovery_panel.dart` добавляет явный lookup сохранённых намерений через
+session.recoverPending и подтверждение только terminal result через journal.
+Pending не удаляется; ошибка lookup сохраняет намерения и не раскрывает raw
+exception. Результаты скрываются при смене cache/caller context. Shared widget
+suite проверяет pending/terminal и observer cleanup. Это ещё не полный recovery
+UX: domain outcome details, NOT_FOUND resolution и browser actions остаются.
 Shared mobile/desktop widget test проверяет pending Connect, доступный Disconnect,
 отсутствие ложного Connected и очистку owner controls/context при observer snapshot.
 Панель ещё не заменяет старый main/shell; localization, полный recovery UX и

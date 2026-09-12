@@ -3,12 +3,98 @@ import 'dart:async';
 import 'package:endlessnet/client_state_controller.dart';
 import 'package:endlessnet/client_connection_panel.dart';
 import 'package:endlessnet/client_operation.dart';
+import 'package:endlessnet/client_recovery_panel.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Reused by the native integration-test host; no desktop channel is imported.
 void main() {
+  testWidgets(
+    'US-03: recovery acknowledges only terminal results and clears caller context',
+    (tester) async {
+      final state = ClientStateController();
+      final source = StreamController<api.WatchEventsResponse>();
+      await state.attach(source.stream);
+      final pending = ClientOperation.fromProto(
+        api.Operation(
+          id: 'pending',
+          requestId: 'request-pending',
+          kind: api.OperationKind.OPERATION_KIND_CONNECT,
+          state: api.OperationState.OPERATION_STATE_PENDING,
+        ),
+      );
+      final terminal = ClientOperation.fromProto(
+        api.Operation()..mergeFromProto3Json({
+          'id': 'done',
+          'requestId': 'request-done',
+          'kind': 'OPERATION_KIND_DISCONNECT',
+          'state': 'OPERATION_STATE_SUCCEEDED',
+          'change': {'changed': true},
+        }),
+      );
+      var lookups = 0;
+      final acknowledgements = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ClientRecoveryPanel(
+              state: state,
+              recover: () async {
+                lookups++;
+                return [pending, terminal];
+              },
+              acknowledge: (op) async {
+                acknowledgements.add(op.value.requestId);
+              },
+            ),
+          ),
+        ),
+      );
+      final snapshot = api.WatchEventsResponse()
+        ..mergeFromProto3Json({
+          'sequence': '1',
+          'metadata': {'instanceId': 'recovery-test', 'revision': '1'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'recovery-test',
+              'callerAccess': 'ACCESS_OWNER',
+            },
+            'status': {
+              'metadata': {'instanceId': 'recovery-test', 'revision': '1'},
+            },
+          },
+        });
+      source.add(snapshot);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('client-recover')));
+      await tester.pump();
+      expect(lookups, 1);
+      expect(find.text('Still pending'), findsOneWidget);
+      expect(find.byKey(const Key('ack-request-pending')), findsNothing);
+      await tester.tap(find.byKey(const Key('ack-request-done')));
+      await tester.pump();
+      expect(acknowledgements, ['request-done']);
+      expect(find.byKey(const Key('ack-request-done')), findsNothing);
+      snapshot.sequence += 1;
+      snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      source.add(snapshot);
+      await tester.pump();
+      expect(find.text('Still pending'), findsNothing);
+      expect(
+        tester
+            .widget<OutlinedButton>(find.byKey(const Key('client-recover')))
+            .onPressed,
+        isNull,
+      );
+      await source.close();
+      await tester.pumpWidget(const SizedBox());
+      state.dispose();
+    },
+  );
+
   testWidgets(
     'US-01/03: typed snapshot reaches widgets and stream loss clears it',
     (tester) async {
