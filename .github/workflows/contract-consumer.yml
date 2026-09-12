@@ -47,6 +47,6 @@ jobs:
         working-directory: app
         env:
           ENDLESSNET_TESTSERVER: ${{ github.workspace }}/client-testserver.exe
-        run: flutter test --no-pub test/client_runtime_snapshot_test.dart test/client_event_stream_test.dart test/local_client_events_test.dart
+        run: flutter test --no-pub test/client_runtime_snapshot_test.dart test/client_event_stream_test.dart test/client_operation_test.dart test/local_client_events_test.dart
       - name: Reject dependency drift
         run: git diff --exit-code -- app/pubspec.yaml app/pubspec.lock

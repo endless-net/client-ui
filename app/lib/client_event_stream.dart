@@ -1,6 +1,7 @@
 import 'package:endlessnet_client_api/client_api.dart' as api;
 
 import 'client_runtime_snapshot.dart';
+import 'client_operation.dart';
 
 /// Validates one WatchEvents subscription. Reconnect must call this again with
 /// a new source and discard domain caches; there is deliberately no resume ID.
@@ -40,11 +41,8 @@ Stream<api.WatchEventsResponse> validateClientEvents(
           initial: false,
         );
       } else if (event.hasOperationChanged()) {
-        final operation = event.operationChanged;
-        if (runtime.callerAccess == api.Access.ACCESS_OBSERVER ||
-            operation.id.isEmpty ||
-            operation.kind == api.OperationKind.OPERATION_KIND_UNSPECIFIED ||
-            operation.state == api.OperationState.OPERATION_STATE_UNSPECIFIED) {
+        ClientOperation.fromProto(event.operationChanged);
+        if (runtime.callerAccess == api.Access.ACCESS_OBSERVER) {
           throw const FormatException('Invalid v0 operation event');
         }
       } else if (event.hasSessionChanged()) {

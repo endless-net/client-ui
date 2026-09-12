@@ -232,6 +232,13 @@ capabilities, stream ordering/context, typed overflow, observer session denial
 и независимый cursor новой подписки. EOF считается потерей подписки, а не
 подтверждением Connected; cache/reconnect orchestration остаётся application work.
 `local_client_events.dart` связывает bootstrap/local gRPC с проверенным потоком.
+`client_operation.dart` проверяет state/outcome envelope всех 19 mutation kinds
+в snapshot и operation events. `client_operation_test.dart` содержит отдельные
+векторы по каждому kind и проверяет полноту относительно generated enum:
+nonterminal не имеет outcome, WAITING_FOR_USER требует typed action,
+FAILED/CANCELLED — typed Failure, SUCCEEDED — соответствующий kind результат.
+Это не доказательство доменного эффекта, durable recovery или всех полей
+вложенного результата; эти проверки остаются отдельными сценариями.
 `local_client_events_test.dart` запускает отдельный pinned Go testserver,
 проверяет snapshot/typed overflow/повторную подписку и требует успешного Verify.
 Workflow запускает unit и process integration на Windows/Linux/macOS с прежним

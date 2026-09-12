@@ -1,5 +1,7 @@
 import 'package:endlessnet_client_api/client_api.dart' as api;
 
+import 'client_operation.dart';
+
 /// Validated, immutable v0 snapshot. This is not a transport or runtime emulator.
 /// Callers must discard this value when the stream or caller context changes.
 final class ClientRuntimeSnapshot {
@@ -36,13 +38,7 @@ final class ClientRuntimeSnapshot {
       throw const FormatException('Inconsistent v0 snapshot metadata');
     }
     for (final operation in status.currentOperations) {
-      if (operation.kind == api.OperationKind.OPERATION_KIND_UNSPECIFIED ||
-          operation.id.isEmpty ||
-          !{
-            api.OperationState.OPERATION_STATE_PENDING,
-            api.OperationState.OPERATION_STATE_RUNNING,
-            api.OperationState.OPERATION_STATE_WAITING_FOR_USER,
-          }.contains(operation.state)) {
+      if (ClientOperation.fromProto(operation).terminal) {
         throw const FormatException('Invalid current operation');
       }
     }
