@@ -255,6 +255,13 @@ GetOperation. Выбор caller-private installation-scoped directory, startup r
 UI и обработка unresolved NOT_FOUND ещё требуют интеграции с production shell.
 Это process-restart foundation, не доказательство power-loss durability или
 защиты platform storage; mobile storage/OS acceptance остаются отдельными gates.
+
+`client_session_process_test.dart` объединяет эти слои с producer fixture,
+закреплённым на `ac30bfe0e959f3c93ef1059495f2356fa5476b06`: WatchEvents с
+hold_open, snapshot-gated Connect, pending acceptance, lookup и journal
+acknowledgement после terminal result. Подготовка ID в fixture выполняется заранее
+для exact request matching; хранение и session остаются настоящими. Native RPC
+execution этого сценария требует успешного CI, локальный skip его не доказывает.
 `client_operation.dart` проверяет state/outcome envelope всех 19 mutation kinds
 в snapshot и operation events. `client_operation_test.dart` содержит отдельные
 векторы по каждому kind и проверяет полноту относительно generated enum:

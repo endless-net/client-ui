@@ -15,7 +15,7 @@ final class PendingClientIntent {
 /// UI-owned outbox in a caller-private, installation-scoped directory chosen by
 /// the platform adapter. Never point this at runtime state or a shared folder.
 /// Records contain only UUID and kind, never command payloads or credentials.
-final class ClientIntentJournal {
+base class ClientIntentJournal {
   ClientIntentJournal(this.directory);
   final Directory directory;
   static final _uuid = RegExp(
