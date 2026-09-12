@@ -80,4 +80,4 @@ jobs:
             trap 'xcrun simctl shutdown "$device"' EXIT
           fi
           xcrun simctl bootstatus "$device" -b
-          flutter test integration_test/contract_test.dart -d "$device" --no-pub
+          flutter test integration_test/contract_test.dart -d "$device" --no-pub --verbose

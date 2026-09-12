@@ -41,6 +41,12 @@ hardware acceleration, without changing host permissions, udev rules or runner
 services. Missing access must be escalated to the runner owner; it must not be
 hidden by software-emulation fallback or a skipped green job.
 
+The [iOS job](https://github.com/endless-net/client-ui/actions/runs/34723624391/job/103633802770)
+built the native test host successfully but timed out waiting for its debug
+connection (12 minutes, zero tests executed). The workflow enables verbose
+Flutter startup diagnostics; the cause is not yet established. Do not count
+successful compilation as simulator execution or extend the timeout as proof.
+
 ## Validation
 
 Run from the repository root:

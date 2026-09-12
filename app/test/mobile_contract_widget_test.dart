@@ -34,6 +34,7 @@ void main() {
         }),
       );
       var lookups = 0;
+      Completer<List<ClientOperation>>? delayedLookup;
       final acknowledgements = <String>[];
       await tester.pumpWidget(
         MaterialApp(
@@ -42,6 +43,7 @@ void main() {
               state: state,
               recover: () async {
                 lookups++;
+                if (delayedLookup != null) return delayedLookup.future;
                 return [pending, terminal];
               },
               acknowledge: (op) async {
@@ -78,10 +80,18 @@ void main() {
       await tester.pump();
       expect(acknowledgements, ['request-done']);
       expect(find.byKey(const Key('ack-request-done')), findsNothing);
+      delayedLookup = Completer<List<ClientOperation>>();
+      await tester.tap(find.byKey(const Key('client-recover')));
+      await tester.pump();
+      expect(lookups, 2);
       snapshot.sequence += 1;
       snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
       source.add(snapshot);
       await tester.pump();
+      delayedLookup.complete([pending, terminal]);
+      await tester.pump();
+      expect(find.byKey(const Key('ack-request-done')), findsNothing);
+      expect(acknowledgements, ['request-done']);
       expect(find.text('Still pending'), findsNothing);
       expect(
         tester
