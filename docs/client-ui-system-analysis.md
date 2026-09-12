@@ -245,6 +245,11 @@ UTC; отсутствие срока означает Unknown. Observer не в�
 контекста заменяет сроки, UI clock не синтезирует expired/connected state.
 Shared widget test проверяет разные сроки и исчезновение одного без подстановки
 второго. Это частичное US-09 evidence, не renewal UX или production acceptance.
+Кнопка Renew session в общей панели вызывает journaled RenewSession только при
+owner/profile, доступной capability и session.renewal; renewing отключает её.
+Принятие операции не меняет сроки; credential renewal не вызывается из UI.
+Shared widget suite проверяет gating и сохранение deadlines после acceptance.
+Browser action, terminal-result recovery и production shell wiring ещё требуются.
 Shared mobile/desktop widget test проверяет pending Connect, доступный Disconnect,
 отсутствие ложного Connected и очистку owner controls/context при observer snapshot.
 Панель ещё не заменяет старый main/shell; localization, полный recovery UX и

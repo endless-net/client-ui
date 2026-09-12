@@ -13,6 +13,17 @@ class ClientSessionPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ClientConnectionPanel(
     state: session.state,
+    renewSession: () => session.submit(
+      api.OperationKind.OPERATION_KIND_RENEW_SESSION,
+      (commands, mutation) => commands.renewSession(
+        api.RenewSessionRequest(
+          mutation: mutation,
+          profile: api.ProfileRef(
+            profileId: session.state.snapshot!.status.activeProfileId,
+          ),
+        ),
+      ),
+    ),
     connect: () => session.submit(api.OperationKind.OPERATION_KIND_CONNECT, (
       commands,
       mutation,

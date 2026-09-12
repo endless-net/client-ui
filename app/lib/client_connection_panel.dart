@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'client_operation.dart';
 import 'client_state_controller.dart';
 
+enum _ClientAction { connect, disconnect, renewSession }
+
 /// Shared primary UI surface. Platform/application wiring supplies journaled
 /// actions; this widget knows no HTTP DTO, desktop pipe or private state path.
 class ClientConnectionPanel extends StatefulWidget {
@@ -12,36 +14,37 @@ class ClientConnectionPanel extends StatefulWidget {
     required this.state,
     required this.connect,
     required this.disconnect,
+    required this.renewSession,
   });
   final ClientStateController state;
   final Future<ClientOperation> Function() connect;
   final Future<ClientOperation> Function() disconnect;
+  final Future<ClientOperation> Function() renewSession;
 
   @override
   State<ClientConnectionPanel> createState() => _ClientConnectionPanelState();
 }
 
 class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
-  bool _connecting = false;
-  bool _disconnecting = false;
+  final _pending = <_ClientAction>{};
+  bool get _connecting => _pending.contains(_ClientAction.connect);
+  bool get _disconnecting => _pending.contains(_ClientAction.disconnect);
   String? _notice;
   int? _noticeEpoch;
 
-  Future<void> _run(bool connect) async {
+  Future<void> _run(_ClientAction action) async {
     final epoch = widget.state.cacheEpoch;
     setState(() {
-      if (connect) {
-        _connecting = true;
-      } else {
-        _disconnecting = true;
-      }
+      _pending.add(action);
       _notice = null;
       _noticeEpoch = epoch;
     });
     try {
-      final operation = await (connect
-          ? widget.connect()
-          : widget.disconnect());
+      final operation = await switch (action) {
+        _ClientAction.connect => widget.connect(),
+        _ClientAction.disconnect => widget.disconnect(),
+        _ClientAction.renewSession => widget.renewSession(),
+      };
       if (!mounted || widget.state.cacheEpoch != epoch) return;
       setState(() {
         _notice = operation.succeeded
@@ -60,11 +63,7 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
     } finally {
       if (mounted) {
         setState(() {
-          if (connect) {
-            _connecting = false;
-          } else {
-            _disconnecting = false;
-          }
+          _pending.remove(action);
         });
       }
     }
@@ -100,6 +99,15 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
           snapshot.supports(api.Capability.CAPABILITY_CONNECTION) &&
           snapshot.status.connectionPhase ==
               api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED;
+      final canRenew =
+          owner &&
+          profile &&
+          !_pending.contains(_ClientAction.renewSession) &&
+          snapshot.supports(api.Capability.CAPABILITY_SESSION_RENEWAL) &&
+          snapshot.status.session.renewal.availability ==
+              api.Availability.AVAILABILITY_AVAILABLE &&
+          snapshot.status.session.state !=
+              api.SessionState.SESSION_STATE_RENEWING;
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -137,7 +145,9 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                 children: [
                   FilledButton(
                     key: const Key('client-connect'),
-                    onPressed: canConnect ? () => _run(true) : null,
+                    onPressed: canConnect
+                        ? () => _run(_ClientAction.connect)
+                        : null,
                     child: Text(_connecting ? 'Submitting…' : 'Connect'),
                   ),
                   OutlinedButton(
@@ -145,9 +155,16 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                     // Disconnect stays available during connect, blocked recovery
                     // and stale intent. The producer owns authorization/policy.
                     onPressed: owner && profile && !_disconnecting
-                        ? () => _run(false)
+                        ? () => _run(_ClientAction.disconnect)
                         : null,
                     child: const Text('Disconnect'),
+                  ),
+                  OutlinedButton(
+                    key: const Key('client-renew-session'),
+                    onPressed: canRenew
+                        ? () => _run(_ClientAction.renewSession)
+                        : null,
+                    child: const Text('Renew session'),
                   ),
                 ],
               ),
