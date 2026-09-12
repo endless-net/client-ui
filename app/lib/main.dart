@@ -1838,7 +1838,7 @@ Future<DateTime?> showSignalWriteTime() async {
     if (!await file.exists()) {
       return null;
     }
-    return file.lastModified();
+    return await file.lastModified();
   } catch (_) {
     return null;
   }

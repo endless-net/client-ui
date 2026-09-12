@@ -1,0 +1,52 @@
+name: Local client v0 interoperability
+
+on:
+  push:
+    branches: [main]
+    paths: ['packages/local_client_rpc/**', '.github/workflows/local-rpc.yml']
+  pull_request:
+    paths: ['packages/local_client_rpc/**', '.github/workflows/local-rpc.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-rpc:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      ENDLESSNET_TESTSERVER: ${{ github.workspace }}/local-testserver.exe
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: endless-net/client
+          ref: dc560f82a12f909b14ab2d6e5e584366a1a2893a
+          path: client-source
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: client-source/clientipc/go.mod
+          cache: false
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.13.0
+      - name: Build pinned producer scenario host
+        shell: bash
+        working-directory: client-source/clientipc
+        run: go build -o "$GITHUB_WORKSPACE/local-testserver.exe" ./cmd/client-testserver
+      - name: Resolve locked transport dependencies
+        working-directory: packages/local_client_rpc
+        run: dart pub get --enforce-lockfile
+      - name: Analyze transport
+        working-directory: packages/local_client_rpc
+        run: dart analyze --fatal-infos
+      - name: Test actual local Go-Dart transport
+        working-directory: packages/local_client_rpc
+        run: dart test --reporter expanded

@@ -1,0 +1,18 @@
+name: endlessnet_local_client_rpc
+description: OS-local gRPC transport for the EndlessNet desktop client.
+version: 0.0.0
+publish_to: none
+environment:
+  sdk: ^3.10.0
+dependencies:
+  endlessnet_client_api:
+    git:
+      url: https://github.com/endless-net/client.git
+      ref: dc560f82a12f909b14ab2d6e5e584366a1a2893a
+      path: packages/client_api
+  ffi: ^2.2.0
+  grpc: ^5.1.0
+  http2: ^2.3.1
+  win32: 6.3.0
+dev_dependencies:
+  test: ^1.26.3
