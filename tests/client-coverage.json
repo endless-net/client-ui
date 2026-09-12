@@ -13,13 +13,19 @@
   "execution": [
     {
       "platforms": [
-        "windows",
         "linux",
         "macos"
       ],
       "workflow": ".github/workflows/contract-consumer.yml",
+      "status": "passed",
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34725762762",
+      "scope": "Linux/macOS jobs at d1d2998: 89 consumer tests, 7 profile tests and app cancellation probe passed; overall run cancelled for Windows; mock foundations only, not current HEAD or runtime acceptance"
+    },
+    {
+      "platforms": ["windows"],
+      "workflow": ".github/workflows/contract-consumer.yml",
       "status": "pending",
-      "scope": "Partial v0 unit and synthetic local process checks; not full runtime acceptance"
+      "scope": "Corrected transport run at d1d2998 was cancelled; current revision needs verification"
     },
     {
       "platforms": [

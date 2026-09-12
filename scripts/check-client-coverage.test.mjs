@@ -26,6 +26,7 @@ test('a test file is not product acceptance evidence', () => {
 test('unverified green execution cannot be asserted without a run', () => {
   const matrix = fixture();
   matrix.execution[0].status = 'passed';
+  delete matrix.execution[0].run;
   assert.throws(() => validateCoverage(matrix));
 });
 test('missing tests and out-of-repository references fail validation', () => {
