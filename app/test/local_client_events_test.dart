@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:endlessnet/client_event_stream.dart';
+import 'package:endlessnet/client_intent_journal.dart';
 import 'package:endlessnet/local_client_events.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter_test/flutter_test.dart';
@@ -19,7 +20,15 @@ void main() {
         'instanceId': 'runtime-a',
         'callerAccess': 'ACCESS_OWNER',
       };
-      const requestId = '12345678-1234-1234-1234-123456789abc';
+      final journalDirectory = await Directory.systemTemp.createTemp(
+        'en-ui-intent-',
+      );
+      addTearDown(() => journalDirectory.delete(recursive: true));
+      final journal = ClientIntentJournal(journalDirectory);
+      final intent = await journal.prepare(
+        api.OperationKind.OPERATION_KIND_CONNECT,
+      );
+      final requestId = intent.requestId;
       final connectRequest = {
         'mutation': {
           'requestId': requestId,
@@ -144,6 +153,12 @@ void main() {
           api.OperationKind.OPERATION_KIND_CONNECT,
         );
         expect(recovered.value.id, operation.value.id);
+        expect(
+          (await ClientIntentJournal(
+            journalDirectory,
+          ).pending()).single.requestId,
+          recovered.value.requestId,
+        );
         await source.close();
         await host.verify();
       } finally {

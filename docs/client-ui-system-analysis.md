@@ -241,8 +241,15 @@ profile/account/network, хранит caller-visible операции и domain 
 проверяет UUID/instance/revision до отправки и соответствие kind/request ID
 принятой операции. Запрос копируется перед отправкой; автоматического retry и
 подмены UUID нет. GetOperation по request ID проверяет ту же идентичность.
-Сохранение UUID до отправки и восстановление UI после restart ещё требуют
-application journal; этот слой сам не заявляет durable client recovery.
+`client_intent_journal.dart` сохраняет UUID/kind до callback отправки с flush,
+без payload/credential. Pending запись переживает timeout; удаление допускается
+только после обработки matching terminal result. Повреждённые записи сохраняются
+и блокируют новые намерения вместо неявного повторного исполнения. Unit-тесты
+переоткрывают storage, а process test использует сохранённый UUID для Connect и
+GetOperation. Выбор caller-private installation-scoped directory, startup recovery
+UI и обработка unresolved NOT_FOUND ещё требуют интеграции с production shell.
+Это process-restart foundation, не доказательство power-loss durability или
+защиты platform storage; mobile storage/OS acceptance остаются отдельными gates.
 `client_operation.dart` проверяет state/outcome envelope всех 19 mutation kinds
 в snapshot и operation events. `client_operation_test.dart` содержит отдельные
 векторы по каждому kind и проверяет полноту относительно generated enum:
