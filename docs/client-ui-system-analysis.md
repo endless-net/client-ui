@@ -175,6 +175,12 @@ trace duration и upload требуют отдельного scope/контра�
 
 ## 6. Тестирование и release gates
 
+[Coverage ledger](client-ui-test-coverage.md) и
+[`tests/client-coverage.json`](../tests/client-coverage.json) трассируют весь
+scope из 104 UF/UBR/UI-AC/US identifiers. Проверка структуры и отдельный
+`--require-complete` gate не смешиваются: первая может быть зелёной при
+незавершённых функциях, второй требует полный исходный scope и acceptance.
+
 Contract tests используют pinned generated SDK и producer-owned
 [testserver, main](https://github.com/endless-net/client/tree/main/clientipc/testserver).
 Необъявленный вызов scripted fixture возвращает typed UNSUPPORTED и проваливает

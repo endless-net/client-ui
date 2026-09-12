@@ -1,0 +1,346 @@
+{
+  "sources": {
+    "ba": "https://github.com/endless-net/architecture/blob/main/docs/ru/client-ui-business-analysis.md",
+    "sa": "docs/client-ui-system-analysis.md"
+  },
+  "platforms": [
+    "windows",
+    "linux",
+    "macos",
+    "android",
+    "ios"
+  ],
+  "execution": [
+    {
+      "platforms": [
+        "windows",
+        "linux",
+        "macos"
+      ],
+      "workflow": ".github/workflows/contract-consumer.yml",
+      "status": "pending",
+      "scope": "Partial v0 unit and synthetic local process checks; not full runtime acceptance"
+    },
+    {
+      "platforms": [
+        "android",
+        "ios"
+      ],
+      "workflow": ".github/workflows/mobile-contract.yml",
+      "status": "pending",
+      "scope": "Synthetic widget in emulator/simulator; no native VPN bridge or real traffic acceptance"
+    }
+  ],
+  "sharedEnvelopeTests": [
+    "app/test/client_operation_test.dart",
+    "app/test/client_mutations_test.dart"
+  ],
+  "scenarios": [
+    {
+      "id": "US-01",
+      "title": "Bootstrap/shell",
+      "requirements": [
+        "UF-01",
+        "UF-02",
+        "UF-04",
+        "UBR-01",
+        "UBR-03",
+        "UBR-04",
+        "UBR-16",
+        "UBR-18",
+        "UBR-21",
+        "UBR-33",
+        "UBR-34",
+        "UBR-35",
+        "UI-AC-01",
+        "UI-AC-02",
+        "UI-AC-04",
+        "UI-AC-10",
+        "UI-AC-11",
+        "UI-AC-15",
+        "UI-AC-23",
+        "UI-AC-26"
+      ],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/client_runtime_snapshot_test.dart",
+          "scope": "Bootstrap identity, first snapshot and capability gating only"
+        },
+        {
+          "path": "app/test/client_state_controller_test.dart",
+          "scope": "Fresh context and stream-loss handling only"
+        },
+        {
+          "path": "app/test/mobile_contract_widget_test.dart",
+          "scope": "Synthetic typed state reaches a widget; not the product shell"
+        }
+      ],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-02",
+      "title": "Enrollment",
+      "requirements": [
+        "UF-03",
+        "UF-09",
+        "UBR-02",
+        "UBR-06",
+        "UBR-07",
+        "UBR-09",
+        "UBR-22",
+        "UBR-36",
+        "UI-AC-01",
+        "UI-AC-04",
+        "UI-AC-05",
+        "UI-AC-07",
+        "UI-AC-22"
+      ],
+      "implementation": "missing",
+      "testEvidence": [],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-03",
+      "title": "Connection",
+      "requirements": [
+        "UF-04",
+        "UF-05",
+        "UBR-04",
+        "UBR-05",
+        "UBR-08",
+        "UBR-14",
+        "UBR-36",
+        "UBR-37",
+        "UI-AC-02",
+        "UI-AC-03",
+        "UI-AC-04",
+        "UI-AC-22",
+        "UI-AC-23"
+      ],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/client_session_test.dart",
+          "scope": "Snapshot-gated submission and retained request ID"
+        },
+        {
+          "path": "app/test/client_session_process_test.dart",
+          "scope": "Pinned synthetic host; live stream, Connect and operation lookup"
+        }
+      ],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-04",
+      "title": "Peers/network",
+      "requirements": [
+        "UF-06",
+        "UF-07",
+        "UBR-09",
+        "UBR-10",
+        "UBR-14",
+        "UBR-22",
+        "UI-AC-14",
+        "UI-AC-20",
+        "UI-AC-23"
+      ],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/client_state_controller_test.dart",
+          "scope": "Context cache invalidation only; no peer/network catalog UI"
+        }
+      ],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-05",
+      "title": "Exit node",
+      "requirements": [
+        "UF-08",
+        "UBR-05",
+        "UBR-22",
+        "UBR-39",
+        "UI-AC-17"
+      ],
+      "implementation": "missing",
+      "testEvidence": [],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-06",
+      "title": "Recovery/trust",
+      "requirements": [
+        "UF-09",
+        "UF-10",
+        "UBR-02",
+        "UBR-05",
+        "UBR-11",
+        "UBR-12",
+        "UBR-14",
+        "UBR-22",
+        "UI-AC-04",
+        "UI-AC-06",
+        "UI-AC-07"
+      ],
+      "implementation": "missing",
+      "testEvidence": [],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-07",
+      "title": "Diagnostics",
+      "requirements": [
+        "UF-11",
+        "UBR-06",
+        "UBR-13",
+        "UBR-14",
+        "UBR-31",
+        "UI-AC-05",
+        "UI-AC-08",
+        "UI-AC-27"
+      ],
+      "implementation": "missing",
+      "testEvidence": [],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-08",
+      "title": "Logout/profiles",
+      "requirements": [
+        "UF-12",
+        "UF-16",
+        "UBR-15",
+        "UBR-23",
+        "UBR-38",
+        "UI-AC-09",
+        "UI-AC-16",
+        "UI-AC-22"
+      ],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/client_state_controller_test.dart",
+          "scope": "Profile context replacement only; no profile lifecycle UI"
+        }
+      ],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-09",
+      "title": "Expiry/renewal",
+      "requirements": [
+        "UF-09",
+        "UF-15",
+        "UF-17",
+        "UBR-24",
+        "UBR-25",
+        "UBR-40",
+        "UI-AC-18",
+        "UI-AC-26"
+      ],
+      "implementation": "missing",
+      "testEvidence": [],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-10",
+      "title": "Preferences/policy",
+      "requirements": [
+        "UF-18",
+        "UF-20",
+        "UBR-22",
+        "UBR-27",
+        "UBR-28",
+        "UI-AC-19",
+        "UI-AC-24"
+      ],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/client_runtime_snapshot_test.dart",
+          "scope": "Capability denial only; no preference editor"
+        }
+      ],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-11",
+      "title": "Resources",
+      "requirements": [
+        "UF-19",
+        "UBR-22",
+        "UBR-29",
+        "UI-AC-20",
+        "UI-AC-24"
+      ],
+      "implementation": "missing",
+      "testEvidence": [],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-12",
+      "title": "Lifecycle",
+      "requirements": [
+        "UF-21",
+        "UBR-26",
+        "UBR-33",
+        "UBR-34",
+        "UI-AC-03",
+        "UI-AC-15",
+        "UI-AC-21"
+      ],
+      "implementation": "missing",
+      "testEvidence": [],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-13",
+      "title": "Distribution/help",
+      "requirements": [
+        "UF-13",
+        "UF-22",
+        "UF-23",
+        "UBR-16",
+        "UBR-17",
+        "UBR-21",
+        "UBR-30",
+        "UBR-32",
+        "UI-AC-10",
+        "UI-AC-11",
+        "UI-AC-25"
+      ],
+      "implementation": "missing",
+      "testEvidence": [],
+      "acceptanceEvidence": []
+    },
+    {
+      "id": "US-14",
+      "title": "Presentation/privacy",
+      "requirements": [
+        "UF-14",
+        "UF-15",
+        "UBR-18",
+        "UBR-19",
+        "UBR-20",
+        "UBR-33",
+        "UBR-34",
+        "UBR-35",
+        "UI-AC-05",
+        "UI-AC-12",
+        "UI-AC-13",
+        "UI-AC-15",
+        "UI-AC-26"
+      ],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/client_intent_journal_test.dart",
+          "scope": "Journal contains UUID and kind only; not complete privacy/accessibility acceptance"
+        }
+      ],
+      "acceptanceEvidence": []
+    }
+  ]
+}
