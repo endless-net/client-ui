@@ -33,6 +33,8 @@ dependencies:
       url: https://github.com/endless-net/client.git
       ref: a5d7be8e8ec7468a7fe4754818827f976b39addf
       path: packages/client_api
+  endlessnet_local_client_rpc:
+    path: ../packages/local_client_rpc
 
   cupertino_icons: ^1.0.8
   tray_manager: ^0.5.3

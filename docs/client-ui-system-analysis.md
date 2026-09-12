@@ -231,10 +231,14 @@ capability availability. Workflow `contract-consumer.yml` запускает э�
 capabilities, stream ordering/context, typed overflow, observer session denial
 и независимый cursor новой подписки. EOF считается потерей подписки, а не
 подтверждением Connected; cache/reconnect orchestration остаётся application work.
-Workflow запускает
-проверки на Windows/Linux/macOS с прежним закреплённым Flutter SDK. Этот слой
-ещё не подключён к production shell/transport и не подтверждает полный US,
-testserver integration, Android/iOS execution или UI/runtime cutover.
+`local_client_events.dart` связывает bootstrap/local gRPC с проверенным потоком.
+`local_client_events_test.dart` запускает отдельный pinned Go testserver,
+проверяет snapshot/typed overflow/повторную подписку и требует успешного Verify.
+Workflow запускает unit и process integration на Windows/Linux/macOS с прежним
+закреплённым Flutter SDK. Без ENDLESSNET_TESTSERVER process test пропускается;
+такой локальный запуск не является interoperability evidence. До успешного CI
+свидетельство остаётся pending. Этот слой ещё не подключён к production shell и
+не подтверждает полный US, Android/iOS execution или UI/runtime cutover.
 
 1. client реализует новый snapshot, credential projection, operations и RPC
    authorization; backend owners предоставляют authoritative deadline/policy.

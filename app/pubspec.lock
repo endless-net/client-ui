@@ -66,6 +66,13 @@ packages:
       url: "https://github.com/endless-net/client.git"
     source: git
     version: "0.0.0"
+  endlessnet_local_client_rpc:
+    dependency: "direct main"
+    description:
+      path: "../packages/local_client_rpc"
+      relative: true
+    source: path
+    version: "0.0.0"
   fake_async:
     dependency: transitive
     description:
