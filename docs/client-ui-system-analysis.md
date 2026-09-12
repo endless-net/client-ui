@@ -227,6 +227,11 @@ evidence и не меняет датированные свидетельств�
 `app/test/client_runtime_snapshot_test.dart` проверяет часть US-01/03/10:
 первый snapshot, pairing, instance/revision, operation kind, immutable copy и
 capability availability. Workflow `contract-consumer.yml` запускает эти unit
+проверки вместе с `client_event_stream_test.dart`: повторный snapshot при смене
+capabilities, stream ordering/context, typed overflow, observer session denial
+и независимый cursor новой подписки. EOF считается потерей подписки, а не
+подтверждением Connected; cache/reconnect orchestration остаётся application work.
+Workflow запускает
 проверки на Windows/Linux/macOS с прежним закреплённым Flutter SDK. Этот слой
 ещё не подключён к production shell/transport и не подтверждает полный US,
 testserver integration, Android/iOS execution или UI/runtime cutover.

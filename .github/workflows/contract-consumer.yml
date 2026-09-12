@@ -31,6 +31,6 @@ jobs:
         run: flutter pub get --enforce-lockfile
       - name: Test generated v0 snapshot consumer
         working-directory: app
-        run: flutter test --no-pub test/client_runtime_snapshot_test.dart
+        run: flutter test --no-pub test/client_runtime_snapshot_test.dart test/client_event_stream_test.dart
       - name: Reject dependency drift
         run: git diff --exit-code -- app/pubspec.yaml app/pubspec.lock

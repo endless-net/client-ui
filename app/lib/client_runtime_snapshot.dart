@@ -8,8 +8,11 @@ final class ClientRuntimeSnapshot {
   final api.RuntimeInfo runtime;
   final api.Status status;
 
-  factory ClientRuntimeSnapshot.fromEvent(api.WatchEventsResponse event) {
-    if (event.sequence != 1 ||
+  factory ClientRuntimeSnapshot.fromEvent(
+    api.WatchEventsResponse event, {
+    bool initial = true,
+  }) {
+    if ((initial ? event.sequence != 1 : event.sequence <= 0) ||
         !event.hasSnapshot() ||
         !event.hasMetadata() ||
         !event.snapshot.hasRuntime() ||
