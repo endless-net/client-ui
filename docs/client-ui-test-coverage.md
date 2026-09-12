@@ -32,6 +32,19 @@ These jobs exercise producer mock interoperability and consumer foundations,
 not the installed daemon, VPN dataplane, full production UI, or mobile native
 bridges. No complete SA scenario or five-platform execution group is accepted.
 
+Transport diagnosis: the pinned Dart `http2` 2.3.1 implementation treats HEADERS
+received after local stream cancellation as a new server connection attempt,
+then terminates the whole connection. This matches
+[upstream issue 1799](https://github.com/dart-lang/http/issues/1799) and the
+[pinned source](https://github.com/dart-lang/http/blob/http2-v2.3.1/pkgs/http2/lib/src/streams/stream_handler.dart#L496).
+The 82-byte `ProtocolError` text also matches the observed 90-byte GOAWAY payload
+(8-byte fixed fields). This is a strong diagnosis, not yet a verified fix:
+capture the full debug reason, reproduce late trailers deterministically, then
+validate the correction with same-channel unary calls and all desktop runners.
+Do not hide it with sleeps, mutation replay, or channel-per-call replacement.
+No dependency version increase is authorized; upstream correction must be
+evaluated within that constraint before changing the pinned transport.
+
 The [Android job](https://github.com/endless-net/client-ui/actions/runs/34723624391/job/103633802852)
 for the same consumer commit failed before Flutter tests started: software-only
 emulation took about 12 minutes to boot, then `adb shell input keyevent 82`
