@@ -29,6 +29,20 @@ class FakeConnection implements ClientConnection {
   }
 }
 
+class FailedWatchConnection extends FakeConnection {
+  int closeCalls = 0;
+  @override
+  Stream<api.WatchEventsResponse> watch() =>
+      throw const FormatException('Synthetic watch setup failure');
+  @override
+  Future<void> close() async {
+    closeCalls++;
+    closed = true;
+    // No subscription was created. Do not await an unlistened controller.
+    unawaited(events.close());
+  }
+}
+
 api.WatchEventsResponse snapshot() =>
     api.WatchEventsResponse()..mergeFromProto3Json({
       'sequence': '1',
@@ -73,6 +87,31 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'US-01: failed watch releases bootstrapped channel before retry',
+    () async {
+      await session.close();
+      final failed = FailedWatchConnection();
+      final replacement = FakeConnection();
+      var attempts = 0;
+      session = ClientSession(
+        journal: ClientIntentJournal(directory),
+        open: () async => attempts++ == 0 ? failed : replacement,
+      );
+      await expectLater(session.connect(), throwsFormatException);
+      await pumpEventQueue();
+      expect(failed.closeCalls, 1);
+      expect(session.state.link, ClientLinkState.unavailable);
+      expect(session.state.snapshot, isNull);
+      await session.connect();
+      replacement.events.add(snapshot());
+      await pumpEventQueue();
+      expect(failed.closeCalls, 1);
+      expect(session.state.link, ClientLinkState.ready);
+      expect(replacement.closed, isFalse);
+    },
+  );
 
   test(
     'US-01/03: bootstrap alone cannot submit; snapshot context is journaled before send',

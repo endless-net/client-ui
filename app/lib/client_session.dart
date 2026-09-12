@@ -51,8 +51,10 @@ final class ClientSession {
     await state.detach();
     await previous?.close();
     if (_closed || epoch != _epoch) return;
+    ClientConnection? opened;
     try {
       final connection = await _open();
+      opened = connection;
       if (_closed || epoch != _epoch) {
         await connection.close();
         return;
@@ -60,6 +62,14 @@ final class ClientSession {
       _connection = connection;
       await state.attach(connection.watch());
     } catch (error) {
+      // A successful bootstrap can still be followed by a synchronous watch
+      // failure. Do not retain that channel or close a newer concurrent one.
+      if (identical(_connection, opened)) _connection = null;
+      try {
+        await opened?.close();
+      } catch (_) {
+        // Preserve the original connection failure, not a teardown diagnostic.
+      }
       if (!_closed && epoch == _epoch) {
         await state.attach(Stream<api.WatchEventsResponse>.error(error));
       }
