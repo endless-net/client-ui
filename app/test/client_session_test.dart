@@ -93,6 +93,55 @@ void main() {
   });
 
   test(
+    'US-03: acceptance snapshot refresh does not invalidate RPC result',
+    () async {
+      connection.events.add(snapshot());
+      await pumpEventQueue();
+      final cacheEpoch = session.state.cacheEpoch;
+      final contextEpoch = session.state.contextEpoch;
+      final result = await session.submit(
+        api.OperationKind.OPERATION_KIND_CONNECT,
+        (_, context) async {
+          final refresh = snapshot()..sequence += 1;
+          refresh.metadata.revision += 1;
+          refresh.snapshot.status.metadata.revision += 1;
+          connection.events.add(refresh);
+          await pumpEventQueue();
+          return accepted(context);
+        },
+      );
+      expect(result.value.kind, api.OperationKind.OPERATION_KIND_CONNECT);
+      expect(session.state.cacheEpoch, greaterThan(cacheEpoch));
+      expect(session.state.contextEpoch, contextEpoch);
+      expect(await session.journal.pending(), hasLength(1));
+    },
+  );
+
+  test(
+    'US-03: real profile change still makes in-flight result recoverable',
+    () async {
+      connection.events.add(snapshot());
+      await pumpEventQueue();
+      await expectLater(
+        session.submit(api.OperationKind.OPERATION_KIND_CONNECT, (
+          _,
+          context,
+        ) async {
+          final changed = snapshot()..sequence += 1;
+          changed.metadata.revision += 1;
+          changed.snapshot.status.metadata.revision += 1;
+          changed.snapshot.status.activeProfileId = 'different-profile';
+          connection.events.add(changed);
+          await pumpEventQueue();
+          return accepted(context);
+        }),
+        throwsStateError,
+      );
+      expect(await session.journal.pending(), hasLength(1));
+    },
+  );
+
+  test(
     'US-08: catalog requires snapshot and rejects a late caller-context result',
     () async {
       var calls = 0;

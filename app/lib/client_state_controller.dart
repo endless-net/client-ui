@@ -18,6 +18,7 @@ final class ClientStateController extends ChangeNotifier {
   StreamSubscription<api.WatchEventsResponse>? _subscription;
   int _epoch = 0;
   int _cacheEpoch = 0;
+  int _contextEpoch = 0;
   bool _disposed = false;
   api.Failure? _failure;
   bool _invalidContract = false;
@@ -27,16 +28,20 @@ final class ClientStateController extends ChangeNotifier {
   Map<String, api.Operation> get operations => Map.unmodifiable(_operations);
   Set<(api.Domain, String)> get invalidated => Set.unmodifiable(_invalidated);
   int get cacheEpoch => _cacheEpoch;
+
+  /// Caller/profile identity lifetime, independent of full snapshot refreshes.
+  int get contextEpoch => _contextEpoch;
   api.Failure? get failure => _failure;
   bool get invalidContract => _invalidContract;
 
-  void _clear() {
+  void _clear({bool contextChanged = true}) {
     _snapshot = null;
     _operations.clear();
     _invalidated.clear();
     _failure = null;
     _invalidContract = false;
     _cacheEpoch++;
+    if (contextChanged) _contextEpoch++;
   }
 
   Future<void> attach(Stream<api.WatchEventsResponse> source) async {
@@ -70,8 +75,17 @@ final class ClientStateController extends ChangeNotifier {
   void _accept(api.WatchEventsResponse event) {
     if (event.hasSnapshot()) {
       // Capabilities/caller refresh also replaces the authoritative baseline.
-      _clear();
-      _snapshot = ClientRuntimeSnapshot.fromEvent(event, initial: false);
+      final next = ClientRuntimeSnapshot.fromEvent(event, initial: false);
+      final old = _snapshot;
+      final changed =
+          old == null ||
+          old.runtime.instanceId != next.runtime.instanceId ||
+          old.runtime.callerAccess != next.runtime.callerAccess ||
+          old.status.activeProfileId != next.status.activeProfileId ||
+          old.status.accountId != next.status.accountId ||
+          old.status.network.id != next.status.network.id;
+      _clear(contextChanged: changed);
+      _snapshot = next;
       _replaceOperations();
       _link = ClientLinkState.ready;
     } else if (event.hasStatusChanged()) {
@@ -82,6 +96,7 @@ final class ClientStateController extends ChangeNotifier {
           status.network.id != old.status.network.id) {
         _invalidated.clear();
         _cacheEpoch++;
+        _contextEpoch++;
       }
       _snapshot = ClientRuntimeSnapshot.fromEvent(
         api.WatchEventsResponse(

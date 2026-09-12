@@ -100,6 +100,7 @@ final class ClientSession {
     }
     final epoch = _epoch;
     final cacheEpoch = state.cacheEpoch;
+    final contextEpoch = state.contextEpoch;
     if (!_submitting.add(kind)) {
       throw StateError('A submission of this kind is already in progress');
     }
@@ -124,7 +125,7 @@ final class ClientSession {
         );
         if (_closed ||
             epoch != _epoch ||
-            state.cacheEpoch != cacheEpoch ||
+            state.contextEpoch != contextEpoch ||
             state.link != ClientLinkState.ready) {
           throw StateError(
             'Client context changed after submission; recover the intention',

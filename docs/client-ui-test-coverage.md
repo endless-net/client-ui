@@ -78,6 +78,23 @@ successful compilation as simulator execution or extend the timeout as proof.
 
 ## Validation
 
+### Snapshot/acceptance race (2026-09-13)
+
+The native producer may publish a full refreshed Snapshot before its mutation
+response arrives. `ClientStateController` now distinguishes cache replacement
+from caller/profile/account/network context changes. `ClientSession` still
+checks the current cache before sending, but uses the identity-context epoch
+after sending so an ordinary same-context snapshot does not turn a validated
+acceptance into an uncertain result. Reconnect, stream loss and actual context
+changes still retain the intention for explicit recovery.
+
+Two `client_session_test.dart` regressions cover same-context snapshot-before-
+response and actual profile change during submission. Local validation passed:
+`go test ./...`, `flutter analyze --no-pub`, and `flutter test --no-pub`
+(144 passed, 7 skipped). These are local consumer tests, not production pairing
+or system acceptance; `main.dart` still uses the old HTTP IPC bridge and must be
+cut over together with the producer, without a dual-protocol fallback.
+
 Run from the repository root:
 
 ```sh
