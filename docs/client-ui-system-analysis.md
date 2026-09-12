@@ -238,6 +238,12 @@ capabilities, stream ordering/context, typed overflow, observer session denial
 и независимый cursor новой подписки. EOF считается потерей подписки, а не
 подтверждением Connected; cache/reconnect orchestration остаётся application work.
 `local_client_events.dart` связывает bootstrap/local gRPC с проверенным потоком.
+`client_connection_panel.dart` — общий typed UI-компонент connection/status;
+`client_session_panel.dart` связывает его кнопки с journaled v0-командами.
+Shared mobile/desktop widget test проверяет pending Connect, доступный Disconnect,
+отсутствие ложного Connected и очистку owner controls/context при observer snapshot.
+Панель ещё не заменяет старый main/shell; localization, полный recovery UX и
+остальные экраны остаются незавершёнными, как и product acceptance.
 `client_session.dart` объединяет connection, typed state и intention journal:
 до snapshot команды запрещены, запись предшествует отправке, поздний ответ после
 смены контекста требует recovery. Pending recovery выполняет только GetOperation,

@@ -73,7 +73,7 @@
         },
         {
           "path": "app/test/mobile_contract_widget_test.dart",
-          "scope": "Synthetic typed state reaches a widget; not the product shell"
+          "scope": "Shared connection panel: pending actions, observer controls and context cleanup; not the product shell"
         }
       ],
       "acceptanceEvidence": []
