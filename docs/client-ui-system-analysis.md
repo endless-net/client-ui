@@ -243,8 +243,11 @@ capabilities, stream ordering/context, typed overflow, observer session denial
 `client_profiles.dart` собирает полный immutable ListProfiles catalog с одной
 instance/revision, неизменным active ID и непрозрачными page tokens; несогласованные
 страницы не публикуются. LocalClientEvents предоставляет реальный typed RPC binding.
-Тесты пагинации включены в desktop и mobile harness; epoch guard сессии, profile
-lifecycle UI и platform execution evidence ещё нужны для полного US-08.
+Тесты пагинации включены в desktop и mobile harness. Session.listProfiles требует
+owner snapshot и отклоняет результат после смены epoch/caller/cache, другого
+instance или с revision старше текущего snapshot. Session tests проверяют late
+observer result и stale revision; profile lifecycle UI и platform execution
+evidence ещё нужны для полного US-08.
 Общая панель отдельно отображает authoritative session/credential expires_at в
 UTC; отсутствие срока означает Unknown. Observer не видит эти поля, смена
 контекста заменяет сроки, UI clock не синтезирует expired/connected state.

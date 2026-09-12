@@ -3,10 +3,12 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'client_intent_journal.dart';
 import 'client_mutations.dart';
 import 'client_operation.dart';
+import 'client_profiles.dart';
 import 'client_state_controller.dart';
 import 'local_client_events.dart';
 
 abstract interface class ClientConnection {
+  Future<ClientProfileCatalog> listProfiles();
   ClientMutations get mutations;
   Stream<api.WatchEventsResponse> watch();
   Future<void> close();
@@ -15,6 +17,8 @@ abstract interface class ClientConnection {
 final class _LocalConnection implements ClientConnection {
   _LocalConnection(this.source);
   final LocalClientEvents source;
+  @override
+  Future<ClientProfileCatalog> listProfiles() => source.listProfiles();
   @override
   ClientMutations get mutations => source.mutations;
   @override
@@ -131,6 +135,31 @@ final class ClientSession {
     } finally {
       _submitting.remove(kind);
     }
+  }
+
+  Future<ClientProfileCatalog> listProfiles() async {
+    final connection = _connection;
+    final snapshot = state.snapshot;
+    if (_closed ||
+        connection == null ||
+        snapshot == null ||
+        state.link != ClientLinkState.ready ||
+        snapshot.runtime.callerAccess == api.Access.ACCESS_OBSERVER) {
+      throw StateError('Profile catalog requires a current owner snapshot');
+    }
+    final epoch = _epoch;
+    final cacheEpoch = state.cacheEpoch;
+    final catalog = await connection.listProfiles();
+    if (_closed ||
+        epoch != _epoch ||
+        cacheEpoch != state.cacheEpoch ||
+        state.link != ClientLinkState.ready ||
+        state.snapshot == null ||
+        catalog.metadata.instanceId != snapshot.runtime.instanceId ||
+        catalog.metadata.revision < state.snapshot!.status.metadata.revision) {
+      throw StateError('Client context changed during profile lookup');
+    }
+    return catalog;
   }
 
   /// Lookup only. NOT_FOUND/authorization errors preserve the record and are

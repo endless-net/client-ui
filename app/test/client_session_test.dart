@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:endlessnet/client_intent_journal.dart';
 import 'package:endlessnet/client_mutations.dart';
 import 'package:endlessnet/client_operation.dart';
+import 'package:endlessnet/client_profiles.dart';
 import 'package:endlessnet/client_session.dart';
 import 'package:endlessnet/client_state_controller.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
@@ -16,6 +17,9 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 class FakeConnection implements ClientConnection {
+  Future<ClientProfileCatalog> Function()? profiles;
+  @override
+  Future<ClientProfileCatalog> listProfiles() => profiles!();
   final events = StreamController<api.WatchEventsResponse>();
   bool closed = false;
   @override
@@ -87,6 +91,64 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'US-08: catalog requires snapshot and rejects a late caller-context result',
+    () async {
+      var calls = 0;
+      final result = Completer<ClientProfileCatalog>();
+      connection.profiles = () {
+        calls++;
+        return result.future;
+      };
+      await expectLater(session.listProfiles(), throwsStateError);
+      expect(calls, 0);
+      connection.events.add(snapshot());
+      await pumpEventQueue();
+      final query = session.listProfiles();
+      final rejection = expectLater(query, throwsStateError);
+      final observer = snapshot()..sequence += 1;
+      observer.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      connection.events.add(observer);
+      await pumpEventQueue();
+      result.complete(
+        await readClientProfiles(
+          (_) async => api.ListProfilesResponse()
+            ..mergeFromProto3Json({
+              'page': {
+                'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+              },
+            }),
+          instanceId: 'runtime-a',
+        ),
+      );
+      await rejection;
+      expect(calls, 1);
+      await expectLater(session.listProfiles(), throwsStateError);
+      expect(calls, 1);
+    },
+  );
+
+  test(
+    'US-08: owner receives a complete current catalog, never an older revision',
+    () async {
+      connection.events.add(snapshot());
+      await pumpEventQueue();
+      var revision = '7';
+      connection.profiles = () => readClientProfiles(
+        (_) async => api.ListProfilesResponse()
+          ..mergeFromProto3Json({
+            'page': {
+              'metadata': {'instanceId': 'runtime-a', 'revision': revision},
+            },
+          }),
+        instanceId: 'runtime-a',
+      );
+      expect((await session.listProfiles()).profiles, isEmpty);
+      revision = '6';
+      await expectLater(session.listProfiles(), throwsStateError);
+    },
+  );
 
   test(
     'US-01: failed watch releases bootstrapped channel before retry',
