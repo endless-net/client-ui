@@ -1,4 +1,5 @@
 import 'package:endlessnet/client_profiles.dart';
+import 'package:endlessnet/client_create_profile_panel.dart';
 import 'dart:async';
 import 'package:endlessnet/client_profiles_panel.dart';
 import 'package:endlessnet/client_state_controller.dart';
@@ -24,6 +25,100 @@ api.ListProfilesResponse page(
   });
 
 void main() {
+  testWidgets(
+    'US-08: initial profile claim validates input and clears late result',
+    (tester) async {
+      final state = ClientStateController();
+      final events = StreamController<api.WatchEventsResponse>();
+      await state.attach(events.stream);
+      final result = Completer<ClientOperation>();
+      final calls = <(String, String)>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ClientCreateProfilePanel(
+              state: state,
+              create: (name, origin) {
+                calls.add((name, origin));
+                return result.future;
+              },
+            ),
+          ),
+        ),
+      );
+      final submit = find.byKey(const Key('create-profile-submit'));
+      expect(tester.widget<OutlinedButton>(submit).onPressed, isNull);
+      final snapshot = api.WatchEventsResponse()
+        ..mergeFromProto3Json({
+          'sequence': '1',
+          'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'runtime-a',
+              'callerAccess': 'ACCESS_OBSERVER',
+            },
+            'status': {
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            },
+          },
+        });
+      events.add(snapshot);
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('create-profile-name')),
+        ' New profile ',
+      );
+      for (final origin in [
+        'http://example.test',
+        'https://user@example.test',
+        'https://example.test/api',
+        'https://example.test?q=1',
+        'https://example.test#x',
+      ]) {
+        await tester.enterText(
+          find.byKey(const Key('create-profile-origin')),
+          origin,
+        );
+        await tester.pump();
+        expect(tester.widget<OutlinedButton>(submit).onPressed, isNull);
+      }
+      await tester.enterText(
+        find.byKey(const Key('create-profile-origin')),
+        'https://example.test',
+      );
+      await tester.pump();
+      await tester.tap(submit);
+      await tester.pump();
+      expect(calls, [('New profile', 'https://example.test')]);
+      expect(tester.widget<OutlinedButton>(submit).onPressed, isNull);
+      snapshot.sequence += 1;
+      snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OWNER;
+      events.add(snapshot);
+      await tester.pump();
+      result.complete(
+        ClientOperation.fromProto(
+          api.Operation(
+            id: 'create',
+            kind: api.OperationKind.OPERATION_KIND_CREATE_PROFILE,
+            state: api.OperationState.OPERATION_STATE_PENDING,
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.text(
+          'Creation accepted. Recover the operation to see its result.',
+        ),
+        findsNothing,
+      );
+      expect(find.text('New profile'), findsNothing);
+      await events.close();
+      await tester.pumpWidget(const SizedBox());
+      state.dispose();
+    },
+  );
   testWidgets(
     'US-08: profile mutations use IDs and require fresh catalog and confirmation',
     (tester) async {

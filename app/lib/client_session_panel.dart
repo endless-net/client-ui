@@ -5,6 +5,7 @@ import 'client_connection_panel.dart';
 import 'client_session.dart';
 import 'client_recovery_panel.dart';
 import 'client_profiles_panel.dart';
+import 'client_create_profile_panel.dart';
 
 /// Desktop application binding. A mobile runtime adapter can supply the same
 /// shared connection panel without using a desktop local channel.
@@ -16,6 +17,19 @@ class ClientSessionPanel extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
+      ClientCreateProfilePanel(
+        state: session.state,
+        create: (name, origin) => session.submit(
+          api.OperationKind.OPERATION_KIND_CREATE_PROFILE,
+          (commands, mutation) => commands.createProfile(
+            api.CreateProfileRequest(
+              mutation: mutation,
+              displayName: name,
+              controlOrigin: origin,
+            ),
+          ),
+        ),
+      ),
       ClientConnectionPanel(
         state: session.state,
         renewSession: () => session.submit(

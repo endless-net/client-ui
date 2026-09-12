@@ -249,7 +249,16 @@ instance или с revision старше текущего snapshot. Session test
 observer result и stale revision; profile lifecycle UI и platform execution
 evidence ещё нужны для полного US-08.
 `client_profiles_panel.dart` теперь подключает refresh и journaled SelectProfile
-и RenameProfile к общей session panel. Переименование проверяет непустое имя,
+и RenameProfile к общей session panel. Создание профиля вынесено в
+`client_create_profile_panel.dart`: имя и HTTPS origin проверяются до journaled
+CreateProfile, но initial ownership claim решает только producer. Observer может
+отправить это конкретное намерение без права читать каталог или выполнять другие
+owner RPC. Смена snapshot/cache очищает поля и скрывает поздний ответ; созданный
+ID не превращается в локально синтезированный active profile. Shared widget-тест
+проверяет input validation и observer-to-owner context transition. Реальный
+ownership race и platform runtime acceptance этим widget-тестом не доказаны.
+Переименование подключено
+к общей session panel. Переименование проверяет непустое имя,
 лимит 128 UTF-8 bytes и отсутствие control characters, отправляет opaque profile
 ID и не подменяет authoritative catalog локальным именем. Общий widget-тест
 проверяет ограничения имени, dispatch и отсутствие optimistic результата;
