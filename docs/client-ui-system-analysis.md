@@ -92,6 +92,13 @@ logout/local forget не снимают ownership. UI не обещает воз
 
 ## 3. Команды и восстановление
 
+US-04 read foundation: `client_networks.dart` собирает полный immutable каталог
+через ListNetworks с фиксированным ProfileRef и opaque page tokens. Проверяются
+instance/revision, неизменность selected ID, duplicate IDs и pagination cycles;
+LocalClientEvents предоставляет typed RPC binding. Шесть проверок входят в общий
+`client_profiles_test.dart` и mobile harness. Session context/domain guards и UI
+выбора сети ещё не подключены; это не доказательство network lifecycle acceptance.
+
 Составная ClientSessionPanel имеет общий scroll container, enrollment mode dropdown
 ограничен доступной шириной. US-14 widget regression проверяет всю session panel
 при 360×640 и text scale 2, отсутствие RenderFlex overflow и достижимость profile

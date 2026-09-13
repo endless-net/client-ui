@@ -1,4 +1,5 @@
 import 'package:endlessnet/client_profiles.dart';
+import 'package:endlessnet/client_networks.dart';
 import 'package:endlessnet/client_create_profile_panel.dart';
 import 'dart:async';
 import 'package:endlessnet/client_profiles_panel.dart';
@@ -25,6 +26,79 @@ api.ListProfilesResponse page(
   });
 
 void main() {
+  for (final fault in [
+    '',
+    'revision',
+    'selection',
+    'duplicate',
+    'token',
+    'instance',
+  ]) {
+    test(
+      'US-04: profile-bound network pagination ${fault.isEmpty ? 'succeeds immutably' : 'rejects $fault'}',
+      () async {
+        final requests = <api.ListNetworksRequest>[];
+        final pages = [
+          api.ListNetworksResponse()..mergeFromProto3Json({
+            'networks': [
+              {'id': 'network-a', 'name': 'A'},
+            ],
+            'selectedNetworkId': 'network-a',
+            'page': {
+              'nextPageToken': 'opaque-next',
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            },
+          }),
+          api.ListNetworksResponse()..mergeFromProto3Json({
+            'networks': [
+              {
+                'id': fault == 'duplicate' ? 'network-a' : 'network-b',
+                'name': 'B',
+              },
+            ],
+            'selectedNetworkId': fault == 'selection'
+                ? 'network-b'
+                : 'network-a',
+            'page': {
+              'nextPageToken': fault == 'token' ? 'opaque-next' : '',
+              'metadata': {
+                'instanceId': fault == 'instance' ? 'other' : 'runtime-a',
+                'revision': fault == 'revision' ? '8' : '7',
+              },
+            },
+          }),
+        ];
+        final query = readClientNetworks(
+          (request) async {
+            requests.add(request);
+            return pages[requests.length - 1];
+          },
+          instanceId: 'runtime-a',
+          profileId: 'profile-a',
+        );
+        if (fault.isNotEmpty) {
+          await expectLater(query, throwsFormatException);
+        } else {
+          final catalog = await query;
+          expect(catalog.profileId, 'profile-a');
+          expect(catalog.networks.map((n) => n.id), ['network-a', 'network-b']);
+          expect(catalog.selectedNetworkId, 'network-a');
+          pages.first.networks.first.name = 'changed';
+          expect(catalog.networks.first.name, 'A');
+          expect(() => catalog.networks.clear(), throwsUnsupportedError);
+          expect(
+            () => catalog.networks.first.name = 'mutate',
+            throwsUnsupportedError,
+          );
+        }
+        expect(requests.map((r) => r.profile.profileId), [
+          'profile-a',
+          'profile-a',
+        ]);
+        expect(requests.map((r) => r.page.pageToken), ['', 'opaque-next']);
+      },
+    );
+  }
   testWidgets(
     'US-08: initial profile claim validates input and clears late result',
     (tester) async {
