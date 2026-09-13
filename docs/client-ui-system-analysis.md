@@ -155,6 +155,13 @@ checksum-verified read и файловую запись одним session/conte
 regression проверяет успешный файл, отсутствие нового output при checksum mismatch
 и смене caller во время загрузки. Intention не acknowledge автоматически.
 Native picker и UI export action ещё не подключены; это не полный US-07 acceptance.
+Recovery UI теперь предоставляет explicit export action только для succeeded
+bundle outcome и переданного native adapter. Перед callback повторяется recovery;
+adapter получает request ID и context guard, не старый handle/путь. Cancellation
+отличается от saved, intention остаётся для отдельного acknowledgement. Shared
+widget test проверяет explicit invocation, fresh lookup и cancellation. Default
+session panel без native adapter сообщает недоступность; полноценное системное
+сохранение на пяти платформах всё ещё не реализовано и не принято.
 Helper не пишет файлы, clipboard или сеть вне переданного RPC callback.
 
 Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:

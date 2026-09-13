@@ -16,8 +16,14 @@ import 'client_diagnostics_panel.dart';
 /// Desktop application binding. A mobile runtime adapter can supply the same
 /// shared connection panel without using a desktop local channel.
 class ClientSessionPanel extends StatelessWidget {
-  const ClientSessionPanel({super.key, required this.session});
+  const ClientSessionPanel({
+    super.key,
+    required this.session,
+    this.exportBundle,
+  });
   final ClientSession session;
+  final Future<bool> Function(String requestId, void Function() checkContext)?
+  exportBundle;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -186,6 +192,7 @@ class ClientSessionPanel extends StatelessWidget {
             ),
           ),
           ClientRecoveryPanel(
+            exportBundle: exportBundle,
             state: session.state,
             recover: session.recoverPending,
             acknowledge: session.journal.acknowledge,

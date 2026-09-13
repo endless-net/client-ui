@@ -17,6 +17,83 @@ import 'support/contract_test_scaffold.dart';
 
 /// Reused by the native integration-test host; no desktop channel is imported.
 void main() {
+  testWidgets(
+    'US-07: export is explicit and cancellation retains the operation',
+    (tester) async {
+      final state = ClientStateController();
+      final events = StreamController<api.WatchEventsResponse>();
+      await state.attach(events.stream);
+      var exports = 0;
+      var lookups = 0;
+      final operation = ClientOperation.fromProto(
+        api.Operation()..mergeFromProto3Json({
+          'id': 'bundle-op',
+          'requestId': 'bundle-request',
+          'kind': 'OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE',
+          'state': 'OPERATION_STATE_SUCCEEDED',
+          'continuity': 'CONNECTION_CONTINUITY_UNKNOWN',
+          'bundle': {'bundleId': 'opaque', 'sizeBytes': '3'},
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ContractTestScaffold(
+            body: ClientRecoveryPanel(
+              state: state,
+              recover: () async {
+                lookups++;
+                return [operation];
+              },
+              acknowledge: (_) =>
+                  throw TestFailure('Export must not acknowledge'),
+              exportBundle: (id, check) async {
+                check();
+                expect(id, 'bundle-request');
+                exports++;
+                return false;
+              },
+            ),
+          ),
+        ),
+      );
+      events.add(
+        api.WatchEventsResponse()..mergeFromProto3Json({
+          'sequence': '1',
+          'metadata': {'instanceId': 'export-test', 'revision': '1'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'export-test',
+              'callerAccess': 'ACCESS_OWNER',
+            },
+            'status': {
+              'metadata': {'instanceId': 'export-test', 'revision': '1'},
+            },
+          },
+        }),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('client-recover')));
+      await tester.pump();
+      expect(exports, 0);
+      await tester.tap(find.byKey(const Key('export-bundle-request')));
+      await tester.pump();
+      expect(exports, 1);
+      expect(lookups, 2);
+      expect(
+        find.text('Export cancelled. The operation is retained.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('ack-bundle-request')), findsOneWidget);
+      await events.close();
+      await tester.pump();
+      expect(find.byKey(const Key('export-bundle-request')), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      state.dispose();
+    },
+  );
+
   test(
     'US-07: invalid bundle handles never read and chunk errors never retry',
     () async {

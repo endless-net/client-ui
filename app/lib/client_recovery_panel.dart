@@ -13,11 +13,17 @@ class ClientRecoveryPanel extends StatefulWidget {
     required this.recover,
     required this.acknowledge,
     this.openBrowser,
+    this.exportBundle,
   });
   final ClientStateController state;
   final Future<List<ClientOperation>> Function() recover;
   final Future<void> Function(ClientOperation) acknowledge;
   final Future<bool> Function(Uri)? openBrowser;
+
+  /// Adapter chooses a native destination, re-reads via ClientSession and calls
+  /// checkContext across every await. False means user cancellation, not success.
+  final Future<bool> Function(String requestId, void Function() checkContext)?
+  exportBundle;
 
   @override
   State<ClientRecoveryPanel> createState() => _ClientRecoveryPanelState();
@@ -103,6 +109,56 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
     }
   }
 
+  Future<void> _export(ClientOperation displayed) async {
+    if (_busy ||
+        !_owner ||
+        _epoch != widget.state.cacheEpoch ||
+        widget.exportBundle == null) {
+      return;
+    }
+    final epoch = widget.state.cacheEpoch;
+    void check() {
+      if (!mounted || !_owner || epoch != widget.state.cacheEpoch) {
+        throw StateError('Export context changed');
+      }
+    }
+
+    setState(() {
+      _busy = true;
+      _notice = null;
+    });
+    try {
+      final results = await widget.recover();
+      check();
+      final current = results.singleWhere(
+        (op) =>
+            op.value.id == displayed.value.id &&
+            op.value.requestId == displayed.value.requestId,
+      );
+      if (!current.succeeded ||
+          current.value.kind !=
+              api.OperationKind.OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE) {
+        throw StateError('Bundle is not ready');
+      }
+      final saved = await widget.exportBundle!(current.value.requestId, check);
+      check();
+      setState(
+        () => _notice = saved
+            ? 'Verified bundle exported. The operation is retained.'
+            : 'Export cancelled. The operation is retained.',
+      );
+    } catch (_) {
+      if (mounted && _owner && epoch == widget.state.cacheEpoch) {
+        setState(
+          () =>
+              _notice = 'Export could not complete. The operation is retained.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _run(ClientOperation? acknowledgement) async {
     if (_busy || !_owner) return;
     final epoch = widget.state.cacheEpoch;
@@ -163,7 +219,30 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
             for (final operation in _results)
               ListTile(
                 title: Text(operation.value.kind.name),
-                subtitle: ClientOperationDetails(operation: operation),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClientOperationDetails(operation: operation),
+                    if (operation.succeeded &&
+                        operation.value.kind ==
+                            api
+                                .OperationKind
+                                .OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE)
+                      widget.exportBundle == null
+                          ? const Text(
+                              'Native export adapter is not available.',
+                            )
+                          : TextButton(
+                              key: ValueKey(
+                                'export-${operation.value.requestId}',
+                              ),
+                              onPressed: !_busy
+                                  ? () => _export(operation)
+                                  : null,
+                              child: const Text('Export verified bundle'),
+                            ),
+                  ],
+                ),
                 trailing: operation.terminal
                     ? TextButton(
                         key: ValueKey('ack-${operation.value.requestId}'),
