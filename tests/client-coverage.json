@@ -312,6 +312,10 @@
           "scope": "Typed diagnostics preview read: owner/profile guard, metadata and nested status consistency, immutable copy, truncation preserved and repeated domain invalidation rejection; no bundle/export, native execution or actual runtime acceptance"
         },
         {
+          "path": "app/test/client_diagnostics_details_test.dart",
+          "scope": "Four short widget tests: expand interfaces/routes/conflicts/failures, exact RU/EN fields and empty-state text, locale switch and suppression of unprojected browser URL/private failure reason. UI-only inspection; tunnel/DNS details and actual runtime/platform acceptance remain incomplete"
+        },
+        {
           "path": "app/test/mobile_contract_widget_test.dart",
           "scope": "Explicit diagnostics preview/create confirmation, invalidation cleanup, bundle chunk offset/EOF/expiry/caller checks and checksum corruption rejection; no complete export or actual runtime acceptance"
         },

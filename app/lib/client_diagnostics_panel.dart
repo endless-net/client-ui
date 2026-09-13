@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'client_state_controller.dart';
 import 'client_operation.dart';
 import 'client_locale.dart';
+import 'client_diagnostics_details.dart';
 
 enum _DiagnosticsNotice { logs, preview, succeeded, received, unknown }
 
@@ -27,7 +28,7 @@ String diagnosticPhaseLabel(api.ConnectionPhase phase, ClientLocale locale) =>
       _ => locale.text(en: 'Not specified', ru: 'Не указано'),
     };
 
-/// Local summary only. Never serialize the full message into logs/clipboard:
+/// Local inspection. Never serialize the full message into logs/clipboard:
 /// diagnostics can contain addresses, pending browser actions and log entries.
 class ClientDiagnosticsPanel extends StatefulWidget {
   const ClientDiagnosticsPanel({
@@ -338,6 +339,11 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
                   'Создать архив диагностики',
                 ),
               ),
+            ),
+            ClientDiagnosticsDetails(
+              key: ValueKey(preview),
+              diagnostics: preview,
+              locale: widget.locale,
             ),
             if (_confirmBundle) ...[
               Text(

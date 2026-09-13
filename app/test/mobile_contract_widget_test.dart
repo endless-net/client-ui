@@ -241,10 +241,7 @@ void main() {
             await tester.pump();
           }
           expect(sent, isNull);
-          expect(
-            find.text('Effective: Yes; requested: No'),
-            findsOneWidget,
-          );
+          expect(find.text('Effective: Yes; requested: No'), findsOneWidget);
           expect(
             tester
                 .widget<TextButton>(find.byKey(const Key('reset-preference-1')))
@@ -705,36 +702,38 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: ContractTestScaffold(
-            body: ClientDiagnosticsPanel(
-              state: state,
-              createBundle: (id) async {
-                creates.add(id);
-                return ClientOperation.fromProto(
-                  api.Operation(
-                    id: 'bundle-op',
-                    kind: api
-                        .OperationKind
-                        .OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE,
-                    state: api.OperationState.OPERATION_STATE_PENDING,
-                  ),
-                );
-              },
-              load: () async {
-                reads++;
-                return api.Diagnostics()..mergeFromProto3Json({
-                  'metadata': {
-                    'instanceId': 'diagnostic-test',
-                    'revision': '1',
-                  },
-                  'osName': 'synthetic-os',
-                  'truncated': true,
-                  'status': {
-                    'pendingAction': {
-                      'browserUrl': 'https://private.example/action',
+            body: SingleChildScrollView(
+              child: ClientDiagnosticsPanel(
+                state: state,
+                createBundle: (id) async {
+                  creates.add(id);
+                  return ClientOperation.fromProto(
+                    api.Operation(
+                      id: 'bundle-op',
+                      kind: api
+                          .OperationKind
+                          .OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE,
+                      state: api.OperationState.OPERATION_STATE_PENDING,
+                    ),
+                  );
+                },
+                load: () async {
+                  reads++;
+                  return api.Diagnostics()..mergeFromProto3Json({
+                    'metadata': {
+                      'instanceId': 'diagnostic-test',
+                      'revision': '1',
                     },
-                  },
-                });
-              },
+                    'osName': 'synthetic-os',
+                    'truncated': true,
+                    'status': {
+                      'pendingAction': {
+                        'browserUrl': 'https://private.example/action',
+                      },
+                    },
+                  });
+                },
+              ),
             ),
           ),
         ),

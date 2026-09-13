@@ -175,6 +175,17 @@ ClientDiagnosticsPanel поддерживает RU/EN для сводки, жу�
 после повторного подтверждения. Это component evidence, не полная детальная
 диагностика, native export или full-app UI-AC-13.
 
+ClientDiagnosticsDetails добавляет раскрываемые разделы интерфейсов, маршрутов,
+конфликтов и ошибок из уже загруженного snapshot. Отображаются name/index/MTU,
+addresses/prefixes/flags, target/interface/uses-interface/peer, overlap prefixes
+и reason code; ошибки ограничены локализованным typed code и retryability.
+Отсутствие ошибки обозначено как «не сообщена», не как доказательство успеха.
+Четыре short widget-теста сравнивают весь раскрытый RU/EN текст с пустыми и
+непустыми данными, переключение языка и отсутствие private browser/reason
+payload. Разделы не выполняют RPC, copy или upload; новое preview пересоздаёт
+их состояние. Это partial US-07: детали tunnel/DNS ещё отсутствуют, реальная
+platform diagnostics/export acceptance не подтверждена.
+
 ClientResourcesPanel локализует RU/EN поиск, фильтры, effective/requested,
 availability/mutation, источник/lock, overlap и пять typed notices. Коды причин,
 идентификаторы и адреса остаются данными службы. Два unit-теста покрывают все
