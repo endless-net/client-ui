@@ -1,6 +1,7 @@
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 
+import 'client_locale.dart';
 import 'client_operation.dart';
 import 'client_operation_labels.dart';
 import 'client_runtime_snapshot.dart';
@@ -17,7 +18,9 @@ class ClientConnectionPanel extends StatefulWidget {
     required this.connect,
     required this.disconnect,
     required this.renewSession,
+    this.locale = ClientLocale.en,
   });
+  final ClientLocale locale;
   final ClientStateController state;
   final Future<ClientOperation> Function() connect;
   final Future<ClientOperation> Function() disconnect;
@@ -31,7 +34,7 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
   final _pending = <_ClientAction>{};
   bool get _connecting => _pending.contains(_ClientAction.connect);
   bool get _disconnecting => _pending.contains(_ClientAction.disconnect);
-  String? _notice;
+  _ConnectionNotice? _notice;
   int? _noticeEpoch;
 
   Future<void> _run(
@@ -63,18 +66,15 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
       if (!mounted || widget.state.cacheEpoch != epoch) return;
       setState(() {
         _notice = operation.succeeded
-            ? 'Command completed. Runtime status is shown above.'
+            ? _ConnectionNotice.completed
             : operation.terminal
-            ? 'Command did not complete successfully. Check runtime status.'
-            : 'Command accepted. Waiting for the runtime result.';
+            ? _ConnectionNotice.failed
+            : _ConnectionNotice.accepted;
       });
     } catch (_) {
       if (!mounted || widget.state.cacheEpoch != epoch) return;
       // Raw transport/exception text can contain credentials or private URLs.
-      setState(
-        () => _notice =
-            'Command result is unknown. Recover the original operation before retrying.',
-      );
+      setState(() => _notice = _ConnectionNotice.unknown);
     } finally {
       if (mounted) {
         setState(() {
@@ -138,68 +138,123 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                 ),
               ),
               if (ready && !owner)
-                const Text(
-                  'An installation owner is required to control this device.',
+                Text(
+                  widget.locale.text(
+                    en: 'An installation owner is required to control this device.',
+                    ru: 'Для управления устройством требуется владелец установки.',
+                  ),
                 ),
               if (owner && profile)
-                Text('Profile: ${snapshot.status.activeProfileId}'),
+                Text(
+                  widget.locale.text(
+                    en: 'Profile: ${snapshot.status.activeProfileId}',
+                    ru: 'Профиль: ${snapshot.status.activeProfileId}',
+                  ),
+                ),
               if (owner && profile) ...[
                 if (snapshot.status.hasPendingAction())
                   Text(
-                    'Required action: ${clientRequiredActionLabel(snapshot.status.pendingAction.kind)}',
+                    widget.locale.text(
+                      en: 'Required action: ${clientRequiredActionLabel(snapshot.status.pendingAction.kind, locale: widget.locale)}',
+                      ru: 'Необходимое действие: ${clientRequiredActionLabel(snapshot.status.pendingAction.kind, locale: widget.locale)}',
+                    ),
                     key: const Key('client-status-required-action'),
                   ),
                 if (snapshot.status.recovery.hasFailure())
                   Text(
-                    'Recovery: ${clientFailureLabel(snapshot.status.recovery.failure.code)}. Action owner: ${clientActionOwnerLabel(snapshot.status.recovery.failure.actionOwner)}.',
+                    widget.locale.text(
+                      en: 'Recovery: ${clientFailureLabel(snapshot.status.recovery.failure.code, locale: widget.locale)}. Action owner: ${clientActionOwnerLabel(snapshot.status.recovery.failure.actionOwner, locale: widget.locale)}.',
+                      ru: 'Восстановление: ${clientFailureLabel(snapshot.status.recovery.failure.code, locale: widget.locale)}. Ответственный за действие: ${clientActionOwnerLabel(snapshot.status.recovery.failure.actionOwner, locale: widget.locale)}.',
+                    ),
                     key: const Key('client-status-recovery-failure'),
                   ),
                 for (final failure in snapshot.status.failures)
                   Text(
-                    'Runtime issue: ${clientFailureLabel(failure.code)}. Action owner: ${clientActionOwnerLabel(failure.actionOwner)}.',
+                    widget.locale.text(
+                      en: 'Runtime issue: ${clientFailureLabel(failure.code, locale: widget.locale)}. Action owner: ${clientActionOwnerLabel(failure.actionOwner, locale: widget.locale)}.',
+                      ru: 'Проблема службы: ${clientFailureLabel(failure.code, locale: widget.locale)}. Ответственный за действие: ${clientActionOwnerLabel(failure.actionOwner, locale: widget.locale)}.',
+                    ),
                   ),
                 Text(
-                  'Account: ${_contextValue(snapshot.status.accountId)}',
+                  widget.locale.text(
+                    en: 'Account: ${_contextValue(snapshot.status.accountId)}',
+                    ru: 'Учётная запись: ${_contextValue(snapshot.status.accountId)}',
+                  ),
                   key: const Key('client-context-account'),
                 ),
                 Text(
-                  'Network: ${_contextValue(snapshot.status.network.name)}',
+                  widget.locale.text(
+                    en: 'Network: ${_contextValue(snapshot.status.network.name)}',
+                    ru: 'Сеть: ${_contextValue(snapshot.status.network.name)}',
+                  ),
                   key: const Key('client-context-network'),
                 ),
                 Text(
-                  'Network ID: ${_contextValue(snapshot.status.network.id)}',
+                  widget.locale.text(
+                    en: 'Network ID: ${_contextValue(snapshot.status.network.id)}',
+                    ru: 'Идентификатор сети: ${_contextValue(snapshot.status.network.id)}',
+                  ),
                 ),
                 Text(
-                  'Device: ${_contextValue(snapshot.status.hostname)}',
+                  widget.locale.text(
+                    en: 'Device: ${_contextValue(snapshot.status.hostname)}',
+                    ru: 'Устройство: ${_contextValue(snapshot.status.hostname)}',
+                  ),
                   key: const Key('client-context-device'),
                 ),
-                Text('Device ID: ${_contextValue(snapshot.status.nodeId)}'),
                 Text(
-                  'Session state: ${_sessionState(snapshot.status.session.state)}',
+                  widget.locale.text(
+                    en: 'Device ID: ${_contextValue(snapshot.status.nodeId)}',
+                    ru: 'Идентификатор устройства: ${_contextValue(snapshot.status.nodeId)}',
+                  ),
+                ),
+                Text(
+                  widget.locale.text(
+                    en: 'Session state: ${_sessionState(snapshot.status.session.state)}',
+                    ru: 'Состояние сессии: ${_sessionState(snapshot.status.session.state)}',
+                  ),
                   key: const Key('client-session-state'),
                 ),
                 Text(
-                  'Session expiry: ${snapshot.status.session.hasExpiresAt() ? _deadline(snapshot.status.session.expiresAt.seconds.toInt(), snapshot.status.session.expiresAt.nanos) : 'Unknown'}',
+                  widget.locale.text(
+                    en: 'Session expiry: ${snapshot.status.session.hasExpiresAt() ? _deadline(snapshot.status.session.expiresAt.seconds.toInt(), snapshot.status.session.expiresAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                    ru: 'Срок сессии: ${snapshot.status.session.hasExpiresAt() ? _deadline(snapshot.status.session.expiresAt.seconds.toInt(), snapshot.status.session.expiresAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                  ),
                   key: const Key('client-session-expiry'),
                 ),
                 Text(
-                  'Session warning: ${snapshot.status.session.hasWarningAt() ? _deadline(snapshot.status.session.warningAt.seconds.toInt(), snapshot.status.session.warningAt.nanos) : 'Unknown'}',
+                  widget.locale.text(
+                    en: 'Session warning: ${snapshot.status.session.hasWarningAt() ? _deadline(snapshot.status.session.warningAt.seconds.toInt(), snapshot.status.session.warningAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                    ru: 'Предупреждение о сессии: ${snapshot.status.session.hasWarningAt() ? _deadline(snapshot.status.session.warningAt.seconds.toInt(), snapshot.status.session.warningAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                  ),
                   key: const Key('client-session-warning'),
                 ),
                 Text(
-                  'Session renewal: ${_renewalStatus(snapshot)}',
+                  widget.locale.text(
+                    en: 'Session renewal: ${_renewalStatus(snapshot)}',
+                    ru: 'Продление сессии: ${_renewalStatus(snapshot)}',
+                  ),
                   key: const Key('client-session-renewal-status'),
                 ),
                 Text(
-                  'Credential state: ${_credentialState(snapshot.status.credential.state)}',
+                  widget.locale.text(
+                    en: 'Credential state: ${_credentialState(snapshot.status.credential.state)}',
+                    ru: 'Состояние учётных данных: ${_credentialState(snapshot.status.credential.state)}',
+                  ),
                   key: const Key('client-credential-state'),
                 ),
                 Text(
-                  'Credential expiry: ${snapshot.status.credential.hasExpiresAt() ? _deadline(snapshot.status.credential.expiresAt.seconds.toInt(), snapshot.status.credential.expiresAt.nanos) : 'Unknown'}',
+                  widget.locale.text(
+                    en: 'Credential expiry: ${snapshot.status.credential.hasExpiresAt() ? _deadline(snapshot.status.credential.expiresAt.seconds.toInt(), snapshot.status.credential.expiresAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                    ru: 'Срок учётных данных: ${snapshot.status.credential.hasExpiresAt() ? _deadline(snapshot.status.credential.expiresAt.seconds.toInt(), snapshot.status.credential.expiresAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                  ),
                   key: const Key('client-credential-expiry'),
                 ),
                 Text(
-                  'Credential warning: ${snapshot.status.credential.hasWarningAt() ? _deadline(snapshot.status.credential.warningAt.seconds.toInt(), snapshot.status.credential.warningAt.nanos) : 'Unknown'}',
+                  widget.locale.text(
+                    en: 'Credential warning: ${snapshot.status.credential.hasWarningAt() ? _deadline(snapshot.status.credential.warningAt.seconds.toInt(), snapshot.status.credential.warningAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                    ru: 'Предупреждение об учётных данных: ${snapshot.status.credential.hasWarningAt() ? _deadline(snapshot.status.credential.warningAt.seconds.toInt(), snapshot.status.credential.warningAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                  ),
                   key: const Key('client-credential-warning'),
                 ),
               ],
@@ -213,7 +268,14 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                     onPressed: canConnect
                         ? () => _run(_ClientAction.connect, snapshot)
                         : null,
-                    child: Text(_connecting ? 'Submitting…' : 'Connect'),
+                    child: Text(
+                      _connecting
+                          ? widget.locale.text(
+                              en: 'Submitting…',
+                              ru: 'Отправка…',
+                            )
+                          : widget.locale.text(en: 'Connect', ru: 'Подключить'),
+                    ),
                   ),
                   OutlinedButton(
                     key: const Key('client-disconnect'),
@@ -222,14 +284,21 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                     onPressed: owner && profile && !_disconnecting
                         ? () => _run(_ClientAction.disconnect, snapshot)
                         : null,
-                    child: const Text('Disconnect'),
+                    child: Text(
+                      widget.locale.text(en: 'Disconnect', ru: 'Отключить'),
+                    ),
                   ),
                   OutlinedButton(
                     key: const Key('client-renew-session'),
                     onPressed: canRenew
                         ? () => _run(_ClientAction.renewSession, snapshot)
                         : null,
-                    child: const Text('Renew session'),
+                    child: Text(
+                      widget.locale.text(
+                        en: 'Renew session',
+                        ru: 'Продлить сессию',
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -242,7 +311,7 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                     key: const Key('client-command-announcement'),
                     container: true,
                     liveRegion: true,
-                    child: Text(_notice!),
+                    child: Text(_notice!.label(widget.locale)),
                   ),
                 ),
             ],
@@ -251,104 +320,221 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
       );
     },
   );
-}
 
-String _contextValue(String value) => value.isEmpty ? 'Unknown' : value;
+  String _contextValue(String value) => value.isEmpty
+      ? widget.locale.text(en: 'Unknown', ru: 'Неизвестно')
+      : value;
 
-String _renewalStatus(ClientRuntimeSnapshot snapshot) {
-  if (!snapshot.supports(api.Capability.CAPABILITY_SESSION_RENEWAL)) {
-    return 'Unavailable on this runtime';
+  String _renewalStatus(ClientRuntimeSnapshot snapshot) {
+    if (!snapshot.supports(api.Capability.CAPABILITY_SESSION_RENEWAL)) {
+      return widget.locale.text(
+        en: 'Unavailable on this runtime',
+        ru: 'Недоступно в этой службе',
+      );
+    }
+    if (snapshot.status.session.state ==
+        api.SessionState.SESSION_STATE_RENEWING) {
+      return widget.locale.text(en: 'In progress', ru: 'Выполняется');
+    }
+    return switch (snapshot.status.session.renewal.availability) {
+      api.Availability.AVAILABILITY_AVAILABLE => widget.locale.text(
+        en: 'Available — choose Renew session',
+        ru: 'Доступно — выберите «Продлить сессию»',
+      ),
+      api.Availability.AVAILABILITY_UNSUPPORTED => widget.locale.text(
+        en: 'Not supported',
+        ru: 'Не поддерживается',
+      ),
+      api.Availability.AVAILABILITY_POLICY_BLOCKED => widget.locale.text(
+        en: 'Blocked by policy',
+        ru: 'Заблокировано политикой',
+      ),
+      api.Availability.AVAILABILITY_PERMISSION_REQUIRED => widget.locale.text(
+        en: 'Permission required',
+        ru: 'Требуется разрешение',
+      ),
+      api.Availability.AVAILABILITY_TEMPORARILY_UNAVAILABLE =>
+        widget.locale.text(
+          en: 'Temporarily unavailable',
+          ru: 'Временно недоступно',
+        ),
+      _ => widget.locale.text(en: 'Unknown', ru: 'Неизвестно'),
+    };
   }
-  if (snapshot.status.session.state ==
-      api.SessionState.SESSION_STATE_RENEWING) {
-    return 'In progress';
-  }
-  return switch (snapshot.status.session.renewal.availability) {
-    api.Availability.AVAILABILITY_AVAILABLE =>
-      'Available — choose Renew session',
-    api.Availability.AVAILABILITY_UNSUPPORTED => 'Not supported',
-    api.Availability.AVAILABILITY_POLICY_BLOCKED => 'Blocked by policy',
-    api.Availability.AVAILABILITY_PERMISSION_REQUIRED => 'Permission required',
-    api.Availability.AVAILABILITY_TEMPORARILY_UNAVAILABLE =>
-      'Temporarily unavailable',
-    _ => 'Unknown',
+
+  String _sessionState(api.SessionState state) => switch (state) {
+    api.SessionState.SESSION_STATE_NOT_AUTHENTICATED => widget.locale.text(
+      en: 'Not authenticated',
+      ru: 'Не выполнен вход',
+    ),
+    api.SessionState.SESSION_STATE_ACTIVE => widget.locale.text(
+      en: 'Active',
+      ru: 'Активна',
+    ),
+    api.SessionState.SESSION_STATE_EXPIRING => widget.locale.text(
+      en: 'Expiring',
+      ru: 'Истекает',
+    ),
+    api.SessionState.SESSION_STATE_EXPIRED => widget.locale.text(
+      en: 'Expired',
+      ru: 'Срок истёк',
+    ),
+    api.SessionState.SESSION_STATE_RENEWING => widget.locale.text(
+      en: 'Renewing',
+      ru: 'Продлевается',
+    ),
+    _ => widget.locale.text(en: 'Unknown', ru: 'Неизвестно'),
   };
+
+  String _credentialState(api.CredentialState state) => switch (state) {
+    api.CredentialState.CREDENTIAL_STATE_ABSENT => widget.locale.text(
+      en: 'Absent',
+      ru: 'Отсутствуют',
+    ),
+    api.CredentialState.CREDENTIAL_STATE_VALID => widget.locale.text(
+      en: 'Valid',
+      ru: 'Действительны',
+    ),
+    api.CredentialState.CREDENTIAL_STATE_EXPIRING => widget.locale.text(
+      en: 'Expiring',
+      ru: 'Истекает',
+    ),
+    api.CredentialState.CREDENTIAL_STATE_EXPIRED => widget.locale.text(
+      en: 'Expired',
+      ru: 'Срок истёк',
+    ),
+    api.CredentialState.CREDENTIAL_STATE_RENEWING => widget.locale.text(
+      en: 'Renewing',
+      ru: 'Продлевается',
+    ),
+    api.CredentialState.CREDENTIAL_STATE_BLOCKED => widget.locale.text(
+      en: 'Blocked',
+      ru: 'Заблокированы',
+    ),
+    _ => widget.locale.text(en: 'Unknown', ru: 'Неизвестно'),
+  };
+
+  // Display authoritative UTC deadlines independently. Never infer runtime state
+  // from the UI clock or substitute one deadline for the other.
+  String _deadline(int seconds, int nanos) {
+    if (seconds < -62135596800 ||
+        seconds > 253402300799 ||
+        nanos < 0 ||
+        nanos > 999999999) {
+      return widget.locale.text(en: 'Unknown', ru: 'Неизвестно');
+    }
+    return DateTime.fromMicrosecondsSinceEpoch(
+      seconds * 1000000 + nanos ~/ 1000,
+      isUtc: true,
+    ).toIso8601String();
+  }
+
+  String _statusLabel(ClientStateController state) {
+    if (state.invalidContract) {
+      return widget.locale.text(
+        en: 'Incompatible runtime. Repair or update the application.',
+        ru: 'Несовместимая служба. Восстановите или обновите приложение.',
+      );
+    }
+    final snapshot = state.snapshot;
+    if (snapshot == null) {
+      return state.link == ClientLinkState.awaitingSnapshot
+          ? widget.locale.text(
+              en: 'Waiting for runtime snapshot…',
+              ru: 'Ожидание снимка состояния службы…',
+            )
+          : widget.locale.text(
+              en: 'Runtime unavailable',
+              ru: 'Служба недоступна',
+            );
+    }
+    switch (snapshot.status.serviceState) {
+      case api.ServiceState.SERVICE_STATE_NEEDS_ENROLLMENT:
+        return widget.locale.text(
+          en: 'Device enrollment required',
+          ru: 'Требуется регистрация устройства',
+        );
+      case api.ServiceState.SERVICE_STATE_NEEDS_APPROVAL:
+        return widget.locale.text(
+          en: 'Waiting for approval',
+          ru: 'Ожидание одобрения',
+        );
+      case api.ServiceState.SERVICE_STATE_NEEDS_LOGIN:
+        return widget.locale.text(en: 'Login required', ru: 'Требуется вход');
+      case api.ServiceState.SERVICE_STATE_SERVER_IDENTITY_CHANGED:
+        return widget.locale.text(
+          en: 'Server identity changed',
+          ru: 'Идентичность сервера изменилась',
+        );
+      case api.ServiceState.SERVICE_STATE_RECOVERING:
+        return widget.locale.text(en: 'Recovering', ru: 'Восстановление');
+      case api.ServiceState.SERVICE_STATE_RECOVERY_BLOCKED:
+        return widget.locale.text(
+          en: 'Recovery blocked',
+          ru: 'Восстановление заблокировано',
+        );
+      case api.ServiceState.SERVICE_STATE_POLICY_BLOCKED:
+        return widget.locale.text(
+          en: 'Blocked by policy',
+          ru: 'Заблокировано политикой',
+        );
+      case api.ServiceState.SERVICE_STATE_ERROR:
+        return widget.locale.text(en: 'Runtime error', ru: 'Ошибка службы');
+      case api.ServiceState.SERVICE_STATE_DEGRADED:
+        return snapshot.status.connectionPhase ==
+                api.ConnectionPhase.CONNECTION_PHASE_CONNECTING
+            ? widget.locale.text(en: 'Connecting', ru: 'Подключение')
+            : widget.locale.text(en: 'Degraded', ru: 'Работа с ограничениями');
+      default:
+        break;
+    }
+    return switch (snapshot.status.connectionPhase) {
+      api.ConnectionPhase.CONNECTION_PHASE_CONNECTING => widget.locale.text(
+        en: 'Connecting',
+        ru: 'Подключение',
+      ),
+      api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTING => widget.locale.text(
+        en: 'Disconnecting',
+        ru: 'Отключение',
+      ),
+      api.ConnectionPhase.CONNECTION_PHASE_CONNECTED => widget.locale.text(
+        en: 'Connected',
+        ru: 'Подключено',
+      ),
+      api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED => widget.locale.text(
+        en: 'Disconnected',
+        ru: 'Отключено',
+      ),
+      _ => widget.locale.text(
+        en: 'Runtime state unknown',
+        ru: 'Состояние службы неизвестно',
+      ),
+    };
+  }
 }
 
-String _sessionState(api.SessionState state) => switch (state) {
-  api.SessionState.SESSION_STATE_NOT_AUTHENTICATED => 'Not authenticated',
-  api.SessionState.SESSION_STATE_ACTIVE => 'Active',
-  api.SessionState.SESSION_STATE_EXPIRING => 'Expiring',
-  api.SessionState.SESSION_STATE_EXPIRED => 'Expired',
-  api.SessionState.SESSION_STATE_RENEWING => 'Renewing',
-  _ => 'Unknown',
-};
+enum _ConnectionNotice {
+  completed,
+  failed,
+  accepted,
+  unknown;
 
-String _credentialState(api.CredentialState state) => switch (state) {
-  api.CredentialState.CREDENTIAL_STATE_ABSENT => 'Absent',
-  api.CredentialState.CREDENTIAL_STATE_VALID => 'Valid',
-  api.CredentialState.CREDENTIAL_STATE_EXPIRING => 'Expiring',
-  api.CredentialState.CREDENTIAL_STATE_EXPIRED => 'Expired',
-  api.CredentialState.CREDENTIAL_STATE_RENEWING => 'Renewing',
-  api.CredentialState.CREDENTIAL_STATE_BLOCKED => 'Blocked',
-  _ => 'Unknown',
-};
-
-// Display authoritative UTC deadlines independently. Never infer runtime state
-// from the UI clock or substitute one deadline for the other.
-String _deadline(int seconds, int nanos) {
-  if (seconds < -62135596800 ||
-      seconds > 253402300799 ||
-      nanos < 0 ||
-      nanos > 999999999) {
-    return 'Unknown';
-  }
-  return DateTime.fromMicrosecondsSinceEpoch(
-    seconds * 1000000 + nanos ~/ 1000,
-    isUtc: true,
-  ).toIso8601String();
-}
-
-String _statusLabel(ClientStateController state) {
-  if (state.invalidContract) {
-    return 'Incompatible runtime. Repair or update the application.';
-  }
-  final snapshot = state.snapshot;
-  if (snapshot == null) {
-    return state.link == ClientLinkState.awaitingSnapshot
-        ? 'Waiting for runtime snapshot…'
-        : 'Runtime unavailable';
-  }
-  switch (snapshot.status.serviceState) {
-    case api.ServiceState.SERVICE_STATE_NEEDS_ENROLLMENT:
-      return 'Device enrollment required';
-    case api.ServiceState.SERVICE_STATE_NEEDS_APPROVAL:
-      return 'Waiting for approval';
-    case api.ServiceState.SERVICE_STATE_NEEDS_LOGIN:
-      return 'Login required';
-    case api.ServiceState.SERVICE_STATE_SERVER_IDENTITY_CHANGED:
-      return 'Server identity changed';
-    case api.ServiceState.SERVICE_STATE_RECOVERING:
-      return 'Recovering';
-    case api.ServiceState.SERVICE_STATE_RECOVERY_BLOCKED:
-      return 'Recovery blocked';
-    case api.ServiceState.SERVICE_STATE_POLICY_BLOCKED:
-      return 'Blocked by policy';
-    case api.ServiceState.SERVICE_STATE_ERROR:
-      return 'Runtime error';
-    case api.ServiceState.SERVICE_STATE_DEGRADED:
-      return snapshot.status.connectionPhase ==
-              api.ConnectionPhase.CONNECTION_PHASE_CONNECTING
-          ? 'Connecting'
-          : 'Degraded';
-    default:
-      break;
-  }
-  return switch (snapshot.status.connectionPhase) {
-    api.ConnectionPhase.CONNECTION_PHASE_CONNECTING => 'Connecting',
-    api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTING => 'Disconnecting',
-    api.ConnectionPhase.CONNECTION_PHASE_CONNECTED => 'Connected',
-    api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED => 'Disconnected',
-    _ => 'Runtime state unknown',
+  String label(ClientLocale locale) => switch (this) {
+    _ConnectionNotice.completed => locale.text(
+      en: 'Command completed. Runtime status is shown above.',
+      ru: 'Команда завершена. Состояние службы показано выше.',
+    ),
+    _ConnectionNotice.failed => locale.text(
+      en: 'Command did not complete successfully. Check runtime status.',
+      ru: 'Команда не завершилась успешно. Проверьте состояние службы.',
+    ),
+    _ConnectionNotice.accepted => locale.text(
+      en: 'Command accepted. Waiting for the runtime result.',
+      ru: 'Команда принята. Ожидается результат службы.',
+    ),
+    _ConnectionNotice.unknown => locale.text(
+      en: 'Command result is unknown. Recover the original operation before retrying.',
+      ru: 'Результат команды неизвестен. Восстановите исходную операцию перед повтором.',
+    ),
   };
 }

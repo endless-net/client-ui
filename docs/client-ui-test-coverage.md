@@ -14,6 +14,16 @@ Status: incomplete. Owner: client-ui. Scope: the complete BA/SA goal, not the
 subset already implemented. The canonical machine-readable trace is
 [`tests/client-coverage.json`](../tests/client-coverage.json).
 
+Primary connection localization: shared RU/EN tests exercise 29 typed projections
+per locale and four command outcomes per locale. The latter compare complete
+panel text, preserve the semantic live region, change language without another
+command and retain authoritative disconnected status even after command success.
+Runtime guidance uses localized typed labels; UTC deadlines remain ISO. This is
+component-level evidence, not full-app switching, OS speech or UI-AC-13 acceptance.
+Runner qualification for this addition is pending.
+Local validation passed 407 Flutter tests with 30 skips, Flutter analysis,
+Go tests and coverage-ledger checks.
+
 Recovery localization: the panel now renders readable operation names and all
 recovery/browser/export notices in RU/EN. Twenty-two shared widget vectors compare
 the entire panel text, then change locale on the same state without replaying
