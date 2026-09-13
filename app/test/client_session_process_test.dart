@@ -19,6 +19,8 @@ Map<String, Object> recoveredOperation(Map<String, Object> accepted) => {
     'enrollment': {'profileId': 'profile-a', 'nodeId': 'node-a'}
   else if (accepted['kind'] == 'OPERATION_KIND_SELECT_EXIT_NODE')
     'selection': {'selectedId': 'exit-a'}
+  else if (accepted['kind'] == 'OPERATION_KIND_SELECT_NETWORK')
+    'selection': {'selectedId': 'network-b'}
   else if (accepted['kind'] == 'OPERATION_KIND_CLEAR_EXIT_NODE')
     'selection': <String, Object>{}
   else if (accepted['kind'] == 'OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE')
@@ -123,6 +125,7 @@ void main() {
       'RESET_PREFERENCES',
       'SET_RESOURCE_ENABLED',
       'SELECT_EXIT_NODE',
+      'SELECT_NETWORK',
       'CLEAR_EXIT_NODE',
       'NOTIFY_LIFECYCLE',
     ]) {
@@ -145,12 +148,14 @@ void main() {
         'ENROLL' => api.Operation_Outcome.enrollment,
         'CREATE_DIAGNOSTICS_BUNDLE' => api.Operation_Outcome.bundle,
         'SELECT_EXIT_NODE' ||
+        'SELECT_NETWORK' ||
         'CLEAR_EXIT_NODE' => api.Operation_Outcome.selection,
         _ => api.Operation_Outcome.change,
       });
     }
   });
   for (final authentication in [
+    'select-network',
     'connect',
     'browser',
     'token',
@@ -167,7 +172,7 @@ void main() {
     'ui-quit',
   ]) {
     test(
-      'US-01/02/03/05/06/07/10/11/12: $authentication session submits and recovers while WatchEvents stays open',
+      'US-01/02/03/04/05/06/07/10/11/12: $authentication session submits and recovers while WatchEvents stays open',
       () async {
         final directory = await Directory.systemTemp.createTemp(
           'en-session-rpc-',
@@ -176,6 +181,7 @@ void main() {
         final intent = PendingClientIntent(
           'c06bd29f-7c77-4b27-943a-620081f313df',
           switch (authentication) {
+            'select-network' => api.OperationKind.OPERATION_KIND_SELECT_NETWORK,
             'ui-quit' => api.OperationKind.OPERATION_KIND_NOTIFY_LIFECYCLE,
             'select-exit' ||
             'failed-exit' => api.OperationKind.OPERATION_KIND_SELECT_EXIT_NODE,
@@ -239,6 +245,8 @@ void main() {
                   'status': {
                     'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
                     'activeProfileId': 'profile-a',
+                    if (authentication == 'select-network')
+                      'network': {'id': 'network-a'},
                     'serviceState': 'SERVICE_STATE_DISCONNECTED',
                     'connectionPhase': 'CONNECTION_PHASE_DISCONNECTED',
                   },
@@ -370,6 +378,30 @@ void main() {
               ],
             },
           ],
+          if (authentication == 'select-network')
+            {
+              'method': 'ListNetworks',
+              'request': {
+                'profile': {'profileId': 'profile-a'},
+                'page': {'pageSize': 100},
+              },
+              'responses': [
+                {
+                  'page': {
+                    'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+                  },
+                  'selectedNetworkId': 'network-a',
+                  'networks': [
+                    {'id': 'network-a', 'name': 'A'},
+                    {
+                      'id': 'network-b',
+                      'name': 'B',
+                      'selection': {'availability': 'AVAILABILITY_AVAILABLE'},
+                    },
+                  ],
+                },
+              ],
+            },
           if (authentication == 'trust')
             {
               'method': 'GetServerIdentity',
@@ -392,6 +424,7 @@ void main() {
             },
           {
             'method': switch (authentication) {
+              'select-network' => 'SelectNetwork',
               'ui-quit' => 'NotifyLifecycle',
               'select-exit' || 'failed-exit' => 'SelectExitNode',
               'clear-exit' => 'ClearExitNode',
@@ -412,6 +445,7 @@ void main() {
                 'expectedRevision': '7',
               },
               'profile': {'profileId': 'profile-a'},
+              if (authentication == 'select-network') 'networkId': 'network-b',
               if (authentication == 'ui-quit')
                 'event': 'LIFECYCLE_EVENT_UI_QUIT',
               if (authentication == 'select-exit' ||
@@ -509,6 +543,9 @@ void main() {
           final identity = authentication == 'trust'
               ? (await session.getServerIdentity()).identity
               : null;
+          final networks = authentication == 'select-network'
+              ? await session.listNetworks()
+              : null;
           final preferences = authentication.endsWith('-preferences')
               ? await session.getPreferences()
               : null;
@@ -540,6 +577,22 @@ void main() {
                   mutation: context,
                   profile: api.ProfileRef(profileId: 'profile-a'),
                   event: api.LifecycleEvent.LIFECYCLE_EVENT_UI_QUIT,
+                ),
+              );
+            }
+            if (networks != null) {
+              final target = networks.networks.singleWhere(
+                (network) => network.id == 'network-b',
+              );
+              expect(
+                target.selection.availability,
+                api.Availability.AVAILABILITY_AVAILABLE,
+              );
+              return commands.selectNetwork(
+                api.SelectNetworkRequest(
+                  mutation: context,
+                  profile: api.ProfileRef(profileId: networks.profileId),
+                  networkId: target.id,
                 ),
               );
             }
@@ -661,7 +714,24 @@ void main() {
             session.state.snapshot!.status.connectionPhase,
             api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED,
           );
+          if (networks != null) {
+            expect(session.state.snapshot!.status.network.id, 'network-a');
+          }
           final recovered = await session.recoverPending();
+          if (networks != null) {
+            expect(recovered.single.value.selection.selectedId, 'network-b');
+            expect(
+              recovered.single.value.continuity,
+              api.ConnectionContinuity.CONNECTION_CONTINUITY_UNKNOWN,
+            );
+            // Neither acceptance nor operation success is a new status snapshot.
+            expect(session.state.snapshot!.status.network.id, 'network-a');
+            expect(networks.selectedNetworkId, 'network-a');
+            expect(
+              (await journal.pending()).single.requestId,
+              intent.requestId,
+            );
+          }
           expect(
             recovered.single.succeeded,
             authentication != 'conflict-resource' &&

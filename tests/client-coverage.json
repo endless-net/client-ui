@@ -183,6 +183,18 @@
         {
           "path": "app/test/client_peers_process_test.dart",
           "scope": "Producer-host desktop scenarios assert exact profile/search/page requests, opaque continuation, immutable previous-map projection, rejection of cross-page revision drift, observer denial without ListPeers, open WatchEvents and no journal mutations or extra RPCs. Local fixture validation passed; process execution requires GitHub runner evidence. Not mobile bridge or actual runtime/path acceptance"
+        },
+        {
+          "path": "app/test/client_session_process_test.dart",
+          "scope": "Producer-host ListNetworks then exact profile/network-bound SelectNetwork, durable UUID and GetOperation recovery. Pending acceptance and terminal selection outcome do not replace the authoritative network snapshot or claim continuity. New desktop process scenario pending runner execution; does not yet cover streamed new-network snapshot, runtime tunnel switch or mobile bridge"
+        },
+        {
+          "path": "app/test/client_profiles_test.dart",
+          "scope": "Shared network reader pagination and widget selection restrictions, no optimistic network update, domain invalidation and observer cleanup; local mocks reused by mobile harness, not actual network lifecycle"
+        },
+        {
+          "path": "app/test/client_session_test.dart",
+          "scope": "Network catalog active-profile binding and repeated invalidation rejection in session unit tests; no producer runtime acceptance"
         }
       ],
       "acceptanceEvidence": []

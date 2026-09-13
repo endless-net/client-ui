@@ -18,6 +18,18 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+At `e4a06abac6d2f4a39dc9a091140410c2c8120210`, the
+[Linux consumer job](https://github.com/endless-net/client-ui/actions/runs/34741391970/job/103681568115)
+passed 256 tests, including all three newly added producer-host peer scenarios.
+This establishes Linux synthetic IPC execution, not actual runtime reachability.
+
+The session process suite now additionally scripts ListNetworks, exact
+SelectNetwork and GetOperation recovery using one durable request ID. Assertions
+keep the original network snapshot after both pending acceptance and successful
+selection outcome, with continuity still UNKNOWN. Runner execution of this
+addition is pending. Streamed new-network context replacement, runtime tunnel
+switch and mobile native bridge remain separate missing acceptance evidence.
+
 At `c0026dcaccbd59c87ea817b52f641999330022e8`, all three
 [desktop jobs](https://github.com/endless-net/client-ui/actions/runs/34740892688)
 passed 252 tests each, including the Windows trust process scenario. A single
