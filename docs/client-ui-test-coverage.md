@@ -18,6 +18,24 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+At `c0026dcaccbd59c87ea817b52f641999330022e8`, all three
+[desktop jobs](https://github.com/endless-net/client-ui/actions/runs/34740892688)
+passed 252 tests each, including the Windows trust process scenario. A single
+successful run does not establish that the intermittent rejection is fixed.
+The [iOS job](https://github.com/endless-net/client-ui/actions/runs/34740892717/job/103680327024)
+passed 84 simulator tests, now including the separate peer bounds/time suites.
+The Android job in that run failed KVM preflight before test execution. The
+[Windows packaging job](https://github.com/endless-net/client-ui/actions/runs/34740892692/job/103680299006)
+passed 252 tests before rejecting the core manifest target/IPC pairing.
+These are scoped mock/simulator results, not complete platform acceptance.
+
+`client_peers_process_test.dart` adds exact two-page peer requests, revision-drift
+rejection and observer denial through the pinned producer host with WatchEvents
+held open. It also checks that the local journal stays empty and verifies no
+unexpected RPCs. Its local fixture check is separate from the three desktop-only
+process tests; runner execution of these additions is pending, and the counts
+above do not include them. No actual peer endpoint is contacted.
+
 At `d7746b8fbf475d29264e757b0ca385e374138145`, the
 [Windows consumer job](https://github.com/endless-net/client-ui/actions/runs/34740483570/job/103679234050)
 passed 251 tests and failed the trust process scenario with an aggregate stale
