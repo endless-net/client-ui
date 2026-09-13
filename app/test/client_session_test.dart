@@ -20,6 +20,10 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 class FakeConnection implements ClientConnection {
+  Future<api.GetServerIdentityResponse> Function(String)? identity;
+  @override
+  Future<api.GetServerIdentityResponse> getServerIdentity(String profileId) =>
+      identity!(profileId);
   Future<ClientNetworkCatalog> Function(String profileId)? networks;
   @override
   Future<ClientNetworkCatalog> listNetworks(String profileId) =>
@@ -98,6 +102,109 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'US-06: identity read binds profile, metadata and immutable result',
+    () async {
+      await expectLater(session.getServerIdentity(), throwsStateError);
+      connection.events.add(
+        snapshot()..snapshot.status.activeProfileId = 'profile-a',
+      );
+      await pumpEventQueue();
+      final response = api.GetServerIdentityResponse()
+        ..mergeFromProto3Json({
+          'identity': {
+            'profileId': 'profile-a',
+            'controlOrigin': 'https://control.example',
+            'announcedKeyId': 'key-a',
+            'announcementId': 'announcement-a',
+          },
+          'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+        });
+      connection.identity = (id) async {
+        expect(id, 'profile-a');
+        return response;
+      };
+      final result = await session.getServerIdentity();
+      response.identity.announcementId = 'announcement-b';
+      expect(result.identity.announcementId, 'announcement-a');
+      expect(result.isFrozen, isTrue);
+      for (final change in <void Function(api.GetServerIdentityResponse)>[
+        (r) => r.clearIdentity(),
+        (r) => r.clearMetadata(),
+        (r) => r.identity.profileId = 'profile-b',
+        (r) => r.metadata.instanceId = 'runtime-b',
+        (r) => r.metadata.revision -= 1,
+      ]) {
+        final invalid = api.GetServerIdentityResponse.fromBuffer(
+          response.writeToBuffer(),
+        );
+        change(invalid);
+        connection.identity = (_) async => invalid;
+        await expectLater(session.getServerIdentity(), throwsStateError);
+      }
+      final observer = snapshot()..sequence += 1;
+      observer.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      connection.events.add(observer);
+      await pumpEventQueue();
+      connection.identity = (_) =>
+          throw TestFailure('Observer must not call RPC');
+      await expectLater(session.getServerIdentity(), throwsStateError);
+    },
+  );
+
+  test(
+    'US-06: repeated identity invalidation and profile change reject late reads',
+    () async {
+      connection.events.add(
+        snapshot()..snapshot.status.activeProfileId = 'profile-a',
+      );
+      await pumpEventQueue();
+      final response = api.GetServerIdentityResponse()
+        ..mergeFromProto3Json({
+          'identity': {'profileId': 'profile-a'},
+          'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+        });
+      for (var i = 0; i < 3; i++) {
+        final pending = Completer<api.GetServerIdentityResponse>();
+        connection.identity = (_) => pending.future;
+        final rejected = expectLater(
+          session.getServerIdentity(),
+          throwsStateError,
+        );
+        connection.events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '${i + 2}',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'invalidated': {
+              'domain': i == 2 ? 'DOMAIN_PROFILES' : 'DOMAIN_SERVER_IDENTITY',
+              'profileId': 'profile-a',
+            },
+          }),
+        );
+        await pumpEventQueue();
+        pending.complete(response);
+        await rejected;
+        connection.identity = (_) async => response;
+        expect(
+          (await session.getServerIdentity()).identity.profileId,
+          'profile-a',
+        );
+      }
+      final pending = Completer<api.GetServerIdentityResponse>();
+      connection.identity = (_) => pending.future;
+      final rejected = expectLater(
+        session.getServerIdentity(),
+        throwsStateError,
+      );
+      final changed = snapshot()..sequence += 4;
+      changed.snapshot.status.activeProfileId = 'profile-b';
+      connection.events.add(changed);
+      await pumpEventQueue();
+      pending.complete(response);
+      await rejected;
+    },
+  );
 
   test(
     'US-04: networks bind active profile and reject repeated invalidations',

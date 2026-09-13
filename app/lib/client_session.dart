@@ -9,6 +9,7 @@ import 'client_state_controller.dart';
 import 'local_client_events.dart';
 
 abstract interface class ClientConnection {
+  Future<api.GetServerIdentityResponse> getServerIdentity(String profileId);
   Future<ClientNetworkCatalog> listNetworks(String profileId);
   Future<ClientProfileCatalog> listProfiles();
   ClientMutations get mutations;
@@ -19,6 +20,9 @@ abstract interface class ClientConnection {
 final class _LocalConnection implements ClientConnection {
   _LocalConnection(this.source);
   final LocalClientEvents source;
+  @override
+  Future<api.GetServerIdentityResponse> getServerIdentity(String profileId) =>
+      source.getServerIdentity(profileId);
   @override
   Future<ClientNetworkCatalog> listNetworks(String profileId) =>
       source.listNetworks(profileId);
@@ -141,6 +145,45 @@ final class ClientSession {
     } finally {
       _submitting.remove(kind);
     }
+  }
+
+  /// A read never grants trust. Confirmation must separately bind the exact
+  /// origin/key/announcement and remain subject to producer authorization.
+  Future<api.GetServerIdentityResponse> getServerIdentity() async {
+    final connection = _connection;
+    final snapshot = state.snapshot;
+    if (_closed ||
+        connection == null ||
+        snapshot == null ||
+        state.link != ClientLinkState.ready ||
+        snapshot.runtime.callerAccess == api.Access.ACCESS_OBSERVER ||
+        snapshot.status.activeProfileId.isEmpty) {
+      throw StateError('Server identity requires a current owner profile');
+    }
+    final epoch = _epoch;
+    final cacheEpoch = state.cacheEpoch;
+    final identityEpoch = state.domainEpoch(api.Domain.DOMAIN_SERVER_IDENTITY);
+    final profileEpoch = state.domainEpoch(api.Domain.DOMAIN_PROFILES);
+    final profileId = snapshot.status.activeProfileId;
+    final response = await connection.getServerIdentity(profileId);
+    if (_closed ||
+        epoch != _epoch ||
+        cacheEpoch != state.cacheEpoch ||
+        identityEpoch != state.domainEpoch(api.Domain.DOMAIN_SERVER_IDENTITY) ||
+        profileEpoch != state.domainEpoch(api.Domain.DOMAIN_PROFILES) ||
+        state.link != ClientLinkState.ready ||
+        state.snapshot == null ||
+        state.snapshot!.status.activeProfileId != profileId ||
+        !response.hasIdentity() ||
+        !response.hasMetadata() ||
+        response.identity.profileId != profileId ||
+        response.metadata.instanceId != snapshot.runtime.instanceId ||
+        response.metadata.revision <= 0 ||
+        response.metadata.revision < state.snapshot!.status.metadata.revision) {
+      throw StateError('Invalid or stale server identity context');
+    }
+    return api.GetServerIdentityResponse.fromBuffer(response.writeToBuffer())
+      ..freeze();
   }
 
   Future<ClientProfileCatalog> listProfiles() async {

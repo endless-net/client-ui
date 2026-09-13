@@ -204,8 +204,13 @@
         "UI-AC-06",
         "UI-AC-07"
       ],
-      "implementation": "missing",
-      "testEvidence": [],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/client_session_test.dart",
+          "scope": "ServerIdentity owner/active-profile read, metadata checks, immutable copy and rejection after repeated identity/profile invalidations or profile switch; not trust confirmation, elevation or runtime acceptance"
+        }
+      ],
       "acceptanceEvidence": []
     },
     {
