@@ -44,9 +44,15 @@ class ClientDesktopApp extends StatefulWidget {
     this.localeReadFailed = false,
     this.saveLocale,
     this.deliverNotification,
+    this.initialNotifications = false,
+    this.notificationReadFailed = false,
+    this.saveNotifications,
   });
   final ClientSession session;
   final DeliverClientNotification? deliverNotification;
+  final bool initialNotifications;
+  final bool notificationReadFailed;
+  final Future<void> Function(bool)? saveNotifications;
   final ClientLocale initialLocale;
   final bool localeReadFailed;
   final Future<void> Function(ClientLocale)? saveLocale;
@@ -72,6 +78,36 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   bool _localeStorageFailed = false;
   int _localeChoice = 0;
   Future<void>? _localeWrites;
+  Future<void>? _notificationWrites;
+  bool _notificationStorageFailed = false;
+  int _notificationChoice = 0;
+
+  void _chooseNotifications(bool value) {
+    if (!mounted || _busy || value == _notifications.enabled) return;
+    _notifications.enabled = value;
+    final choice = ++_notificationChoice;
+    setState(() => _notificationStorageFailed = false);
+    final save = widget.saveNotifications;
+    if (save == null) return;
+    final previous = _notificationWrites;
+    final writing = () async {
+      if (previous != null) await previous;
+      try {
+        await save(value);
+      } catch (_) {
+        if (mounted && choice == _notificationChoice) {
+          setState(() => _notificationStorageFailed = true);
+        }
+      }
+    }();
+    _notificationWrites = writing;
+    unawaited(
+      writing.then((_) {
+        if (identical(_notificationWrites, writing)) _notificationWrites = null;
+      }),
+    );
+  }
+
   void _chooseLocale(ClientLocale value) {
     if (_busy || value == _locale) return;
     final choice = ++_localeChoice;
@@ -158,10 +194,12 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     super.initState();
     _locale = widget.initialLocale;
     _localeStorageFailed = widget.localeReadFailed;
+    _notificationStorageFailed = widget.notificationReadFailed;
     _notifications = ClientNotificationDelivery(
       state: session.state,
       locale: _locale,
-      enabled: false,
+      enabled:
+          widget.initialNotifications && widget.deliverNotification != null,
       deliver:
           widget.deliverNotification ??
           (_, _) async => ClientNotificationDeliveryResult.unsupported,
@@ -386,8 +424,10 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     _signals?.cancel();
     _trayReady = false;
     final savingLocale = _localeWrites;
+    final savingNotifications = _notificationWrites;
     _notifications.enabled = false;
     if (savingLocale != null) await savingLocale;
+    if (savingNotifications != null) await savingNotifications;
     await session.close();
     await widget.onExit?.call();
     if (widget.desktopIntegration) {
@@ -503,6 +543,9 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
                 supported: widget.deliverNotification != null,
                 locale: _locale,
                 busy: _busy,
+                onChanged: _chooseNotifications,
+                persistent: widget.saveNotifications != null,
+                storageFailed: _notificationStorageFailed,
               ),
               exportBundle: widget.desktopIntegration && Platform.isWindows
                   ? _exportBundle

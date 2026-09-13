@@ -37,6 +37,14 @@ scrollable RU/EN panel содержит toggle текущего запуска, 
 не OS delivery. Persisted preference, permissions и native adapters остаются
 незавершёнными; первое включение off пока не окончательная policy.
 
+Persistence дополнение: [UI notification store](../app/lib/client_notification_store.dart)
+подключён к entrypoint/shell, восстанавливает boolean, сериализует explicit
+choices, сохраняет ошибки как безопасный UI notice и дожидается записи на quit.
+[4 storage tests](../app/test/client_notification_store_test.dart) и
+[5 shell tests](../app/test/client_app_notifications_test.dart) дают local/unit
+evidence. Native delivery/permissions, мобильный settings container и итоговая
+default policy остаются незавершёнными; это не полное закрытие UF-15.
+
 | UF | Наблюдаемая реализация | Что ещё нужно для исходного scope |
 | --- | --- | --- |
 | UF-01 | `main.dart`, Windows runner/package pipeline; Linux/macOS scaffold | Product hosts Android/iOS отсутствуют; дистрибуция и compatible pairing всех платформ не квалифицированы |

@@ -9,11 +9,17 @@ class ClientNotificationsPanel extends StatelessWidget {
     required this.supported,
     required this.locale,
     this.busy = false,
+    this.onChanged,
+    this.persistent = false,
+    this.storageFailed = false,
   });
   final ClientNotificationDelivery delivery;
   final bool supported;
   final ClientLocale locale;
   final bool busy;
+  final ValueChanged<bool>? onChanged;
+  final bool persistent;
+  final bool storageFailed;
 
   String text(String en, String ru) => locale.text(en: en, ru: ru);
 
@@ -53,17 +59,36 @@ class ClientNotificationsPanel extends StatelessWidget {
           title: Text(text('Deadline notifications', 'Уведомления о сроках')),
           subtitle: Text(
             text(
-              'Session and device credential warnings. This choice applies to this run only.',
-              'Предупреждения о сроках сессии и учётных данных устройства. Выбор действует только в этом запуске.',
+              persistent
+                  ? 'Session and device credential warnings. The choice is saved on this device; system permission is separate.'
+                  : 'Session and device credential warnings. This choice applies to this run only.',
+              persistent
+                  ? 'Предупреждения о сроках сессии и учётных данных устройства. Выбор сохраняется на этом устройстве; разрешение системы запрашивается отдельно.'
+                  : 'Предупреждения о сроках сессии и учётных данных устройства. Выбор действует только в этом запуске.',
             ),
           ),
           value: delivery.enabled,
           onChanged: !supported || busy
               ? null
               : (value) {
-                  if (!busy) delivery.enabled = value;
+                  if (busy) return;
+                  if (onChanged != null) {
+                    onChanged!(value);
+                  } else {
+                    delivery.enabled = value;
+                  }
                 },
         ),
+        if (storageFailed)
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              text(
+                'The notification setting could not be read or saved. The current choice applies to this run only.',
+                'Не удалось прочитать или сохранить настройку уведомлений. Текущий выбор действует только в этом запуске.',
+              ),
+            ),
+          ),
         if (!supported || delivery.result != null)
           Semantics(
             liveRegion: true,

@@ -62,6 +62,21 @@ OS permission/click handling и native delivery ещё нужны. Началь�
 и [shell regression](../app/test/client_app_notifications_test.dart) проверяют
 явный toggle/retry, смену языка без replay и отсутствие runtime mutation.
 
+Persistence дополнена: [`ClientNotificationStore`](../app/lib/client_notification_store.dart)
+читает/сохраняет только `0`/`1` в UI settings `notifications`, отдельно от языка,
+endpoint и runtime state. Чтение ограничено двумя байтами, malformed/non-file
+отклоняется без неявного исправления; запись сериализована через unique temp
+и rename. Entry point читает выбор до запуска shell; отсутствующий или
+нечитаемый выбор оставляет отправку выключенной. Восстановленный on не
+активирует отсутствующий adapter и не перезаписывается при старте/выходе.
+Explicit UI choice сохраняется по порядку; поздняя ошибка старой записи не
+заменяет результат новой. Ошибка read/save показывает fixed RU/EN предупреждение
+о выборе только на текущий запуск. Quit ждёт текущую запись, stale toggle
+во время quit не принимается. [Четыре store tests](../app/test/client_notification_store_test.dart)
+и пять shell tests проверяют эти границы. Это local/unit evidence, не native
+restart/mobile secure container или notification permission acceptance.
+Production native delivery и окончательная default policy остаются открытыми.
+
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin

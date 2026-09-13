@@ -12,6 +12,7 @@ import 'client_build_target.dart';
 import 'client_intent_journal.dart';
 import 'client_locale.dart';
 import 'client_locale_store.dart';
+import 'client_notification_store.dart';
 import 'client_session.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
@@ -85,9 +86,27 @@ Future<void> main(List<String> args) async {
   } catch (_) {
     localeReadFailed = true;
   }
+  ClientNotificationStore? notificationStore;
+  var notifications = false;
+  var notificationReadFailed = false;
+  try {
+    notificationStore = ClientNotificationStore(clientLocaleDirectory());
+    notifications = await notificationStore.read() ?? false;
+  } catch (_) {
+    notificationReadFailed = true;
+  }
   runApp(
     ClientDesktopApp(
       initialLocale: locale,
+      initialNotifications: notifications,
+      notificationReadFailed: notificationReadFailed,
+      saveNotifications: (value) async {
+        final store = notificationStore;
+        if (store == null) {
+          throw StateError('UI notification storage unavailable');
+        }
+        await store.write(value);
+      },
       localeReadFailed: localeReadFailed,
       saveLocale: (value) async {
         final store = localeStore;
