@@ -10,6 +10,7 @@ import 'client_operation.dart';
 import 'client_privileged_recovery.dart';
 import 'client_profiles.dart';
 import 'client_networks.dart';
+import 'client_peers.dart';
 import 'client_preferences.dart';
 import 'client_resources.dart';
 import 'client_exit_nodes.dart';
@@ -20,6 +21,7 @@ import 'client_state_controller.dart';
 import 'local_client_events.dart';
 
 abstract interface class ClientConnection {
+  Future<api.ListPeersResponse> listPeers(api.ListPeersRequest request);
   Future<api.ListRecentLogsResponse> listRecentLogs(
     api.ListRecentLogsRequest request,
   );
@@ -59,6 +61,9 @@ abstract interface class ClientConnection {
 final class _LocalConnection implements ClientConnection {
   _LocalConnection(this.source);
   final LocalClientEvents source;
+  @override
+  Future<api.ListPeersResponse> listPeers(api.ListPeersRequest request) =>
+      source.listPeers(request);
   @override
   Future<api.ListRecentLogsResponse> listRecentLogs(
     api.ListRecentLogsRequest request,
@@ -676,6 +681,61 @@ final class ClientSession {
         catalog.metadata.instanceId != snapshot.runtime.instanceId ||
         catalog.metadata.revision < state.snapshot!.status.metadata.revision) {
       throw StateError('Client context changed during profile lookup');
+    }
+    return catalog;
+  }
+
+  Future<ClientPeerCatalog> listPeers({String search = ''}) async {
+    final connection = _connection;
+    final snapshot = state.snapshot;
+    if (_closed ||
+        connection == null ||
+        snapshot == null ||
+        state.link != ClientLinkState.ready ||
+        snapshot.runtime.callerAccess == api.Access.ACCESS_OBSERVER ||
+        snapshot.status.activeProfileId.isEmpty) {
+      throw StateError('Peer catalog requires a current owner profile');
+    }
+    final epoch = _epoch;
+    final cache = state.cacheEpoch;
+    final domains = {
+      for (final domain in [
+        api.Domain.DOMAIN_PEERS,
+        api.Domain.DOMAIN_NETWORKS,
+        api.Domain.DOMAIN_PROFILES,
+      ])
+        domain: state.domainEpoch(domain),
+    };
+    void check() {
+      if (_closed ||
+          epoch != _epoch ||
+          cache != state.cacheEpoch ||
+          state.link != ClientLinkState.ready ||
+          state.snapshot == null ||
+          state.snapshot!.status.activeProfileId !=
+              snapshot.status.activeProfileId ||
+          state.snapshot!.status.network.id != snapshot.status.network.id ||
+          domains.entries.any(
+            (entry) => state.domainEpoch(entry.key) != entry.value,
+          )) {
+        throw StateError('Client context changed during peer lookup');
+      }
+    }
+
+    final catalog = await readClientPeers(
+      (request) async {
+        check();
+        final response = await connection.listPeers(request);
+        check();
+        return response;
+      },
+      instanceId: snapshot.runtime.instanceId,
+      profileId: snapshot.status.activeProfileId,
+      search: search,
+    );
+    check();
+    if (catalog.metadata.revision < state.snapshot!.status.metadata.revision) {
+      throw StateError('Stale peer projection');
     }
     return catalog;
   }

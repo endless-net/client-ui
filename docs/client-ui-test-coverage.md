@@ -26,8 +26,12 @@ applied/target map revisions across pages. Exact search text and opaque page
 tokens are preserved. Empty and unavailable snapshots do not imply healthy
 connectivity; selected endpoints and reason keys are data, never probe targets.
 The desktop suite discovers these tests and the Android/iOS host imports them.
-This foundation is not yet bound to the session or a peer screen; no actual
-producer IPC, native browser/path probe or routing acceptance is claimed.
+The reader is bound to the native ListPeers RPC through ClientSession. Each page
+checks session/cache and PEERS/NETWORKS/PROFILES invalidation epochs, with owner
+and active-profile admission and stale final revision rejection. Shared tests
+cover repeated invalidations and profile/network/owner changes before a later
+page can be requested; reads leave the intention journal untouched. A peer
+screen, producer-process scenarios and native IPC/path acceptance remain open.
 
 Consumer `5d5c979f0ac539e23c4e2b6e102201f3b4cb9bce` has verified individual
 [Windows](https://github.com/endless-net/client-ui/actions/runs/34737934018/job/103672549796)

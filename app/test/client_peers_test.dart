@@ -1,8 +1,122 @@
 import 'package:endlessnet/client_peers.dart';
+import 'dart:io';
+import 'package:endlessnet/client_intent_journal.dart';
+import 'package:endlessnet/client_session.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter_test/flutter_test.dart';
+import 'client_session_test.dart' as fixtures;
 
 void main() {
+  test(
+    'US-04: peer session guards owner context and stops stale pagination',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'en-peer-session-',
+      );
+      final connection = fixtures.FakeConnection();
+      final session = ClientSession(
+        journal: ClientIntentJournal(directory),
+        open: () async => connection,
+      );
+      var calls = 0;
+      api.ListPeersResponse response({
+        String next = '',
+        String revision = '7',
+      }) => api.ListPeersResponse()
+        ..mergeFromProto3Json({
+          'page': {
+            'metadata': {'instanceId': 'runtime-a', 'revision': revision},
+            'nextPageToken': next,
+          },
+        });
+      try {
+        await session.connect();
+        await expectLater(session.listPeers(), throwsStateError);
+        connection.events.add(
+          fixtures.snapshot()
+            ..snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER
+            ..snapshot.status.activeProfileId = 'profile-a',
+        );
+        await pumpEventQueue();
+        await expectLater(session.listPeers(), throwsStateError);
+        connection.events.add(fixtures.snapshot()..sequence += 1);
+        await pumpEventQueue();
+        await expectLater(session.listPeers(), throwsStateError);
+        connection.events.add(
+          fixtures.snapshot()
+            ..sequence += 2
+            ..snapshot.status.activeProfileId = 'profile-a',
+        );
+        await pumpEventQueue();
+        connection.peers = (request) async {
+          calls++;
+          expect(request.profile.profileId, 'profile-a');
+          expect(request.search, 'exact query');
+          return response();
+        };
+        expect((await session.listPeers(search: 'exact query')).peers, isEmpty);
+        expect(calls, 1);
+        connection.peers = (_) async => response(revision: '6');
+        await expectLater(session.listPeers(), throwsStateError);
+
+        var sequence = 4;
+        for (final domain in [
+          api.Domain.DOMAIN_PEERS,
+          api.Domain.DOMAIN_NETWORKS,
+          api.Domain.DOMAIN_PROFILES,
+        ]) {
+          for (var repeat = 0; repeat < 2; repeat++) {
+            calls = 0;
+            connection.peers = (_) async {
+              calls++;
+              connection.events.add(
+                api.WatchEventsResponse()..mergeFromProto3Json({
+                  'sequence': '${sequence++}',
+                  'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+                  'invalidated': {'domain': domain.name},
+                }),
+              );
+              await pumpEventQueue();
+              return response(next: 'must-not-fetch');
+            };
+            await expectLater(session.listPeers(), throwsStateError);
+            expect(calls, 1);
+          }
+        }
+        for (final change in ['profile', 'network', 'owner']) {
+          final initial = fixtures.snapshot()
+            ..sequence += sequence++ - 1
+            ..snapshot.status.activeProfileId = 'profile-a';
+          connection.events.add(initial);
+          await pumpEventQueue();
+          calls = 0;
+          connection.peers = (_) async {
+            calls++;
+            final changed = fixtures.snapshot()
+              ..sequence += sequence++ - 1
+              ..snapshot.status.activeProfileId = 'profile-a';
+            if (change == 'profile') {
+              changed.snapshot.status.activeProfileId = 'profile-b';
+            } else if (change == 'network') {
+            changed.snapshot.status.network = api.Network(id: 'network-b');
+            } else {
+              changed.snapshot.runtime.callerAccess =
+                  api.Access.ACCESS_OBSERVER;
+            }
+            connection.events.add(changed);
+            await pumpEventQueue();
+            return response(next: 'must-not-fetch');
+          };
+          await expectLater(session.listPeers(), throwsStateError);
+          expect(calls, 1);
+        }
+        expect(await session.journal.pending(), isEmpty);
+      } finally {
+        await session.close();
+        await directory.delete(recursive: true);
+      }
+    },
+  );
   revision(int value) =>
       (api.SnapshotMetadata()..mergeFromProto3Json({'revision': '$value'}))
           .revision;

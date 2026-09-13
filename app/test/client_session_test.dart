@@ -27,6 +27,10 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 class FakeConnection implements ClientConnection {
+  Future<api.ListPeersResponse> Function(api.ListPeersRequest)? peers;
+  @override
+  Future<api.ListPeersResponse> listPeers(api.ListPeersRequest request) =>
+      peers!(request);
   Future<api.ListRecentLogsResponse> Function(api.ListRecentLogsRequest)? logs;
   @override
   Future<api.ListRecentLogsResponse> listRecentLogs(
