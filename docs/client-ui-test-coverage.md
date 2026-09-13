@@ -14,6 +14,15 @@ Status: incomplete. Owner: client-ui. Scope: the complete BA/SA goal, not the
 subset already implemented. The canonical machine-readable trace is
 [`tests/client-coverage.json`](../tests/client-coverage.json).
 
+Recovery localization: the panel now renders readable operation names and all
+recovery/browser/export notices in RU/EN. Twenty-two shared widget vectors compare
+the entire panel text, then change locale on the same state without replaying
+lookup, acknowledgement, browser launch or export. These are component tests;
+whole-app language switching, system dialogs and UI-AC-13 remain incomplete.
+Runner qualification for this addition is pending.
+Local validation passed 397 Flutter tests with 30 skips, Flutter analysis,
+Go tests and coverage-ledger checks.
+
 Contract workflow cost policy: push/PR executes one pass per selected platform.
 For release preparation or flake diagnosis, manually run `Client v0 consumer`,
 `Mobile v0 consumer` and/or `Local client v0 interoperability` with

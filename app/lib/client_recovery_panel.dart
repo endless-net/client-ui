@@ -1,6 +1,8 @@
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 
+import 'client_locale.dart';
+import 'client_operation_labels.dart';
 import 'client_operation.dart';
 import 'client_operation_details.dart';
 import 'client_state_controller.dart';
@@ -14,7 +16,9 @@ class ClientRecoveryPanel extends StatefulWidget {
     required this.acknowledge,
     this.openBrowser,
     this.exportBundle,
+    this.locale = ClientLocale.en,
   });
+  final ClientLocale locale;
   final ClientStateController state;
   final Future<List<ClientOperation>> Function() recover;
   final Future<void> Function(ClientOperation) acknowledge;
@@ -31,7 +35,7 @@ class ClientRecoveryPanel extends StatefulWidget {
 
 class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
   List<ClientOperation> _results = [];
-  String? _notice;
+  _RecoveryNotice? _notice;
   int? _epoch;
   bool _busy = false;
 
@@ -96,15 +100,12 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
       if (!mounted || !_owner || epoch != widget.state.cacheEpoch) return;
       setState(
         () => _notice = opened
-            ? 'Browser opened. The operation is still pending; recover its result.'
-            : 'Browser could not be opened. The operation is retained.',
+            ? _RecoveryNotice.browserOpened
+            : _RecoveryNotice.browserUnavailable,
       );
     } catch (_) {
       if (!mounted || !_owner || epoch != widget.state.cacheEpoch) return;
-      setState(
-        () => _notice =
-            'Browser action could not be completed. Refresh the operation; no command was replayed.',
-      );
+      setState(() => _notice = _RecoveryNotice.browserFailed);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -145,15 +146,12 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
       check();
       setState(
         () => _notice = saved
-            ? 'Verified bundle exported. The operation is retained.'
-            : 'Export cancelled. The operation is retained.',
+            ? _RecoveryNotice.exported
+            : _RecoveryNotice.exportCancelled,
       );
     } catch (_) {
       if (mounted && _owner && epoch == widget.state.cacheEpoch) {
-        setState(
-          () =>
-              _notice = 'Export could not complete. The operation is retained.',
-        );
+        setState(() => _notice = _RecoveryNotice.exportFailed);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -180,7 +178,7 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
         if (!mounted || widget.state.cacheEpoch != epoch || !_owner) return;
         setState(() {
           _results = List.unmodifiable(results);
-          if (results.isEmpty) _notice = 'No pending intentions.';
+          if (results.isEmpty) _notice = _RecoveryNotice.empty;
         });
       } else {
         if (!acknowledgement.terminal) return;
@@ -192,15 +190,12 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
                 (op) => op.value.requestId != acknowledgement.value.requestId,
               )
               .toList();
-          _notice = 'Result acknowledged. No command was replayed.';
+          _notice = _RecoveryNotice.acknowledged;
         });
       }
     } catch (_) {
       if (!mounted || widget.state.cacheEpoch != epoch || !_owner) return;
-      setState(
-        () => _notice =
-            'Recovery could not complete. Pending intentions are retained.',
-      );
+      setState(() => _notice = _RecoveryNotice.recoveryFailed);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -228,25 +223,41 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
                     if (current()) _run(null);
                   }
                 : null,
-            child: const Text('Recover pending operations'),
+            child: Text(
+              widget.locale.text(
+                en: 'Recover pending operations',
+                ru: 'Восстановить результаты операций',
+              ),
+            ),
           ),
-          if (visible && _notice != null) Text(_notice!),
+          if (visible && _notice != null) Text(_notice!.label(widget.locale)),
           if (visible)
             for (final operation in _results)
               ListTile(
-                title: Text(operation.value.kind.name),
+                title: Text(
+                  clientOperationKindLabel(
+                    operation.value.kind,
+                    locale: widget.locale,
+                  ),
+                ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ClientOperationDetails(operation: operation),
+                    ClientOperationDetails(
+                      operation: operation,
+                      locale: widget.locale,
+                    ),
                     if (operation.succeeded &&
                         operation.value.kind ==
                             api
                                 .OperationKind
                                 .OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE)
                       widget.exportBundle == null
-                          ? const Text(
-                              'Native export adapter is not available.',
+                          ? Text(
+                              widget.locale.text(
+                                en: 'Native export adapter is not available.',
+                                ru: 'Системный адаптер экспорта недоступен.',
+                              ),
                             )
                           : TextButton(
                               key: ValueKey(
@@ -260,7 +271,12 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
                                       }
                                     }
                                   : null,
-                              child: const Text('Export verified bundle'),
+                              child: Text(
+                                widget.locale.text(
+                                  en: 'Export verified bundle',
+                                  ru: 'Экспортировать проверенный пакет',
+                                ),
+                              ),
                             ),
                   ],
                 ),
@@ -272,7 +288,12 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
                                 if (current()) _run(operation);
                               }
                             : null,
-                        child: const Text('Acknowledge result'),
+                        child: Text(
+                          widget.locale.text(
+                            en: 'Acknowledge result',
+                            ru: 'Подтвердить результат',
+                          ),
+                        ),
                       )
                     : operation.value.userAction.kind ==
                               api.UserAction_Kind.KIND_OPEN_BROWSER &&
@@ -286,12 +307,74 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
                                 }
                               }
                             : null,
-                        child: const Text('Open browser'),
+                        child: Text(
+                          widget.locale.text(
+                            en: 'Open browser',
+                            ru: 'Открыть браузер',
+                          ),
+                        ),
                       )
-                    : const Text('Still pending'),
+                    : Text(
+                        widget.locale.text(
+                          en: 'Still pending',
+                          ru: 'Ещё выполняется',
+                        ),
+                      ),
               ),
         ],
       );
     },
   );
+}
+
+// Store state, not translated text, so an existing notice follows locale changes.
+enum _RecoveryNotice {
+  browserOpened,
+  browserUnavailable,
+  browserFailed,
+  exported,
+  exportCancelled,
+  exportFailed,
+  empty,
+  acknowledged,
+  recoveryFailed;
+
+  String label(ClientLocale locale) => switch (this) {
+    _RecoveryNotice.browserOpened => locale.text(
+      en: 'Browser opened. The operation is still pending; recover its result.',
+      ru: 'Браузер открыт. Операция ещё выполняется; запросите её результат.',
+    ),
+    _RecoveryNotice.browserUnavailable => locale.text(
+      en: 'Browser could not be opened. The operation is retained.',
+      ru: 'Не удалось открыть браузер. Операция сохранена.',
+    ),
+    _RecoveryNotice.browserFailed => locale.text(
+      en: 'Browser action could not be completed. Refresh the operation; no command was replayed.',
+      ru: 'Не удалось выполнить действие в браузере. Обновите операцию; команда не отправлялась повторно.',
+    ),
+    _RecoveryNotice.exported => locale.text(
+      en: 'Verified bundle exported. The operation is retained.',
+      ru: 'Проверенный пакет экспортирован. Операция сохранена.',
+    ),
+    _RecoveryNotice.exportCancelled => locale.text(
+      en: 'Export cancelled. The operation is retained.',
+      ru: 'Экспорт отменён. Операция сохранена.',
+    ),
+    _RecoveryNotice.exportFailed => locale.text(
+      en: 'Export could not complete. The operation is retained.',
+      ru: 'Не удалось завершить экспорт. Операция сохранена.',
+    ),
+    _RecoveryNotice.empty => locale.text(
+      en: 'No pending intentions.',
+      ru: 'Нет незавершённых намерений.',
+    ),
+    _RecoveryNotice.acknowledged => locale.text(
+      en: 'Result acknowledged. No command was replayed.',
+      ru: 'Результат подтверждён. Команда не отправлялась повторно.',
+    ),
+    _RecoveryNotice.recoveryFailed => locale.text(
+      en: 'Recovery could not complete. Pending intentions are retained.',
+      ru: 'Не удалось восстановить результаты. Незавершённые намерения сохранены.',
+    ),
+  };
 }

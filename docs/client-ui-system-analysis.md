@@ -45,6 +45,13 @@ outcomes требуют отдельного evidence.
 всего приложения ещё не переключается, остальные тексты и системные Flutter
 компоненты требуют локализации. Это не закрывает UI-AC-13.
 
+ClientRecoveryPanel также принимает `ru`/`en`: названия операций, lookup/ack,
+browser/export и notices локализованы. Notices хранятся типизированно и при
+смене локали перерисовываются без повторного RPC или внешнего действия.
+22 shared widget-вектора сравнивают весь текст панели в обеих локалях,
+включая ошибки/отмену и отсутствие native export adapter. Это component
+evidence; full-app locale switching, системные диалоги и UI-AC-13 ещё не приняты.
+
 ClientOperationDetails принимает выбранную локаль и отображает пояснения всех
 typed outcomes на RU/EN. Два shared widget tests проверяют по 14 векторов целиком,
 включая remote/local cleanup и suppression секретов. Локаль пока передаётся
