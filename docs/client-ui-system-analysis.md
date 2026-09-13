@@ -92,6 +92,15 @@ logout/local forget не снимают ownership. UI не обещает воз
 
 ## 3. Команды и восстановление
 
+`client_enrollment_panel.dart` подключает явный Enroll выбранного профиля через
+session journal: hostname, typed mode и ровно одна authentication alternative
+(browser_login=true или enrollment_token). Форма требует owner, active profile
+и доступную CAPABILITY_ENROLLMENT; token field masked, очищается до dispatch и
+не включается в ошибки/журнал. Snapshot/cache change пересоздаёт форму. Shared
+widget-тест проверяет capability gating, обе auth alternatives на callback boundary,
+очистку token и observer transition. End-to-end enrollment и initial Enroll claim
+без выбранного профиля пока не доказаны; initial ownership UI начинается с CreateProfile.
+
 `client_operation_details.dart` отображает typed outcome в recovery panel:
 remote cleanup confirmation отдельно от local registration removal, failure code,
 action owner и correlation ID, selection/enrollment IDs и connection continuity.
