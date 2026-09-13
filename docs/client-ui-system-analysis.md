@@ -393,8 +393,15 @@ whitespace/control characters. Пустые destinations остаются пус
 нет metadata/revision: consumer не синтезирует их, а отклоняет ответ при смене
 cache/context или повторной SUPPORT invalidation. Offline key остаётся opaque,
 не является путём к файлу. Shared reader/session tests локально проверяют эти
-границы; Help UI, shipped offline content, explicit links и platform evidence
-ещё нужны.
+границы. `ClientSupportPanel` подключён к session panel: базовая встроенная
+справка доступна без runtime/network, Refresh support — отдельное действие.
+Documentation/support/privacy/license кнопки существуют только для непустых
+producer destinations; click повторно читает SupportInfo и открывает лишь тот
+же raw URL в неизменном context. UI не разрешает unknown offline key как path,
+а сообщает, что producer topic не bundled; базовая UI-owned справка остаётся.
+Shared widget tests используют fake launcher и проверяют open, changed/unsafe
+URL, invalidation и launcher отказ. Это не native browser acceptance; полный
+локализованный offline corpus и platform evidence ещё нужны.
 
 US-12 foundation: desktop shell отправляет journaled NotifyLifecycle(UI_QUIT)
 при явном Quit owner с активным профилем; observer не отправляет мутацию.

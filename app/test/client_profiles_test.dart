@@ -7,6 +7,7 @@ import 'package:endlessnet/client_exit_panel.dart';
 import 'package:endlessnet/client_update_info.dart';
 import 'package:endlessnet/client_update_panel.dart';
 import 'package:endlessnet/client_support_info.dart';
+import 'package:endlessnet/client_support_panel.dart';
 import 'package:endlessnet/client_networks_panel.dart';
 import 'package:endlessnet/client_create_profile_panel.dart';
 import 'dart:async';
@@ -117,6 +118,119 @@ api.GetExitNodeResponse _exitStatus() =>
     });
 
 void main() {
+  for (final scenario in [
+    'open',
+    'changed',
+    'unsafe',
+    'invalidated',
+    'cancelled',
+  ]) {
+    testWidgets('US-13: support UI $scenario', (tester) async {
+      final state = ClientStateController();
+      final events = StreamController<api.WatchEventsResponse>();
+      await state.attach(events.stream);
+      addTearDown(() async {
+        await state.detach();
+        await events.close();
+        state.dispose();
+      });
+      var reads = 0;
+      var opens = 0;
+      final pending = Completer<void>();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ContractTestScaffold(
+            body: SingleChildScrollView(
+              child: ClientSupportPanel(
+                state: state,
+                load: () async {
+                  reads++;
+                  if (reads == 2 && scenario == 'invalidated') {
+                    await pending.future;
+                  }
+                  return api.SupportInfo()..mergeFromProto3Json({
+                    'runtime': {},
+                    'productName': 'EndlessNet',
+                    'offlineHelpKey': '../../not-a-path',
+                    'supportUrl': reads == 2 && scenario == 'changed'
+                        ? 'https://changed.example/'
+                        : reads == 2 && scenario == 'unsafe'
+                        ? 'https://user:secret@example.test/'
+                        : 'https://support.example/',
+                  });
+                },
+                openBrowser: (uri, check) async {
+                  check();
+                  opens++;
+                  expect(uri.toString(), 'https://support.example/');
+                  return scenario != 'cancelled';
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('client-offline-help')));
+      await tester.pump();
+      expect(find.textContaining('Built-in help:'), findsOneWidget);
+      expect(reads, 0);
+      events.add(
+        api.WatchEventsResponse()..mergeFromProto3Json({
+          'sequence': '1',
+          'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'runtime-a',
+              'callerAccess': 'ACCESS_OBSERVER',
+            },
+            'status': {
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            },
+          },
+        }),
+      );
+      await tester.pump();
+      final refresh = find.byKey(const Key('client-load-support'));
+      await tester.ensureVisible(refresh);
+      await tester.tap(refresh);
+      await tester.pump();
+      expect(reads, 1);
+      expect(opens, 0);
+      expect(
+        find.textContaining('runtime-requested offline topic is not bundled'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('../../not-a-path'), findsNothing);
+      expect(
+        find.byKey(const Key('client-support-documentation')),
+        findsNothing,
+      );
+      final button = find.byKey(const Key('client-support-support'));
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pump();
+      if (scenario == 'invalidated') {
+        events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '2',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'invalidated': {'domain': 'DOMAIN_SUPPORT'},
+          }),
+        );
+        await tester.pump();
+        pending.complete();
+        await tester.pump();
+      }
+      expect(reads, 2);
+      expect(opens, scenario == 'open' || scenario == 'cancelled' ? 1 : 0);
+      if (scenario != 'open') expect(button, findsNothing);
+      expect(find.textContaining('user:secret'), findsNothing);
+      expect(find.textContaining('Built-in help:'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
   test(
     'US-13: support projection preserves identity and rejects unsafe destinations',
     () async {

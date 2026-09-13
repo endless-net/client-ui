@@ -422,7 +422,7 @@
       "testEvidence": [
         {
           "path": "app/test/client_profiles_test.dart",
-          "scope": "Update reader and panel: distinct source/compatibility states, immutable identity/context-bound projection, expiry/target/URL checks, observer denial, explicit refresh, late invalidated response rejection and expiry after display. Local execution only for new UI; no signature verification, About/Help, distribution action/outcome or platform acceptance"
+          "scope": "Update reader/panel: distinct source/compatibility states, immutable context, expiry/target/URL checks, observer denial and explicit refresh. Support reader/panel: runtime identity, safe destinations, offline basic help without RPC, observer refresh, fresh unchanged URL before fake launch, changed/unsafe/invalidation/refusal outcomes. Local execution only for new UI; no signature verification, complete localized help, native browser, distribution outcome or platform acceptance"
         },
         {
           "path": "app/test/client_session_test.dart",

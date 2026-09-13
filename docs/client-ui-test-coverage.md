@@ -171,8 +171,15 @@ credentials and whitespace/control characters in all four destinations. This
 does not establish ownership of a domain; trusted source configuration remains
 producer-owned. The session test allows observer access with no active profile,
 rejects repeated SUPPORT invalidation and confirms no intention journal writes.
-SupportInfo has no revision field in v0; none is fabricated. Help UI, bundled
-offline content, explicit link launching and platform evidence remain open.
+SupportInfo has no revision field in v0; none is fabricated. The session panel
+now includes basic UI-owned offline help that needs no runtime or network, and
+an explicit support refresh available to observers. Five shared widget cases
+use a fake launcher to test opening only an unchanged freshly read URL, changed
+and unsafe URLs, invalidation and launcher refusal. Missing links produce no
+buttons; unknown offline keys are not paths or invented mapped topics. The
+production binding uses the external browser launcher with a context guard.
+Native browser acceptance, complete localized offline content and platform
+evidence remain open. These new UI tests have local evidence only until CI runs.
 
 ### Desktop lifecycle foundation (2026-09-13)
 
