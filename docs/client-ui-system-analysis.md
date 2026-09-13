@@ -117,6 +117,14 @@ GetOperation, при открытом WatchEvents. Journal проверяетс�
 моделирует роль только для этой fixture, не даёт UI способ задавать свою роль.
 Новый process scenario ожидает GitHub execution; локально standalone Go testserver
 не запускался. Проверка operation envelope локально включает trust outcome.
+На `f6386db` trust process fixture прошла на Linux, macOS и Windows; Windows job
+в целом failed (107 passed / 1 failed): connect fixture получила EOF от testserver
+вместо ожидаемого lifecycle event
+([job](https://github.com/endless-net/client-ui/actions/runs/34730155723/job/103651358745)).
+Причина выхода не сохранена прежним фильтром stderr; гонка cancellation/Verify —
+гипотеза, не установленная причина. Harness теперь сохраняет только точные
+фиксированные lifecycle errors и exit code; payload/headers не добавляются.
+Это диагностика следующего запуска, не исправление или Windows acceptance.
 Privileged helper, production shell cutover и actual runtime acceptance ещё
 требуются; этот partial consumer flow не закрывает US-06.
 

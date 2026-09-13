@@ -23,6 +23,25 @@ Map<String, Object> recoveredOperation(Map<String, Object> accepted) => {
 
 void main() {
   final executable = Platform.environment['ENDLESSNET_TESTSERVER'];
+  test('Synthetic host diagnostics retain only exact lifecycle errors', () {
+    expect(
+      scenarioLifecycleDiagnostic('script has in-flight calls'),
+      'script has in-flight calls',
+    );
+    expect(
+      scenarioLifecycleDiagnostic('testserver transport failed'),
+      'testserver transport failed',
+    );
+    for (final line in [
+      'Authorization: synthetic-value',
+      'request mismatch: payload',
+      'script has in-flight calls: extra payload',
+      ' response body ',
+      '',
+    ]) {
+      expect(scenarioLifecycleDiagnostic(line), isNull);
+    }
+  });
   test('US-03: process recovery fixture satisfies operation contract', () {
     for (final kind in ['CONNECT', 'ENROLL', 'TRUST_SERVER_IDENTITY']) {
       final operation = ClientOperation.fromProto(

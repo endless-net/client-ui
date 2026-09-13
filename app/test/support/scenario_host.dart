@@ -4,6 +4,20 @@ import 'dart:io';
 
 import 'package:endlessnet_client_api/client_api.dart' show ClientContract;
 
+// Exact producer lifecycle errors only; never retain arbitrary stderr lines,
+// payload mismatches, headers or request dumps from the synthetic process.
+String? scenarioLifecycleDiagnostic(String line) =>
+    const {
+      'script has in-flight calls',
+      'script has unconsumed expectations',
+      'testserver stopped before verification',
+      'testserver transport failed',
+      'parent ended without explicit verification',
+      'cannot stop testserver',
+    }.contains(line)
+    ? line
+    : null;
+
 /// Process harness for synthetic producer scripts, not a daemon replacement.
 final class ScenarioHost {
   ScenarioHost._(this._directory, this._process, this._output, this.endpoint);
@@ -67,7 +81,10 @@ final class ScenarioHost {
           .transform(const LineSplitter())
           .forEach((line) {
             // Never retain request/response/header dumps, even for fixtures.
-            if (!line.contains('GOAWAY')) return;
+            if (!line.contains('GOAWAY') &&
+                scenarioLifecycleDiagnostic(line) == null) {
+              return;
+            }
             if (diagnostics.length == 8) diagnostics.removeAt(0);
             diagnostics.add(
               line.length > 1024 ? line.substring(0, 1024) : line,
@@ -94,7 +111,10 @@ final class ScenarioHost {
 
   Future<Map<String, dynamic>> _event() async {
     if (!await _output.moveNext().timeout(_timeout)) {
-      throw StateError('Testserver ended without expected event');
+      final exitCode = await _process.exitCode.timeout(_timeout);
+      throw StateError(
+        'Testserver ended without expected event (exit $exitCode)',
+      );
     }
     return jsonDecode(_output.current) as Map<String, dynamic>;
   }
