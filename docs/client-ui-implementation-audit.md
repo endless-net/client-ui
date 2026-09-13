@@ -60,6 +60,14 @@ BA прочитан из разрешённого пользователем ф�
 
 ## Последовательность оставшейся работы
 
+Дополнение после audit commit: pre-create preview в ClientDiagnosticsPanel
+теперь содержит RU/EN описание snapshot/recent logs, ограничений 5 MiB /
+15 минут / 256 KiB, отсутствие timed capture/upload и негарантированную
+длительность создания. `client_diagnostics_locale_test.dart` проверяет текст
+до submit и сохранение explicit consent. Source-пробел описания устранён;
+соответствие фактического producer archive и native export ещё не принято.
+Исходная таблица выше сохраняет состояние проверенного `ce98fa4`.
+
 1. Закрыть конкретные UI-пробелы: archive preview; управляемые уведомления;
    отдельные autostart/lifecycle controls и platform adapters. Проверять unit
    и widget tests локально на закреплённом SDK, не ждать CI.

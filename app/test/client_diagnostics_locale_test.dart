@@ -172,6 +172,22 @@ void main() {
           oldConfirm();
           await tester.pumpAndSettle();
           expect(creates, 0);
+          final previewTexts = initial == ClientLocale.ru
+              ? [
+                  'Состав: диагностический снимок и последние записи журнала с удалёнными конфиденциальными данными. Это не полная история; диагностика может быть сокращена.',
+                  'Сбор: фиксированный локальный отчёт, не захват за заданный период. Контракт не задаёт время завершения. Захват пакетов, настраиваемая трассировка и отправка не включены.',
+                  'Ограничения: до 5 MiB; срок дескриптора 15 минут; блоки чтения до 256 KiB. Дескриптор привязан к вызывающему пользователю и профилю и аннулируется при выходе или удалении.',
+                  'Экспорт — отдельное явное действие после проверенной загрузки. Проверьте экспортированный файл перед передачей.',
+                ]
+              : [
+                  'Contents: redacted diagnostics snapshot and recent logs. This is not a complete history; diagnostics may be truncated.',
+                  'Collection: fixed local report, not a timed capture. The contract does not specify completion time. Packet capture, configurable tracing and upload are not included.',
+                  'Limits: at most 5 MiB; handle lifetime 15 minutes; read chunks at most 256 KiB. The handle belongs to the caller/profile and is invalidated by logout or removal.',
+                  'Export is a separate explicit action after verified download. Inspect the exported file before sharing it.',
+                ];
+          for (final text in previewTexts) {
+            expect(find.text(text), findsOneWidget);
+          }
           expect(
             find.text(
               initial == ClientLocale.ru

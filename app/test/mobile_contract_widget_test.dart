@@ -777,11 +777,14 @@ void main() {
       expect(creates, isEmpty);
       await tester.tap(create);
       await tester.pump();
+      await tester.ensureVisible(find.byKey(const Key('cancel-client-bundle')));
       await tester.tap(find.byKey(const Key('cancel-client-bundle')));
       await tester.pump();
       expect(creates, isEmpty);
+      await tester.ensureVisible(create);
       await tester.tap(create);
       await tester.pump();
+      await tester.ensureVisible(confirmBundle);
       await tester.tap(confirmBundle);
       await tester.pump();
       expect(creates, ['profile-a']);
@@ -789,6 +792,7 @@ void main() {
         find.textContaining('archive readiness is not confirmed'),
         findsOneWidget,
       );
+      await tester.ensureVisible(create);
       await tester.tap(create);
       await tester.pump();
       events.add(

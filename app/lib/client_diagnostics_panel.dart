@@ -343,6 +343,30 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
             if (_confirmBundle) ...[
               Text(
                 _text(
+                  'Contents: redacted diagnostics snapshot and recent logs. This is not a complete history; diagnostics may be truncated.',
+                  'Состав: диагностический снимок и последние записи журнала с удалёнными конфиденциальными данными. Это не полная история; диагностика может быть сокращена.',
+                ),
+              ),
+              Text(
+                _text(
+                  'Collection: fixed local report, not a timed capture. The contract does not specify completion time. Packet capture, configurable tracing and upload are not included.',
+                  'Сбор: фиксированный локальный отчёт, не захват за заданный период. Контракт не задаёт время завершения. Захват пакетов, настраиваемая трассировка и отправка не включены.',
+                ),
+              ),
+              Text(
+                _text(
+                  'Limits: at most 5 MiB; handle lifetime 15 minutes; read chunks at most 256 KiB. The handle belongs to the caller/profile and is invalidated by logout or removal.',
+                  'Ограничения: до 5 MiB; срок дескриптора 15 минут; блоки чтения до 256 KiB. Дескриптор привязан к вызывающему пользователю и профилю и аннулируется при выходе или удалении.',
+                ),
+              ),
+              Text(
+                _text(
+                  'Export is a separate explicit action after verified download. Inspect the exported file before sharing it.',
+                  'Экспорт — отдельное явное действие после проверенной загрузки. Проверьте экспортированный файл перед передачей.',
+                ),
+              ),
+              Text(
+                _text(
                   'Create a local redacted diagnostics archive? This does not upload or export it.',
                   'Создать локальный архив диагностики с удалёнными конфиденциальными данными? Это не отправляет и не экспортирует архив.',
                 ),

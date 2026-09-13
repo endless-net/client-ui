@@ -316,6 +316,10 @@
           "scope": "Four short widget tests: expand interfaces/routes/conflicts/failures, exact RU/EN fields and empty-state text, locale switch and suppression of unprojected browser URL/private failure reason. UI-only inspection; actual runtime/platform acceptance remains incomplete"
         },
         {
+          "path": "app/test/client_diagnostics_locale_test.dart",
+          "scope": "Six existing RU/EN create-outcome vectors also verify all pre-create composition/limits/collection/export paragraphs before submit, no create before consent, and stale confirmation rejection after cancel/reconfirm. Text evidence only, not actual archive contents or native export acceptance"
+        },
+        {
           "path": "app/test/client_tunnel_dns_details_test.dart",
           "scope": "Eight short widgets compare all RU/EN tunnel/DNS fields for absent, empty, populated and missing-timing projections; exact 64-bit counters, explicit zero keepalive and retained expansion on locale changes. No live traffic/DNS probe, capture, upload or platform acceptance"
         },

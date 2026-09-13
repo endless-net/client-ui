@@ -17,7 +17,8 @@
 [Проверка полноты реализации от 2026-09-14](client-ui-implementation-audit.md)
 сверяет все 23 UF и группы UBR/UI-AC с текущим source. Первый этап не закрыт:
 mobile product hosts, notifications/autostart/lifecycle adapters, не-Windows
-export/authorization и archive preview ещё требуют реализации. Unit totals
+export/authorization ещё требуют реализации. Archive preview дополнен ниже;
+это не пересмотр исторического audit commit. Unit totals
 и исторические CI runs не заменяют этот gate.
 
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
@@ -889,6 +890,13 @@ UI отображает `ipv4` и `ipv6` requested/effective IDs, apply state, f
 на заданный интервал. Max 5 MiB, срок handle 15 минут, chunks до 256 KiB;
 эти значения не заменяют проверку ответа runtime. Packet capture, configurable
 trace duration и upload требуют отдельного scope/контракта и сейчас недоступны.
+Реализован RU/EN pre-create текст: неполная история/truncation, отсутствие
+гарантированного времени создания, caller/profile binding и invalidation
+handle при logout/removal, отдельный verified download/export и проверка
+файла перед передачей. Шесть существующих widget-векторов create outcome
+сравнивают все четыре абзаца до submit, проверяют zero create до согласия и
+непригодность старого подтверждения после cancel/reconfirm. Это проверка
+описания и согласия, не доказательство фактического состава архива на hosts.
 Экспорт через пользовательский save/share action не разрешает скрытую отправку.
 
 ## 6. Тестирование и release gates
