@@ -193,6 +193,15 @@ RU/EN просмотр/lock/apply/reset/error и stale draft actions. Locale reb
 не повторяет команды. Это component evidence, не OS lifecycle/policy acceptance
 и не full-app UI-AC-13.
 
+ClientExitPanel привязывает действия к controller/snapshot, загруженному каталогу
+и поколению черновика/подтверждения. Изменение узла, IP family или LAN policy
+отменяет прежнее подтверждение очистки. Старые select/confirm/cancel callbacks
+не используют новое согласие и не меняют новый черновик. Поздние lookup/error
+от прежнего контроллера не отображаются в новом контексте. Восемь short widget
+тестов проверяют эти гонки и успешное выполнение свежего явного действия.
+Это component evidence US-05, не traffic/fail-closed или native acceptance;
+локализация exit-панели и общий выбор языка ещё не реализованы.
+
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
 оставляют открытыми версии ОС, принятые assistive technologies, lifecycle

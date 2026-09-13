@@ -35,6 +35,8 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
   api.LanAccess? _lan;
   bool _busy = false;
   bool _confirmClear = false;
+  int _draftSerial = 0;
+  bool Function()? _contextCurrent;
   String? _notice;
   String get contextId =>
       '${widget.state.cacheEpoch}:'
@@ -47,7 +49,8 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
           api.Access.ACCESS_OBSERVER &&
       widget.state.snapshot!.status.activeProfileId.isNotEmpty &&
       widget.state.snapshot!.supports(api.Capability.CAPABILITY_EXIT_NODE);
-  bool get current => allowed && _context == contextId;
+  bool get current =>
+      allowed && _context == contextId && (_contextCurrent?.call() ?? false);
   bool get editable =>
       current &&
       _view != null &&
@@ -69,6 +72,8 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
       selected!.allowedFamilyModes.contains(_mode) &&
       selected!.allowedLanAccess.contains(_lan);
   void _discard() {
+    _draftSerial++;
+    _contextCurrent = null;
     _view = null;
     _context = null;
     _node = null;
@@ -113,6 +118,8 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
       return;
     }
     final context = contextId;
+    final state = widget.state;
+    final snapshot = state.snapshot;
     final profile = widget.state.snapshot!.status.activeProfileId;
     final node = _node;
     final mode = _mode;
@@ -124,6 +131,9 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
     }
 
     setState(() {
+      _draftSerial++;
+      _contextCurrent = () =>
+          identical(widget.state, state) && identical(state.snapshot, snapshot);
       _context = context;
       _busy = true;
       _notice = null;
@@ -185,9 +195,18 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
     builder: (context, _) {
       final view = _view;
       final viewContext = _context;
+      final state = widget.state;
+      final snapshot = state.snapshot;
+      final serial = _draftSerial;
+      bool validFrame() =>
+          mounted &&
+          identical(widget.state, state) &&
+          identical(state.snapshot, snapshot) &&
+          serial == _draftSerial &&
+          !_busy;
       bool validView() =>
+          validFrame() &&
           current &&
-          !_busy &&
           identical(view, _view) &&
           viewContext == _context;
       final node = selected;
@@ -196,7 +215,11 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
         children: [
           OutlinedButton(
             key: const Key('client-load-exits'),
-            onPressed: allowed && !_busy ? () => _run() : null,
+            onPressed: allowed && !_busy
+                ? () {
+                    if (validFrame()) _run();
+                  }
+                : null,
             child: const Text('Refresh exit nodes'),
           ),
           if (current && _notice != null) Text(_notice!),
@@ -260,6 +283,7 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                         return;
                       }
                       setState(() {
+                        _draftSerial++;
                         _node = id;
                         _mode = null;
                         _lan = null;
@@ -283,7 +307,11 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                         if (validView() &&
                             selected == node &&
                             node.allowedFamilyModes.contains(mode)) {
-                          setState(() => _mode = mode);
+                          setState(() {
+                            _draftSerial++;
+                            _mode = mode;
+                            _confirmClear = false;
+                          });
                         }
                       }
                     : null,
@@ -302,7 +330,11 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                         if (validView() &&
                             selected == node &&
                             node.allowedLanAccess.contains(lan)) {
-                          setState(() => _lan = lan);
+                          setState(() {
+                            _draftSerial++;
+                            _lan = lan;
+                            _confirmClear = false;
+                          });
                         }
                       }
                     : null,
@@ -325,7 +357,12 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
               key: const Key('client-clear-exit'),
               onPressed: editable && !_busy
                   ? () {
-                      if (validView()) setState(() => _confirmClear = true);
+                      if (validView()) {
+                        setState(() {
+                          _draftSerial++;
+                          _confirmClear = true;
+                        });
+                      }
                     }
                   : null,
               child: const Text('Clear exit node'),
@@ -338,7 +375,12 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                 key: const Key('client-cancel-clear-exit'),
                 onPressed: !_busy
                     ? () {
-                        if (validView()) setState(() => _confirmClear = false);
+                        if (validView()) {
+                          setState(() {
+                            _draftSerial++;
+                            _confirmClear = false;
+                          });
+                        }
                       }
                     : null,
                 child: const Text('Cancel'),
