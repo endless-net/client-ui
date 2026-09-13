@@ -11,6 +11,7 @@ import '../../../app/test/client_disposed_actions_test.dart' as disposedActions;
 import '../../../app/test/client_connection_activation_test.dart' as activation;
 import '../../../app/test/client_session_layout_test.dart' as sessionLayout;
 import '../../../app/test/client_operation_labels_test.dart' as operationLabels;
+import '../../../app/test/client_loopback_contract_test.dart' as wireMock;
 import '../../../app/test/client_rebootstrap_test.dart' as rebootstrap;
 import '../../../app/test/client_runtime_operations_panel_test.dart' as runtimeOperations;
 import '../../../app/test/client_operation_details_locale_test.dart' as operationLocales;
@@ -27,6 +28,7 @@ void main() {
   group('Queued primary action context binding', activation.main);
   group('Active session large-text layout', sessionLayout.main);
   group('Typed operation presentation', operationLabels.main);
+  group('Synthetic protobuf wire contract server', wireMock.main);
   group('Runtime readiness rebootstrap', rebootstrap.main);
   group('Initial snapshot and stream operation presentation', runtimeOperations.main);
   group('Bilingual operation outcomes', operationLocales.main);

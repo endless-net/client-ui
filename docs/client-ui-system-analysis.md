@@ -642,6 +642,15 @@ trace duration и upload требуют отдельного scope/контра�
 
 ## 6. Тестирование и release gates
 
+Дополнительный UI-owned wire mock: `app/test/support/loopback_contract_server.dart`
+использует generated server bindings текущего SDK. Shared тест запускает его на
+случайном loopback TCP порту и проверяет bootstrap → WatchEvents → Connect →
+GetOperation → StatusChanged с disk-backed journal. Это только test transport:
+production код его не импортирует, native Go-host/OS IPC тесты не заменяются.
+В mobile harness это protobuf serialization/gRPC/session evidence, не проверка
+OS identity, защищённого bridge, VPN или producer runtime. Остальные RPC пока
+не реализованы этим fixture и отклоняются; полнота контракта не заявляется.
+
 [Coverage ledger](client-ui-test-coverage.md) и
 [`tests/client-coverage.json`](../tests/client-coverage.json) трассируют весь
 scope из 104 UF/UBR/UI-AC/US identifiers. Проверка структуры и отдельный

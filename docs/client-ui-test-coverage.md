@@ -36,6 +36,24 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+At `a218fde9ccf0252970cca85a8f65a012ea7009e5`, the
+[desktop consumer run](https://github.com/endless-net/client-ui/actions/runs/34776165084)
+passed 344 tests with 1 skip on each of Windows, Linux and macOS. The
+[iOS job](https://github.com/endless-net/client-ui/actions/runs/34776165077/job/103774647470)
+passed 166 shared tests. Inspected logs explicitly pass RU/EN operation details,
+runtime-operation projection, stale acknowledgement and readiness rebootstrap.
+Android job 103774647519 failed KVM preflight before tests. Windows packaging
+run 34776165095 failed the reviewed core manifest target/IPC check, independently
+of consumer test success. No runtime/traffic/full platform acceptance is inferred.
+
+The subsequent UI-owned loopback protobuf server is registered in the shared
+mobile/desktop harness and passes locally (316 tests, 30 skips overall); its
+runner execution is pending. It covers synthetic bootstrap/stream/Connect/lookup
+and disk-backed intention ordering, not OS-authenticated transport or a VPN.
+
+The following paragraphs preserve earlier chronological snapshots; their
+pending statements refer to those increments, not to the newer evidence above.
+
 The operation-presentation extension maps closed producer enums to readable
 English labels for state, continuity, failure, action owner and required action.
 `client_operation_labels_test.dart` checks the current enum set; the shared

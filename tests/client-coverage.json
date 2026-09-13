@@ -19,15 +19,15 @@
       ],
       "workflow": ".github/workflows/contract-consumer.yml",
       "status": "passed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34745141995",
-      "scope": "All three desktop jobs at c1899a3f5925806b699e52b835f44e8c59f72723 passed 261 tests each. Includes producer-host peer pagination/revision drift, direct observer denial and gated Network selection/recovery/status sequence, shared identity context and resource Network-change guards, and command-announcement live-region flag/label/observer cleanup. Native host/consumer mocks and semantics tree only, not actual speech, runtime, installed-service, traffic or product/platform acceptance; intermittent trust rejection is not proven eliminated"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34776165084",
+      "scope": "At a218fde9ccf0252970cca85a8f65a012ea7009e5 all three desktop jobs passed 344 tests with 1 skip each. Logs explicitly confirm RU/EN operation details, runtime operation stream projection, stale acknowledgement rejection and readiness rebootstrap without replay. Includes pinned producer-host tests; not real runtime/OS/traffic acceptance. The later UI-owned loopback wire-server addition is NOT covered by this run"
     },
     {
       "platforms": ["ios"],
       "workflow": ".github/workflows/mobile-contract.yml",
       "status": "passed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34745141999",
-      "scope": "iOS job 103691570867 at c1899a3f5925806b699e52b835f44e8c59f72723 passed 87 simulator tests, including shared connection identity context, resource-opening rejection after Network change, peer bounds/times and Network-change cleanup, and command-announcement live-region flag/label/observer cleanup. Not actual speech, the whole mobile run, desktop plugins, native VPN bridge, producer-process interoperability or real traffic acceptance"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34776165077",
+      "scope": "iOS job 103774647470 at a218fde9ccf0252970cca85a8f65a012ea7009e5 passed 166 simulator tests. Logs explicitly confirm RU/EN operation details and stream projection, stale acknowledgement rejection and readiness rebootstrap. Not whole mobile run, native bridge/VPN/OS speech or real traffic acceptance. The later loopback wire-server addition is NOT covered by this run"
     },
     {
       "platforms": [
@@ -35,8 +35,8 @@
       ],
       "workflow": ".github/workflows/mobile-contract.yml",
       "status": "failed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34745141999",
-      "scope": "Android job 103691570759 at c1899a3f5925806b699e52b835f44e8c59f72723 failed KVM read/write preflight before tests on GitHub-hosted ubuntu-latest. Runner permission changes remain unapproved; native execution and VPN/real traffic acceptance remain unproven"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34776165077",
+      "scope": "Android job 103774647519 at a218fde9ccf0252970cca85a8f65a012ea7009e5 failed KVM access preflight before tests. No Android scenario pass is claimed; runner access remains an external blocker, and no host permissions were changed"
     }
   ],
   "sharedEnvelopeTests": [
@@ -141,6 +141,10 @@
       ],
       "implementation": "partial",
       "testEvidence": [
+        {
+          "path": "app/test/client_loopback_contract_test.dart",
+          "scope": "UI-owned generated gRPC loopback server: exact pairing metadata/context, durable UUID before Connect, separate GetOperation and authoritative StatusChanged, explicit acknowledgement and no extra RPC. Registered in all desktop/mobile harnesses, local pass only pending runners. Synthetic protobuf wire evidence, NOT OS-authenticated IPC/mobile bridge, policy, VPN or real runtime acceptance"
+        },
         {
           "path": "app/test/client_rebootstrap_test.dart",
           "scope": "Typed STALE_STATE readiness failure clears snapshot, requires explicit fresh connection/opening snapshot, revokes an old identity capability and preserves original journal UUID without replay. Shared desktop/mobile session fixture, locally passed; runner execution pending, not native producer readiness acceptance"
