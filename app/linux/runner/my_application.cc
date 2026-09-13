@@ -76,7 +76,7 @@ static void my_application_activate(GApplication* application) {
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
   register_notifications(fl_engine_get_binary_messenger(fl_view_get_engine(view)),
-                         g_application_get_dbus_connection(application));
+                         g_application_get_dbus_connection(application), window);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

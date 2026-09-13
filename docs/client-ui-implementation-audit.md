@@ -52,6 +52,12 @@ unit-проверки (без desktop bus). Dart channel проверен 11 sho
 и адаптеры Windows/macOS/Android/iOS не квалифицированы. См. актуальное
 дополнение в [SA](client-ui-system-analysis.md), не считать UF-15 закрытым.
 
+Linux click source дополнена: известный одноразовый notification ID/default
+показывает текущее окно, без runtime command/URL/profile restoration. Receipt
+set ограничен 64 ID, удаляется при close/service owner change; уничтоженный
+host не удерживается живым callback. Четыре GLib unit tests и C++ syntax check
+пройдены локально. Реальный ActionInvoked/Wayland focus остаётся acceptance gap.
+
 | UF | Наблюдаемая реализация | Что ещё нужно для исходного scope |
 | --- | --- | --- |
 | UF-01 | `main.dart`, Windows runner/package pipeline; Linux/macOS scaffold | Product hosts Android/iOS отсутствуют; дистрибуция и compatible pairing всех платформ не квалифицированы |

@@ -97,6 +97,22 @@ GTK 3.24.41/GIO 2.80.0 (`-std=c++14 -Wall -Werror -fsyntax-only`);
 desktop-entry packaging, Wayland focus, sandbox/portal, OS notification policy
 и остальные четыре платформенных адаптера остаются незавершёнными.
 
+Linux activation source дополнена: `Notify.actions` содержит только пару
+`default`/`EndlessNet`. [Receipt guard](../app/linux/runner/notification_activations.h)
+хранит не более 64 последних ID без private context. `ActionInvoked` принимается
+только от notification service для известного ID/default, однократно; он вызывает
+только `gtk_window_present` существующего окна через weak reference, не RPC,
+URL и не выбор профиля. `NotificationClosed` удаляет ID, смена владельца D-Bus
+service очищает receipts и инвалидирует старые in-flight registration results.
+Уничтожение channel отменяет signal subscriptions; pending callback удерживает
+только безопасный lifetime контекста и method call. Повтор/чужой ID/другое
+действие/закрытый/вытесненный receipt отклоняются четырьмя GLib unit tests
+(включая прежние protocol/errors); native syntax check повторён успешно.
+Это source/unit evidence: сервер может игнорировать actions согласно
+[спецификации](https://specifications.freedesktop.org/notification/latest/protocol.html),
+а реальный desktop/Wayland focus и restart не квалифицированы. Старые receipts
+за пределами последних 64 не активируют UI; app restart не восстанавливает их.
+
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin

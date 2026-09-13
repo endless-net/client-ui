@@ -17,6 +17,8 @@ inline const char* notification_error_result(const GError* error) {
 inline GVariant* notification_parameters(const char* body) {
   GVariantBuilder actions;
   g_variant_builder_init(&actions, G_VARIANT_TYPE("as"));
+  g_variant_builder_add(&actions, "s", "default");
+  g_variant_builder_add(&actions, "s", "EndlessNet");
   GVariantBuilder hints;
   g_variant_builder_init(&hints, G_VARIANT_TYPE("a{sv}"));
   g_variant_builder_add(&hints, "{sv}", "suppress-sound", g_variant_new_boolean(TRUE));

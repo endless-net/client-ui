@@ -646,7 +646,7 @@
         },
         {
           "path": "app/linux/runner/notification_protocol_test.cc",
-          "scope": "Two local Ubuntu GLib unit tests compiled with C++14/Wall/Werror: actual GVariant Notify signature, fixed app/title, no actions/private hints, escaped RU markup, server-selected expiry, sound suppression and typed DBus/GIO error mapping. No bus connection or desktop delivery; not native platform acceptance"
+          "scope": "Four local Ubuntu GLib unit tests compiled with C++14/Wall/Werror: actual GVariant Notify signature, fixed app/title and default/EndlessNet action, no private hints, escaped RU markup, server-selected expiry, sound suppression and typed DBus/GIO error mapping. Receipt guard rejects unknown/repeated/closed/cleared IDs and non-default actions, bounded to 64 newest IDs. No bus connection, real callback/window focus or desktop delivery; not native platform acceptance"
         },
         {
           "path": "app/test/client_notification_store_test.dart",

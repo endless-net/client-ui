@@ -3,8 +3,9 @@
 
 #include <flutter_linux/flutter_linux.h>
 #include <gio/gio.h>
+#include <gtk/gtk.h>
 
 void register_notifications(FlBinaryMessenger* messenger,
-                            GDBusConnection* session_bus);
+                            GDBusConnection* session_bus, GtkWindow* window);
 
 #endif
