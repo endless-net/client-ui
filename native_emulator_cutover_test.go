@@ -28,7 +28,7 @@ func TestNativeEmulatorCutover(t *testing.T) {
 		t.Fatal(err)
 	}
 	workflow := string(data)
-	for _, required := range []string{"ENDLESSNET_TESTSERVER:", "./cmd/client-testserver", "ac30bfe0e959f3c93ef1059495f2356fa5476b06"} {
+	for _, required := range []string{"ENDLESSNET_TESTSERVER:", "./cmd/client-testserver", "c7a92e61558531147b9e12f18ad2cbe3549a5f3b"} {
 		if !strings.Contains(workflow, required) {
 			t.Errorf("CI missing native host wiring: %s", required)
 		}

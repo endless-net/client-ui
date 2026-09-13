@@ -60,7 +60,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: endless-net/client
-          ref: ac30bfe0e959f3c93ef1059495f2356fa5476b06
+          ref: c7a92e61558531147b9e12f18ad2cbe3549a5f3b
           path: client-source
           persist-credentials: false
 

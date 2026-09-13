@@ -9,7 +9,14 @@ The sole UI process fixture is producer-owned
 [`clientipc/testserver` on client main](https://github.com/endless-net/client/tree/main/clientipc/testserver).
 CI builds `clientipc/cmd/client-testserver` from the same immutable source pin
 already used by `contract-consumer.yml`:
-`ac30bfe0e959f3c93ef1059495f2356fa5476b06`. No contract or dependency version changes.
+`c7a92e61558531147b9e12f18ad2cbe3549a5f3b`. No contract or dependency version changes.
+
+This pin waits for producer handler completion (at most five seconds) after the
+parent closes its channels and explicitly requests verification. Parent channel
+termination can precede server-side stream cancellation; the previous host could
+fail with `script has in-flight calls` during this interval. Strict verification
+still rejects leaked calls, unexpected requests and unconsumed expectations.
+No scenario is retried and no runtime or runner permission is changed.
 The host implements generated v0 RPCs, strict per-method expected requests,
 ordered event streams and typed failures. It rejects undeclared commands rather
 than inventing successful outcomes. It is not the actual runtime or a durable

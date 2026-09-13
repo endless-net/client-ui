@@ -18,6 +18,17 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+At `0fec352f2fb6e9391b1ae0fcb956548349f9a782`, inspected
+[macOS](https://github.com/endless-net/client-ui/actions/runs/34739507905/job/103676688251)
+passed 248 tests including the peer panel and full outbox boundary.
+[Linux](https://github.com/endless-net/client-ui/actions/runs/34739507905/job/103676688110)
+passed 246 and failed two process scenarios (failed-exit and update
+VERIFICATION_FAILED) during host teardown with `script has in-flight calls`.
+The corrected producer host pin synchronizes completion before strict Verify;
+its inclusion is not a successful CI rerun. Android
+[preflight](https://github.com/endless-net/client-ui/actions/runs/34739507716/job/103676687658)
+failed KVM access before tests; no host permission changes were made.
+
 ### Peer reader foundation
 
 `client_peers.dart` and its shared tests collect one producer-filtered catalog
