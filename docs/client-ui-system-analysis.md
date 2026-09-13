@@ -139,6 +139,10 @@ Producer process suite содержит bundle fixture: journaled create, termin
 SHA-256 и сохранение intention до явного acknowledgement. Test envelope проверен
 локально; execution этого нового process scenario ожидает desktop GitHub runners.
 Synthetic bytes [1,2,3] проверяют transport/checksum, не формат/redaction архива.
+Дополнительные shared bundle vectors проверяют отказ до RPC при empty handle,
+размере >5 MiB, отсутствующем expiry, некорректных nanos/checksum; oversized chunk
+отклоняется, RPC error передаётся без повторного чтения. Это unit-level evidence;
+оно не подменяет process execution, redaction или native export acceptance.
 Helper не пишет файлы, clipboard или сеть вне переданного RPC callback.
 
 Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:

@@ -18,6 +18,74 @@ import 'support/contract_test_scaffold.dart';
 /// Reused by the native integration-test host; no desktop channel is imported.
 void main() {
   test(
+    'US-07: invalid bundle handles never read and chunk errors never retry',
+    () async {
+      api.BundleResult handle() => api.BundleResult()
+        ..mergeFromProto3Json({
+          'bundleId': 'opaque',
+          'sizeBytes': '1',
+          'expiresAt': '2030-01-01T00:00:00Z',
+          'sha256': 'a' * 64,
+        });
+      DateTime now() => DateTime.utc(2029);
+      for (final change in <void Function(api.BundleResult)>[
+        (h) => h.bundleId = '',
+        (h) => h.sizeBytes = h.sizeBytes * (5 * 1024 * 1024 + 1),
+        (h) => h.clearExpiresAt(),
+        (h) => h.expiresAt.nanos = -1,
+        (h) => h.expiresAt.nanos = 1000000000,
+        (h) => h.sha256 = 'not-a-checksum',
+      ]) {
+        final invalid = handle();
+        change(invalid);
+        await expectLater(
+          readClientBundleChunks(
+            invalid,
+            (_) => throw TestFailure('Invalid handle called RPC'),
+            checkContext: () {},
+            now: now,
+          ),
+          throwsFormatException,
+        );
+      }
+      var calls = 0;
+      final failure = StateError('synthetic RPC denial');
+      await expectLater(
+        readClientBundleChunks(
+          handle(),
+          (_) async {
+            calls++;
+            throw failure;
+          },
+          checkContext: () {},
+          now: now,
+        ),
+        throwsA(same(failure)),
+      );
+      expect(calls, 1);
+      final large = handle()..sizeBytes *= 65537;
+      calls = 0;
+      await expectLater(
+        readClientBundleChunks(
+          large,
+          (request) async {
+            calls++;
+            return api.ReadDiagnosticsBundleResponse(
+              data: List.filled(65537, 0),
+              nextOffset: large.sizeBytes,
+              eof: true,
+            );
+          },
+          checkContext: () {},
+          now: now,
+        ),
+        throwsFormatException,
+      );
+      expect(calls, 1);
+    },
+  );
+
+  test(
     'US-07: bundle chunks enforce bounds, offset, EOF, expiry and caller context',
     () async {
       api.BundleResult bundle() => api.BundleResult()
