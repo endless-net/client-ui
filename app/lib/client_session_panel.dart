@@ -18,6 +18,7 @@ import 'client_privileged_recovery.dart';
 import 'client_privileged_session.dart';
 import 'client_windows_recovery.dart';
 import 'client_resources_panel.dart';
+import 'client_exit_panel.dart';
 
 /// Desktop application binding. A mobile runtime adapter can supply the same
 /// shared connection panel without using a desktop local channel.
@@ -43,6 +44,37 @@ class ClientSessionPanel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          ClientExitPanel(
+            state: session.state,
+            load: session.getExitNodes,
+            select: (profile, node, mode, lan, check) => session.submit(
+              api.OperationKind.OPERATION_KIND_SELECT_EXIT_NODE,
+              (commands, mutation) {
+                check();
+                return commands.selectExitNode(
+                  api.SelectExitNodeRequest(
+                    mutation: mutation,
+                    profile: api.ProfileRef(profileId: profile),
+                    exitNodeId: node,
+                    familyMode: mode,
+                    lanAccess: lan,
+                  ),
+                );
+              },
+            ),
+            clear: (profile, check) => session.submit(
+              api.OperationKind.OPERATION_KIND_CLEAR_EXIT_NODE,
+              (commands, mutation) {
+                check();
+                return commands.clearExitNode(
+                  api.ClearExitNodeRequest(
+                    mutation: mutation,
+                    profile: api.ProfileRef(profileId: profile),
+                  ),
+                );
+              },
+            ),
+          ),
           ClientResourcesPanel(
             state: session.state,
             openBrowser: (uri, check) {

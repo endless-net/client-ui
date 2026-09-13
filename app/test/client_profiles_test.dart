@@ -3,6 +3,7 @@ import 'package:endlessnet/client_networks.dart';
 import 'package:endlessnet/client_resources.dart';
 import 'package:endlessnet/client_resources_panel.dart';
 import 'package:endlessnet/client_exit_nodes.dart';
+import 'package:endlessnet/client_exit_panel.dart';
 import 'package:endlessnet/client_networks_panel.dart';
 import 'package:endlessnet/client_create_profile_panel.dart';
 import 'dart:async';
@@ -113,6 +114,211 @@ api.GetExitNodeResponse _exitStatus() =>
     });
 
 void main() {
+  for (final scenario in ['select', 'clear', 'invalidated', 'locked']) {
+    testWidgets('US-05: explicit exit UI $scenario', (tester) async {
+      final state = ClientStateController();
+      final events = StreamController<api.WatchEventsResponse>();
+      await state.attach(events.stream);
+      addTearDown(() async {
+        await state.detach();
+        await events.close();
+        state.dispose();
+      });
+      var selections = 0;
+      var clears = 0;
+      ClientOperation pending(api.OperationKind kind) =>
+          ClientOperation.fromProto(
+            api.Operation(
+              id: 'operation-a',
+              kind: kind,
+              state: api.OperationState.OPERATION_STATE_PENDING,
+            ),
+          );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ContractTestScaffold(
+            body: SingleChildScrollView(
+              child: ClientExitPanel(
+                state: state,
+                load: () async {
+                  final page = _exitPage();
+                  page.exitNodes.single.ensureSelection().availability =
+                      api.Availability.AVAILABILITY_AVAILABLE;
+                  final status = _exitStatus();
+                  status.status.ensureControl().locked = scenario == 'locked';
+                  status.status.control.ensureMutation().availability =
+                      api.Availability.AVAILABILITY_AVAILABLE;
+                  return readClientExitNodes(
+                    instanceId: 'runtime-a',
+                    profileId: 'profile-a',
+                    list: (_) async => page,
+                    get: (_) async => status,
+                    checkContext: () {},
+                  );
+                },
+                select: (profile, node, mode, lan, check) async {
+                  check();
+                  selections++;
+                  expect(profile, 'profile-a');
+                  expect(node, 'candidate-a');
+                  expect(mode, api.ExitFamilyMode.EXIT_FAMILY_MODE_IPV4_ONLY);
+                  expect(lan, api.LanAccess.LAN_ACCESS_BLOCK);
+                  return pending(
+                    api.OperationKind.OPERATION_KIND_SELECT_EXIT_NODE,
+                  );
+                },
+                clear: (profile, check) async {
+                  check();
+                  clears++;
+                  expect(profile, 'profile-a');
+                  return pending(
+                    api.OperationKind.OPERATION_KIND_CLEAR_EXIT_NODE,
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      events.add(
+        api.WatchEventsResponse()..mergeFromProto3Json({
+          'sequence': '1',
+          'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'runtime-a',
+              'callerAccess': 'ACCESS_OWNER',
+              'capabilities': [
+                {
+                  'capability': 'CAPABILITY_EXIT_NODE',
+                  'restriction': {'availability': 'AVAILABILITY_AVAILABLE'},
+                },
+              ],
+            },
+            'status': {
+              'activeProfileId': 'profile-a',
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            },
+          },
+        }),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('client-load-exits')));
+      await tester.pump();
+      expect(
+        find.text('IPv4: requested old-selection; effective old-selection'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('IPv6: requested old-selection; effective No exit'),
+        findsOneWidget,
+      );
+      final selectFinder = find.byKey(const Key('client-select-exit'));
+      expect(tester.widget<FilledButton>(selectFinder).onPressed, isNull);
+      final node = tester.widget<DropdownButton<String>>(
+        find.byKey(const Key('client-exit-node')),
+      );
+      if (scenario == 'locked') {
+        expect(node.onChanged, isNull);
+        expect(
+          tester
+              .widget<OutlinedButton>(
+                find.byKey(const Key('client-clear-exit')),
+              )
+              .onPressed,
+          isNull,
+        );
+      } else if (scenario == 'clear') {
+        final clear = find.byKey(const Key('client-clear-exit'));
+        await tester.ensureVisible(clear);
+        await tester.tap(clear);
+        await tester.pump();
+        expect(clears, 0);
+        final cancel = find.byKey(const Key('client-cancel-clear-exit'));
+        await tester.ensureVisible(cancel);
+        await tester.tap(cancel);
+        await tester.pump();
+        expect(clears, 0);
+        expect(
+          find.byKey(const Key('client-confirm-clear-exit')),
+          findsNothing,
+        );
+        await tester.ensureVisible(clear);
+        await tester.tap(clear);
+        await tester.pump();
+        final confirm = find.byKey(const Key('client-confirm-clear-exit'));
+        await tester.ensureVisible(confirm);
+        await tester.tap(confirm);
+        await tester.pump();
+        expect(clears, 1);
+      } else {
+        node.onChanged!('candidate-a');
+        await tester.pump();
+        final mode = tester.widget<DropdownButton<api.ExitFamilyMode>>(
+          find.byKey(const Key('client-exit-mode')),
+        );
+        expect(mode.value, isNull);
+        expect(mode.items!.map((item) => item.value), [
+          api.ExitFamilyMode.EXIT_FAMILY_MODE_IPV4_ONLY,
+        ]);
+        mode.onChanged!(api.ExitFamilyMode.EXIT_FAMILY_MODE_DUAL_STACK);
+        await tester.pump();
+        expect(tester.widget<FilledButton>(selectFinder).onPressed, isNull);
+        mode.onChanged!(api.ExitFamilyMode.EXIT_FAMILY_MODE_IPV4_ONLY);
+        await tester.pump();
+        expect(tester.widget<FilledButton>(selectFinder).onPressed, isNull);
+        final lan = tester.widget<DropdownButton<api.LanAccess>>(
+          find.byKey(const Key('client-exit-lan')),
+        );
+        expect(lan.value, isNull);
+        lan.onChanged!(api.LanAccess.LAN_ACCESS_BLOCK);
+        await tester.pump();
+        expect(
+          find.text('IPv6 will not be protected by this exit selection.'),
+          findsOneWidget,
+        );
+        final submit = tester.widget<FilledButton>(selectFinder).onPressed!;
+        if (scenario == 'invalidated') {
+          events.add(
+            api.WatchEventsResponse()..mergeFromProto3Json({
+              'sequence': '2',
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+              'invalidated': {
+                'domain': 'DOMAIN_EXIT_NODE',
+                'profileId': 'profile-a',
+              },
+            }),
+          );
+          await tester.idle();
+          // Invoke the callback retained from the old frame before repaint.
+          submit();
+          node.onChanged!('candidate-a');
+          await tester.pump();
+          expect(selectFinder, findsNothing);
+          expect(selections, 0);
+        } else {
+          await tester.ensureVisible(selectFinder);
+          await tester.tap(selectFinder);
+          await tester.pump();
+          expect(selections, 1);
+        }
+      }
+      if (scenario == 'select' || scenario == 'clear') {
+        expect(
+          find.text(
+            'Exit operation received. Recover its result and refresh both address families.',
+          ),
+          findsOneWidget,
+        );
+        expect(selectFinder, findsNothing);
+      }
+      expect(selections, scenario == 'select' ? 1 : 0);
+      expect(clears, scenario == 'clear' ? 1 : 0);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
   test(
     'US-05: exit aggregate cannot claim partial apply or missing protection',
     () async {

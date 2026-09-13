@@ -189,7 +189,7 @@
       "testEvidence": [
         {
           "path": "app/test/client_profiles_test.dart",
-          "scope": "Shared exit-node reader: one revision, required IPv4/IPv6 and typed modes; reject inconsistent intent/effective IDs, aggregate APPLIED before family/LAN convergence and false fail-closed claims; preserve partial apply/clear and single-family status. No selection UI or traffic enforcement proof"
+          "scope": "Shared exit-node reader: one revision, required IPv4/IPv6 and typed modes; reject inconsistent intent/effective IDs, aggregate APPLIED before family/LAN convergence and false fail-closed claims; preserve partial apply/clear and single-family status. Widget tests: explicit node/family/LAN selection without downgrade, cancel/confirm Clear, lock and stale callback invalidation; pending is not applied. Dropdown callbacks are injected. No actual traffic enforcement proof"
         },
         {
           "path": "app/test/client_session_test.dart",

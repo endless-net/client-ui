@@ -353,7 +353,15 @@ FAILED, family/LAN convergence для APPLIED и заявлением aggregate 
 Противоречивый status отвергается без исправления или догадок. Это не доказывает
 реальную блокировку обходного трафика. Shared tests проверяют partial apply,
 missing families и пагинацию; session tests — owner/context invalidation.
-Exit-node UI, Select/Clear process scenarios и actual traffic acceptance ещё нужны.
+`ClientExitPanel` показывает requested/effective и apply/failure/fail-closed
+раздельно для IPv4/IPv6. Выбор требует явных node, разрешённого family mode и
+LAN policy; недоступный режим не подменяется. Clear подтверждается отдельно.
+Policy lock запрещает изменения, invalidation удаляет draft и блокирует callbacks
+старого кадра. Select/Clear связаны с session journal; acceptance операции не
+означает applied, результат восстанавливается отдельно. Четыре shared widget
+tests проверяют select, cancel/confirm clear, lock и invalidation; значения
+dropdown задаются через callbacks, не native gestures. Select/Clear producer
+process scenarios и actual traffic/platform acceptance ещё нужны.
 
 US-11 read foundation: `ClientSession.listResources` использует typed local RPC
 и immutable каталог. Search ограничен 256 UTF-8 bytes; фильтры фиксируются перед

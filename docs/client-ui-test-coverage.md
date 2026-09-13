@@ -136,8 +136,16 @@ The reader also rejects aggregate APPLIED/effective IDs before requested family
 and LAN convergence, hidden family failures, mismatched family intent and
 fail-closed claims without enforcement flags for each requested family. Valid
 dual-stack, v4-only, v6-only, LAN-pending and partial-clear states remain distinct.
-This validates producer claims for consistency; it is not selection/clear UI,
-producer-process evidence or actual routing/fail-closed proof.
+This validates producer claims for consistency, not actual routing enforcement.
+Four shared widget tests additionally cover explicit node/family/LAN selection,
+rejection of an unavailable dual-stack mode, cancel/confirm Clear, policy lock
+and invalidation including a callback retained before repaint. Dropdown values
+are supplied through callbacks, while action buttons are tapped. A pending
+operation never becomes an optimistic applied state. The production session
+panel binds Select/Clear to the existing operation journal. These shared tests
+are included by desktop and mobile host suites, but this change has only local
+widget execution evidence until its GitHub jobs finish. Select/Clear producer
+process scenarios and actual routing/fail-closed platform acceptance remain open.
 
 ### Resource reader foundation (2026-09-13)
 
