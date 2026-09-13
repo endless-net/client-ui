@@ -9,6 +9,7 @@ import 'package:endlessnet/client_cleanup_panel.dart';
 import 'package:endlessnet/client_recovery_panel.dart';
 import 'package:endlessnet/client_identity_panel.dart';
 import 'package:endlessnet/client_diagnostics_panel.dart';
+import 'package:endlessnet/client_bundle_chunks.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +17,84 @@ import 'support/contract_test_scaffold.dart';
 
 /// Reused by the native integration-test host; no desktop channel is imported.
 void main() {
+  test(
+    'US-07: bundle chunks enforce bounds, offset, EOF, expiry and caller context',
+    () async {
+      api.BundleResult bundle() => api.BundleResult()
+        ..mergeFromProto3Json({
+          'bundleId': 'opaque-handle',
+          'sizeBytes': '3',
+          'expiresAt': '2030-01-01T00:00:00Z',
+          'sha256': 'a' * 64,
+        });
+      DateTime now() => DateTime.utc(2029);
+      var calls = 0;
+      final bytes = await readClientBundleChunks(
+        bundle(),
+        (request) async {
+          expect(request.bundleId, 'opaque-handle');
+          expect(request.maxBytes, 65536);
+          expect(request.offset.toInt(), calls == 0 ? 0 : 2);
+          calls++;
+          return api.ReadDiagnosticsBundleResponse()..mergeFromProto3Json(
+            calls == 1
+                ? {'data': 'AQI=', 'nextOffset': '2'}
+                : {'data': 'Aw==', 'nextOffset': '3', 'eof': true},
+          );
+        },
+        checkContext: () {},
+        now: now,
+      );
+      expect(bytes, [1, 2, 3]);
+      for (final chunk in [
+        {'data': 'AQI=', 'nextOffset': '1'},
+        {'data': 'AQI=', 'nextOffset': '2', 'eof': true},
+        {'nextOffset': '0'},
+        {'data': 'AQIDBA==', 'nextOffset': '4', 'eof': true},
+        {'data': 'AQID', 'nextOffset': '3'},
+      ]) {
+        await expectLater(
+          readClientBundleChunks(
+            bundle(),
+            (_) async =>
+                api.ReadDiagnosticsBundleResponse()..mergeFromProto3Json(chunk),
+            checkContext: () {},
+            now: now,
+          ),
+          throwsFormatException,
+        );
+      }
+      await expectLater(
+        readClientBundleChunks(
+          bundle(),
+          (_) => throw TestFailure('Expired handle must not call RPC'),
+          checkContext: () {},
+          now: () => DateTime.utc(2030),
+        ),
+        throwsStateError,
+      );
+      var current = true;
+      await expectLater(
+        readClientBundleChunks(
+          bundle(),
+          (_) async {
+            current = false;
+            return api.ReadDiagnosticsBundleResponse()..mergeFromProto3Json({
+              'data': 'AQID',
+              'nextOffset': '3',
+              'eof': true,
+            });
+          },
+          checkContext: () {
+            if (!current) throw StateError('Caller changed');
+          },
+          now: now,
+        ),
+        throwsStateError,
+      );
+    },
+  );
+
   testWidgets(
     'US-07: diagnostics preview is explicit, scoped and cleared on invalidation',
     (tester) async {

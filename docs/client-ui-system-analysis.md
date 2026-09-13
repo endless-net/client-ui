@@ -108,6 +108,12 @@ invalidation скрывает прежний summary. Shared widget regression �
 авточтения, очистку и исключение browser URL из отображения. Полный payload
 не сериализуется в clipboard/logs; подробные данные и archive export ещё не
 реализованы. Native execution нового preview test ожидает CI.
+`readClientBundleChunks` — transport assembly foundation: frozen handle, 5 MiB
+bound, 64 KiB requests, exact offset/EOF, expiry и caller-context checks до/после
+RPC. Shared tests проверяют two-chunk read, malformed offsets/EOF, отсутствие
+progress, expiry и caller change. Bytes пока НЕ считаются проверенным архивом:
+SHA-256 content verification, session binding и explicit file export ещё нужны.
+Helper не пишет файлы, clipboard или сеть вне переданного RPC callback.
 
 Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:
 [desktop run](https://github.com/endless-net/client-ui/actions/runs/34730432514)
