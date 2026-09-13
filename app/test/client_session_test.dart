@@ -6,6 +6,8 @@ import 'package:endlessnet/client_bundle_export.dart';
 import 'package:endlessnet/client_intent_journal.dart';
 import 'package:endlessnet/client_mutations.dart';
 import 'package:endlessnet/client_operation.dart';
+import 'package:endlessnet/client_privileged_recovery.dart';
+import 'dart:convert';
 import 'package:endlessnet/client_profiles.dart';
 import 'package:endlessnet/client_networks.dart';
 import 'package:endlessnet/client_preferences.dart';
@@ -181,6 +183,62 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'privileged recovery journals before launch and retains ambiguous outcomes',
+    () async {
+      connection.events.add(
+        snapshot()..snapshot.status.activeProfileId = 'profile-a',
+      );
+      await pumpEventQueue();
+      const kind = api.OperationKind.OPERATION_KIND_TRUST_SERVER_IDENTITY;
+      var calls = 0;
+      Future<ClientOperation> send() => session.submitPrivileged(
+        kind,
+        (mutation) => ClientPrivilegedRecovery.trust(
+          api.TrustServerIdentityRequest(
+            mutation: mutation,
+            profile: api.ProfileRef(profileId: 'profile-a'),
+            confirmedControlOrigin: 'https://control.test',
+            confirmedKeyId: 'key',
+            confirmedAnnouncementId: 'a' * 64,
+          ),
+        ),
+        (request) async {
+          calls++;
+          expect(
+            (await session.journal.pending()).single.requestId,
+            request.mutation.requestId,
+          );
+          expect(
+            request.arguments,
+            containsAll([
+              '--confirmed-announcement-id',
+              'a' * 64,
+              '--expected-revision',
+              '7',
+            ]),
+          );
+          return (
+            0,
+            jsonEncode({
+              'id': 'operation',
+              'requestId': request.mutation.requestId,
+              'profileId': 'profile-a',
+              'kind': kind.name,
+              'state': 'OPERATION_STATE_PENDING',
+              'metadata': {'instanceId': 'runtime-a', 'revision': '8'},
+            }),
+          );
+        },
+      );
+      final accepted = await send();
+      expect(accepted.terminal, false);
+      await expectLater(send(), throwsStateError);
+      expect(calls, 1);
+      expect(await session.journal.pending(), hasLength(1));
+    },
+  );
 
   test(
     'US-10: preferences reject observer, stale and invalidated reads',

@@ -202,3 +202,24 @@ Keep test references and limitations current as production flows are migrated.
 Record platform-specific restrictions explicitly, but do not remove a platform
 or requirement to make the gate pass. No deployment, signing or production
 approval is implied by this ledger.
+
+### Native privileged recovery consumer foundation — 2026-09-13
+
+`ClientSession.submitPrivileged` uses the durable intent journal before invoking
+a platform launcher. `ClientPrivilegedRecovery` builds only the two fixed helper
+operations, binds profile/request/CAS and the full trust announcement, and checks
+native Operation/Failure output. Mismatched request, kind, profile, instance or
+revision, malformed output and untyped diagnostics are rejected. Acceptance is
+not treated as completed recovery and does not remove the pending intention.
+
+Evidence: `app/test/client_privileged_recovery_test.dart` and the privileged
+recovery case in `app/test/client_session_test.dart`. Local validation: Go tests,
+Flutter analysis and 182 Flutter tests passed, 13 skipped. The installed SDK is
+Flutter 3.47.0/Dart 3.13.0, whereas CI pins Flutter 3.38.1. Analysis/tests used
+`--no-pub` after restoring unintended automatic lockfile updates; this is not
+verification of the pinned CI dependency resolution. No versions were committed.
+
+This is native-session integration, not a completed application cutover: the
+old `main.dart` launcher still needs replacement, actual elevation must supply
+validated output or authorized operation lookup, and cross-platform caller
+identity/correlation remains to be verified. No release acceptance is claimed.

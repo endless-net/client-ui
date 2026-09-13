@@ -7,6 +7,7 @@ import 'client_bundle_chunks.dart';
 import 'client_intent_journal.dart';
 import 'client_mutations.dart';
 import 'client_operation.dart';
+import 'client_privileged_recovery.dart';
 import 'client_profiles.dart';
 import 'client_networks.dart';
 import 'client_preferences.dart';
@@ -180,6 +181,28 @@ final class ClientSession {
       _submitting.remove(kind);
     }
   }
+
+  /// The platform launcher must use a fixed installed executable and argument
+  /// vector, never a shell. This uses the same durable outbox as direct RPC.
+  Future<ClientOperation> submitPrivileged(
+    api.OperationKind kind,
+    ClientPrivilegedRecovery Function(api.MutationContext) prepare,
+    Future<(int, String)> Function(ClientPrivilegedRecovery) launch,
+  ) => submit(kind, (_, mutation) async {
+    if (state.snapshot!.runtime.callerAccess == api.Access.ACCESS_OBSERVER) {
+      throw StateError('Privileged recovery requires the local owner context');
+    }
+    final request = prepare(mutation);
+    if (request.kind != kind ||
+        request.mutation != mutation ||
+        request.profileId != state.snapshot!.status.activeProfileId) {
+      throw StateError(
+        'Privileged request does not match the retained context',
+      );
+    }
+    final (exitCode, output) = await launch(request);
+    return request.decodeResult(exitCode, output);
+  });
 
   Future<ClientPreferences> getPreferences() async {
     final connection = _connection;
