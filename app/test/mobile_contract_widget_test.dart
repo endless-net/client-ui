@@ -22,6 +22,7 @@ void main() {
       final events = StreamController<api.WatchEventsResponse>();
       await state.attach(events.stream);
       var announcement = 'announcement-a';
+      Completer<api.GetServerIdentityResponse>? pendingRead;
       final sent = <api.ServerIdentity>[];
       api.GetServerIdentityResponse response() =>
           api.GetServerIdentityResponse()..mergeFromProto3Json({
@@ -40,7 +41,8 @@ void main() {
           home: ContractTestScaffold(
             body: ClientIdentityPanel(
               state: state,
-              load: () async => response(),
+              load: () async =>
+                  pendingRead == null ? response() : await pendingRead.future,
               trust: (identity) async {
                 sent.add(identity);
                 return ClientOperation.fromProto(
@@ -135,6 +137,51 @@ void main() {
       expect(confirm, findsNothing);
       expect(find.text('Announced key: new-key'), findsNothing);
       expect(sent.length, 1);
+      for (final domain in ['DOMAIN_SERVER_IDENTITY', 'DOMAIN_PROFILES']) {
+        await tester.tap(load);
+        await tester.pump();
+        await tester.tap(confirm);
+        await tester.pump();
+        final pending = Completer<api.GetServerIdentityResponse>();
+        pendingRead = pending;
+        await tester.tap(trust);
+        // Deliver invalidation and then the read response without a frame:
+        // the old form is still mounted but must not submit its confirmation.
+        events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '${++sequence}',
+            'metadata': {'instanceId': 'identity-test', 'revision': '1'},
+            'invalidated': {'domain': domain, 'profileId': 'profile-a'},
+          }),
+        );
+        await tester.idle();
+        pending.complete(response());
+        await tester.idle();
+        expect(sent.length, 1);
+        pendingRead = null;
+        await tester.pump();
+        expect(confirm, findsNothing);
+      }
+      await tester.tap(load);
+      await tester.pump();
+      await tester.tap(confirm);
+      await tester.pump();
+      final stalePress = tester.widget<TextButton>(trust).onPressed!;
+      events.add(
+        api.WatchEventsResponse()..mergeFromProto3Json({
+          'sequence': '${++sequence}',
+          'metadata': {'instanceId': 'identity-test', 'revision': '1'},
+          'invalidated': {
+            'domain': 'DOMAIN_SERVER_IDENTITY',
+            'profileId': 'profile-a',
+          },
+        }),
+      );
+      await tester.idle();
+      stalePress();
+      await tester.idle();
+      expect(sent.length, 1);
+      await tester.pump();
       snapshot('ACCESS_OBSERVER');
       await tester.pump();
       expect(tester.widget<OutlinedButton>(load).onPressed, isNull);

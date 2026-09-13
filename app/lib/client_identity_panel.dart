@@ -42,12 +42,21 @@ class _IdentityFormState extends State<_IdentityForm> {
   bool _confirmed = false;
   String? _notice;
   ClientStateController get state => widget.panel.state;
+  late final (int, int, int) _boundContext;
+
+  @override
+  void initState() {
+    super.initState();
+    _boundContext = _context;
+  }
+
   (int, int, int) get _context => (
     state.cacheEpoch,
     state.domainEpoch(api.Domain.DOMAIN_SERVER_IDENTITY),
     state.domainEpoch(api.Domain.DOMAIN_PROFILES),
   );
   bool get _readAllowed =>
+      _boundContext == _context &&
       state.link == ClientLinkState.ready &&
       state.snapshot != null &&
       state.snapshot!.runtime.callerAccess != api.Access.ACCESS_OBSERVER &&

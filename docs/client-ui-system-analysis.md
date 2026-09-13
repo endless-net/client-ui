@@ -105,6 +105,11 @@ key и announcement. Explicit checkbox и отдельный confirm требу�
 Cache/domain changes очищают UI; invalidation во время записи intention также
 проверяется перед RPC. Shared mobile widget test проверяет owner denial, смену
 announcement, точные подтверждённые поля и сброс invalidated data без автодоверия.
+Форма дополнительно привязана к context tuple при создании: callback старого
+виджета отвергается даже после invalidation до следующего frame. Regression
+доставляет late read и вызывает captured callback без перерисовки; без этой
+проверки тест падает, с ней проходит. Это локальная consumer race verification,
+не native/runtime acceptance.
 Privileged helper, production shell cutover и actual runtime acceptance ещё
 требуются; этот partial consumer flow не закрывает US-06.
 
