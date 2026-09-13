@@ -18,6 +18,13 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+The shared application-resource widget test now switches Network from a to b
+while the browser action's fresh-catalog validation is pending. It requires the
+old action to disappear and the late old-network response to open no browser and
+submit no mutation. This locally passed UI-AC-14 regression is included in the
+existing desktop/mobile shared suite; runner execution is pending and no real
+external application, native browser integration or traffic was exercised.
+
 The peer process suite also bypasses ClientSession's local observer guard and
 calls ListPeers through LocalClientEvents directly. It expects a typed
 OWNER_REQUIRED from the producer guard, with no ListPeers expectation in the

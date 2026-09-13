@@ -1007,6 +1007,7 @@ void main() {
     'changed',
     'denied',
     'invalidated',
+    'network-changed',
     'http',
     'credentials',
   ]) {
@@ -1038,7 +1039,9 @@ void main() {
                 },
                 load: (search, kinds) async {
                   reads++;
-                  if (scenario == 'invalidated' && reads == 2) {
+                  if ((scenario == 'invalidated' ||
+                          scenario == 'network-changed') &&
+                      reads == 2) {
                     await pending.future;
                   }
                   final response = _resourcePage('a');
@@ -1097,6 +1100,7 @@ void main() {
             },
             'status': {
               'activeProfileId': 'profile-a',
+              'network': {'id': 'network-a'},
               'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
             },
           },
@@ -1117,7 +1121,23 @@ void main() {
         await tester.ensureVisible(button);
         await tester.tap(button);
         await tester.pump();
-        if (scenario == 'invalidated') {
+        if (scenario == 'network-changed') {
+          final status =
+              api.Status.fromBuffer(state.snapshot!.status.writeToBuffer())
+                ..network = api.Network(id: 'network-b')
+                ..metadata.revision += 1;
+          events.add(
+            api.WatchEventsResponse()
+              ..mergeFromProto3Json({'sequence': '2'})
+              ..metadata = status.metadata
+              ..statusChanged = status,
+          );
+          await tester.pump();
+          expect(state.snapshot!.status.network.id, 'network-b');
+          expect(button, findsNothing);
+          pending.complete();
+          await tester.pump();
+        } else if (scenario == 'invalidated') {
           events.add(
             api.WatchEventsResponse()..mergeFromProto3Json({
               'sequence': '2',
