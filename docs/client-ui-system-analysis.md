@@ -352,9 +352,22 @@ invalidation preferences/managed settings/profiles отменяют незаве
 lock не вычисляются UI. Некорректные и повторяющиеся managed keys/value kinds
 отвергаются. Read не пишет intention journal и не повторяется автоматически.
 Shared tests входят в desktop и mobile harness, session checks — в desktop suite;
-runner execution этого изменения ещё не подтверждено. Preferences editor,
-Set/Reset UX, atomic producer validation/apply и platform lifecycle acceptance
-остаются незавершёнными; production shell ещё использует старый consumer.
+runner execution этого изменения ещё не подтверждено.
+
+`ClientPreferencesPanel` реализует editor foundation для трёх boolean и пяти
+lifecycle полей. Поля входят в один явный Set patch только после выбора;
+explicit false не теряет presence. Reset override — отдельная команда с key,
+а не запись default/false. При наличии черновика Reset недоступен до Apply/Discard.
+Источник, lock, availability, reason и action owner выводятся из producer control;
+любой запрещающий control блокирует редактирование, lifecycle menu ограничено
+allowed values. Invalidation удаляет projection и draft, включая устаревшие
+callbacks до следующего frame. Session panel отправляет Set/Reset через intention
+journal с повторной context check перед RPC. Acceptance не подменяет effective
+projection: после команды нужен recovery и refresh. Shared widget tests проверяют
+patch всех восьми полей, отдельный reset, policy denial и stale draft callbacks.
+Локализация, producer-process Set/Reset evidence, atomic producer validation/apply
+и platform lifecycle acceptance остаются незавершёнными; production shell ещё
+использует старый consumer.
 
 Session.expires_at и credential.expires_at являются разными фактами. Для каждого
 UI показывает отдельно expiry, warning и доступный следующий шаг; отсутствие

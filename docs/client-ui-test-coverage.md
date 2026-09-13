@@ -128,6 +128,14 @@ this is test inclusion, not verified runner execution. Local validation passed
 have producer-process evidence, a preference editor or actual apply acceptance.
 The full migration gate remains 0/14, not completed.
 
+The next editor increment adds shared widget vectors for one explicit eight-field
+Set patch, a separate Reset key, policy lock enforcement, allowed lifecycle values
+and invalidated draft/callback rejection. Session panel binds these actions to
+the existing journaled mutations. Tests exercise typed inputs and explicit Apply/
+Reset buttons; lifecycle value selections are injected through widget callbacks,
+not full native dropdown gestures. Producer-process mutation/apply evidence,
+localized presentation and production shell integration are still missing.
+
 ### Operation envelope checks (2026-09-13)
 
 The mutation boundary rejects nil/malformed request UUIDs before submission or

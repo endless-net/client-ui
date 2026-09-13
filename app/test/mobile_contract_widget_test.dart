@@ -11,13 +11,283 @@ import 'package:endlessnet/client_identity_panel.dart';
 import 'package:endlessnet/client_diagnostics_panel.dart';
 import 'package:endlessnet/client_bundle_chunks.dart';
 import 'package:endlessnet/client_preferences.dart';
+import 'package:endlessnet/client_preferences_panel.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/contract_test_scaffold.dart';
 
 /// Reused by the native integration-test host; no desktop channel is imported.
+Future<ClientPreferences> _preferenceEditorProjection({required bool locked}) =>
+    readClientPreferences(
+      instanceId: 'preferences-test',
+      profileId: 'profile-a',
+      checkContext: () {},
+      get: (_) async => api.GetPreferencesResponse()
+        ..mergeFromProto3Json({
+          'preferences': {
+            'metadata': {'instanceId': 'preferences-test', 'revision': '7'},
+            'profileId': 'profile-a',
+            for (final key in ['allowInbound', 'acceptDns', 'acceptRoutes'])
+              key: {
+                'effective': true,
+                if (key != 'acceptRoutes') 'requested': key == 'acceptDns',
+                'control': {
+                  'source': 'SETTING_SOURCE_USER',
+                  'mutation': {'availability': 'AVAILABILITY_AVAILABLE'},
+                },
+              },
+            'lifecycle': {
+              for (final key in [
+                'runtimeStart',
+                'uiQuit',
+                'userLogoff',
+                'suspend',
+                'resume',
+              ])
+                key: {
+                  'effective': 'LIFECYCLE_BEHAVIOR_KEEP_INTENT',
+                  'allowedValues': ['LIFECYCLE_BEHAVIOR_DISCONNECT'],
+                  'control': {
+                    'source': 'SETTING_SOURCE_DEFAULT',
+                    'mutation': {'availability': 'AVAILABILITY_AVAILABLE'},
+                  },
+                },
+            },
+          },
+        }),
+      listManaged: (_) async =>
+          api.ListManagedSettingsResponse()..mergeFromProto3Json({
+            'metadata': {'instanceId': 'preferences-test', 'revision': '7'},
+            'settings': [
+              {
+                'key': 'PREFERENCE_KEY_ACCEPT_DNS',
+                'booleanValue': true,
+                'control': {
+                  'locked': locked,
+                  'source': 'SETTING_SOURCE_ACCOUNT_POLICY',
+                  'mutation': {'availability': 'AVAILABILITY_AVAILABLE'},
+                },
+              },
+            ],
+          }),
+    );
+
 void main() {
+  for (final locked in [false, true]) {
+    testWidgets(
+      'US-10: preference editor ${locked ? 'denies policy and clears invalidated drafts' : 'sends one explicit eight-field patch and a separate reset'}',
+      (tester) async {
+        final state = ClientStateController();
+        final events = StreamController<api.WatchEventsResponse>();
+        await state.attach(events.stream);
+        addTearDown(() async {
+          await state.detach();
+          await events.close();
+          state.dispose();
+        });
+        api.PreferencesPatch? sent;
+        List<api.PreferenceKey>? reset;
+        var reads = 0;
+        final projection = await _preferenceEditorProjection(locked: locked);
+        ClientOperation pending(api.OperationKind kind) =>
+            ClientOperation.fromProto(
+              api.Operation(
+                id: 'preference-op',
+                requestId: 'preference-request',
+                kind: kind,
+                state: api.OperationState.OPERATION_STATE_PENDING,
+              ),
+            );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ContractTestScaffold(
+              body: SingleChildScrollView(
+                child: ClientPreferencesPanel(
+                  state: state,
+                  load: () async {
+                    reads++;
+                    return projection;
+                  },
+                  apply: (profile, patch, check) async {
+                    check();
+                    expect(profile, 'profile-a');
+                    expect(patch.isFrozen, isTrue);
+                    sent = patch;
+                    return pending(
+                      api.OperationKind.OPERATION_KIND_SET_PREFERENCES,
+                    );
+                  },
+                  reset: (profile, keys, check) async {
+                    check();
+                    expect(profile, 'profile-a');
+                    reset = keys;
+                    return pending(
+                      api.OperationKind.OPERATION_KIND_RESET_PREFERENCES,
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+        events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '1',
+            'metadata': {'instanceId': 'preferences-test', 'revision': '7'},
+            'snapshot': {
+              'runtime': {
+                'protocol': api.ClientContract.protocol,
+                'contractSha256': api.ClientContract.sha256,
+                'instanceId': 'preferences-test',
+                'callerAccess': 'ACCESS_OWNER',
+                'capabilities': [
+                  for (final capability in [
+                    'CAPABILITY_PREFERENCES',
+                    'CAPABILITY_MANAGED_SETTINGS',
+                  ])
+                    {
+                      'capability': capability,
+                      'restriction': {'availability': 'AVAILABILITY_AVAILABLE'},
+                    },
+                ],
+              },
+              'status': {
+                'activeProfileId': 'profile-a',
+                'metadata': {'instanceId': 'preferences-test', 'revision': '7'},
+              },
+            },
+          }),
+        );
+        await tester.pump();
+        expect(reads, 0);
+        await tester.tap(find.byKey(const Key('client-load-preferences')));
+        await tester.pump();
+        expect(reads, 1);
+        expect(sent, isNull);
+        expect(reset, isNull);
+        expect(find.text('Effective: true; requested: false'), findsOneWidget);
+        final dns = tester.widget<DropdownButton<Object>>(
+          find.byKey(const Key('preference-2')),
+        );
+        if (locked) {
+          final staleEdit = tester
+              .widget<DropdownButton<Object>>(
+                find.byKey(const Key('preference-1')),
+              )
+              .onChanged!;
+          expect(dns.onChanged, isNull);
+          expect(
+            tester
+                .widget<TextButton>(find.byKey(const Key('reset-preference-2')))
+                .onPressed,
+            isNull,
+          );
+          tester
+              .widget<DropdownButton<Object>>(
+                find.byKey(const Key('preference-1')),
+              )
+              .onChanged!(false);
+          await tester.pump();
+          events.add(
+            api.WatchEventsResponse()..mergeFromProto3Json({
+              'sequence': '2',
+              'metadata': {'instanceId': 'preferences-test', 'revision': '7'},
+              'invalidated': {
+                'domain': 'DOMAIN_MANAGED_SETTINGS',
+                'profileId': 'profile-a',
+              },
+            }),
+          );
+          await tester.pump();
+          expect(
+            find.byKey(const Key('client-apply-preferences')),
+            findsNothing,
+          );
+          expect(sent, isNull);
+          await tester.ensureVisible(
+            find.byKey(const Key('client-load-preferences')),
+          );
+          await tester.tap(find.byKey(const Key('client-load-preferences')));
+          await tester.pump();
+          staleEdit(true);
+          await tester.pump();
+          expect(
+            tester
+                .widget<FilledButton>(
+                  find.byKey(const Key('client-apply-preferences')),
+                )
+                .onPressed,
+            isNull,
+          );
+        } else {
+          for (var key = 1; key <= 8; key++) {
+            final dropdown = tester.widget<DropdownButton<Object>>(
+              find.byKey(Key('preference-$key')),
+            );
+            if (key > 3) {
+              expect(dropdown.items!.map((item) => item.value), [
+                api.LifecycleBehavior.LIFECYCLE_BEHAVIOR_DISCONNECT,
+              ]);
+            }
+            dropdown.onChanged!(
+              key <= 3
+                  ? false
+                  : api.LifecycleBehavior.LIFECYCLE_BEHAVIOR_DISCONNECT,
+            );
+            await tester.pump();
+          }
+          expect(sent, isNull);
+          expect(
+            find.text('Effective: true; requested: false'),
+            findsOneWidget,
+          );
+          expect(
+            tester
+                .widget<TextButton>(find.byKey(const Key('reset-preference-1')))
+                .onPressed,
+            isNull,
+          );
+          await tester.ensureVisible(
+            find.byKey(const Key('client-apply-preferences')),
+          );
+          await tester.tap(find.byKey(const Key('client-apply-preferences')));
+          await tester.pump();
+          expect(sent!.toProto3Json(), {
+            'allowInbound': false,
+            'acceptDns': false,
+            'acceptRoutes': false,
+            'runtimeStart': 'LIFECYCLE_BEHAVIOR_DISCONNECT',
+            'uiQuit': 'LIFECYCLE_BEHAVIOR_DISCONNECT',
+            'userLogoff': 'LIFECYCLE_BEHAVIOR_DISCONNECT',
+            'suspend': 'LIFECYCLE_BEHAVIOR_DISCONNECT',
+            'resume': 'LIFECYCLE_BEHAVIOR_DISCONNECT',
+          });
+          expect(
+            find.text(
+              'Preference operation received. Recover its result and refresh effective values.',
+            ),
+            findsOneWidget,
+          );
+          expect(find.byKey(const Key('preference-1')), findsNothing);
+          expect(reset, isNull);
+          await tester.ensureVisible(
+            find.byKey(const Key('client-load-preferences')),
+          );
+          await tester.tap(find.byKey(const Key('client-load-preferences')));
+          await tester.pump();
+          await tester.ensureVisible(
+            find.byKey(const Key('reset-preference-1')),
+          );
+          await tester.tap(find.byKey(const Key('reset-preference-1')));
+          await tester.pump();
+          expect(reset, [api.PreferenceKey.PREFERENCE_KEY_ALLOW_INBOUND]);
+        }
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  }
+
   test(
     'US-10: preference projection preserves presence and policy without writes',
     () async {
