@@ -113,6 +113,9 @@ Future<void> main(List<String> args) async {
   runApp(
     ClientDesktopApp(
       initialLocale: locale,
+      openAutostartSettings: Platform.isMacOS
+          ? openNativeClientAutostartSettings
+          : null,
       openWindowsAutostartSettings: Platform.isWindows
           ? openWindowsClientAutostartSettings
           : null,

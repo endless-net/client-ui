@@ -21,10 +21,21 @@ class MainFlutterWindow: NSWindow {
     let autostart = FlutterMethodChannel(name: "endlessnet/ui-autostart",
       binaryMessenger: flutterViewController.engine.binaryMessenger)
     autostart.setMethodCallHandler { call, result in
-      guard call.method == "read" || call.method == "setEnabled" else {
+      guard call.method == "read" || call.method == "setEnabled" || call.method == "openSettings" else {
         result(FlutterMethodNotImplemented); return
       }
-      guard #available(macOS 13.0, *) else { result("unsupported"); return }
+      guard #available(macOS 13.0, *) else {
+        if call.method == "openSettings" { result(false) } else { result("unsupported") }
+        return
+      }
+      if call.method == "openSettings" {
+        guard call.arguments == nil else {
+          result(FlutterError(code: "invalid_arguments", message: "No arguments expected", details: nil)); return
+        }
+        SMAppService.openSystemSettingsLoginItems()
+        result(true) // Dispatched only; does not confirm user approval.
+        return
+      }
       let service = SMAppService.mainApp
       if call.method == "read" {
         guard call.arguments == nil else {

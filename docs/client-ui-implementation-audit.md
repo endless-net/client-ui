@@ -137,6 +137,12 @@ requiresApproval/unsupported; 9 channel/widget tests проверяют read/wri
 
 ## Последовательность оставшейся работы
 
+macOS autostart approval navigation: UI теперь по явной кнопке открывает
+Login Items системным SMAppService API; не изменяет approval/registration и
+оставляет requiresApproval до явного Refresh. Восемь channel/widget tests
+прошли локально. Native Swift compilation и OS interaction ещё не проверены;
+Windows notification AppUserModelID по-прежнему ожидает подтверждения пользователя.
+
 Windows UI-autostart дополнение: отдельная RU/EN панель открывает системную
 Startup apps страницу по явному нажатию (fixed URI, без runtime inputs).
 Восемь short unit/widget tests проверяют guards и безопасные outcomes;

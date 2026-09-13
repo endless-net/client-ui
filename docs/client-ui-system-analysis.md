@@ -513,6 +513,19 @@ Mobile использует отдельно проверенный native bridg
 
 ## 2. Bootstrap, состояние и права
 
+macOS approval navigation дополнение: при requiresApproval отдельная explicit
+RU/EN кнопка вызывает
+[`SMAppService.openSystemSettingsLoginItems()`](https://developer.apple.com/documentation/servicemanagement/smappservice/opensystemsettingsloginitems())
+через `endlessnet/ui-autostart` / `openSettings` без arguments. Она не вызывает
+register/unregister, не отправляет runtime RPC и не считает dispatch одобрением.
+Только explicit Refresh перечитывает authoritative autostart state. Native
+source ограничен macOS 13+, прежний deployment target не изменён; unsupported
+не показывает действие. Восемь
+[short channel/widget tests](../app/test/client_autostart_settings_test.dart)
+проверяют форму канала, RU/EN outcomes, busy/disabled/dispose, safe error и
+отсутствие оптимистического enable. Native Swift compilation и фактическое
+открытие/approval/login по-прежнему не проверены; это не platform acceptance.
+
 Windows UI autostart control: entrypoint подключает отдельную RU/EN панель,
 которая по явному нажатию открывает фиксированный
 [`ms-settings:startupapps`](https://learn.microsoft.com/en-us/windows/apps/develop/launch/launch-settings)

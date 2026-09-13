@@ -20,3 +20,7 @@ Future<ClientAutostartSetting> _invoke(String method, [bool? enabled]) async {
 Future<ClientAutostartSetting> readNativeClientAutostart() => _invoke('read');
 Future<ClientAutostartSetting> writeNativeClientAutostart(bool enabled) =>
     _invoke('setEnabled', enabled);
+
+/// Dispatch is not evidence of approval or of a changed registration state.
+Future<bool> openNativeClientAutostartSettings() async =>
+    await _channel.invokeMethod<bool>('openSettings') == true;

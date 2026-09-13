@@ -56,11 +56,13 @@ class ClientDesktopApp extends StatefulWidget {
     this.readAutostart,
     this.writeAutostart,
     this.openWindowsAutostartSettings,
+    this.openAutostartSettings,
   });
   final ClientSession session;
   final Future<ClientAutostartSetting> Function()? readAutostart;
   final Future<ClientAutostartSetting> Function(bool)? writeAutostart;
   final Future<bool> Function()? openWindowsAutostartSettings;
+  final Future<bool> Function()? openAutostartSettings;
   final DeliverClientNotification? deliverNotification;
   final bool initialNotifications;
   final bool notificationReadFailed;
@@ -622,6 +624,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
                       widget.writeAutostart != null)
                     ClientAutostartPanel(
                       read: widget.readAutostart!,
+                      openSettings: widget.openAutostartSettings,
                       write: _writeAutostart,
                       locale: _locale,
                       enabled: !_busy,

@@ -77,6 +77,10 @@
           "scope": "Eight short tests: fixed Windows Startup apps URI, explicit RU/EN action, safe launch result not startup confirmation, busy/disabled and stale adapter/dispose guards. No registry writes or runtime intent; actual OS settings/policy/login/installer acceptance unverified"
         },
         {
+          "path": "app/test/client_autostart_settings_test.dart",
+          "scope": "Eight short tests: argument-free settings channel, explicit RU/EN Login Items dispatch never approves/enables or mutates registration, authoritative explicit refresh, busy/disabled/dispose/error guards and no unsupported action. macOS 13+ SMAppService source only; native compilation and OS interaction unverified"
+        },
+        {
           "path": "app/test/client_native_autostart_test.dart",
           "scope": "Nine short channel/widget tests: authoritative enabled/disabled/requiresApproval/unsupported on read and boolean-only set, missing/malformed/error distinction, RU/EN approval and unsupported UI with writes disabled. macOS SMAppService source added for 13+, older OS unsupported without fallback; native compilation, registration/approval/login and install/upgrade unverified"
         },
