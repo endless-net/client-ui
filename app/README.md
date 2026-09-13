@@ -3,8 +3,9 @@
 The desktop entrypoint uses Client Protobuf v0 over local named pipes or Unix
 sockets. It never launches the core as an IPC adapter or reads private state.
 Commands require a validated snapshot and use a persistent request journal.
-Remaining retired classes/tests are tracked in
-[native desktop cutover](../docs/native-desktop-cutover.md), not runtime fallbacks.
+Remaining release-pairing and scenario work is tracked in
+[native desktop cutover](../docs/native-desktop-cutover.md). The retired HTTP
+bridge, DTOs, controller and widgets have been removed.
 
 Run ordinary checks from this directory:
 

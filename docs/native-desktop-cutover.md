@@ -27,9 +27,8 @@ current working-tree Flutter suite passed 207 tests with 16 skipped. The suite
 still includes retired-contract tests and concurrent native exit-node work;
 its aggregate result is not a native-only coverage claim.
 
-Remaining work in client-ui: remove the unreachable old controller, bridge and
-widgets from main.dart and replace their HTTP-based tests; complete the native
-scenario catalog and release pairing; complete native shell actions and destination adapters;
+Remaining work in client-ui: complete the native scenario catalog and release
+pairing; complete native shell actions and destination adapters;
 validate actual desktop integration and elevation on supported platforms.
 Client owns remaining runtime providers/capabilities. System acceptance against
 pinned artifacts remains separate. This entrypoint change does not establish
@@ -87,3 +86,28 @@ remain separate evidence; OS integration and release acceptance remain pending.
 
 The subsequent emulator removal, pinned native host wiring and unfulfilled
 scenario coverage are recorded in [Native v0 scenario host](native-scenario-host.md).
+
+## HTTP UI implementation removed — 2026-09-13
+
+Removed `named_pipe_http.dart`, `service_contract.dart`, the old bridge,
+controller, widgets and HTTP envelope/transport tests. `main.dart` now contains
+only native startup, logging and single-instance support. Startup validates the
+local endpoint, rejects missing/unknown/retired options without echoing input,
+uses platform-neutral home-relative paths and limits the FindWindow call to
+Windows. Enrollment URLs/tokens are not accepted as startup mutations; the MSI
+deep-link registration still requires a native, explicit-confirmation design.
+
+Replacement evidence is split by responsibility: `client_startup_test.dart`
+covers endpoint/defaults/options/redaction/quoting; `client_desktop_app_test.dart`
+and `client_tray_test.dart` cover the shell; native snapshot/event/operation tests
+cover projections; `mobile_contract_widget_test.dart` covers shared actions;
+local transport and session process suites replace HTTP framing checks.
+Removal does not prove former peer-path UI layout and broad multi-command
+transport scenario parity. Those checks must use the native diagnostics/catalogs
+and remain part of system coverage work. The upstream OpenAPI file still exists
+solely for unconverted release pairing, not for application runtime use.
+
+Local validation: Go tests, Flutter analysis and 180 Flutter tests passed;
+14 process/platform cases were skipped without the native host. The same local
+SDK versus pinned-CI limitation applies. Full 104-ID trace scope remains intact,
+with zero of 14 scenarios claimed complete. CI was queued at inspection time.
