@@ -116,6 +116,13 @@ same-size corruption test отклоняется. Используется уж�
 как direct dependency, версия не повышалась. Checksum подтверждает соответствие
 handle, не redaction/подлинность произвольного архива; session binding и explicit
 file export ещё нужны.
+`ClientSession.readDiagnosticsBundle(requestId)` теперь заново выполняет typed
+GetOperation с expected CREATE_DIAGNOSTICS_BUNDLE kind, требует succeeded outcome
+и читает свежий handle через защищённый local channel. Перед каждым chunk и после
+него проверяются session/cache/profile/session-domain epochs. Consumer test
+проверяет свежий lookup, pending rejection и caller change во время чтения.
+Чтение не acknowledge intention и не сохраняет файл; UI/export binding и producer
+process/native execution этого пути ещё требуются.
 Helper не пишет файлы, clipboard или сеть вне переданного RPC callback.
 
 Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:

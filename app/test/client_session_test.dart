@@ -20,6 +20,18 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 class FakeConnection implements ClientConnection {
+  Future<ClientOperation> Function(String, api.OperationKind)? lookup;
+  @override
+  Future<ClientOperation> recoverOperation(String id, api.OperationKind kind) =>
+      lookup!(id, kind);
+  Future<api.ReadDiagnosticsBundleResponse> Function(
+    api.ReadDiagnosticsBundleRequest,
+  )?
+  chunks;
+  @override
+  Future<api.ReadDiagnosticsBundleResponse> readDiagnosticsBundle(
+    api.ReadDiagnosticsBundleRequest request,
+  ) => chunks!(request);
   Future<api.GetDiagnosticsResponse> Function(String)? diagnostics;
   @override
   Future<api.GetDiagnosticsResponse> getDiagnostics(String profileId) =>
@@ -38,7 +50,10 @@ class FakeConnection implements ClientConnection {
   final events = StreamController<api.WatchEventsResponse>();
   bool closed = false;
   @override
-  final mutations = ClientMutations(NoCallsClient(), instanceId: 'runtime-a');
+  ClientMutations mutations = ClientMutations(
+    NoCallsClient(),
+    instanceId: 'runtime-a',
+  );
   @override
   Stream<api.WatchEventsResponse> watch() => events.stream;
   @override
@@ -106,6 +121,93 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'US-07: bundle download rechecks operation and context without acknowledging',
+    () async {
+      const requestId = 'c06bd29f-7c77-4b27-943a-620081f313df';
+      await expectLater(
+        session.readDiagnosticsBundle(requestId),
+        throwsStateError,
+      );
+      connection.events.add(
+        snapshot()..snapshot.status.activeProfileId = 'profile-a',
+      );
+      await pumpEventQueue();
+      var lookups = 0;
+      var succeeded = true;
+      connection.lookup = (id, kind) async {
+        expect(id, requestId);
+        expect(
+          kind,
+          api.OperationKind.OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE,
+        );
+        lookups++;
+        final response = api.GetOperationResponse()
+          ..mergeFromProto3Json({
+            'operation': {
+              'id': 'bundle-operation',
+              'requestId': requestId,
+              'kind': 'OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE',
+              'state': succeeded
+                  ? 'OPERATION_STATE_SUCCEEDED'
+                  : 'OPERATION_STATE_PENDING',
+              if (succeeded) ...{
+                'continuity': 'CONNECTION_CONTINUITY_UNKNOWN',
+                'bundle': {
+                  'bundleId': 'fresh-handle',
+                  'sizeBytes': '3',
+                  'expiresAt': '2099-01-01T00:00:00Z',
+                  'sha256':
+                      '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81',
+                },
+              },
+            },
+          });
+        return ClientMutations.validateAcceptance(response.operation, id, kind);
+      };
+      connection.chunks = (request) async {
+        expect(request.bundleId, 'fresh-handle');
+        return api.ReadDiagnosticsBundleResponse()..mergeFromProto3Json({
+          'data': 'AQID',
+          'nextOffset': '3',
+          'eof': true,
+        });
+      };
+      expect(await session.readDiagnosticsBundle(requestId), [1, 2, 3]);
+      succeeded = false;
+      await expectLater(
+        session.readDiagnosticsBundle(requestId),
+        throwsStateError,
+      );
+      expect(lookups, 2);
+      succeeded = true;
+      final pending = Completer<api.ReadDiagnosticsBundleResponse>();
+      connection.chunks = (_) => pending.future;
+      final rejected = expectLater(
+        session.readDiagnosticsBundle(requestId),
+        throwsStateError,
+      );
+      await pumpEventQueue();
+      final observer = snapshot()..sequence += 1;
+      observer.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      connection.events.add(observer);
+      await pumpEventQueue();
+      pending.complete(
+        api.ReadDiagnosticsBundleResponse()..mergeFromProto3Json({
+          'data': 'AQID',
+          'nextOffset': '3',
+          'eof': true,
+        }),
+      );
+      await rejected;
+      await expectLater(
+        session.readDiagnosticsBundle(requestId),
+        throwsStateError,
+      );
+      expect(lookups, 3);
+    },
+  );
 
   test(
     'US-07: diagnostics preview rejects stale context and freezes its copy',

@@ -1,4 +1,6 @@
 import 'package:endlessnet_client_api/client_api.dart' as api;
+import 'dart:typed_data';
+import 'client_bundle_chunks.dart';
 
 import 'client_intent_journal.dart';
 import 'client_mutations.dart';
@@ -9,6 +11,13 @@ import 'client_state_controller.dart';
 import 'local_client_events.dart';
 
 abstract interface class ClientConnection {
+  Future<ClientOperation> recoverOperation(
+    String requestId,
+    api.OperationKind kind,
+  );
+  Future<api.ReadDiagnosticsBundleResponse> readDiagnosticsBundle(
+    api.ReadDiagnosticsBundleRequest request,
+  );
   Future<api.GetDiagnosticsResponse> getDiagnostics(String profileId);
   Future<api.GetServerIdentityResponse> getServerIdentity(String profileId);
   Future<ClientNetworkCatalog> listNetworks(String profileId);
@@ -21,6 +30,15 @@ abstract interface class ClientConnection {
 final class _LocalConnection implements ClientConnection {
   _LocalConnection(this.source);
   final LocalClientEvents source;
+  @override
+  Future<ClientOperation> recoverOperation(
+    String requestId,
+    api.OperationKind kind,
+  ) => source.mutations.recoverByRequestId(requestId, kind);
+  @override
+  Future<api.ReadDiagnosticsBundleResponse> readDiagnosticsBundle(
+    api.ReadDiagnosticsBundleRequest request,
+  ) => source.readDiagnosticsBundle(request);
   @override
   Future<api.GetDiagnosticsResponse> getDiagnostics(String profileId) =>
       source.getDiagnostics(profileId);
@@ -237,6 +255,49 @@ final class ClientSession {
       throw StateError('Invalid or stale diagnostics context');
     }
     return api.Diagnostics.fromBuffer(diagnostics.writeToBuffer())..freeze();
+  }
+
+  /// Re-resolve a caller-authorized operation; never accept an old UI handle.
+  /// Reading does not acknowledge the intention or export the returned bytes.
+  Future<Uint8List> readDiagnosticsBundle(String requestId) async {
+    final connection = _connection;
+    final snapshot = state.snapshot;
+    if (_closed ||
+        connection == null ||
+        snapshot == null ||
+        state.link != ClientLinkState.ready ||
+        snapshot.runtime.callerAccess == api.Access.ACCESS_OBSERVER ||
+        snapshot.status.activeProfileId.isEmpty) {
+      throw StateError('Bundle read requires a current owner profile');
+    }
+    final epoch = _epoch;
+    final cacheEpoch = state.cacheEpoch;
+    final profileEpoch = state.domainEpoch(api.Domain.DOMAIN_PROFILES);
+    final sessionEpoch = state.domainEpoch(api.Domain.DOMAIN_SESSION);
+    void check() {
+      if (_closed ||
+          epoch != _epoch ||
+          cacheEpoch != state.cacheEpoch ||
+          state.link != ClientLinkState.ready ||
+          profileEpoch != state.domainEpoch(api.Domain.DOMAIN_PROFILES) ||
+          sessionEpoch != state.domainEpoch(api.Domain.DOMAIN_SESSION)) {
+        throw StateError('Client context changed during bundle read');
+      }
+    }
+
+    final operation = await connection.recoverOperation(
+      requestId,
+      api.OperationKind.OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE,
+    );
+    check();
+    if (!operation.succeeded || !operation.value.hasBundle()) {
+      throw StateError('Diagnostics bundle operation has not succeeded');
+    }
+    return readClientBundleChunks(
+      operation.value.bundle,
+      connection.readDiagnosticsBundle,
+      checkContext: check,
+    );
   }
 
   Future<ClientProfileCatalog> listProfiles() async {
