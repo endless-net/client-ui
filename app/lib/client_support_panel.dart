@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'client_state_controller.dart';
 import 'client_support_info.dart';
 import 'client_locale.dart';
+import 'client_offline_help.dart';
 
 class ClientSupportPanel extends StatefulWidget {
   const ClientSupportPanel({
@@ -169,6 +170,7 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
                     'Для обращения в поддержку явно экспортируйте диагностику; проверьте файл перед отправкой.',
               ),
             ),
+          if (_help) ClientOfflineHelp(locale: widget.locale),
           OutlinedButton(
             key: const Key('client-load-support'),
             onPressed: allowed && !_busy ? () => _run() : null,

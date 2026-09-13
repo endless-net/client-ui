@@ -96,6 +96,35 @@ void main() {
               ru
                   ? 'Встроенная справка: переподключитесь к службе, если её состояние недоступно. Принятие операции не означает завершения: восстановите незавершённые операции перед повтором. Выход и удаление локальной регистрации — разные действия. Никому не передавайте токены регистрации и закрытые ключи. Для обращения в поддержку явно экспортируйте диагностику; проверьте файл перед отправкой.'
                   : 'Built-in help: Reconnect runtime if its status is unavailable. An accepted operation is not a completed result: recover pending operations before retrying. Logout and Forget local enrollment are different actions. Never share enrollment tokens or private keys. Use explicit diagnostics export when requesting support; inspect the file before sharing.',
+              ...(ru
+                  ? [
+                      'Служба и разрешения',
+                      'Регистрация и вход',
+                      'Подключение и сети',
+                      'Неизвестный результат операции',
+                      'Изменение идентичности сервера',
+                      'Выходной узел и локальная сеть',
+                      'Ресурсы и конфликты маршрутов',
+                      'Настройки и политика',
+                      'Выход и локальное удаление',
+                      'Диагностика и конфиденциальность',
+                      'Обновления и совместимость',
+                      'Язык и обращение в поддержку',
+                    ]
+                  : [
+                      'Service and permissions',
+                      'Enrollment and login',
+                      'Connection and networks',
+                      'Unknown operation result',
+                      'Changed server identity',
+                      'Exit node and LAN access',
+                      'Resources and route conflicts',
+                      'Preferences and policy',
+                      'Logout and local removal',
+                      'Diagnostics and privacy',
+                      'Updates and compatibility',
+                      'Language and contacting support',
+                    ]),
               ru
                   ? 'Обновить сведения о поддержке'
                   : 'Refresh support information',

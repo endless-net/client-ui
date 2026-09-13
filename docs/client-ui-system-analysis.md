@@ -717,7 +717,16 @@ producer destinations; click повторно читает SupportInfo и отк
 а сообщает, что producer topic не bundled; базовая UI-owned справка остаётся.
 Shared widget tests используют fake launcher и проверяют open, changed/unsafe
 URL, invalidation и launcher отказ. Это не native browser acceptance; полный
-локализованный offline corpus и platform evidence ещё нужны.
+platform evidence и согласованное отображение producer offline-help keys ещё
+нужны. UI-owned справка расширена до 12 RU/EN тем: служба/доступ, регистрация,
+сети/подключение, recovery, trust, exit/LAN, ресурсы, preferences/policy,
+cleanup, диагностика/privacy, обновления и язык/support. Темы раскрываются без
+RPC, browser, файловых путей из ключа или иных внешних действий. Они не задают
+неутверждённые OS defaults, VPN permission flows или команды установки.
+Три short теста проверяют состав каталога и ключевые смысловые ограничения,
+раскрывают все 12 тем в обеих локалях при 360×640/text scale 2, проверяют
+отсутствие overflow/RPC/browser и сохранение раскрытия при смене языка.
+Это UI component evidence, не product approval всех текстов или OS accessibility.
 
 US-13 process foundation: `client_information_process_test.dart` содержит семь
 сценариев producer-host — observer support и шесть owner update states. Runtime

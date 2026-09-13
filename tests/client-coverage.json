@@ -573,6 +573,10 @@
           "scope": "14 short RU/EN widget vectors compare entire offline/loaded/error support text, unknown offline-topic guidance and all four links with fresh lookup before mock browser opening. Locale changes cause no repeat reads or opens. Not complete offline corpus, full-app switching or native browser acceptance"
         },
         {
+          "path": "app/test/client_offline_help_test.dart",
+          "scope": "Three short tests: twelve UI-owned RU/EN task topics, critical recovery/cleanup/privacy meaning checks, all topics expanded at 360x640/text scale 2 with locale-switch retention, zero RPC/browser and no overflow. Producer key mapping, native accessibility and product approval remain unverified"
+        },
+        {
           "path": "app/test/client_update_locale_test.dart",
           "scope": "Six unit tests cover all 32 update/compatibility/classification/channel/platform/availability enum labels in RU/EN; four widget vectors compare full source-unavailable/incompatible-pair and error text without repeated lookup during locale switching. Not verified distribution installation or full-app UI-AC-13"
         },
