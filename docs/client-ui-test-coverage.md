@@ -14,6 +14,14 @@ Status: incomplete. Owner: client-ui. Scope: the complete BA/SA goal, not the
 subset already implemented. The canonical machine-readable trace is
 [`tests/client-coverage.json`](../tests/client-coverage.json).
 
+Contract workflow cost policy: push/PR executes one pass per selected platform.
+For release preparation or flake diagnosis, manually run `Client v0 consumer`,
+`Mobile v0 consumer` and/or `Local client v0 interoperability` with
+`repetitions: 3`; the default remains `1`. Repeats use independent jobs and do
+not add scenarios. New runs cancel older runs of the same workflow/ref. iOS
+failure artifacts include the pass number. This option does not dispatch a
+release, resolve Android runner access, or establish product acceptance.
+
 It maps all UF-01–23, UBR-01–40 and UI-AC-01–27 to US-01–14 and retains all five
 target platforms. Test evidence describes only what a test actually checks.
 Shared operation-envelope tests do not close enrollment, trust, profiles,
