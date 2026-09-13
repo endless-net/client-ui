@@ -19,8 +19,8 @@
       ],
       "workflow": ".github/workflows/contract-consumer.yml",
       "status": "passed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34776165084",
-      "scope": "At a218fde9ccf0252970cca85a8f65a012ea7009e5 all three desktop jobs passed 344 tests with 1 skip each. Logs explicitly confirm RU/EN operation details, runtime operation stream projection, stale acknowledgement rejection and readiness rebootstrap without replay. Includes pinned producer-host tests; not real runtime/OS/traffic acceptance. The later UI-owned loopback wire-server addition is NOT covered by this run"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34777079094",
+      "scope": "At b210280faf952b9099aa27f7cd1ad11b501fa2fb all three desktop jobs passed 346 tests with 1 skip each. Logs explicitly confirm both loopback wire scenarios, including ambiguous acceptance and consumer-session restart. Includes pinned producer-host tests; not real runtime/OS/traffic acceptance. The later all-mutation wire-envelope suite is NOT covered by this run"
     },
     {
       "platforms": ["ios"],
@@ -41,7 +41,8 @@
   ],
   "sharedEnvelopeTests": [
     "app/test/client_operation_test.dart",
-    "app/test/client_mutations_test.dart"
+    "app/test/client_mutations_test.dart",
+    "app/test/client_mutation_wire_test.dart"
   ],
   "scenarios": [
     {

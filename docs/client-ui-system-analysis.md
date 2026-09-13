@@ -642,6 +642,15 @@ trace duration и upload требуют отдельного scope/контра�
 
 ## 6. Тестирование и release gates
 
+`app/test/support/mutation_wire_server.dart` — отдельный строгий single-call
+fixture для всех 19 mutation RPC. `client_mutation_wire_test.dart` проверяет
+точные protobuf bytes и pairing metadata, копирование запроса до отправки,
+pending envelope, отклонение чужого request ID/operation kind без повторного
+RPC. Набор сверяется со всеми concrete OperationKind и включён в mobile harness.
+Это shared envelope evidence: не все варианты payload, terminal outcomes,
+бизнес-эффекты, policy или platform acceptance. Production код fixture не
+импортирует; остальные RPC им не реализованы.
+
 Дополнительный UI-owned wire mock: `app/test/support/loopback_contract_server.dart`
 использует generated server bindings текущего SDK. Shared тест запускает его на
 случайном loopback TCP порту и проверяет bootstrap → WatchEvents → Connect →

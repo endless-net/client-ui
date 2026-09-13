@@ -36,6 +36,23 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+At `b210280faf952b9099aa27f7cd1ad11b501fa2fb`, the
+[desktop consumer run](https://github.com/endless-net/client-ui/actions/runs/34777079094)
+passed 346 tests with 1 skip on each of Windows, Linux and macOS. Logs explicitly
+pass both loopback wire scenarios, including ambiguous acceptance followed by
+consumer-session restart. This is synthetic protobuf/session evidence, not
+protected IPC or runtime/traffic acceptance.
+
+The subsequent `client_mutation_wire_test.dart` adds 58 shared envelope checks:
+all 19 mutation RPCs preserve exact request bytes and pairing metadata; clearing
+the caller's request after invocation does not alter its submitted copy; pending
+responses correlate by kind and UUID, and mismatches fail without retry. The
+enum-set guard detects omitted operation kinds. Registered in the mobile harness;
+runner evidence for this new suite is pending. This does not close product
+scenarios, terminal outcome coverage, or every request-field variant.
+Local validation passed 375 Flutter tests with 30 skips, Flutter analysis,
+Go tests and coverage-ledger structural tests.
+
 At `a218fde9ccf0252970cca85a8f65a012ea7009e5`, the
 [desktop consumer run](https://github.com/endless-net/client-ui/actions/runs/34776165084)
 passed 344 tests with 1 skip on each of Windows, Linux and macOS. The
@@ -46,10 +63,11 @@ Android job 103774647519 failed KVM preflight before tests. Windows packaging
 run 34776165095 failed the reviewed core manifest target/IPC check, independently
 of consumer test success. No runtime/traffic/full platform acceptance is inferred.
 
-The subsequent UI-owned loopback protobuf server is registered in the shared
-mobile/desktop harness and passes locally (316 tests, 30 skips overall); its
-runner execution is pending. It covers synthetic bootstrap/stream/Connect/lookup
-and disk-backed intention ordering, not OS-authenticated transport or a VPN.
+The UI-owned loopback protobuf server is registered in the shared mobile/desktop
+harness. Its desktop execution is qualified by the newer b210280 run above;
+mobile qualification remains separate. It covers synthetic bootstrap/stream/
+Connect/lookup and disk-backed intention ordering, not OS-authenticated transport
+or a VPN.
 
 The following paragraphs preserve earlier chronological snapshots; their
 pending statements refer to those increments, not to the newer evidence above.
