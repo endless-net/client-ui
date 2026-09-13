@@ -92,6 +92,13 @@ logout/local forget не снимают ownership. UI не обещает воз
 
 ## 3. Команды и восстановление
 
+Native iOS run на `840a6f5` впервые выполнил suite: 16 passed / 5 failed
+([job](https://github.com/endless-net/client-ui/actions/runs/34727879154/job/103645229712)).
+Пять failures сопровождались hit-test miss верхних кнопок на y=24. Shared test
+scaffold и составная session panel теперь используют SafeArea; локальная regression
+проверяет верхний inset 59 и настоящий tap, layout — также нижний inset 34.
+Исправление требует повторного simulator execution; локальные unit tests не закрывают iOS acceptance.
+
 US-04 read foundation: `client_networks.dart` собирает полный immutable каталог
 через ListNetworks с фиксированным ProfileRef и opaque page tokens. Проверяются
 instance/revision, неизменность selected ID, duplicate IDs и pagination cycles;

@@ -9,6 +9,7 @@ import 'package:endlessnet/client_operation.dart';
 import 'package:flutter/material.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter_test/flutter_test.dart';
+import 'support/contract_test_scaffold.dart';
 
 api.ListProfilesResponse page(
   String id, {
@@ -36,7 +37,7 @@ void main() {
       final calls = <(String, String)>[];
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
+          home: ContractTestScaffold(
             body: ClientNetworksPanel(
               state: state,
               load: () => readClientNetworks(
@@ -223,7 +224,7 @@ void main() {
       final calls = <(String, String)>[];
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
+          home: ContractTestScaffold(
             body: ClientCreateProfilePanel(
               state: state,
               create: (name, origin) {
@@ -318,7 +319,7 @@ void main() {
       final removed = <String>[];
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
+          home: ContractTestScaffold(
             body: ClientProfilesPanel(
               state: state,
               remove: (id) async {

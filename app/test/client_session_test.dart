@@ -165,7 +165,10 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: MediaQuery(
-            data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+            data: const MediaQueryData(
+              textScaler: TextScaler.linear(2),
+              padding: EdgeInsets.only(top: 59, bottom: 34),
+            ),
             child: Scaffold(body: ClientSessionPanel(session: session)),
           ),
         ),

@@ -10,9 +10,38 @@ import 'package:endlessnet/client_recovery_panel.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/contract_test_scaffold.dart';
 
 /// Reused by the native integration-test host; no desktop channel is imported.
 void main() {
+  testWidgets('US-14: shared host respects system safe-area hit testing', (
+    tester,
+  ) async {
+    var taps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(
+            padding: EdgeInsets.only(top: 59, bottom: 34),
+          ),
+          child: ContractTestScaffold(
+            body: Align(
+              alignment: Alignment.topCenter,
+              child: TextButton(
+                key: const Key('safe-area-action'),
+                onPressed: () => taps++,
+                child: const Text('Action'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final action = find.byKey(const Key('safe-area-action'));
+    expect(tester.getTopLeft(action).dy, greaterThanOrEqualTo(59));
+    await tester.tap(action);
+    expect(taps, 1);
+  });
   testWidgets(
     'US-08: failed logout never falls back to administrator local forget',
     (tester) async {
@@ -23,7 +52,7 @@ void main() {
       final forget = <String>[];
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
+          home: ContractTestScaffold(
             body: ClientCleanupPanel(
               state: state,
               logout: (id) async {
@@ -129,7 +158,7 @@ void main() {
       final calls = <(String, api.EnrollmentMode, String, String?)>[];
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
+          home: ContractTestScaffold(
             body: ClientEnrollmentPanel(
               state: state,
               enroll: (id, mode, hostname, token) async {
@@ -247,7 +276,7 @@ void main() {
       final launched = <Uri>[];
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
+          home: ContractTestScaffold(
             body: ClientRecoveryPanel(
               state: state,
               recover: () async {
@@ -354,7 +383,9 @@ void main() {
         );
         await tester.pumpWidget(
           MaterialApp(
-            home: Scaffold(body: ClientOperationDetails(operation: operation)),
+            home: ContractTestScaffold(
+              body: ClientOperationDetails(operation: operation),
+            ),
           ),
         );
         expect(find.text('Local registration removed.'), findsOneWidget);
@@ -385,7 +416,9 @@ void main() {
       );
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: ClientOperationDetails(operation: failure)),
+          home: ContractTestScaffold(
+            body: ClientOperationDetails(operation: failure),
+          ),
         ),
       );
       expect(
@@ -408,7 +441,9 @@ void main() {
       );
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: ClientOperationDetails(operation: waiting)),
+          home: ContractTestScaffold(
+            body: ClientOperationDetails(operation: waiting),
+          ),
         ),
       );
       expect(find.text('Required action: KIND_OPEN_BROWSER'), findsOneWidget);
@@ -444,7 +479,7 @@ void main() {
       final acknowledgements = <String>[];
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
+          home: ContractTestScaffold(
             body: ClientRecoveryPanel(
               state: state,
               recover: () async {
@@ -523,7 +558,7 @@ void main() {
       await state.attach(source.stream);
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
+          home: ContractTestScaffold(
             body: ClientConnectionPanel(
               state: state,
               renewSession: () async {
