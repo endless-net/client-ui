@@ -80,7 +80,7 @@ jobs:
       - name: Prepare Flutter dependencies
         if: steps.idempotency.outputs.noop != 'true'
         working-directory: app
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Validate dependency licenses
         if: steps.idempotency.outputs.noop != 'true'
@@ -94,20 +94,24 @@ jobs:
         shell: pwsh
         run: |
           go test ./...
+          if ($LASTEXITCODE -ne 0) { throw "Go source tests failed" }
           Push-Location app
           try {
-            flutter analyze
-            flutter test
+            flutter analyze --no-pub
+            if ($LASTEXITCODE -ne 0) { throw "Flutter analysis failed" }
+            flutter test --no-pub
+            if ($LASTEXITCODE -ne 0) { throw "Flutter source tests failed" }
           } finally {
             Pop-Location
           }
 
-      - name: Test UI against released IPC contract
+      - name: Verify released native descriptor against resolved Dart SDK
         if: steps.idempotency.outputs.noop != 'true'
         env:
-          ENDLESSNET_IPC_OPENAPI: ${{ steps.core.outputs.ipc_contract }}
+          ENDLESSNET_IPC_DESCRIPTOR: ${{ steps.core.outputs.ipc_contract }}
+          ENDLESSNET_REQUIRE_RELEASE_DESCRIPTOR: 'true'
         working-directory: app
-        run: flutter test test/ui_contract_e2e_test.dart
+        run: flutter test --no-pub test/client_release_pairing_test.dart
 
       - uses: anchore/sbom-action@v0
         if: steps.idempotency.outputs.noop != 'true'

@@ -28,6 +28,33 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+At `b863ee2e8793437bc390c5d108a7532fd29da5f3`, the
+[three desktop consumer jobs](https://github.com/endless-net/client-ui/actions/runs/34760912272)
+passed. They use the synthetic Go host pinned to
+`80d9cdc16241ca03200381b6b1b04fa5acca1987`, not the current production agent.
+The [iOS simulator job](https://github.com/endless-net/client-ui/actions/runs/34760912226/job/103733580308)
+also passed, including queued primary-action callback and lifecycle preference
+validation regressions. This qualifies shared consumer behavior, not installed
+VPN providers, native lifecycle effects, traffic or full platform acceptance.
+The same mobile run failed Android KVM preflight before tests; no runner host
+permissions were changed. The
+[Windows packaging run](https://github.com/endless-net/client-ui/actions/runs/34760912259)
+failed the reviewed core manifest target/IPC check. The core remains pinned to
+`v0.4.1`; no replacement version or release is approved by this evidence.
+
+Release gate repair: the release workflow no longer calls the deleted HTTP v2
+test or passes an OpenAPI input. It requires the resolver's raw descriptor and
+compares its SHA-256 with the resolved generated Dart SDK, rejecting missing,
+textual, altered, appended and truncated inputs. Dependency resolution enforces
+the lockfile, and Go/Flutter source failures explicitly stop the PowerShell step.
+Local Go tests and Flutter analysis passed; Flutter passed 282 tests with 27
+CI-only skips when supplied the public producer source descriptor. That local
+input checks the pairing algorithm, not an immutable released artifact. The
+release workflow itself was not executed, and the earlier incompatible core
+pin still blocks packaging. Zero full SA scenarios are accepted.
+
+Earlier snapshots (preserved with their original scope and limits):
+
 At `c1899a3f5925806b699e52b835f44e8c59f72723`, the native consumer suite passed
 261 tests on each of
 [Linux](https://github.com/endless-net/client-ui/actions/runs/34745141995/job/103691570908),

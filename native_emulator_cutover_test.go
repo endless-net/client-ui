@@ -75,3 +75,25 @@ func TestNativeConsumerCIDiscoversEveryFlutterTest(t *testing.T) {
 		t.Fatal("explicit test file allowlists silently omit new native regression tests")
 	}
 }
+
+func TestReleaseUsesRequiredNativeDescriptorGate(t *testing.T) {
+	workflow := readRepositoryFile(t, ".github/workflows/release.yml")
+	for _, retired := range []string{"ENDLESSNET_IPC_OPENAPI", "test/ui_contract_e2e_test.dart"} {
+		if strings.Contains(workflow, retired) {
+			t.Errorf("release still invokes retired IPC gate: %s", retired)
+		}
+	}
+	for _, required := range []string{
+		"ENDLESSNET_IPC_DESCRIPTOR: ${{ steps.core.outputs.ipc_contract }}",
+		"ENDLESSNET_REQUIRE_RELEASE_DESCRIPTOR: 'true'",
+		"flutter test --no-pub test/client_release_pairing_test.dart",
+		"flutter pub get --enforce-lockfile",
+		`if ($LASTEXITCODE -ne 0) { throw "Go source tests failed" }`,
+		`if ($LASTEXITCODE -ne 0) { throw "Flutter analysis failed" }`,
+		`if ($LASTEXITCODE -ne 0) { throw "Flutter source tests failed" }`,
+	} {
+		if !strings.Contains(workflow, required) {
+			t.Errorf("release missing mandatory native contract/source gate: %s", required)
+		}
+	}
+}
