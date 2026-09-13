@@ -63,6 +63,9 @@ Future<ClientPeerCatalog> readClientPeers(
         response.page.metadata.instanceId != instanceId ||
         response.page.metadata.revision <= 0 ||
         response.peers.length > 100 ||
+        peers.length + response.peers.length > 4096 ||
+        utf8.encode(response.page.nextPageToken).length > 2048 ||
+        (response.peers.isEmpty && response.page.nextPageToken.isNotEmpty) ||
         (first != null &&
             (first.page.metadata.revision != response.page.metadata.revision ||
                 first.snapshotState != response.snapshotState ||
