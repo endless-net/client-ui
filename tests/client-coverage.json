@@ -341,6 +341,10 @@
         {
           "path": "app/test/mobile_contract_widget_test.dart",
           "scope": "Independent authoritative session/credential deadlines, unknown values and caller cleanup in shared panel; not renewal or production shell acceptance"
+        },
+        {
+          "path": "app/test/client_connection_activation_test.dart",
+          "scope": "All 42 combinations of authoritative session/credential states with unknown deadlines, removal on detach, and queued renewal admission guards. Included in desktop/mobile harness; not real renewal or full platform acceptance"
         }
       ],
       "acceptanceEvidence": []

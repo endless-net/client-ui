@@ -10,6 +10,87 @@ import 'package:flutter_test/flutter_test.dart';
 // Deliberately retain a callback to simulate queued activation from an older
 // frame. This does not replace platform keyboard/hit-test acceptance.
 void main() {
+  testWidgets('US-09 displays independent authoritative renewal states', (
+    tester,
+  ) async {
+    final state = ClientStateController();
+    final source = StreamController<api.WatchEventsResponse>();
+    await state.attach(source.stream);
+    var mutationCalls = 0;
+    Future<ClientOperation> unexpectedMutation() async {
+      mutationCalls++;
+      throw StateError('Rendering must not submit a mutation');
+    }
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ClientConnectionPanel(
+            state: state,
+            connect: unexpectedMutation,
+            disconnect: unexpectedMutation,
+            renewSession: unexpectedMutation,
+          ),
+        ),
+      ),
+    );
+    const sessionLabels = [
+      'Unknown',
+      'Not authenticated',
+      'Active',
+      'Expiring',
+      'Expired',
+      'Renewing',
+    ];
+    const credentialLabels = [
+      'Unknown',
+      'Absent',
+      'Valid',
+      'Expiring',
+      'Expired',
+      'Renewing',
+      'Blocked',
+    ];
+    var sequence = 0;
+    for (var session = 0; session < sessionLabels.length; session++) {
+      for (
+        var credential = 0;
+        credential < credentialLabels.length;
+        credential++
+      ) {
+        final event = _snapshot();
+        sequence++;
+        event.sequence = event.sequence * sequence;
+        event.metadata.revision = event.sequence;
+        event.snapshot.status.metadata.revision = event.sequence;
+        event.snapshot.status.session.state = api.SessionState.valueOf(
+          session,
+        )!;
+        event.snapshot.status.ensureCredential().state =
+            api.CredentialState.valueOf(credential)!;
+        source.add(event);
+        await tester.pump();
+        expect(state.link, ClientLinkState.ready);
+        expect(
+          find.text('Session state: ${sessionLabels[session]}'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Credential state: ${credentialLabels[credential]}'),
+          findsOneWidget,
+        );
+        expect(find.text('Session expiry: Unknown'), findsOneWidget);
+        expect(find.text('Credential expiry: Unknown'), findsOneWidget);
+      }
+    }
+    expect(mutationCalls, 0);
+    await tester.runAsync(state.detach);
+    await tester.pump();
+    expect(find.byKey(const Key('client-session-state')), findsNothing);
+    expect(find.byKey(const Key('client-credential-state')), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(source.close);
+    state.dispose();
+  });
   for (final action in ['connect', 'disconnect', 'renew-session']) {
     for (final change in [
       'profile',

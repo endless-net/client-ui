@@ -160,8 +160,16 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                 ),
                 Text('Device ID: ${_contextValue(snapshot.status.nodeId)}'),
                 Text(
+                  'Session state: ${_sessionState(snapshot.status.session.state)}',
+                  key: const Key('client-session-state'),
+                ),
+                Text(
                   'Session expiry: ${snapshot.status.session.hasExpiresAt() ? _deadline(snapshot.status.session.expiresAt.seconds.toInt(), snapshot.status.session.expiresAt.nanos) : 'Unknown'}',
                   key: const Key('client-session-expiry'),
+                ),
+                Text(
+                  'Credential state: ${_credentialState(snapshot.status.credential.state)}',
+                  key: const Key('client-credential-state'),
                 ),
                 Text(
                   'Credential expiry: ${snapshot.status.credential.hasExpiresAt() ? _deadline(snapshot.status.credential.expiresAt.seconds.toInt(), snapshot.status.credential.expiresAt.nanos) : 'Unknown'}',
@@ -219,6 +227,25 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
 }
 
 String _contextValue(String value) => value.isEmpty ? 'Unknown' : value;
+
+String _sessionState(api.SessionState state) => switch (state) {
+  api.SessionState.SESSION_STATE_NOT_AUTHENTICATED => 'Not authenticated',
+  api.SessionState.SESSION_STATE_ACTIVE => 'Active',
+  api.SessionState.SESSION_STATE_EXPIRING => 'Expiring',
+  api.SessionState.SESSION_STATE_EXPIRED => 'Expired',
+  api.SessionState.SESSION_STATE_RENEWING => 'Renewing',
+  _ => 'Unknown',
+};
+
+String _credentialState(api.CredentialState state) => switch (state) {
+  api.CredentialState.CREDENTIAL_STATE_ABSENT => 'Absent',
+  api.CredentialState.CREDENTIAL_STATE_VALID => 'Valid',
+  api.CredentialState.CREDENTIAL_STATE_EXPIRING => 'Expiring',
+  api.CredentialState.CREDENTIAL_STATE_EXPIRED => 'Expired',
+  api.CredentialState.CREDENTIAL_STATE_RENEWING => 'Renewing',
+  api.CredentialState.CREDENTIAL_STATE_BLOCKED => 'Blocked',
+  _ => 'Unknown',
+};
 
 // Display authoritative UTC deadlines independently. Never infer runtime state
 // from the UI clock or substitute one deadline for the other.
