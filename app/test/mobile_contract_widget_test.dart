@@ -8,6 +8,7 @@ import 'package:endlessnet/client_enrollment_panel.dart';
 import 'package:endlessnet/client_cleanup_panel.dart';
 import 'package:endlessnet/client_recovery_panel.dart';
 import 'package:endlessnet/client_identity_panel.dart';
+import 'package:endlessnet/client_diagnostics_panel.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +16,90 @@ import 'support/contract_test_scaffold.dart';
 
 /// Reused by the native integration-test host; no desktop channel is imported.
 void main() {
+  testWidgets(
+    'US-07: diagnostics preview is explicit, scoped and cleared on invalidation',
+    (tester) async {
+      final state = ClientStateController();
+      final events = StreamController<api.WatchEventsResponse>();
+      await state.attach(events.stream);
+      var reads = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ContractTestScaffold(
+            body: ClientDiagnosticsPanel(
+              state: state,
+              load: () async {
+                reads++;
+                return api.Diagnostics()..mergeFromProto3Json({
+                  'metadata': {
+                    'instanceId': 'diagnostic-test',
+                    'revision': '1',
+                  },
+                  'osName': 'synthetic-os',
+                  'truncated': true,
+                  'status': {
+                    'pendingAction': {
+                      'browserUrl': 'https://private.example/action',
+                    },
+                  },
+                });
+              },
+            ),
+          ),
+        ),
+      );
+      final load = find.byKey(const Key('load-client-diagnostics'));
+      expect(reads, 0);
+      events.add(
+        api.WatchEventsResponse()..mergeFromProto3Json({
+          'sequence': '1',
+          'metadata': {'instanceId': 'diagnostic-test', 'revision': '1'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'diagnostic-test',
+              'callerAccess': 'ACCESS_OWNER',
+              'capabilities': [
+                {
+                  'capability': 'CAPABILITY_DIAGNOSTICS',
+                  'restriction': {'availability': 'AVAILABILITY_AVAILABLE'},
+                },
+              ],
+            },
+            'status': {
+              'activeProfileId': 'profile-a',
+              'metadata': {'instanceId': 'diagnostic-test', 'revision': '1'},
+            },
+          },
+        }),
+      );
+      await tester.pump();
+      expect(reads, 0);
+      await tester.tap(load);
+      await tester.pump();
+      expect(reads, 1);
+      expect(find.textContaining('synthetic-os'), findsOneWidget);
+      expect(find.textContaining('not a complete report'), findsOneWidget);
+      expect(find.textContaining('private.example'), findsNothing);
+      events.add(
+        api.WatchEventsResponse()..mergeFromProto3Json({
+          'sequence': '2',
+          'metadata': {'instanceId': 'diagnostic-test', 'revision': '1'},
+          'invalidated': {'domain': 'DOMAIN_PEERS', 'profileId': 'profile-a'},
+        }),
+      );
+      await tester.pump();
+      expect(find.textContaining('synthetic-os'), findsNothing);
+      expect(reads, 1);
+      await events.close();
+      await tester.pump();
+      expect(tester.widget<OutlinedButton>(load).onPressed, isNull);
+      await tester.pumpWidget(const SizedBox());
+      state.dispose();
+    },
+  );
+
   testWidgets(
     'US-06: explicit trust compares fresh announcement and clears invalidated data',
     (tester) async {

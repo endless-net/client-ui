@@ -101,6 +101,13 @@ truncated. Любая domain invalidation во время aggregate read отк�
 проверяет эти границы; UI preview, redaction/export policy, chunks, native execution
 и actual runtime acceptance ещё требуются. Production main пока использует старую
 диагностику; этот слой не означает её cutover.
+Составная session panel теперь содержит явный local diagnostics summary:
+OS/Go, counts interfaces/routes/peers/conflicts/failures, connection phase и
+truncation warning. Capability/caller/context ограничивают просмотр; domain
+invalidation скрывает прежний summary. Shared widget regression проверяет отсутствие
+авточтения, очистку и исключение browser URL из отображения. Полный payload
+не сериализуется в clipboard/logs; подробные данные и archive export ещё не
+реализованы. Native execution нового preview test ожидает CI.
 
 Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:
 [desktop run](https://github.com/endless-net/client-ui/actions/runs/34730432514)

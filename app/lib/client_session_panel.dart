@@ -11,6 +11,7 @@ import 'client_enrollment_panel.dart';
 import 'client_cleanup_panel.dart';
 import 'client_networks_panel.dart';
 import 'client_identity_panel.dart';
+import 'client_diagnostics_panel.dart';
 
 /// Desktop application binding. A mobile runtime adapter can supply the same
 /// shared connection panel without using a desktop local channel.
@@ -24,6 +25,10 @@ class ClientSessionPanel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          ClientDiagnosticsPanel(
+            state: session.state,
+            load: session.getDiagnostics,
+          ),
           ClientIdentityPanel(
             state: session.state,
             load: session.getServerIdentity,
