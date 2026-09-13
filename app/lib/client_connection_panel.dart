@@ -2,6 +2,7 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 
 import 'client_operation.dart';
+import 'client_runtime_snapshot.dart';
 import 'client_state_controller.dart';
 
 enum _ClientAction { connect, disconnect, renewSession }
@@ -32,7 +33,20 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
   String? _notice;
   int? _noticeEpoch;
 
-  Future<void> _run(_ClientAction action) async {
+  Future<void> _run(
+    _ClientAction action,
+    ClientRuntimeSnapshot? displayedSnapshot,
+  ) async {
+    // A queued pointer/keyboard activation belongs to the projection that
+    // enabled the button, never to a replacement profile/caller or status.
+    if (!mounted ||
+        displayedSnapshot == null ||
+        widget.state.link != ClientLinkState.ready ||
+        !identical(widget.state.snapshot, displayedSnapshot) ||
+        _pending.contains(action) ||
+        (action == _ClientAction.connect && _disconnecting)) {
+      return;
+    }
     final epoch = widget.state.cacheEpoch;
     setState(() {
       _pending.add(action);
@@ -162,7 +176,7 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                   FilledButton(
                     key: const Key('client-connect'),
                     onPressed: canConnect
-                        ? () => _run(_ClientAction.connect)
+                        ? () => _run(_ClientAction.connect, snapshot)
                         : null,
                     child: Text(_connecting ? 'Submitting…' : 'Connect'),
                   ),
@@ -171,14 +185,14 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                     // Disconnect stays available during connect, blocked recovery
                     // and stale intent. The producer owns authorization/policy.
                     onPressed: owner && profile && !_disconnecting
-                        ? () => _run(_ClientAction.disconnect)
+                        ? () => _run(_ClientAction.disconnect, snapshot)
                         : null,
                     child: const Text('Disconnect'),
                   ),
                   OutlinedButton(
                     key: const Key('client-renew-session'),
                     onPressed: canRenew
-                        ? () => _run(_ClientAction.renewSession)
+                        ? () => _run(_ClientAction.renewSession, snapshot)
                         : null,
                     child: const Text('Renew session'),
                   ),

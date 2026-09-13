@@ -1,0 +1,154 @@
+import 'dart:async';
+
+import 'package:endlessnet/client_connection_panel.dart';
+import 'package:endlessnet/client_operation.dart';
+import 'package:endlessnet/client_state_controller.dart';
+import 'package:endlessnet_client_api/client_api.dart' as api;
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+// Deliberately retain a callback to simulate queued activation from an older
+// frame. This does not replace platform keyboard/hit-test acceptance.
+void main() {
+  for (final action in ['connect', 'disconnect', 'renew-session']) {
+    for (final change in [
+      'profile',
+      'observer',
+      'capability',
+      'status',
+      'session',
+      'detach',
+      'dispose',
+      'duplicate',
+    ]) {
+      testWidgets('US-03/09 queued $action rejects $change replacement', (
+        tester,
+      ) async {
+        final state = ClientStateController();
+        final source = StreamController<api.WatchEventsResponse>();
+        await state.attach(source.stream);
+        final pending = Completer<ClientOperation>();
+        var calls = 0;
+        Future<ClientOperation> submit() {
+          calls++;
+          return pending.future;
+        }
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ClientConnectionPanel(
+                state: state,
+                connect: submit,
+                disconnect: submit,
+                renewSession: submit,
+              ),
+            ),
+          ),
+        );
+        final snapshot = _snapshot();
+        source.add(snapshot);
+        await tester.pump();
+        expect(state.link, ClientLinkState.ready);
+        final queued = tester
+            .widget<ButtonStyleButton>(find.byKey(Key('client-$action')))
+            .onPressed!;
+
+        if (change == 'duplicate') {
+          queued();
+          queued();
+          expect(calls, 1);
+        } else {
+          if (change == 'detach') {
+            await tester.runAsync(state.detach);
+          } else if (change == 'dispose') {
+            await tester.pumpWidget(const SizedBox());
+          } else {
+            final replacement = api.WatchEventsResponse.fromBuffer(
+              snapshot.writeToBuffer(),
+            );
+            replacement.sequence += 1;
+            replacement.metadata.revision += 1;
+            replacement.snapshot.status.metadata.revision += 1;
+            switch (change) {
+              case 'profile':
+                replacement.snapshot.status.activeProfileId = 'profile-b';
+              case 'observer':
+                replacement.snapshot.runtime.callerAccess =
+                    api.Access.ACCESS_OBSERVER;
+                replacement.snapshot.status.clearActiveProfileId();
+                replacement.snapshot.status.clearSession();
+              case 'capability':
+                replacement.snapshot.runtime.capabilities.clear();
+              case 'status':
+                final status = replacement.snapshot.status;
+                status.connectionPhase =
+                    api.ConnectionPhase.CONNECTION_PHASE_CONNECTING;
+                replacement.clearSnapshot();
+                replacement.statusChanged = status;
+              case 'session':
+                replacement.clearSnapshot();
+                replacement.ensureSessionChanged().state =
+                    api.SessionState.SESSION_STATE_RENEWING;
+            }
+            source.add(replacement);
+            await tester.pump();
+            expect(state.link, ClientLinkState.ready);
+          }
+          queued();
+          expect(calls, 0);
+        }
+        pending.complete(
+          ClientOperation.fromProto(
+            api.Operation(
+              id: 'synthetic-operation',
+              kind: api.OperationKind.OPERATION_KIND_CONNECT,
+              state: api.OperationState.OPERATION_STATE_PENDING,
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pumpWidget(const SizedBox());
+        await tester.runAsync(() async {
+          await state.detach();
+          await source.close();
+          state.dispose();
+        });
+        expect(tester.takeException(), isNull);
+      }, timeout: const Timeout(Duration(seconds: 20)));
+    }
+  }
+}
+
+api.WatchEventsResponse _snapshot() =>
+    api.WatchEventsResponse()..mergeFromProto3Json({
+      'sequence': '1',
+      'metadata': {'instanceId': 'activation-test', 'revision': '1'},
+      'snapshot': {
+        'runtime': {
+          'protocol': api.ClientContract.protocol,
+          'contractSha256': api.ClientContract.sha256,
+          'instanceId': 'activation-test',
+          'callerAccess': 'ACCESS_OWNER',
+          'capabilities': [
+            for (final capability in [
+              'CAPABILITY_CONNECTION',
+              'CAPABILITY_SESSION_RENEWAL',
+            ])
+              {
+                'capability': capability,
+                'restriction': {'availability': 'AVAILABILITY_AVAILABLE'},
+              },
+          ],
+        },
+        'status': {
+          'metadata': {'instanceId': 'activation-test', 'revision': '1'},
+          'activeProfileId': 'profile-a',
+          'connectionPhase': 'CONNECTION_PHASE_DISCONNECTED',
+          'session': {
+            'state': 'SESSION_STATE_ACTIVE',
+            'renewal': {'availability': 'AVAILABILITY_AVAILABLE'},
+          },
+        },
+      },
+    });

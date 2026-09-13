@@ -305,6 +305,16 @@ semantic live region. Shared regression проверяет точный текс
 Это проверка Flutter semantics tree, а не фактического озвучивания VoiceOver,
 TalkBack или Windows screen reader; полная accessibility и локализация открыты.
 
+US-03/09: Connect, Disconnect и RenewSession привязаны к immutable snapshot,
+который разрешил кнопку. Отложенный callback после замены profile/caller,
+capabilities, status или session, отключения подписки либо dispose не вызывает
+команду. Повторный callback во время незавершённого submit также отклоняется;
+Disconnect во время Connect остаётся доступным. 24 widget regressions в
+`client_connection_activation_test.dart` включены в desktop suite и mobile host.
+Они моделируют queued activation напрямую, не доказывают реальные OS input events.
+Локальный анализ mobile host невозможен без его ephemeral dependency resolution;
+исполнение Android/iOS этих новых сценариев остаётся за CI.
+
 `client_cleanup_panel.dart` подключает отдельные journaled Logout и
 ForgetLocalEnrollment(confirmed=true) для active profile. Каждое действие требует
 подтверждения; local forget дополнительно требует ACCESS_ADMINISTRATOR и capability.

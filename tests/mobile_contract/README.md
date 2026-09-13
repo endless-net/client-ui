@@ -6,6 +6,11 @@ and `app/test/client_intent_journal_test.dart`. Journal tests run in an isolated
 test group and use the native sandbox temporary filesystem, including the real
 4096-record admission boundary and reserved Disconnect record. Test inclusion
 alone is not successful Android/iOS execution evidence.
+The host also includes primary-action queued callback/context regressions and
+lifecycle preference projection validation. Direct callback invocation here
+models an already queued event; it does not replace real keyboard, touch or
+assistive-technology activation tests. Subscription shutdown in widget tests
+uses real async execution so cancellation is not stranded in Flutter fake time.
 The mobile workflow generates native
 Android/iOS project files using the existing pinned Flutter 3.38.1 SDK and runs
 the integration test inside an emulator/simulator, not the host Dart VM.
