@@ -14,6 +14,12 @@
 
 ### Актуализация source cutover — 2026-09-13
 
+[Проверка полноты реализации от 2026-09-14](client-ui-implementation-audit.md)
+сверяет все 23 UF и группы UBR/UI-AC с текущим source. Первый этап не закрыт:
+mobile product hosts, notifications/autostart/lifecycle adapters, не-Windows
+export/authorization и archive preview ещё требуют реализации. Unit totals
+и исторические CI runs не заменяют этот gate.
+
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin
