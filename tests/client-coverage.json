@@ -645,6 +645,10 @@
           "scope": "Five composed-shell tests: explicit enable/retry/disable without runtime mutation, restored setting without implicit save, read/write failure privacy, ordered rapid writes with stale failure suppression, observer quit awaits pending save and rejects stale toggle. Production native adapter remains absent; not OS delivery or native restart acceptance"
         },
         {
+          "path": "app/test/client_notification_permission_test.dart",
+          "scope": "10 short tests: no-argument explicit permission channel, distinct granted/denied/unsupported/unavailable, missing/failed/malformed host never grants, no request on build, single-flight and stale disabled click guards, exact RU/EN outcomes and disposal suppression. macOS native source added but OS authorization prompt/grant, native Swift build and click behavior not verified"
+        },
+        {
           "path": "app/test/client_native_notifications_test.dart",
           "scope": "11 short MethodChannel tests: exact title/body-only payload, all outcomes, missing host, private platform error suppression, malformed responses and pre-channel UTF8/NUL/size checks. Linux native source connected in main; channel mocks do not prove desktop service delivery or native app build"
         },

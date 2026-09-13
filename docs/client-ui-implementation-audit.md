@@ -71,6 +71,12 @@ read/write entitlement при сохранённом sandbox, release в finally
 compilation, effective sandbox rights и реальный диалог пока не проверены.
 Mobile export и macOS protected-IPC acceptance остаются отдельными пробелами.
 
+macOS notification source дополнена: UNUserNotificationCenter delivery с
+permission precheck, отдельный explicit permission button в UI и known-ID
+default click только для текущего окна. 10 short permission tests проверяют
+общую UI/channel-логику; AppKit/UserNotifications build и фактическая работа ОС
+не проверены. Windows/Android/iOS adapters остаются незавершёнными.
+
 | UF | Наблюдаемая реализация | Что ещё нужно для исходного scope |
 | --- | --- | --- |
 | UF-01 | `main.dart`, Windows runner/package pipeline; Linux/macOS scaffold | Product hosts Android/iOS отсутствуют; дистрибуция и compatible pairing всех платформ не квалифицированы |

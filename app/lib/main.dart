@@ -100,8 +100,11 @@ Future<void> main(List<String> args) async {
     ClientDesktopApp(
       initialLocale: locale,
       initialNotifications: notifications,
-      deliverNotification: Platform.isLinux
+      deliverNotification: Platform.isLinux || Platform.isMacOS
           ? deliverNativeClientNotification
+          : null,
+      requestNotificationPermission: Platform.isMacOS
+          ? requestNativeClientNotificationPermission
           : null,
       notificationReadFailed: notificationReadFailed,
       saveNotifications: (value) async {

@@ -150,6 +150,26 @@ Mobile export отсутствует; наличие macOS source не озна�
 локальный origin/main остаются `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`.
 Producer repository, его пользовательские изменения, pin и версии не менялись.
 
+macOS notifications source дополнена в `MainFlutterWindow.swift` через
+[`UNUserNotificationCenter`](https://developer.apple.com/documentation/usernotifications/unusernotificationcenter).
+Перед add проверяются текущие authorization settings; без разрешения delivery
+возвращает permissionDenied, не вызывает OS prompt. Отдельная RU/EN
+[`permission panel`](../app/lib/client_notification_permission_panel.dart)
+показывается в shell только при наличии request adapter: явное действие вызывает
+`requestAuthorization(.alert)`, без sound/badge; результат не включает preference
+и не повторяет delivery автоматически. Ошибки/unsupported/denied/granted разделены.
+Background/foreground delivery содержит fixed title/body и случайный ID без
+userInfo/URL. Delegate показывает banner/list для известных IDs, а default click
+однократно открывает только текущее окно; receipt list ограничен 64 и не
+восстанавливается после restart. Window close очищает delegate/pending requests;
+уже переданный системе показ этим source не гарантированно отзывается.
+[10 short permission tests](../app/test/client_notification_permission_test.dart)
+проверяют channel/result mapping, explicit single-flight action, RU/EN тексты,
+отсутствие запроса при rebuild, disabled/stale click и disposal. Прежние delivery
+channel tests сохраняются. Native Swift/AppKit compilation, OS prompt, grant
+и реальный click/foreground behavior не проверены; Windows/mobile notification
+adapters ещё отсутствуют. Deployment target и версии не менялись.
+
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin

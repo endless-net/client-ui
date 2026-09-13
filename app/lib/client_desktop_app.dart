@@ -17,6 +17,8 @@ import 'client_state_controller.dart';
 import 'client_tray.dart';
 import 'client_notification_delivery.dart';
 import 'client_notifications_panel.dart';
+import 'client_notification_permission_panel.dart';
+import 'client_native_notifications.dart';
 
 Directory clientJournalDirectory(String endpoint) {
   final home =
@@ -47,12 +49,15 @@ class ClientDesktopApp extends StatefulWidget {
     this.initialNotifications = false,
     this.notificationReadFailed = false,
     this.saveNotifications,
+    this.requestNotificationPermission,
   });
   final ClientSession session;
   final DeliverClientNotification? deliverNotification;
   final bool initialNotifications;
   final bool notificationReadFailed;
   final Future<void> Function(bool)? saveNotifications;
+  final Future<ClientNotificationPermission> Function()?
+  requestNotificationPermission;
   final ClientLocale initialLocale;
   final bool localeReadFailed;
   final Future<void> Function(ClientLocale)? saveLocale;
@@ -548,14 +553,25 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
               locale: _locale,
               session: session,
               uiBuild: widget.uiBuild,
-              notifications: ClientNotificationsPanel(
-                delivery: _notifications,
-                supported: widget.deliverNotification != null,
-                locale: _locale,
-                busy: _busy,
-                onChanged: _chooseNotifications,
-                persistent: widget.saveNotifications != null,
-                storageFailed: _notificationStorageFailed,
+              notifications: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.requestNotificationPermission != null)
+                    ClientNotificationPermissionPanel(
+                      request: widget.requestNotificationPermission!,
+                      locale: _locale,
+                      enabled: !_busy,
+                    ),
+                  ClientNotificationsPanel(
+                    delivery: _notifications,
+                    supported: widget.deliverNotification != null,
+                    locale: _locale,
+                    busy: _busy,
+                    onChanged: _chooseNotifications,
+                    persistent: widget.saveNotifications != null,
+                    storageFailed: _notificationStorageFailed,
+                  ),
+                ],
               ),
               exportBundle:
                   widget.desktopIntegration &&
