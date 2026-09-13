@@ -113,6 +113,22 @@ service очищает receipts и инвалидирует старые in-flig
 а реальный desktop/Wayland focus и restart не квалифицированы. Старые receipts
 за пределами последних 64 не активируют UI; app restart не восстанавливает их.
 
+Linux diagnostics destination source дополнена:
+[`bundle_destination.cc`](../app/linux/runner/bundle_destination.cc) регистрирует
+существующий UI-only `chooseDirectory` без аргументов. Асинхронный
+[GtkFileChooserNative](https://docs.gtk.org/gtk3/class.FileChooserNative.html)
+выбирает одну локальную папку; не читает archive handle/bytes, не создаёт папки
+и не получает private runtime context. Cancel/закрытие окна возвращает null,
+непригодный результат или конкурирующий chooser — fixed error. Parent destroy
+и channel teardown закрывают диалог и завершают ожидающий вызов без сохранения.
+Shell включает существующий guarded export на Windows/Linux; macOS/mobile
+остаются unsupported. [14 short tests](../app/test/client_bundle_destination_test.dart)
+проверяют shared channel/flow: платформенную границу, missing/malformed reply,
+отмену, context checks до/после выбора и сохранения, отсутствие replay.
+Linux C++ syntax check с GTK/Flutter headers пройден; native dialog interaction,
+filesystem/portal permission, captions относительно UI locale и полная native
+app build не проверены. OS labels выбирает GTK; полное UI-AC-13 не заявлено.
+
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin

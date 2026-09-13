@@ -14,6 +14,38 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
+  test('only implemented Windows/Linux destination hosts are enabled', () {
+    for (final os in [
+      'windows',
+      'linux',
+      'macos',
+      'android',
+      'ios',
+      'fuchsia',
+      'unknown',
+    ]) {
+      expect(
+        supportsClientBundleDestination(os),
+        os == 'windows' || os == 'linux',
+      );
+    }
+  });
+
+  test(
+    'missing host implementation and non-string result are not cancellation',
+    () async {
+      await expectLater(
+        chooseClientBundleDirectory(),
+        throwsA(isA<MissingPluginException>()),
+      );
+      messenger.setMockMethodCallHandler(channel, (_) async => 7);
+      await expectLater(
+        chooseClientBundleDirectory(),
+        throwsA(isA<TypeError>()),
+      );
+    },
+  );
+
   test('native chooser sends no operation or bundle payload', () async {
     final path = Directory.current.path;
     messenger.setMockMethodCallHandler(channel, (call) async {

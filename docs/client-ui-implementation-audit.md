@@ -58,6 +58,13 @@ set ограничен 64 ID, удаляется при close/service owner chan
 host не удерживается живым callback. Четыре GLib unit tests и C++ syntax check
 пройдены локально. Реальный ActionInvoked/Wayland focus остаётся acceptance gap.
 
+Linux export source дополнена: `GtkFileChooserNative` через UI-only channel,
+local single-folder selection, null на отмену/parent close, fixed error на
+непригодный путь/конкурирующий запрос. Shell экспорт теперь доступен для
+Windows/Linux и использует прежние checksum/context/unique-directory guards.
+14 shared short tests и native syntax check прошли; реальный диалог, portal
+permissions и OS captions не квалифицированы. macOS/mobile export ещё отсутствует.
+
 | UF | Наблюдаемая реализация | Что ещё нужно для исходного scope |
 | --- | --- | --- |
 | UF-01 | `main.dart`, Windows runner/package pipeline; Linux/macOS scaffold | Product hosts Android/iOS отсутствуют; дистрибуция и compatible pairing всех платформ не квалифицированы |

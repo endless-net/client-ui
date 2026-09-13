@@ -547,7 +547,9 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
                 persistent: widget.saveNotifications != null,
                 storageFailed: _notificationStorageFailed,
               ),
-              exportBundle: widget.desktopIntegration && Platform.isWindows
+              exportBundle:
+                  widget.desktopIntegration &&
+                      supportsClientBundleDestination(Platform.operatingSystem)
                   ? _exportBundle
                   : null,
             ),

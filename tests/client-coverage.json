@@ -305,7 +305,7 @@
       "testEvidence": [
         {
           "path": "app/test/client_bundle_destination_test.dart",
-          "scope": "Short unit tests cover the UI-owned destination channel payload, native cancellation/error distinction, invalid paths, original request ID, context checks across chooser/save and no retries. Windows desktop binds the native folder chooser to session verified export. No actual chooser interaction or cross-platform export acceptance; other platform adapters remain missing"
+          "scope": "14 short tests cover Windows/Linux-only host selection, UI-owned destination channel payload, missing/malformed responses, cancellation/error distinction, invalid paths, original request ID, context checks across chooser/save and no retries. Windows and Linux shell bind native folder choice to verified session export. Linux source passed C++ syntax check with real GTK/Flutter headers; no actual chooser interaction, portal permissions, OS caption localization or cross-platform export acceptance. macOS/mobile adapters remain missing"
         },
         {
           "path": "app/test/client_session_test.dart",

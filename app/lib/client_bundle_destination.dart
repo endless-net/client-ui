@@ -4,6 +4,9 @@ import 'package:flutter/services.dart';
 
 const _channel = MethodChannel('endlessnet/ui-diagnostics-destination');
 
+bool supportsClientBundleDestination(String operatingSystem) =>
+    operatingSystem == 'windows' || operatingSystem == 'linux';
+
 /// Native UI only: no bundle handle, credentials, or bytes cross this channel.
 Future<Directory?> chooseClientBundleDirectory() async {
   final path = await _channel.invokeMethod<String>('chooseDirectory');
