@@ -15,6 +15,9 @@ import 'package:window_manager/window_manager.dart';
 
 import 'named_pipe_http.dart';
 import 'service_contract.dart';
+import 'client_desktop_app.dart';
+import 'client_intent_journal.dart';
+import 'client_session.dart';
 
 const _appTitle = 'EndlessNet';
 const _appVersion = String.fromEnvironment(
@@ -61,14 +64,12 @@ Future<void> main(List<String> args) async {
     exit(0);
   }
 
-  final bridge = EndlessNetClientBridge(config: config, logger: logger);
-  if (config.elevatedEnrollment) {
-    await _runEnrollmentAndExit(config, bridge, logger);
-    exit(exitCode);
-  }
-  if (config.enrollText.trim().isNotEmpty) {
-    await _runEnrollmentAndExit(config, bridge, logger);
-    exit(exitCode);
+  if (config.elevatedEnrollment || config.enrollText.trim().isNotEmpty) {
+    stderr.writeln(
+      'Startup enrollment arguments are retired. Open the native profile enrollment panel.',
+    );
+    await logger.close();
+    exit(1);
   }
 
   final acquired = await acquireSingleInstanceLock(logger);
@@ -84,13 +85,27 @@ Future<void> main(List<String> args) async {
 
   await windowManager.ensureInitialized();
   await windowManager.setPreventClose(true);
-  final controller = EndlessNetController(
-    config: config,
-    bridge: bridge,
-    logger: logger,
+  final endpoint = Platform.isWindows
+      ? config.pipe
+      : (Platform.isMacOS
+            ? '/var/run/endlessnet/client.sock'
+            : '/run/endlessnet/client.sock');
+  final session = ClientSession(
+    endpoint: endpoint,
+    journal: ClientIntentJournal(clientJournalDirectory(endpoint)),
   );
-  runApp(EndlessNetApp(controller: controller));
-  await controller.initialize();
+  runApp(
+    ClientDesktopApp(
+      session: session,
+      showWindow: config.showWindow,
+      showSignal: showSignalWriteTime,
+      onExit: () async {
+        await logger.close();
+        await _instanceLock?.close();
+        _instanceLock = null;
+      },
+    ),
+  );
 }
 
 String versionText() {
@@ -98,76 +113,6 @@ String versionText() {
       'commit: $_appCommit\n'
       'built: $_appBuildDate\n'
       'target: $_appTarget\n';
-}
-
-Future<void> _runEnrollmentAndExit(
-  AppConfig config,
-  EndlessNetClientBridge bridge,
-  AppLogger logger,
-) async {
-  EnrollmentRequest? request;
-  try {
-    request = config.enrollText.trim().isEmpty
-        ? EnrollmentRequest(token: '', server: config.server, mode: config.mode)
-        : parseEnrollment(config.enrollText, config.server, config.mode);
-    var payload = await bridge.enroll(request);
-    logger.info('enrollment request completed');
-    final approvalURL = enrollmentApprovalURL(payload);
-    if (approvalURL.isNotEmpty) {
-      final opened = await launchExternalURL(Uri.parse(approvalURL));
-      if (!opened) {
-        throw StateError(
-          'Windows could not open the device connection page in your default browser.',
-        );
-      }
-      logger.info('device connection page opened');
-    }
-    final deadline = DateTime.now().add(_defaultEnrollmentPollTimeout);
-    while (isEnrollmentPending(payload) && DateTime.now().isBefore(deadline)) {
-      await Future<void>.delayed(_defaultEnrollmentPollInterval);
-      payload = await bridge.status();
-    }
-    if (isEnrollmentPending(payload)) {
-      throw StateError('Device connection timed out. Try again.');
-    }
-    if (!ServiceStatus(payload).deviceEnrolled) {
-      throw StateError('The service did not complete device enrollment.');
-    }
-    logger.info('enrollment completed');
-  } catch (err, stack) {
-    if (!config.elevatedEnrollment &&
-        Platform.isWindows &&
-        request != null &&
-        requiresAdministratorElevation(err)) {
-      try {
-        final launched = await launchElevatedEnrollment(config, request);
-        if (!launched) {
-          throw StateError(
-            'Administrator approval is required to connect this device.',
-          );
-        }
-        logger.info('elevated enrollment process launched after owner denial');
-        return;
-      } catch (elevatedErr, elevatedStack) {
-        logger.error(
-          'failed to launch elevated enrollment',
-          elevatedErr,
-          elevatedStack,
-        );
-        await showMessageBox(
-          'EndlessNet enrollment',
-          safeErrorText(elevatedErr),
-        );
-        exitCode = 1;
-        return;
-      }
-    }
-    logger.error('enrollment failed', err, stack);
-    await showMessageBox('EndlessNet enrollment', safeErrorText(err));
-    exitCode = 1;
-  } finally {
-    await logger.close();
-  }
 }
 
 class AppConfig {

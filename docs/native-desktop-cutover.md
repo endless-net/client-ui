@@ -1,0 +1,36 @@
+# Native desktop entrypoint cutover
+
+As of 2026-09-13, `app/lib/main.dart` creates `ClientSession` and
+`ClientDesktopApp`, not the retired HTTP controller. Runtime state and mutations
+flow through the accepted client.v0 session and its persisted intention journal.
+Opening a channel does not enable commands before a validated snapshot. Native
+connection failures have no HTTP fallback and expose only a fixed UI message.
+Startup enrollment flags are rejected; enrollment belongs to the native panel.
+
+The desktop shell provides explicit reconnect, single-instance show signalling,
+close-to-tray and quit. Owner quit with an active profile submits UI_QUIT through
+the normal journal. An accepted operation is not reported as completed. If the
+notification is not confirmed, the UI requires a separate exit confirmation and
+does not replay the operation. Observer/no-profile exit does not mutate owner
+intent. The journal path is scoped to the OS home and a hash of the endpoint;
+this alone is not evidence of filesystem permission enforcement on all platforms.
+
+`app/test/client_desktop_app_test.dart` covers awaiting the first snapshot,
+readiness, sanitized transport failure, explicit reconnect, and declining exit
+without a confirmed runtime notification. These are widget/session tests with
+desktop plugins disabled, not acceptance of real windows, tray or UAC behaviour.
+Local checks use Flutter 3.47.0 and `--no-pub`; CI pins Flutter 3.38.1. No SDK,
+dependency, or contract version increase is part of this change.
+
+Local verification on 2026-09-13: Go tests and Flutter analysis passed; the
+current working-tree Flutter suite passed 207 tests with 16 skipped. The suite
+still includes retired-contract tests and concurrent native exit-node work;
+its aggregate result is not a native-only coverage claim.
+
+Remaining work in client-ui: remove the unreachable old controller, bridge and
+widgets from main.dart and replace their HTTP-based tests; migrate the emulator
+and release pairing; complete native shell actions and destination adapters;
+validate actual desktop integration and elevation on supported platforms.
+Client owns remaining runtime providers/capabilities. System acceptance against
+pinned artifacts remains separate. This entrypoint change does not establish
+full UF-01–UF-23 coverage or complete the hard cutover goal.

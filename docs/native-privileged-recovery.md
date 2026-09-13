@@ -45,3 +45,6 @@ no-logout-fallback tests remain green. Go tests and Flutter analysis pass; the
 current full suite passes 195 tests, 13 skipped (same local SDK limitation above).
 This binds the native panel, not the still-retired-contract application shell in
 `main.dart`; full entrypoint removal/migration and actual UAC acceptance remain.
+
+Subsequent entrypoint migration and remaining acceptance limits are recorded in
+[Native desktop entrypoint cutover](native-desktop-cutover.md).
