@@ -686,6 +686,14 @@ evidence и не меняет датированные свидетельств�
 
 ## 7. Реализация и открытые platform решения
 
+UBR-37/UI-AC-23: ClientRuntimeOperationsPanel подключён к общей session panel
+отдельно от local-journal recovery. Он показывает owner-visible current_operations
+из первого snapshot, включая inactive profiles, и последующие OperationChanged.
+Получение terminal result не синтезирует Connected и не подтверждает/удаляет
+намерение из журнала. Observer, новый baseline и detach очищают старый список.
+Shared RU/EN widget tests проверяют эту проекцию без journal callbacks; это не
+installed-runtime restart или полная UI-AC-23 приёмка.
+
 Сверка wiring на `4d063f1e3dc4020118bce6215a2fb7f5320d75fa`: main создаёт
 ClientSession/ClientDesktopApp, desktop shell включает ClientSessionPanel, а
 панель связывает native reads/mutations/recovery. Нижеследующее описывает текущую

@@ -2,6 +2,89 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 
 import 'client_locale.dart';
 
+String clientOperationKindLabel(
+  api.OperationKind value, {
+  ClientLocale locale = ClientLocale.en,
+}) => switch (value) {
+  api.OperationKind.OPERATION_KIND_ENROLL => locale.text(
+    en: 'Enrollment',
+    ru: 'Регистрация',
+  ),
+  api.OperationKind.OPERATION_KIND_CONNECT => locale.text(
+    en: 'Connect',
+    ru: 'Подключение',
+  ),
+  api.OperationKind.OPERATION_KIND_DISCONNECT => locale.text(
+    en: 'Disconnect',
+    ru: 'Отключение',
+  ),
+  api.OperationKind.OPERATION_KIND_TRUST_SERVER_IDENTITY => locale.text(
+    en: 'Confirm server identity',
+    ru: 'Подтверждение идентичности сервера',
+  ),
+  api.OperationKind.OPERATION_KIND_LOGOUT => locale.text(
+    en: 'Logout',
+    ru: 'Выход',
+  ),
+  api.OperationKind.OPERATION_KIND_FORGET_LOCAL_ENROLLMENT => locale.text(
+    en: 'Forget local enrollment',
+    ru: 'Удаление локальной регистрации',
+  ),
+  api.OperationKind.OPERATION_KIND_SELECT_NETWORK => locale.text(
+    en: 'Select network',
+    ru: 'Выбор сети',
+  ),
+  api.OperationKind.OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE => locale.text(
+    en: 'Create diagnostics bundle',
+    ru: 'Создание диагностического пакета',
+  ),
+  api.OperationKind.OPERATION_KIND_CREATE_PROFILE => locale.text(
+    en: 'Create profile',
+    ru: 'Создание профиля',
+  ),
+  api.OperationKind.OPERATION_KIND_SELECT_PROFILE => locale.text(
+    en: 'Select profile',
+    ru: 'Выбор профиля',
+  ),
+  api.OperationKind.OPERATION_KIND_RENAME_PROFILE => locale.text(
+    en: 'Rename profile',
+    ru: 'Переименование профиля',
+  ),
+  api.OperationKind.OPERATION_KIND_REMOVE_PROFILE => locale.text(
+    en: 'Remove profile',
+    ru: 'Удаление профиля',
+  ),
+  api.OperationKind.OPERATION_KIND_RENEW_SESSION => locale.text(
+    en: 'Renew session',
+    ru: 'Продление сессии',
+  ),
+  api.OperationKind.OPERATION_KIND_SELECT_EXIT_NODE => locale.text(
+    en: 'Select exit node',
+    ru: 'Выбор выходного узла',
+  ),
+  api.OperationKind.OPERATION_KIND_CLEAR_EXIT_NODE => locale.text(
+    en: 'Clear exit node',
+    ru: 'Сброс выходного узла',
+  ),
+  api.OperationKind.OPERATION_KIND_SET_PREFERENCES => locale.text(
+    en: 'Set preferences',
+    ru: 'Изменение предпочтений',
+  ),
+  api.OperationKind.OPERATION_KIND_RESET_PREFERENCES => locale.text(
+    en: 'Reset preferences',
+    ru: 'Сброс предпочтений',
+  ),
+  api.OperationKind.OPERATION_KIND_SET_RESOURCE_ENABLED => locale.text(
+    en: 'Change resource activation',
+    ru: 'Изменение активности ресурса',
+  ),
+  api.OperationKind.OPERATION_KIND_NOTIFY_LIFECYCLE => locale.text(
+    en: 'Notify lifecycle',
+    ru: 'Уведомление о событии жизненного цикла',
+  ),
+  _ => locale.text(en: 'Unknown operation', ru: 'Неизвестная операция'),
+};
+
 // Closed producer enums only. Never derive UI text from arbitrary reason keys,
 // transport messages or an enum's wire name.
 String clientOperationStateLabel(

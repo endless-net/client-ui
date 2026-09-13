@@ -4,6 +4,20 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('US-03 all current operation kinds have distinct RU/EN labels', () {
+    for (final locale in ClientLocale.values) {
+      final labels = api.OperationKind.values
+          .skip(1)
+          .map((v) => clientOperationKindLabel(v, locale: locale))
+          .toList();
+      expect(labels.toSet().length, labels.length);
+      for (final label in labels) {
+        expect(label, isNot(contains('_')));
+        expect(label, isNot(contains('Unknown')));
+        expect(label, isNot(contains('Неизвестная')));
+      }
+    }
+  });
   test(
     'US-14 Russian operation catalog preserves roles and failure meanings',
     () {

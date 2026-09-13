@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'client_connection_panel.dart';
 import 'client_session.dart';
 import 'client_recovery_panel.dart';
+import 'client_runtime_operations_panel.dart';
 import 'client_profiles_panel.dart';
 import 'client_create_profile_panel.dart';
 import 'client_enrollment_panel.dart';
@@ -360,7 +361,9 @@ class ClientSessionPanel extends StatelessWidget {
               },
             ),
           ),
+          ClientRuntimeOperationsPanel(state: session.state),
           ClientRecoveryPanel(
+            // Local-journal recovery stays separate from stream observations.
             exportBundle: exportBundle,
             state: session.state,
             recover: session.recoverPending,
