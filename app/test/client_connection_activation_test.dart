@@ -21,6 +21,7 @@ void main() {
       mutationCalls++;
       throw StateError('Rendering must not submit a mutation');
     }
+
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -50,6 +51,14 @@ void main() {
       'Renewing',
       'Blocked',
     ];
+    const renewalLabels = [
+      'Unknown',
+      'Available — choose Renew session',
+      'Not supported',
+      'Blocked by policy',
+      'Permission required',
+      'Temporarily unavailable',
+    ];
     var sequence = 0;
     for (var session = 0; session < sessionLabels.length; session++) {
       for (
@@ -67,6 +76,19 @@ void main() {
         )!;
         event.snapshot.status.ensureCredential().state =
             api.CredentialState.valueOf(credential)!;
+        event.snapshot.status.session.renewal.availability =
+            api.Availability.valueOf(credential % renewalLabels.length)!;
+        if (credential == 6) {
+          event.snapshot.runtime.capabilities.clear();
+        }
+        if (credential != 0) {
+          event.snapshot.status.session.mergeFromProto3Json({
+            'warningAt': '2000-01-01T00:00:00Z',
+          });
+          event.snapshot.status.credential.mergeFromProto3Json({
+            'warningAt': '2031-02-03T04:05:06Z',
+          });
+        }
         source.add(event);
         await tester.pump();
         expect(state.link, ClientLinkState.ready);
@@ -80,6 +102,33 @@ void main() {
         );
         expect(find.text('Session expiry: Unknown'), findsOneWidget);
         expect(find.text('Credential expiry: Unknown'), findsOneWidget);
+        expect(
+          find.text(
+            'Session warning: ${credential == 0 ? 'Unknown' : '2000-01-01T00:00:00.000Z'}',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            'Credential warning: ${credential == 0 ? 'Unknown' : '2031-02-03T04:05:06.000Z'}',
+          ),
+          findsOneWidget,
+        );
+        final renewal = credential == 6
+            ? 'Unavailable on this runtime'
+            : session == 5
+            ? 'In progress'
+            : renewalLabels[credential];
+        expect(find.text('Session renewal: $renewal'), findsOneWidget);
+        expect(
+          tester
+                  .widget<OutlinedButton>(
+                    find.byKey(const Key('client-renew-session')),
+                  )
+                  .onPressed !=
+              null,
+          credential == 1 && session != 5,
+        );
       }
     }
     expect(mutationCalls, 0);
@@ -87,6 +136,12 @@ void main() {
     await tester.pump();
     expect(find.byKey(const Key('client-session-state')), findsNothing);
     expect(find.byKey(const Key('client-credential-state')), findsNothing);
+    expect(find.byKey(const Key('client-session-warning')), findsNothing);
+    expect(find.byKey(const Key('client-credential-warning')), findsNothing);
+    expect(
+      find.byKey(const Key('client-session-renewal-status')),
+      findsNothing,
+    );
     await tester.pumpWidget(const SizedBox());
     await tester.runAsync(source.close);
     state.dispose();

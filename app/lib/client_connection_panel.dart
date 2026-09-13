@@ -168,12 +168,24 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                   key: const Key('client-session-expiry'),
                 ),
                 Text(
+                  'Session warning: ${snapshot.status.session.hasWarningAt() ? _deadline(snapshot.status.session.warningAt.seconds.toInt(), snapshot.status.session.warningAt.nanos) : 'Unknown'}',
+                  key: const Key('client-session-warning'),
+                ),
+                Text(
+                  'Session renewal: ${_renewalStatus(snapshot)}',
+                  key: const Key('client-session-renewal-status'),
+                ),
+                Text(
                   'Credential state: ${_credentialState(snapshot.status.credential.state)}',
                   key: const Key('client-credential-state'),
                 ),
                 Text(
                   'Credential expiry: ${snapshot.status.credential.hasExpiresAt() ? _deadline(snapshot.status.credential.expiresAt.seconds.toInt(), snapshot.status.credential.expiresAt.nanos) : 'Unknown'}',
                   key: const Key('client-credential-expiry'),
+                ),
+                Text(
+                  'Credential warning: ${snapshot.status.credential.hasWarningAt() ? _deadline(snapshot.status.credential.warningAt.seconds.toInt(), snapshot.status.credential.warningAt.nanos) : 'Unknown'}',
+                  key: const Key('client-credential-warning'),
                 ),
               ],
               const SizedBox(height: 12),
@@ -227,6 +239,26 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
 }
 
 String _contextValue(String value) => value.isEmpty ? 'Unknown' : value;
+
+String _renewalStatus(ClientRuntimeSnapshot snapshot) {
+  if (!snapshot.supports(api.Capability.CAPABILITY_SESSION_RENEWAL)) {
+    return 'Unavailable on this runtime';
+  }
+  if (snapshot.status.session.state ==
+      api.SessionState.SESSION_STATE_RENEWING) {
+    return 'In progress';
+  }
+  return switch (snapshot.status.session.renewal.availability) {
+    api.Availability.AVAILABILITY_AVAILABLE =>
+      'Available — choose Renew session',
+    api.Availability.AVAILABILITY_UNSUPPORTED => 'Not supported',
+    api.Availability.AVAILABILITY_POLICY_BLOCKED => 'Blocked by policy',
+    api.Availability.AVAILABILITY_PERMISSION_REQUIRED => 'Permission required',
+    api.Availability.AVAILABILITY_TEMPORARILY_UNAVAILABLE =>
+      'Temporarily unavailable',
+    _ => 'Unknown',
+  };
+}
 
 String _sessionState(api.SessionState state) => switch (state) {
   api.SessionState.SESSION_STATE_NOT_AUTHENTICATED => 'Not authenticated',

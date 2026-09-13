@@ -344,7 +344,7 @@
         },
         {
           "path": "app/test/client_connection_activation_test.dart",
-          "scope": "All 42 combinations of authoritative session/credential states with unknown deadlines, removal on detach, and queued renewal admission guards. Included in desktop/mobile harness; not real renewal or full platform acceptance"
+          "scope": "All 42 combinations of authoritative session/credential states with unknown expiry, independent known/unknown warning times, renewal restrictions/capability and button gating, removal on detach, and queued renewal admission guards. Included in desktop/mobile harness; not real renewal or full platform acceptance"
         }
       ],
       "acceptanceEvidence": []

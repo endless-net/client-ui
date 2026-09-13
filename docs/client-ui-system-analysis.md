@@ -568,6 +568,14 @@ Timestamp означает неизвестный срок. UI не устана
 RenewSession не означает renewal node credential. Continuity показывается как
 preserved/interrupted/unknown/not applicable по подтверждённому результату.
 
+US-09 UI foundation: shared connection panel показывает отдельные typed states,
+expiry и warning timestamps для session и credential. Недоступность RenewSession
+объясняется availability/capability, а RENEWING отображается как in progress.
+Ни прошедший warning timestamp, ни отсутствие expiry не меняют runtime state.
+`client_connection_activation_test.dart` проверяет 42 комбинации состояний,
+ограничения кнопки и очистку при потере связи в desktop/mobile harness.
+Это consumer evidence, не подтверждение реального renewal или platform acceptance.
+
 Requested preference не выдаётся за effective. Если сохранённое намерение ещё
 не применилось, UI показывает расхождение и причину операции. Reset снимает
 user override; false остаётся явным значением. Managed policy не меняется
