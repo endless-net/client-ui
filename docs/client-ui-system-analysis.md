@@ -143,6 +143,13 @@ Synthetic bytes [1,2,3] проверяют transport/checksum, не формат
 размере >5 MiB, отсутствующем expiry, некорректных nanos/checksum; oversized chunk
 отклоняется, RPC error передаётся без повторного чтения. Это unit-level evidence;
 оно не подменяет process execution, redaction или native export acceptance.
+`exportClientBundle` — filesystem export primitive для уже проверенных bytes:
+только явно переданный absolute destination, новая уникальная подпапка,
+`diagnostics.bundle` без предположения ZIP, flush и повторная context check.
+При ошибке удаляется только созданная подпапка. Filesystem regression проверяет
+неперезапись, два отдельных экспорта и cleanup после отмены. Native destination
+picker, session/UI binding, OS permissions и формат/redaction остаются отдельными
+незавершёнными acceptance gates; путь никогда не берётся из bundle handle.
 Helper не пишет файлы, clipboard или сеть вне переданного RPC callback.
 
 Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:

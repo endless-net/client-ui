@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:endlessnet/client_bundle_export.dart';
 
 import 'package:endlessnet/client_intent_journal.dart';
 import 'package:endlessnet/client_mutations.dart';
@@ -105,6 +107,57 @@ ClientOperation accepted(api.MutationContext context) =>
     );
 
 void main() {
+  test(
+    'US-07: explicit bundle export never overwrites and cleans cancelled output',
+    () async {
+      final destination = await Directory.systemTemp.createTemp(
+        'en-export-test-',
+      );
+      try {
+        final existing = File.fromUri(
+          destination.uri.resolve('diagnostics.zip'),
+        );
+        await existing.writeAsString('keep');
+        final input = Uint8List.fromList([1, 2, 3]);
+        final first = await exportClientBundle(
+          destination,
+          input,
+          checkContext: () {},
+        );
+        final second = await exportClientBundle(
+          destination,
+          input,
+          checkContext: () {},
+        );
+        expect(first.path, isNot(second.path));
+        expect(await first.readAsBytes(), [1, 2, 3]);
+        expect(await second.readAsBytes(), [1, 2, 3]);
+        expect(await existing.readAsString(), 'keep');
+        final before = await destination.list().length;
+        var checks = 0;
+        await expectLater(
+          exportClientBundle(
+            destination,
+            input,
+            checkContext: () {
+              if (++checks == 3) {
+                throw StateError('Context expired after write');
+              }
+            },
+          ),
+          throwsStateError,
+        );
+        expect(await destination.list().length, before);
+        await expectLater(
+          exportClientBundle(Directory('relative'), input, checkContext: () {}),
+          throwsArgumentError,
+        );
+      } finally {
+        await destination.delete(recursive: true);
+      }
+    },
+  );
+
   late Directory directory;
   late FakeConnection connection;
   late ClientSession session;
