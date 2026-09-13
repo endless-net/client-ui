@@ -45,8 +45,13 @@ Build identity UI без `ENDLESSNET_TARGET` теперь определяетс
 процесса, а не фиксированному windows/amd64. Тот же resolved target показывается
 в `--version`; явный build target имеет приоритет. Unit-тесты проверяют 16 ABI,
 override и отказ для неподдержанного ABI. Это не утверждённая support matrix:
-в product `app` пока есть только Windows native-host. Остальные native-hosts и
-постоянные application/bundle IDs ещё не применены к новым hosts.
+В product `app` добавлены заготовки Linux/macOS native-hosts с ID `endlessnet.app`
+и отображаемым именем `EndlessNet`; существующий Windows-host не изменён.
+Статические short-тесты проверяют идентификаторы, имя macOS build product и
+получение версии из Flutter build settings. Нативные сборки новых hosts,
+доступ к protected IPC из macOS sandbox, lifecycle, экспорт диагностики и
+production-иконки ещё требуют реализации/проверки. Это не platform acceptance.
+Android/iOS product-hosts пока отсутствуют.
 
 Решение пользователя: основной application/bundle ID новых Android, iOS и macOS
 hosts — `endlessnet.app`, отображаемое имя — `EndlessNet`. ID не привязывается к
