@@ -17,6 +17,8 @@ Map<String, Object> recoveredOperation(Map<String, Object> accepted) => {
   'continuity': 'CONNECTION_CONTINUITY_UNKNOWN',
   if (accepted['kind'] == 'OPERATION_KIND_ENROLL')
     'enrollment': {'profileId': 'profile-a', 'nodeId': 'node-a'}
+  else if (accepted['kind'] == 'OPERATION_KIND_RENEW_SESSION')
+    'renewal': {'expiresAt': '2031-01-01T00:00:00Z'}
   else if (accepted['kind'] == 'OPERATION_KIND_SELECT_EXIT_NODE')
     'selection': {'selectedId': 'exit-a'}
   else if (accepted['kind'] == 'OPERATION_KIND_SELECT_NETWORK')
@@ -118,6 +120,7 @@ void main() {
   test('US-03: process recovery fixture satisfies operation contract', () {
     for (final kind in [
       'CONNECT',
+      'RENEW_SESSION',
       'ENROLL',
       'TRUST_SERVER_IDENTITY',
       'CREATE_DIAGNOSTICS_BUNDLE',
@@ -146,6 +149,7 @@ void main() {
       );
       expect(operation.value.whichOutcome(), switch (kind) {
         'ENROLL' => api.Operation_Outcome.enrollment,
+        'RENEW_SESSION' => api.Operation_Outcome.renewal,
         'CREATE_DIAGNOSTICS_BUNDLE' => api.Operation_Outcome.bundle,
         'SELECT_EXIT_NODE' ||
         'SELECT_NETWORK' ||
@@ -155,6 +159,7 @@ void main() {
     }
   });
   for (final authentication in [
+    'renew-session',
     'select-network',
     'connect',
     'browser',
@@ -172,7 +177,7 @@ void main() {
     'ui-quit',
   ]) {
     test(
-      'US-01/02/03/04/05/06/07/10/11/12: $authentication session submits and recovers while WatchEvents stays open',
+      'US-01/02/03/04/05/06/07/09/10/11/12: $authentication session submits and recovers while WatchEvents stays open',
       () async {
         final directory = await Directory.systemTemp.createTemp(
           'en-session-rpc-',
@@ -181,6 +186,7 @@ void main() {
         final intent = PendingClientIntent(
           'c06bd29f-7c77-4b27-943a-620081f313df',
           switch (authentication) {
+            'renew-session' => api.OperationKind.OPERATION_KIND_RENEW_SESSION,
             'select-network' => api.OperationKind.OPERATION_KIND_SELECT_NETWORK,
             'ui-quit' => api.OperationKind.OPERATION_KIND_NOTIFY_LIFECYCLE,
             'select-exit' ||
@@ -238,6 +244,8 @@ void main() {
             'hold_open': true,
             if (authentication == 'select-network')
               'response_gates': ['', 'network-changed'],
+            if (authentication == 'renew-session')
+              'response_gates': ['', 'session-renewed'],
             'responses': [
               {
                 'sequence': '1',
@@ -247,6 +255,16 @@ void main() {
                   'status': {
                     'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
                     'activeProfileId': 'profile-a',
+                    if (authentication == 'renew-session') ...{
+                      'session': {
+                        'state': 'SESSION_STATE_EXPIRING',
+                        'expiresAt': '2030-01-01T00:00:00Z',
+                      },
+                      'credential': {
+                        'state': 'CREDENTIAL_STATE_VALID',
+                        'expiresAt': '2032-01-01T00:00:00Z',
+                      },
+                    },
                     if (authentication == 'select-network')
                       'network': {'id': 'network-a'},
                     'serviceState': 'SERVICE_STATE_DISCONNECTED',
@@ -264,6 +282,15 @@ void main() {
                     'network': {'id': 'network-b'},
                     'serviceState': 'SERVICE_STATE_DISCONNECTED',
                     'connectionPhase': 'CONNECTION_PHASE_DISCONNECTED',
+                  },
+                },
+              if (authentication == 'renew-session')
+                {
+                  'sequence': '2',
+                  'metadata': {'instanceId': 'runtime-a', 'revision': '8'},
+                  'sessionChanged': {
+                    'state': 'SESSION_STATE_ACTIVE',
+                    'expiresAt': '2031-01-01T00:00:00Z',
                   },
                 },
             ],
@@ -446,6 +473,7 @@ void main() {
               'disable-resource' ||
               'conflict-resource' => 'SetResourceEnabled',
               'connect' => 'Connect',
+              'renew-session' => 'RenewSession',
               'trust' => 'TrustServerIdentity',
               'bundle' => 'CreateDiagnosticsBundle',
               'set-preferences' => 'SetPreferences',
@@ -705,6 +733,14 @@ void main() {
               }
               return commands.enroll(request);
             }
+            if (authentication == 'renew-session') {
+              return commands.renewSession(
+                api.RenewSessionRequest(
+                  mutation: context,
+                  profile: api.ProfileRef(profileId: 'profile-a'),
+                ),
+              );
+            }
             return commands.connect(
               api.ConnectRequest(
                 mutation: context,
@@ -732,6 +768,50 @@ void main() {
             expect(session.state.snapshot!.status.network.id, 'network-a');
           }
           final recovered = await session.recoverPending();
+          if (authentication == 'renew-session') {
+            final before = session.state.snapshot!.status;
+            expect(
+              before.session.state,
+              api.SessionState.SESSION_STATE_EXPIRING,
+            );
+            expect(
+              before.session.expiresAt.toProto3Json(),
+              '2030-01-01T00:00:00Z',
+            );
+            expect(
+              recovered.single.value.renewal.expiresAt.toProto3Json(),
+              '2031-01-01T00:00:00Z',
+            );
+            final credentialBefore = before.credential.writeToBuffer();
+            final changed = Completer<void>();
+            void observeSession() {
+              if (session.state.snapshot?.status.session.state ==
+                      api.SessionState.SESSION_STATE_ACTIVE &&
+                  !changed.isCompleted) {
+                changed.complete();
+              }
+            }
+
+            session.state.addListener(observeSession);
+            try {
+              await host.release('session-renewed');
+              await changed.future.timeout(const Duration(seconds: 10));
+            } finally {
+              session.state.removeListener(observeSession);
+            }
+            expect(
+              session.state.snapshot!.status.session.expiresAt.toProto3Json(),
+              '2031-01-01T00:00:00Z',
+            );
+            expect(
+              session.state.snapshot!.status.credential.writeToBuffer(),
+              credentialBefore,
+            );
+            expect(
+              (await journal.pending()).single.requestId,
+              intent.requestId,
+            );
+          }
           if (networks != null) {
             expect(recovered.single.value.selection.selectedId, 'network-b');
             expect(

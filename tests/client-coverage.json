@@ -345,6 +345,10 @@
         {
           "path": "app/test/client_connection_activation_test.dart",
           "scope": "All 42 combinations of authoritative session/credential states with unknown expiry, independent known/unknown warning times, renewal restrictions/capability and button gating, removal on detach, and queued renewal admission guards. Included in desktop/mobile harness; not real renewal or full platform acceptance"
+        },
+        {
+          "path": "app/test/client_session_process_test.dart",
+          "scope": "RenewSession producer-host scenario: exact mutation context, persisted request ID, pending acceptance, GetOperation renewal result, and gated SessionChanged without credential mutation. Desktop CI execution pending; not real renewal or mobile native interoperability"
         }
       ],
       "acceptanceEvidence": []
