@@ -18,6 +18,13 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+The peer process suite also bypasses ClientSession's local observer guard and
+calls ListPeers through LocalClientEvents directly. It expects a typed
+OWNER_REQUIRED from the producer guard, with no ListPeers expectation in the
+script; verification must reject accidental handler admission. This desktop
+test is pending runner execution and tests a fixture-configured role, not actual
+OS owner assignment or full observer privacy across all RPCs.
+
 At `f2cc6d738699cebd474895b18a027dabaaad96fd`, the
 [iOS job](https://github.com/endless-net/client-ui/actions/runs/34741635033/job/103682207409)
 passed 86 simulator tests, including `peer panel network-visible` and

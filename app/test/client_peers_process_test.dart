@@ -5,7 +5,9 @@ import 'package:endlessnet/client_intent_journal.dart';
 import 'package:endlessnet/client_peers.dart';
 import 'package:endlessnet/client_session.dart';
 import 'package:endlessnet/client_state_controller.dart';
+import 'package:endlessnet/local_client_events.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
+import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/scenario_host.dart';
@@ -28,6 +30,56 @@ Map<String, Object> _page(int index, {bool drift = false}) => {
 
 void main() {
   final executable = Platform.environment['ENDLESSNET_TESTSERVER'];
+  test(
+    'US-04/14: producer guard denies direct observer peer RPC',
+    () async {
+      final host = await ScenarioHost.start(executable!, [
+        {
+          'method': 'GetRuntimeInfo',
+          'request': {},
+          'responses': [
+            {
+              'runtime': {
+                'protocol': api.ClientContract.protocol,
+                'contractSha256': api.ClientContract.sha256,
+                'instanceId': 'runtime-a',
+                'callerAccess': 'ACCESS_OBSERVER',
+              },
+            },
+          ],
+        },
+        // No ListPeers expectation: authorization must reject before dispatch.
+      ], observer: true);
+      LocalClientEvents? connection;
+      try {
+        connection = await LocalClientEvents.open(endpoint: host.endpoint);
+        await expectLater(
+          connection.listPeers(
+            api.ListPeersRequest(
+              profile: api.ProfileRef(profileId: 'private-profile'),
+              page: api.PageRequest(pageSize: 100),
+            ),
+          ),
+          throwsA(
+            predicate<Object>(
+              (error) =>
+                  failureFromLocalRPCError(error)?.code ==
+                  api.ErrorCode.ERROR_CODE_OWNER_REQUIRED,
+            ),
+          ),
+        );
+        await connection.close();
+        await host.verify();
+      } finally {
+        await connection?.close();
+        await host.close();
+      }
+    },
+    skip: executable == null
+        ? 'Requires pinned producer host in desktop CI'
+        : false,
+    timeout: const Timeout(Duration(seconds: 45)),
+  );
   test(
     'US-04: process peer fixtures validate pagination and revision drift',
     () async {

@@ -182,7 +182,7 @@
         },
         {
           "path": "app/test/client_peers_process_test.dart",
-          "scope": "Producer-host desktop scenarios assert exact profile/search/page requests, opaque continuation, immutable previous-map projection, rejection of cross-page revision drift, observer denial without ListPeers, open WatchEvents and no journal mutations or extra RPCs. Local fixture validation passed; process execution requires GitHub runner evidence. Not mobile bridge or actual runtime/path acceptance"
+          "scope": "Producer-host desktop scenarios assert exact profile/search/page requests, opaque continuation, immutable previous-map projection, rejection of cross-page revision drift, local observer denial, open WatchEvents and no journal mutations or extra RPCs. A separate direct observer ListPeers bypasses ClientSession and must receive typed OWNER_REQUIRED before scripted handler admission. Local fixture validation passed; process execution requires GitHub runner evidence. Not actual OS role assignment, mobile bridge or runtime/path acceptance"
         },
         {
           "path": "app/test/client_session_process_test.dart",
