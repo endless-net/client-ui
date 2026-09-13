@@ -156,6 +156,15 @@ runtime; locale rebuild не повторяет lookup и не открывае�
 mock browser; полный offline corpus, full-app language switching и нативное
 открытие браузера ещё не приняты.
 
+ClientUpdatePanel локализует сведения о сборках, source/compatibility/discovery,
+classification/channel, срок проверки и notices. Шесть unit-тестов проверяют
+все 32 значения этих enum на RU/EN; четыре widget-вектора сравнивают весь текст
+недоступного источника/несовместимой пары и ошибки, без повторного lookup при
+смене языка. Неизвестное/недоступное состояние не превращается в up-to-date.
+Диагностические reason keys и версии сохраняются как данные; уведомление
+ничего не устанавливает и не отключает. Это component evidence, не
+distribution acceptance, full-app localization или реальная проверка обновления.
+
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
 оставляют открытыми версии ОС, принятые assistive technologies, lifecycle

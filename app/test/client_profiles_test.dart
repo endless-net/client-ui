@@ -430,7 +430,7 @@ void main() {
           expect(find.textContaining('Update source:'), findsNothing);
         } else if (scenario == 'expires-later') {
           expect(
-            find.textContaining('UPDATE_CLASSIFICATION_MANDATORY'),
+            find.textContaining('; Mandatory'),
             findsOneWidget,
           );
           expect(
@@ -442,24 +442,24 @@ void main() {
             find.text('Update metadata expired. Check again.'),
             findsOneWidget,
           );
-          expect(find.textContaining('UPDATE_STATE_AVAILABLE'), findsNothing);
+          expect(find.text('Update source: Available'), findsNothing);
           expect(calls, 1);
         } else if (scenario == 'expired') {
           expect(
             find.text('Update information could not be confirmed.'),
             findsOneWidget,
           );
-          expect(find.textContaining('UPDATE_STATE_AVAILABLE'), findsNothing);
+          expect(find.text('Update source: Available'), findsNothing);
         } else {
           expect(
-            find.text('Update source: UPDATE_STATE_SOURCE_UNAVAILABLE'),
+            find.text('Update source: Source unavailable'),
             findsOneWidget,
           );
           expect(
-            find.textContaining('COMPATIBILITY_STATE_INCOMPATIBLE'),
+            find.textContaining('Installed pair: Incompatible'),
             findsOneWidget,
           );
-          expect(find.textContaining('UPDATE_STATE_UP_TO_DATE'), findsNothing);
+          expect(find.text('Update source: Up to date'), findsNothing);
         }
         expect(calls, 1);
       }

@@ -2,6 +2,11 @@ import 'dart:async';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'client_state_controller.dart';
+import 'client_locale.dart';
+import 'client_update_labels.dart';
+import 'client_operation_labels.dart';
+
+enum _UpdateNotice { expired, unknown }
 
 class ClientUpdatePanel extends StatefulWidget {
   const ClientUpdatePanel({
@@ -9,8 +14,10 @@ class ClientUpdatePanel extends StatefulWidget {
     required this.state,
     required this.uiBuild,
     required this.load,
+    this.locale = ClientLocale.en,
   });
   final ClientStateController state;
+  final ClientLocale locale;
   final api.BuildIdentity uiBuild;
   final Future<api.UpdateInfo> Function(api.BuildIdentity) load;
   @override
@@ -20,7 +27,9 @@ class ClientUpdatePanel extends StatefulWidget {
 class _ClientUpdatePanelState extends State<ClientUpdatePanel> {
   api.UpdateInfo? _info;
   String? _context;
-  String? _notice;
+  _UpdateNotice? _notice;
+  String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
+  String get _unknown => _text('Unknown', 'Неизвестно');
   bool _busy = false;
   Timer? _expiry;
   String get contextId =>
@@ -69,6 +78,7 @@ class _ClientUpdatePanelState extends State<ClientUpdatePanel> {
   Future<void> _load() async {
     if (!mounted || !allowed || _busy) return;
     final context = contextId;
+    final originalState = widget.state;
     final ui = api.BuildIdentity.fromBuffer(widget.uiBuild.writeToBuffer())
       ..freeze();
     setState(() {
@@ -78,7 +88,11 @@ class _ClientUpdatePanelState extends State<ClientUpdatePanel> {
     });
     try {
       final result = await widget.load(ui);
-      if (!mounted || !current || context != _context || widget.uiBuild != ui) {
+      if (!mounted ||
+          !identical(originalState, widget.state) ||
+          !current ||
+          context != _context ||
+          widget.uiBuild != ui) {
         return;
       }
       if (result.metadata.instanceId !=
@@ -100,15 +114,18 @@ class _ClientUpdatePanelState extends State<ClientUpdatePanel> {
           if (mounted && current && identical(_info, info)) {
             setState(() {
               _info = null;
-              _notice = 'Update metadata expired. Check again.';
+              _notice = _UpdateNotice.expired;
             });
           }
         });
       }
       setState(() => _info = info);
     } catch (_) {
-      if (mounted && current && context == _context) {
-        setState(() => _notice = 'Update information could not be confirmed.');
+      if (mounted &&
+          identical(originalState, widget.state) &&
+          current &&
+          context == _context) {
+        setState(() => _notice = _UpdateNotice.unknown);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -116,7 +133,7 @@ class _ClientUpdatePanelState extends State<ClientUpdatePanel> {
   }
 
   String identity(api.BuildIdentity value) =>
-      '${value.version.isEmpty ? 'Unknown' : value.version}; commit ${value.commit.isEmpty ? 'Unknown' : value.commit}; built ${value.buildDate.isEmpty ? 'Unknown' : value.buildDate}; ${value.platform.name}/${value.architecture}';
+      '${value.version.isEmpty ? _unknown : value.version}; ${_text('commit', 'коммит')} ${value.commit.isEmpty ? _unknown : value.commit}; ${_text('built', 'собрано')} ${value.buildDate.isEmpty ? _unknown : value.buildDate}; ${buildPlatformLabel(value.platform, widget.locale)}/${value.architecture}';
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: widget.state,
@@ -125,40 +142,61 @@ class _ClientUpdatePanelState extends State<ClientUpdatePanel> {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('UI build: ${identity(widget.uiBuild)}'),
+          Text(
+            '${_text('UI build', 'Сборка интерфейса')}: ${identity(widget.uiBuild)}',
+          ),
           if (widget.state.snapshot != null)
             Text(
-              'Runtime build: ${identity(widget.state.snapshot!.runtime.build)}',
+              '${_text('Runtime build', 'Сборка службы')}: ${identity(widget.state.snapshot!.runtime.build)}',
             ),
           OutlinedButton(
             key: const Key('client-check-updates'),
             onPressed: allowed && !_busy ? _load : null,
-            child: const Text('Check updates'),
+            child: Text(_text('Check updates', 'Проверить обновления')),
           ),
-          if (current && _notice != null) Text(_notice!),
+          if (current && _notice != null)
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                _notice == _UpdateNotice.expired
+                    ? _text(
+                        'Update metadata expired. Check again.',
+                        'Срок действия сведений об обновлении истёк. Проверьте снова.',
+                      )
+                    : _text(
+                        'Update information could not be confirmed.',
+                        'Не удалось подтвердить сведения об обновлении.',
+                      ),
+              ),
+            ),
           if (info != null) ...[
-            Text('Update source: ${info.state.name}'),
             Text(
-              'Installed pair: ${info.installedPair.state.name}; ${info.installedPair.reasonKey}',
+              '${_text('Update source', 'Источник обновлений')}: ${updateStateLabel(info.state, widget.locale)}',
             ),
             Text(
-              'Discovery: ${info.discovery.availability.name}; ${info.discovery.reasonKey}; ${info.discovery.actionOwner.name}',
+              '${_text('Installed pair', 'Установленная пара')}: ${compatibilityLabel(info.installedPair.state, widget.locale)}; ${info.installedPair.reasonKey}',
+            ),
+            Text(
+              '${_text('Discovery', 'Поиск обновлений')}: ${updateAvailabilityLabel(info.discovery.availability, widget.locale)}; ${info.discovery.reasonKey}; ${clientActionOwnerLabel(info.discovery.actionOwner, locale: widget.locale)}',
             ),
             if (info.hasAvailable()) ...[
               Text(
-                'Release: ${info.available.releaseId}; ${info.available.classification.name}',
+                '${_text('Release', 'Выпуск')}: ${info.available.releaseId}; ${updateClassificationLabel(info.available.classification, widget.locale)}',
               ),
               Text(
-                'Offered runtime: ${identity(info.available.runtime)}; paired UI: ${info.available.pairedUiVersion}',
+                '${_text('Offered runtime', 'Предлагаемая служба')}: ${identity(info.available.runtime)}; ${_text('paired UI', 'парный интерфейс')}: ${info.available.pairedUiVersion}',
               ),
               Text(
-                'Distribution: ${info.available.channel.name}; pair: ${info.available.compatibility.state.name}',
+                '${_text('Distribution', 'Распространение')}: ${distributionLabel(info.available.channel, widget.locale)}; ${_text('pair', 'пара')}: ${compatibilityLabel(info.available.compatibility.state, widget.locale)}',
               ),
               Text(
-                'Verified until: ${info.available.expiresAt.toDateTime().toUtc().toIso8601String()}',
+                '${_text('Verified until', 'Проверено до')}: ${info.available.expiresAt.toDateTime().toUtc().toIso8601String()}',
               ),
-              const Text(
-                'Installation and its outcome belong to the distribution provider. This notice does not install or disconnect.',
+              Text(
+                _text(
+                  'Installation and its outcome belong to the distribution provider. This notice does not install or disconnect.',
+                  'Установку и её результат обеспечивает поставщик канала распространения. Это уведомление ничего не устанавливает и не отключает.',
+                ),
               ),
             ],
           ],
