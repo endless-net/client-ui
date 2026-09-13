@@ -139,6 +139,15 @@ ClientCleanupPanel локализован на RU/EN с явным различ�
 retarget/reconfirm/snapshot/controller races. Это component evidence, не
 подтверждение реальной remote cleanup или полного UI-AC-13.
 
+ClientEnrollmentPanel поддерживает RU/EN, включая все режимы регистрации,
+вход через браузер/токен и typed notices. Форма отделена по controller и
+epochs профилей/сессии, callback отправки связан с показанными полями и snapshot.
+Изменение hostname/token/mode/login method отменяет старый callback. Токен
+очищается перед вызовом команды; ошибки не выводят исходные исключения.
+17 short тестов проверяют enum-подписи, оба способа входа и три notices в RU/EN,
+очистку токена, отсутствие replay при смене языка и четыре input races.
+Это component evidence, не реальный login/registration или full-app UI-AC-13.
+
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
 оставляют открытыми версии ОС, принятые assistive technologies, lifecycle

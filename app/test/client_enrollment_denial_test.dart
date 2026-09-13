@@ -72,6 +72,8 @@ void main() {
           find.byKey(const Key('enroll-hostname')),
           'test-device',
         );
+        // Use the freshly rendered input context, not the callback from before editing.
+        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('enroll-use-token')));
         await tester.pump();
         await tester.enterText(
