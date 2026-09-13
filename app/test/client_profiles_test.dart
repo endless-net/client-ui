@@ -5,6 +5,7 @@ import 'package:endlessnet/client_resources_panel.dart';
 import 'package:endlessnet/client_exit_nodes.dart';
 import 'package:endlessnet/client_exit_panel.dart';
 import 'package:endlessnet/client_update_info.dart';
+import 'package:endlessnet/client_update_panel.dart';
 import 'package:endlessnet/client_networks_panel.dart';
 import 'package:endlessnet/client_create_profile_panel.dart';
 import 'dart:async';
@@ -115,6 +116,148 @@ api.GetExitNodeResponse _exitStatus() =>
     });
 
 void main() {
+  for (final scenario in [
+    'source-unavailable',
+    'expires-later',
+    'expired',
+    'invalidated',
+    'observer',
+  ]) {
+    testWidgets('US-13: update panel $scenario', (tester) async {
+      final state = ClientStateController();
+      final events = StreamController<api.WatchEventsResponse>();
+      await state.attach(events.stream);
+      addTearDown(() async {
+        await state.detach();
+        await events.close();
+        state.dispose();
+      });
+      var calls = 0;
+      final pending = Completer<void>();
+      final build = api.BuildIdentity(version: 'ui-dev');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ContractTestScaffold(
+            body: SingleChildScrollView(
+              child: ClientUpdatePanel(
+                state: state,
+                uiBuild: build,
+                load: (ui) async {
+                  calls++;
+                  expect(ui, build);
+                  if (scenario == 'invalidated') await pending.future;
+                  final info = api.UpdateInfo()
+                    ..mergeFromProto3Json({
+                      'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+                      'reportedUi': ui.toProto3Json(),
+                      'installedPair': {
+                        'state': 'COMPATIBILITY_STATE_INCOMPATIBLE',
+                      },
+                      'state': 'UPDATE_STATE_SOURCE_UNAVAILABLE',
+                    });
+                  if (scenario == 'expires-later') {
+                    info.state = api.UpdateState.UPDATE_STATE_AVAILABLE;
+                    info.ensureAvailable().mergeFromProto3Json({
+                      'releaseId': 'release-a',
+                      'classification': 'UPDATE_CLASSIFICATION_MANDATORY',
+                      'expiresAt': DateTime.now()
+                          .toUtc()
+                          .add(const Duration(seconds: 2))
+                          .toIso8601String(),
+                    });
+                  }
+                  if (scenario == 'expired') {
+                    info.state = api.UpdateState.UPDATE_STATE_AVAILABLE;
+                    info.ensureAvailable().ensureExpiresAt().seconds =
+                        info.metadata.revision; // Already expired.
+                  }
+                  return info..freeze();
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      events.add(
+        api.WatchEventsResponse()..mergeFromProto3Json({
+          'sequence': '1',
+          'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'runtime-a',
+              'callerAccess': scenario == 'observer'
+                  ? 'ACCESS_OBSERVER'
+                  : 'ACCESS_OWNER',
+              'build': {'version': 'core-dev'},
+            },
+            'status': {
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            },
+          },
+        }),
+      );
+      await tester.pump();
+      expect(calls, 0);
+      expect(find.textContaining('UI build: ui-dev'), findsOneWidget);
+      expect(find.textContaining('Runtime build: core-dev'), findsOneWidget);
+      final button = find.byKey(const Key('client-check-updates'));
+      if (scenario == 'observer') {
+        expect(tester.widget<OutlinedButton>(button).onPressed, isNull);
+      } else {
+        await tester.tap(button);
+        await tester.pump();
+        if (scenario == 'invalidated') {
+          events.add(
+            api.WatchEventsResponse()..mergeFromProto3Json({
+              'sequence': '2',
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+              'invalidated': {'domain': 'DOMAIN_UPDATES'},
+            }),
+          );
+          await tester.pump();
+          pending.complete();
+          await tester.pump();
+          expect(find.textContaining('Update source:'), findsNothing);
+        } else if (scenario == 'expires-later') {
+          expect(
+            find.textContaining('UPDATE_CLASSIFICATION_MANDATORY'),
+            findsOneWidget,
+          );
+          expect(
+            find.textContaining('This notice does not install or disconnect.'),
+            findsOneWidget,
+          );
+          await tester.pump(const Duration(seconds: 3));
+          expect(
+            find.text('Update metadata expired. Check again.'),
+            findsOneWidget,
+          );
+          expect(find.textContaining('UPDATE_STATE_AVAILABLE'), findsNothing);
+          expect(calls, 1);
+        } else if (scenario == 'expired') {
+          expect(
+            find.text('Update information could not be confirmed.'),
+            findsOneWidget,
+          );
+          expect(find.textContaining('UPDATE_STATE_AVAILABLE'), findsNothing);
+        } else {
+          expect(
+            find.text('Update source: UPDATE_STATE_SOURCE_UNAVAILABLE'),
+            findsOneWidget,
+          );
+          expect(
+            find.textContaining('COMPATIBILITY_STATE_INCOMPATIBLE'),
+            findsOneWidget,
+          );
+          expect(find.textContaining('UPDATE_STATE_UP_TO_DATE'), findsNothing);
+        }
+        expect(calls, 1);
+      }
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
   test(
     'US-13: update source states stay distinct and results are immutable',
     () async {

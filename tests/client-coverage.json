@@ -422,7 +422,7 @@
       "testEvidence": [
         {
           "path": "app/test/client_profiles_test.dart",
-          "scope": "Update reader foundation: distinct source states, immutable identity/context-bound projection, expiry/target/URL checks and invalidation. Local tests only; no manifest signature verification, UI, installer outcome or platform acceptance"
+          "scope": "Update reader and panel: distinct source/compatibility states, immutable identity/context-bound projection, expiry/target/URL checks, observer denial, explicit refresh, late invalidated response rejection and expiry after display. Local execution only for new UI; no signature verification, About/Help, distribution action/outcome or platform acceptance"
         },
         {
           "path": "app/test/client_session_test.dart",

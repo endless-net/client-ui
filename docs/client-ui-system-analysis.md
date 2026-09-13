@@ -373,8 +373,16 @@ Local/session binding теперь вызывает generated GetUpdateInfo че
 native channel. Owner не обязан иметь active profile для этого installation-level
 read; observer запрещён до RPC. Cache/context replacement, повторные UPDATES
 invalidations и устаревшая response revision отклоняются; journal не меняется.
-Session test проверяет эти границы. UI, trusted source configuration, external
-installer outcome и platform acceptance ещё не реализованы/не подтверждены этим слоем.
+Session test проверяет эти границы. `ClientUpdatePanel` подключён к production
+desktop shell: UI build берётся из тех же compile-time полей, что versionText,
+core build — из snapshot. Только явный Check updates вызывает чтение; observer
+не может его запустить. Source state и installed-pair compatibility независимы,
+classification/channel не запускают installer и не отключают соединение.
+Context invalidation удаляет projection, late response отвергается; expiry timer
+убирает просроченное предложение без автоматического повторного чтения. Shared
+widget tests проверяют эти границы, включая expiry после показа. Trusted source
+configuration, About/Help, external distribution action/outcome и platform
+acceptance ещё не реализованы/не подтверждены этим слоем.
 
 US-12 foundation: desktop shell отправляет journaled NotifyLifecycle(UI_QUIT)
 при явном Quit owner с активным профилем; observer не отправляет мутацию.

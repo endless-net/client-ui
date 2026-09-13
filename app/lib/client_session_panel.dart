@@ -19,6 +19,7 @@ import 'client_privileged_session.dart';
 import 'client_windows_recovery.dart';
 import 'client_resources_panel.dart';
 import 'client_exit_panel.dart';
+import 'client_update_panel.dart';
 
 /// Desktop application binding. A mobile runtime adapter can supply the same
 /// shared connection panel without using a desktop local channel.
@@ -28,8 +29,10 @@ class ClientSessionPanel extends StatelessWidget {
     required this.session,
     this.exportBundle,
     this.elevate,
+    this.uiBuild,
   });
   final ClientSession session;
+  final api.BuildIdentity? uiBuild;
   final Future<ClientElevationOutcome> Function(ClientPrivilegedRecovery)?
   elevate;
   Future<ClientElevationOutcome> Function(ClientPrivilegedRecovery)?
@@ -44,6 +47,12 @@ class ClientSessionPanel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (uiBuild != null)
+            ClientUpdatePanel(
+              state: session.state,
+              uiBuild: uiBuild!,
+              load: session.getUpdateInfo,
+            ),
           ClientExitPanel(
             state: session.state,
             load: session.getExitNodes,

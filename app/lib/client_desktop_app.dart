@@ -34,8 +34,10 @@ class ClientDesktopApp extends StatefulWidget {
     this.showWindow = true,
     this.showSignal,
     this.onExit,
+    this.uiBuild,
   });
   final ClientSession session;
+  final api.BuildIdentity? uiBuild;
   final bool desktopIntegration;
   final bool showWindow;
   final Future<DateTime?> Function()? showSignal;
@@ -334,7 +336,12 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
             builder: (context, _) =>
                 Text('Runtime: ${session.state.link.name}'),
           ),
-          Expanded(child: ClientSessionPanel(session: session)),
+          Expanded(
+            child: ClientSessionPanel(
+              session: session,
+              uiBuild: widget.uiBuild,
+            ),
+          ),
         ],
       ),
     ),

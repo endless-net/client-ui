@@ -154,7 +154,14 @@ profile requirement for this installation-level owner RPC. Its test rejects
 observer reads before RPC, repeated UPDATES invalidations and stale revisions,
 and verifies an unchanged intention journal. These changes have local execution
 evidence only until their own jobs finish. Signature verification/trusted source
-ownership, UI, installer outcome and actual platform acceptance are separate.
+ownership, installer outcome and actual platform acceptance are separate.
+The production desktop panel now exposes UI/core build identities and an explicit
+Check updates button, with distinct source and installed-pair states. Shared
+widget tests cover observer denial, unavailable source, incompatible pair, expired
+metadata, invalidated late results and timer expiry after display without reread.
+Mandatory notices do not install, launch URLs or disconnect. UI identity comes
+from the executable's compile-time version fields (tested against versionText),
+not from runtime attestation. About/Help and distribution actions remain open.
 
 ### Desktop lifecycle foundation (2026-09-13)
 

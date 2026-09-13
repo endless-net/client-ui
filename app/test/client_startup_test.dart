@@ -5,6 +5,13 @@ import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('reported UI build matches the executable version text', () {
+    final build = desktopBuildIdentity();
+    expect(build.isFrozen, isTrue);
+    expect(versionText(), contains('endlessnet ${build.version}\n'));
+    expect(versionText(), contains('commit: ${build.commit}\n'));
+    expect(versionText(), contains('built: ${build.buildDate}\n'));
+  });
   test(
     'desktop startup uses validated native endpoint and hides on autostart',
     () {

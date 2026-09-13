@@ -9,6 +9,7 @@ import 'package:window_manager/window_manager.dart';
 import 'client_desktop_app.dart';
 import 'client_intent_journal.dart';
 import 'client_session.dart';
+import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
 
 const _appTitle = 'EndlessNet';
@@ -77,6 +78,7 @@ Future<void> main(List<String> args) async {
   runApp(
     ClientDesktopApp(
       session: session,
+      uiBuild: desktopBuildIdentity(),
       showWindow: config.showWindow,
       showSignal: showSignalWriteTime,
       onExit: () async {
@@ -93,6 +95,24 @@ String versionText() {
       'commit: $_appCommit\n'
       'built: $_appBuildDate\n'
       'target: $_appTarget\n';
+}
+
+api.BuildIdentity desktopBuildIdentity() {
+  final target = _appTarget.split('/');
+  return api.BuildIdentity(
+    version: _appVersion,
+    commit: _appCommit,
+    buildDate: _appBuildDate,
+    platform: switch (target.first) {
+      'windows' => api.Platform.PLATFORM_WINDOWS,
+      'linux' => api.Platform.PLATFORM_LINUX,
+      'darwin' || 'macos' => api.Platform.PLATFORM_MACOS,
+      'android' => api.Platform.PLATFORM_ANDROID,
+      'ios' => api.Platform.PLATFORM_IOS,
+      _ => api.Platform.PLATFORM_UNSPECIFIED,
+    },
+    architecture: target.length == 2 ? target.last : '',
+  )..freeze();
 }
 
 class AppConfig {
