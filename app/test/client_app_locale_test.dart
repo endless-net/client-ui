@@ -25,6 +25,7 @@ import 'package:endlessnet/client_recovery_panel.dart';
 import 'package:endlessnet/client_profiles_panel.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'client_session_test.dart' as fixtures;
 
@@ -83,6 +84,28 @@ void main() {
             find.text(locale == ClientLocale.ru ? 'Русский' : 'English').last,
           );
           await tester.pumpAndSettle();
+          final localizedContext = tester.element(
+            find.byType(ClientSessionPanel),
+          );
+          expect(Localizations.localeOf(localizedContext), Locale(locale.name));
+          final material = MaterialLocalizations.of(localizedContext);
+          expect(
+            [
+              material.copyButtonLabel,
+              material.pasteButtonLabel,
+              material.selectAllButtonLabel,
+              material.backButtonTooltip,
+              material.modalBarrierDismissLabel,
+            ],
+            locale == ClientLocale.ru
+                ? ['Копировать', 'Вставить', 'Выбрать все', 'Назад', 'Закрыть']
+                : ['Copy', 'Paste', 'Select all', 'Back', 'Dismiss'],
+          );
+          expect(Directionality.of(localizedContext), TextDirection.ltr);
+          expect(
+            CupertinoLocalizations.of(localizedContext).copyButtonLabel,
+            locale == ClientLocale.ru ? 'Копировать' : 'Copy',
+          );
           expect(
             tester
                 .widget<ClientSessionPanel>(find.byType(ClientSessionPanel))
@@ -201,9 +224,9 @@ void main() {
         }
         await tester.pumpWidget(const SizedBox());
         await tester.runAsync(() async {
-            await session.close();
-            if (failure) connection.events.stream.listen((_) {});
-            await connection.events.close();
+          await session.close();
+          if (failure) connection.events.stream.listen((_) {});
+          await connection.events.close();
           await directory.delete(recursive: true);
         });
       });

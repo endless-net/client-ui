@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -396,6 +397,9 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
 
   @override
   Widget build(BuildContext context) => MaterialApp(
+    locale: Locale(_locale.name),
+    supportedLocales: const [Locale('en'), Locale('ru')],
+    localizationsDelegates: GlobalMaterialLocalizations.delegates,
     navigatorKey: _navigator,
     title: 'EndlessNet',
     theme: ThemeData(useMaterial3: true),

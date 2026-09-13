@@ -216,8 +216,8 @@ requested/effective, ограничений, предупреждений single
 все 16 панелей ClientSessionPanel. Переводятся команды оболочки, её typed
 notices, состояние local connection и подтверждение выхода. Выбор действует
 в пределах запуска для встраиваемой оболочки без storage adapter. Desktop main
-подключает UI-owned хранилище языка; локализация стандартных Material/OS
-подписей ещё не реализована.
+подключает UI-owned хранилище языка. Material/Cupertino delegates получают
+выбранную локаль; native OS dialogs остаются отдельной platform acceptance.
 Шесть short widget-тестов проверяют выбор через раскрывающееся меню в обеих
 локалях, передачу locale всем панелям, сохранение controller/snapshot/form state
 и введённого имени профиля, перевод ошибки без reconnect или записи mutation
@@ -247,6 +247,15 @@ reconnect и ожидание сохранения при выходе observer 
 IPC с явным подтверждением выхода. Завершённая запись не сохраняется как
 объект ожидания; прежний owner quit regression также проходит. Native restart
 и mobile container paths этим не квалифицированы; это не полная UI-AC-13 acceptance.
+
+MaterialApp использует штатные GlobalMaterialLocalizations.delegates и только
+`en`/`ru`. Существующий consumer lock дополнен SDK flutter_localizations и его
+зависимостью intl 0.20.2 из Flutter 3.38.1; прежние версии не менялись.
+`pub get --enforce-lockfile`, analyze и short widget-проверки выполнены локально
+на Flutter 3.38.1/Dart 3.10.0, совпадающем с CI pin. Composed-app regression
+проверяет Locale, LTR, Copy/Paste/Select all/Back/Dismiss Material и Copy
+Cupertino при переключении в обе стороны, с сохранением формы и без RPC replay.
+Нативные clipboard/OS dialogs и screen-reader execution не квалифицированы.
 
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21

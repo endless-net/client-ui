@@ -598,7 +598,7 @@
         },
         {
           "path": "app/test/client_app_locale_test.dart",
-          "scope": "Six short composed-app tests: real dropdown selection in RU/EN reaches all 16 session panels; controller/snapshot/form identity and draft survive without reconnect or journal mutation; shell failure and quit/stay texts translate. Locale is in-memory only. Not persistence, native tray, Material/OS localization or full UI-AC-13 acceptance"
+          "scope": "Six short composed-app tests on Flutter 3.38.1: real dropdown selection in RU/EN reaches all 16 session panels and Material/Cupertino delegates; exact copy/paste/select-all/back/dismiss labels, Locale and LTR checked. Controller/snapshot/form identity and draft survive without reconnect or journal mutation; shell failure and quit/stay texts translate. No storage adapter in this test. Not native clipboard, tray/OS dialogs or full UI-AC-13 acceptance"
         },
         {
           "path": "app/test/client_tray_locale_test.dart",
