@@ -17,7 +17,20 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
-Latest inspected evidence (the older diagnostic history below is retained):
+Latest inspected evidence: consumer `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`.
+The [desktop run](https://github.com/endless-net/client-ui/actions/runs/34730432514)
+passed on all three OSes, each with 109 consumer tests and 15 profile/network
+tests, including exact trust/read requests and terminal recovery. The
+[iOS job](https://github.com/endless-net/client-ui/actions/runs/34730432531/job/103652189494)
+passed 23 simulator tests, including trust confirmation and pre-frame
+invalidation races. The
+[Android job](https://github.com/endless-net/client-ui/actions/runs/34730432531/job/103652189664)
+failed KVM preflight before tests. Desktop and mobile suites have different
+scopes; this is not five-platform product acceptance. A preceding Windows
+connect fixture EOF did not recur; its cause remains undiagnosed. All 14 full
+product scenarios remain incomplete.
+
+Earlier inspected evidence (diagnostic history retained):
 
 - Desktop consumer commit `840a6f5634b23fbda982ace08be988d325cb19d8`:
   [Linux](https://github.com/endless-net/client-ui/actions/runs/34727879150/job/103645176217),

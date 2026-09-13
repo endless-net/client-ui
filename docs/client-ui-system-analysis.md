@@ -92,6 +92,17 @@ logout/local forget не снимают ownership. UI не обещает воз
 
 ## 3. Команды и восстановление
 
+Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:
+[desktop run](https://github.com/endless-net/client-ui/actions/runs/34730432514)
+успешен на Windows/Linux/macOS, по 109 consumer + 15 profile/network tests;
+[iOS job](https://github.com/endless-net/client-ui/actions/runs/34730432531/job/103652189494)
+успешен, 23 simulator tests, включая trust UI race regression.
+[Android job](https://github.com/endless-net/client-ui/actions/runs/34730432531/job/103652189664)
+failed до тестов из-за KVM. Это один consumer commit, но разные scopes:
+desktop Go/Dart interoperability и mobile shared widget suite; не complete
+five-platform product acceptance. Windows EOF ниже не повторился, причина
+не установлена. Ни один полный US этим запуском не закрывается.
+
 US-06 read foundation: `ClientSession.getServerIdentity` вызывает typed RPC
 для текущего active ProfileRef только после owner snapshot. Проверяются
 наличие identity/metadata, profile/instance/revision; late response отклоняется
@@ -115,7 +126,7 @@ GetServerIdentity → TrustServerIdentity с точными origin/key/announcem
 GetOperation, при открытом WatchEvents. Journal проверяется на точные UUID/kind
 без identity payload; acceptance не меняет snapshot оптимистично. Testserver
 моделирует роль только для этой fixture, не даёт UI способ задавать свою роль.
-Новый process scenario ожидает GitHub execution; локально standalone Go testserver
+Process scenario проверен desktop run выше; локально standalone Go testserver
 не запускался. Проверка operation envelope локально включает trust outcome.
 На `f6386db` trust process fixture прошла на Linux, macOS и Windows; Windows job
 в целом failed (107 passed / 1 failed): connect fixture получила EOF от testserver
