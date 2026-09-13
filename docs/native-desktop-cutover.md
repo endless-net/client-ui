@@ -66,3 +66,21 @@ elevation and launcher exceptions, preserving the journal without replay;
 `client_elevation_panel_test.dart` checks owner confirmation and observer gating;
 the US-08 scenario in `mobile_contract_widget_test.dart` checks that failed logout
 never triggers local forget. These do not replace real platform UAC acceptance.
+
+## Native tray commands — 2026-09-13
+
+`ClientTray` projects runtime status and Connect/Disconnect from the native
+snapshot. The desktop shell binds actions to `ClientSession.submit`, sharing the
+same request journal as window actions. Menu action keys expire on state changes;
+stale OS clicks cannot target a newly selected profile/caller. Connect requires
+current owner/admin access, a profile, connection capability and an eligible
+state. Disconnect remains available during connect/recovery, with authorization
+still enforced by the producer. Quit/reconnect temporarily disable tray commands.
+Accepted operations are not displayed as completed. The shell serializes menu
+updates and clears commands when the subscription loses ready state.
+
+`client_tray_test.dart` covers stale menu keys, observer/capability gating,
+disconnect during connect, duplicate queued clicks, context changes during an
+operation and sanitized errors. Tests use native projections with injected
+actions, not real OS tray clicks. Window/session tests and durable journal tests
+remain separate evidence; OS integration and release acceptance remain pending.

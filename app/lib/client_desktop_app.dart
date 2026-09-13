@@ -11,6 +11,7 @@ import 'package:window_manager/window_manager.dart';
 import 'client_session.dart';
 import 'client_session_panel.dart';
 import 'client_state_controller.dart';
+import 'client_tray.dart';
 
 Directory clientJournalDirectory(String endpoint) {
   final home =
@@ -50,12 +51,73 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   DateTime? _lastSignal;
   bool _busy = false;
   String? _notice;
+  late final ClientTray _tray;
+  bool _trayReady = false;
+  bool _trayUpdating = false;
+  bool _trayDirty = false;
   ClientSession get session => widget.session;
 
   @override
   void initState() {
     super.initState();
+    _tray = ClientTray(
+      state: session.state,
+      connect: () => session.submit(
+        api.OperationKind.OPERATION_KIND_CONNECT,
+        (commands, mutation) => commands.connect(
+          api.ConnectRequest(
+            mutation: mutation,
+            profile: api.ProfileRef(
+              profileId: session.state.snapshot!.status.activeProfileId,
+            ),
+          ),
+        ),
+      ),
+      disconnect: () => session.submit(
+        api.OperationKind.OPERATION_KIND_DISCONNECT,
+        (commands, mutation) => commands.disconnect(
+          api.DisconnectRequest(
+            mutation: mutation,
+            profile: api.ProfileRef(
+              profileId: session.state.snapshot!.status.activeProfileId,
+            ),
+          ),
+        ),
+      ),
+    )..addListener(_trayChanged);
     unawaited(_initialize());
+  }
+
+  void _trayChanged() {
+    _trayDirty = true;
+    if (_trayReady && mounted) unawaited(_refreshTray());
+  }
+
+  Future<void> _refreshTray() async {
+    if (_trayUpdating) return;
+    _trayUpdating = true;
+    try {
+      do {
+        _trayDirty = false;
+        await trayManager.setToolTip('EndlessNet: ${_tray.status}');
+        if (!mounted || !_trayReady) return;
+        await trayManager.setContextMenu(_tray.menu);
+      } while (_trayDirty && mounted && _trayReady);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () =>
+              _notice = 'Tray update unavailable. Use the application window.',
+        );
+      }
+    } finally {
+      _trayUpdating = false;
+    }
+  }
+
+  void _setBusy(bool busy) {
+    setState(() => _busy = busy);
+    _tray.enabled = !busy;
   }
 
   Future<void> _initialize() async {
@@ -68,15 +130,8 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
               ? 'assets/icons/endlessnet.ico'
               : 'assets/icons/endlessnet.png',
         );
-        await trayManager.setToolTip('EndlessNet');
-        await trayManager.setContextMenu(
-          Menu(
-            items: [
-              MenuItem(key: 'open', label: 'Open EndlessNet'),
-              MenuItem(key: 'exit', label: 'Quit'),
-            ],
-          ),
-        );
+        _trayReady = true;
+        await _refreshTray();
         await windowManager.waitUntilReadyToShow(
           const WindowOptions(
             title: 'EndlessNet',
@@ -142,11 +197,15 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   void onTrayMenuItemClick(MenuItem item) {
     if (item.key == 'open') unawaited(_show());
     if (item.key == 'exit') unawaited(_quit());
+    if (item.key?.startsWith('connect:') == true ||
+        item.key?.startsWith('disconnect:') == true) {
+      unawaited(_tray.activate(item.key));
+    }
   }
 
   Future<void> _connect() async {
     if (_busy) return;
-    setState(() => _busy = true);
+    _setBusy(true);
     try {
       await session.connect();
     } catch (_) {
@@ -157,13 +216,13 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
         );
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) _setBusy(false);
     }
   }
 
   Future<void> _quit() async {
     if (_busy) return;
-    setState(() => _busy = true);
+    _setBusy(true);
     var notified = false;
     try {
       final snapshot = session.state.snapshot;
@@ -214,11 +273,12 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
         ),
       );
       if (exit != true) {
-        if (mounted) setState(() => _busy = false);
+        if (mounted) _setBusy(false);
         return;
       }
     }
     _signals?.cancel();
+    _trayReady = false;
     await session.close();
     await widget.onExit?.call();
     if (widget.desktopIntegration) {
@@ -230,6 +290,9 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   @override
   void dispose() {
     _signals?.cancel();
+    _trayReady = false;
+    _tray.removeListener(_trayChanged);
+    _tray.dispose();
     if (widget.desktopIntegration) {
       windowManager.removeListener(this);
       trayManager.removeListener(this);
@@ -260,6 +323,12 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
       body: Column(
         children: [
           if (_notice != null) Text(_notice!),
+          AnimatedBuilder(
+            animation: _tray,
+            builder: (context, _) => _tray.notice == null
+                ? const SizedBox.shrink()
+                : Text(_tray.notice!),
+          ),
           AnimatedBuilder(
             animation: session.state,
             builder: (context, _) =>
