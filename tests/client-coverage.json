@@ -422,7 +422,11 @@
       "testEvidence": [
         {
           "path": "app/test/client_profiles_test.dart",
-          "scope": "Unwired update reader foundation: distinct source states, immutable identity/context-bound projection, expiry/target/URL checks and invalidation. Local tests only; no manifest signature verification, session/UI integration, installer outcome or platform acceptance"
+          "scope": "Update reader foundation: distinct source states, immutable identity/context-bound projection, expiry/target/URL checks and invalidation. Local tests only; no manifest signature verification, UI, installer outcome or platform acceptance"
+        },
+        {
+          "path": "app/test/client_session_test.dart",
+          "scope": "Installation-level owner update read without active profile; observer rejected before RPC, repeated UPDATES invalidation and stale revision rejected without journal changes. Native binding present; no producer-process or platform execution claim for this change"
         }
       ],
       "acceptanceEvidence": []

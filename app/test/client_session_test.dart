@@ -27,6 +27,11 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 class FakeConnection implements ClientConnection {
+  Future<api.GetUpdateInfoResponse> Function(api.GetUpdateInfoRequest)? updates;
+  @override
+  Future<api.GetUpdateInfoResponse> getUpdateInfo(
+    api.GetUpdateInfoRequest request,
+  ) => updates!(request);
   Future<ClientExitNodes> Function(String, void Function())? exits;
   @override
   Future<ClientExitNodes> getExitNodes(
@@ -205,6 +210,64 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'US-13: update reads bind owner and reject repeated invalidation or stale revision',
+    () async {
+      final ui = api.BuildIdentity(version: 'dev');
+      await expectLater(session.getUpdateInfo(ui), throwsStateError);
+      connection.events.add(snapshot());
+      await pumpEventQueue();
+      api.GetUpdateInfoResponse response(api.GetUpdateInfoRequest request) =>
+          api.GetUpdateInfoResponse()..mergeFromProto3Json({
+            'info': {
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+              'installedRuntime': {},
+              'reportedUi': request.reportedUi.toProto3Json(),
+              'installedPair': {'state': 'COMPATIBILITY_STATE_UNKNOWN'},
+              'state': 'UPDATE_STATE_SOURCE_UNAVAILABLE',
+            },
+          });
+      connection.updates = (request) async => response(request);
+      expect(
+        (await session.getUpdateInfo(ui)).state,
+        api.UpdateState.UPDATE_STATE_SOURCE_UNAVAILABLE,
+      );
+      for (var i = 0; i < 2; i++) {
+        final pending = Completer<void>();
+        connection.updates = (request) async {
+          await pending.future;
+          return response(request);
+        };
+        final rejected = expectLater(
+          session.getUpdateInfo(ui),
+          throwsStateError,
+        );
+        await pumpEventQueue();
+        connection.events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '${i + 2}',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'invalidated': {'domain': 'DOMAIN_UPDATES'},
+          }),
+        );
+        await pumpEventQueue();
+        pending.complete();
+        await rejected;
+      }
+      connection.updates = (request) async =>
+          response(request)..info.metadata.revision -= 1;
+      await expectLater(session.getUpdateInfo(ui), throwsStateError);
+      final observer = snapshot()..sequence += 3;
+      observer.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      connection.events.add(observer);
+      await pumpEventQueue();
+      connection.updates = (_) =>
+          throw TestFailure('Observer must not call RPC');
+      await expectLater(session.getUpdateInfo(ui), throwsStateError);
+      expect(await session.journal.pending(), isEmpty);
+    },
+  );
 
   test(
     'US-05: exit reads require owner and reject repeated domain invalidations',

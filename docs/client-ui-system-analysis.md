@@ -369,8 +369,12 @@ expiry/verification time, target platform/architecture, classification/channel �
 HTTPS URLs без userinfo. Это проверка согласованности producer projection, не
 криптографическая проверка manifest. Никаких installer/browser действий reader
 не выполняет. Shared tests покрывают valid/invalid projections и invalidation.
-Local/session binding, UI, trusted source configuration, external installer outcome
-и platform acceptance ещё не реализованы/не подтверждены этим слоем.
+Local/session binding теперь вызывает generated GetUpdateInfo через текущий
+native channel. Owner не обязан иметь active profile для этого installation-level
+read; observer запрещён до RPC. Cache/context replacement, повторные UPDATES
+invalidations и устаревшая response revision отклоняются; journal не меняется.
+Session test проверяет эти границы. UI, trusted source configuration, external
+installer outcome и platform acceptance ещё не реализованы/не подтверждены этим слоем.
 
 US-12 foundation: desktop shell отправляет journaled NotifyLifecycle(UI_QUIT)
 при явном Quit owner с активным профилем; observer не отправляет мутацию.

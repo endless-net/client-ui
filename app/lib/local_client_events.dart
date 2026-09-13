@@ -19,6 +19,13 @@ final class LocalClientEvents {
   final api.RuntimeInfo runtime;
   bool _closed = false;
 
+  Future<api.GetUpdateInfoResponse> getUpdateInfo(
+    api.GetUpdateInfoRequest request,
+  ) {
+    if (_closed) throw StateError('Local client is closed');
+    return _client.getUpdateInfo(request);
+  }
+
   Future<ClientExitNodes> getExitNodes(
     String profileId,
     void Function() check,

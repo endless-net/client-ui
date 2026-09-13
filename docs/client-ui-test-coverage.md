@@ -143,7 +143,20 @@ successful compilation as simulator execution or extend the timeout as proof.
 
 ## Validation
 
-### Lifecycle foundation (2026-09-13)
+### Update read foundation (2026-09-13)
+
+The typed update reader preserves unknown/source-unavailable/verification-failed
+states instead of treating them as up-to-date. Shared tests cover immutable
+identity/context-bound results and rejection of expired or future-verified
+metadata, wrong target, mismatched runtime/UI identities and unsafe URLs.
+ClientSession now reads through the generated local binding, without an active
+profile requirement for this installation-level owner RPC. Its test rejects
+observer reads before RPC, repeated UPDATES invalidations and stale revisions,
+and verifies an unchanged intention journal. These changes have local execution
+evidence only until their own jobs finish. Signature verification/trusted source
+ownership, UI, installer outcome and actual platform acceptance are separate.
+
+### Desktop lifecycle foundation (2026-09-13)
 
 Desktop shell widget tests invoke the explicit Quit callback with native
 window/tray integration disabled. Owner quit sends exactly one UI_QUIT with
