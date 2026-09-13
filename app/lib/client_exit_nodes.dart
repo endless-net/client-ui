@@ -108,10 +108,88 @@ Future<ClientExitNodes> readClientExitNodes({
           status.failure.code == api.ErrorCode.ERROR_CODE_UNSPECIFIED)) {
     throw const FormatException('Exit apply failure lacks typed reason');
   }
+  _checkExitConsistency(status);
   // A missing selected catalog entry can be valid after path loss or policy
   // changes. Keep authoritative status; never substitute a different node.
   return ClientExitNodes._(
     List.unmodifiable(nodes),
     api.ExitNodeStatus.fromBuffer(status.writeToBuffer())..freeze(),
   );
+}
+
+void _checkExitConsistency(api.ExitNodeStatus status) {
+  final cleared =
+      status.requestedFamilyMode == api.ExitFamilyMode.EXIT_FAMILY_MODE_NONE;
+  if (cleared == status.hasRequestedExitNodeId()) {
+    throw const FormatException('Exit mode and requested ID disagree');
+  }
+  final families = [
+    (
+      status.ipv4,
+      status.requestedFamilyMode ==
+              api.ExitFamilyMode.EXIT_FAMILY_MODE_IPV4_ONLY ||
+          status.requestedFamilyMode ==
+              api.ExitFamilyMode.EXIT_FAMILY_MODE_DUAL_STACK,
+    ),
+    (
+      status.ipv6,
+      status.requestedFamilyMode ==
+              api.ExitFamilyMode.EXIT_FAMILY_MODE_IPV6_ONLY ||
+          status.requestedFamilyMode ==
+              api.ExitFamilyMode.EXIT_FAMILY_MODE_DUAL_STACK,
+    ),
+  ];
+  var converged = true;
+  for (final (family, selected) in families) {
+    if (selected != family.hasRequestedExitNodeId() ||
+        (selected &&
+            family.requestedExitNodeId != status.requestedExitNodeId)) {
+      throw const FormatException(
+        'Exit family intent disagrees with requested mode',
+      );
+    }
+    final effectiveMatches = selected
+        ? family.hasEffectiveExitNodeId() &&
+              family.effectiveExitNodeId == status.requestedExitNodeId
+        : !family.hasEffectiveExitNodeId();
+    if (family.applyState == api.ApplyState.APPLY_STATE_APPLIED &&
+        !effectiveMatches) {
+      throw const FormatException('Applied exit family has not converged');
+    }
+    converged =
+        converged &&
+        effectiveMatches &&
+        family.applyState == api.ApplyState.APPLY_STATE_APPLIED;
+  }
+  if (status.hasEffectiveExitNodeId() &&
+      (cleared ||
+          !converged ||
+          status.effectiveExitNodeId != status.requestedExitNodeId)) {
+    throw const FormatException(
+      'Aggregate effective exit hides partial application',
+    );
+  }
+  if (status.applyState == api.ApplyState.APPLY_STATE_APPLIED &&
+      (!converged ||
+          (!cleared &&
+              (!status.hasEffectiveExitNodeId() ||
+                  status.requestedLanAccess != status.effectiveLanAccess)))) {
+    throw const FormatException(
+      'Aggregate exit applied before family or LAN convergence',
+    );
+  }
+  if (families.any(
+        (entry) => entry.$1.applyState == api.ApplyState.APPLY_STATE_FAILED,
+      ) &&
+      status.applyState != api.ApplyState.APPLY_STATE_FAILED) {
+    throw const FormatException(
+      'Aggregate exit hides an address-family failure',
+    );
+  }
+  if (status.failClosed &&
+      (cleared || families.any((entry) => entry.$2 && !entry.$1.failClosed))) {
+    throw const FormatException(
+      'Aggregate fail-closed lacks selected family enforcement',
+    );
+  }
 }

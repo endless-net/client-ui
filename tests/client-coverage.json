@@ -189,7 +189,7 @@
       "testEvidence": [
         {
           "path": "app/test/client_profiles_test.dart",
-          "scope": "Shared exit-node reader: one catalog/status revision, typed allowed modes, no inferred downgrade, required IPv4/IPv6 states, partial apply preservation, duplicate/cycle/mixed-page rejection; not selection UI or traffic enforcement"
+          "scope": "Shared exit-node reader: one revision, required IPv4/IPv6 and typed modes; reject inconsistent intent/effective IDs, aggregate APPLIED before family/LAN convergence and false fail-closed claims; preserve partial apply/clear and single-family status. No selection UI or traffic enforcement proof"
         },
         {
           "path": "app/test/client_session_test.dart",

@@ -132,8 +132,12 @@ states. Shared tests preserve IPv4 applied / IPv6 failed without inventing dual-
 success or aggregate fail-closed, retain an unavailable current selection, and
 reject missing families, invalid modes, duplicate IDs, token loops and mixed pages.
 Session tests guard owner context and repeated exit/profile/peer/network invalidation.
-These are structural consumer checks, not a complete aggregate-state consistency
-validator, selection/clear UI, producer-process evidence or actual routing proof.
+The reader also rejects aggregate APPLIED/effective IDs before requested family
+and LAN convergence, hidden family failures, mismatched family intent and
+fail-closed claims without enforcement flags for each requested family. Valid
+dual-stack, v4-only, v6-only, LAN-pending and partial-clear states remain distinct.
+This validates producer claims for consistency; it is not selection/clear UI,
+producer-process evidence or actual routing/fail-closed proof.
 
 ### Resource reader foundation (2026-09-13)
 

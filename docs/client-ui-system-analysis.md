@@ -348,7 +348,9 @@ revision; IPv4/IPv6 обязательны и не синтезируются и
 typed failures и fail_closed сохраняются независимо по каждой семье. Узел,
 исчезнувший из каталога после policy/path change, не подменяется другим; текущий
 status сохраняется. Allowed modes не расширяются до dual-stack. Reader проверяет
-структуру, а не доказывает согласованность всех aggregate/apply invariants или
+структуру и согласованность intent с family modes, effective IDs, приоритетом
+FAILED, family/LAN convergence для APPLIED и заявлением aggregate fail_closed.
+Противоречивый status отвергается без исправления или догадок. Это не доказывает
 реальную блокировку обходного трафика. Shared tests проверяют partial apply,
 missing families и пагинацию; session tests — owner/context invalidation.
 Exit-node UI, Select/Clear process scenarios и actual traffic acceptance ещё нужны.

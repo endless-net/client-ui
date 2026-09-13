@@ -114,6 +114,115 @@ api.GetExitNodeResponse _exitStatus() =>
 
 void main() {
   test(
+    'US-05: exit aggregate cannot claim partial apply or missing protection',
+    () async {
+      for (final change in <void Function(api.ExitNodeStatus)>[
+        (s) => s.applyState = api.ApplyState.APPLY_STATE_APPLIED,
+        (s) => s.applyState = api.ApplyState.APPLY_STATE_PENDING,
+        (s) => s.effectiveExitNodeId = s.requestedExitNodeId,
+        (s) => s.failClosed = true,
+        (s) => s.requestedFamilyMode = api.ExitFamilyMode.EXIT_FAMILY_MODE_NONE,
+        (s) => s.clearRequestedExitNodeId(),
+        (s) => s.ipv4.requestedExitNodeId = 'another-exit',
+        (s) => s.ipv4.effectiveExitNodeId = 'another-exit',
+        (s) => s.ipv4.clearEffectiveExitNodeId(),
+      ]) {
+        final response = _exitStatus();
+        change(response.status);
+        await expectLater(
+          readClientExitNodes(
+            instanceId: 'runtime-a',
+            profileId: 'profile-a',
+            list: (_) async => _exitPage(),
+            get: (_) async => response,
+            checkContext: () {},
+          ),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+  test(
+    'US-05: complete, single-family, LAN-pending and partial-clear statuses stay distinct',
+    () async {
+      for (final mode in [
+        'dual',
+        'v4',
+        'v6',
+        'lan-pending',
+        'clear-pending',
+        'cleared',
+      ]) {
+        final response = _exitStatus();
+        final s = response.status;
+        s.clearFailure();
+        s.ipv6.clearFailure();
+        s.ipv6.effectiveExitNodeId = s.requestedExitNodeId;
+        s.ipv6.applyState = api.ApplyState.APPLY_STATE_APPLIED;
+        s.ipv6.failClosed = true;
+        s.effectiveExitNodeId = s.requestedExitNodeId;
+        s.applyState = api.ApplyState.APPLY_STATE_APPLIED;
+        s.requestedLanAccess = api.LanAccess.LAN_ACCESS_BLOCK;
+        s.effectiveLanAccess = api.LanAccess.LAN_ACCESS_BLOCK;
+        s.failClosed = true;
+        if (mode == 'v4') {
+          s.requestedFamilyMode = api.ExitFamilyMode.EXIT_FAMILY_MODE_IPV4_ONLY;
+          s.ipv6.clearRequestedExitNodeId();
+          s.ipv6.clearEffectiveExitNodeId();
+          s.ipv6.failClosed = false;
+        }
+        if (mode == 'v6') {
+          s.requestedFamilyMode = api.ExitFamilyMode.EXIT_FAMILY_MODE_IPV6_ONLY;
+          s.ipv4.clearRequestedExitNodeId();
+          s.ipv4.clearEffectiveExitNodeId();
+          s.ipv4.failClosed = false;
+        }
+        if (mode == 'lan-pending') {
+          s.applyState = api.ApplyState.APPLY_STATE_PENDING;
+          s.effectiveLanAccess = api.LanAccess.LAN_ACCESS_ALLOW;
+        }
+        if (mode == 'clear-pending' || mode == 'cleared') {
+          s.requestedFamilyMode = api.ExitFamilyMode.EXIT_FAMILY_MODE_NONE;
+          s.clearRequestedExitNodeId();
+          s.clearEffectiveExitNodeId();
+          s.failClosed = false;
+          s.ipv4.clearRequestedExitNodeId();
+          s.ipv4.clearEffectiveExitNodeId();
+          s.ipv4.failClosed = false;
+          s.ipv6.clearRequestedExitNodeId();
+          if (mode == 'clear-pending') {
+            s.applyState = api.ApplyState.APPLY_STATE_PENDING;
+            s.ipv6.applyState = api.ApplyState.APPLY_STATE_PENDING;
+          } else {
+            s.ipv6.clearEffectiveExitNodeId();
+            s.ipv6.failClosed = false;
+          }
+        }
+        final result = await readClientExitNodes(
+          instanceId: 'runtime-a',
+          profileId: 'profile-a',
+          list: (_) async => _exitPage(),
+          get: (_) async => response,
+          checkContext: () {},
+        );
+        expect(result.status.writeToBuffer(), response.status.writeToBuffer());
+        if (mode == 'lan-pending') {
+          response.status.applyState = api.ApplyState.APPLY_STATE_APPLIED;
+          await expectLater(
+            readClientExitNodes(
+              instanceId: 'runtime-a',
+              profileId: 'profile-a',
+              list: (_) async => _exitPage(),
+              get: (_) async => response,
+              checkContext: () {},
+            ),
+            throwsFormatException,
+          );
+        }
+      }
+    },
+  );
+  test(
     'US-05: exit pagination rejects cycles, duplicates and mixed revisions',
     () async {
       for (final variant in ['valid', 'cycle', 'duplicate', 'revision']) {
