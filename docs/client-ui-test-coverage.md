@@ -18,6 +18,20 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+At `c228aeebade053e2b799a68302c192c8f291cc3d`, all
+[three desktop jobs](https://github.com/endless-net/client-ui/actions/runs/34743127619)
+passed 261 tests each. Logs explicitly confirm the gated Network selection and
+direct observer peer RPC scenarios. The
+[iOS job](https://github.com/endless-net/client-ui/actions/runs/34743127637/job/103686151851)
+passed 87 simulator tests, including shared identity context and rejecting resource
+opening after Network changes. This supersedes the pending-execution notes below
+for those additions only; historical limits remain relevant.
+The [Android job](https://github.com/endless-net/client-ui/actions/runs/34743127637/job/103686151891)
+failed KVM preflight before tests. The
+[Windows packaging job](https://github.com/endless-net/client-ui/actions/runs/34743127621/job/103686145581)
+passed 261 tests before rejecting the incompatible core manifest target/IPC pairing.
+No installed-service, native mobile VPN or traffic acceptance follows from this run.
+
 UBR-09 connection context now displays Account, Network name/ID and device
 hostname/node ID from the current Status for owners with an active profile.
 The shared typed-snapshot widget regression checks Unknown for missing values,

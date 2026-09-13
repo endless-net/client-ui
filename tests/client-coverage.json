@@ -14,26 +14,20 @@
     {
       "platforms": [
         "windows",
+        "linux",
         "macos"
       ],
       "workflow": ".github/workflows/contract-consumer.yml",
       "status": "passed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34740892688",
-      "scope": "Windows and macOS at c0026dcaccbd59c87ea817b52f641999330022e8 passed 252 tests each. Includes trust process success, but does not establish that its intermittent rejection is fixed. Excludes later peer process, gated Network event, observer direct-RPC and connection identity additions. Native host/consumer mocks only, not runtime or product/platform acceptance"
-    },
-    {
-      "platforms": ["linux"],
-      "workflow": ".github/workflows/contract-consumer.yml",
-      "status": "passed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34741391970",
-      "scope": "Linux job 103681568115 at e4a06abac6d2f4a39dc9a091140410c2c8120210 passed 256 tests including three producer-host peer scenarios: pagination, revision drift and local observer denial. Not the whole run; later gated Network event, direct observer RPC and connection identity additions remain unverified on runners. No actual runtime/traffic acceptance"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34743127619",
+      "scope": "All three desktop jobs at c228aeebade053e2b799a68302c192c8f291cc3d passed 261 tests each. Includes producer-host peer pagination/revision drift, direct observer denial and gated Network selection/recovery/status sequence, plus shared identity context and resource Network-change guards. Native host/consumer mocks only, not actual runtime, installed-service, traffic or product/platform acceptance; intermittent trust rejection is not proven eliminated"
     },
     {
       "platforms": ["ios"],
       "workflow": ".github/workflows/mobile-contract.yml",
       "status": "passed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34741635033",
-      "scope": "iOS job 103682207409 at f2cc6d738699cebd474895b18a027dabaaad96fd passed 86 simulator tests, including peer bounds/times and Network-change peer cleanup with late-result rejection. Excludes later resource-opening Network change and connection identity additions. Not the whole mobile run, desktop plugins, native VPN bridge, producer-process interoperability or real traffic acceptance"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34743127637",
+      "scope": "iOS job 103686151851 at c228aeebade053e2b799a68302c192c8f291cc3d passed 87 simulator tests, including shared connection identity context, resource-opening rejection after Network change, peer bounds/times and Network-change cleanup. Not the whole mobile run, desktop plugins, native VPN bridge, producer-process interoperability or real traffic acceptance"
     },
     {
       "platforms": [
@@ -41,8 +35,8 @@
       ],
       "workflow": ".github/workflows/mobile-contract.yml",
       "status": "failed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34740892717",
-      "scope": "Android job 103680327101 at c0026dcaccbd59c87ea817b52f641999330022e8 failed KVM read/write preflight before tests on GitHub-hosted ubuntu-latest. Runner permission changes remain unapproved. Later jobs are queued, not successful execution; native execution and VPN/real traffic acceptance remain unproven"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34743127637",
+      "scope": "Android job 103686151891 at c228aeebade053e2b799a68302c192c8f291cc3d failed KVM read/write preflight before tests on GitHub-hosted ubuntu-latest. Runner permission changes remain unapproved; native execution and VPN/real traffic acceptance remain unproven"
     }
   ],
   "sharedEnvelopeTests": [
