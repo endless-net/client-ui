@@ -1,3 +1,6 @@
+@Tags(['integration'])
+library;
+
 import 'dart:async';
 import 'dart:io';
 import 'package:endlessnet/client_intent_journal.dart';

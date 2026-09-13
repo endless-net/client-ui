@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:endlessnet/client_connection_panel.dart';

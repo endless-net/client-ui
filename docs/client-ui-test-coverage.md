@@ -33,7 +33,31 @@ Runner qualification for this addition is pending.
 Local validation passed 397 Flutter tests with 30 skips, Flutter analysis,
 Go tests and coverage-ledger checks.
 
-Contract workflow cost policy: push/PR executes one pass per selected platform.
+Development order: finish the full functionality and its local unit/widget tests
+before integration qualification. CI waits do not gate ongoing implementation.
+Branch pushes now run only `Client UI short` on one runner: `go test -short ./...`
+and `flutter test --no-pub --tags short`. Flutter libraries explicitly select
+`short` or `integration`; the policy guard requires a classification for every
+test file. Short includes mocked unit/widget and bounded temporary filesystem
+tests, excluding socket/process suites. Go short excludes PowerShell integration.
+Full consumer, transport, mobile and packaging workflows run on PR, not branch
+push. CodeQL remains on PR/schedule; tag-triggered publication is unchanged.
+
+Local development commands (no producer host required):
+
+```sh
+go test -short ./...
+cd app
+flutter analyze --no-pub
+flutter test --no-pub --tags short
+```
+
+Policy-cutover validation: short Flutter passed 340 tests with 1 skip; the
+existing full local suite passed 407 with 30 skips. Go short/full, Flutter
+analysis and all 11 policy/trace structural tests passed. This validates selection
+and preserves existing tests; it does not advance integration/product acceptance.
+
+Contract workflow cost policy: PR executes one pass per selected platform.
 For release preparation or flake diagnosis, manually run `Client v0 consumer`,
 `Mobile v0 consumer` and/or `Local client v0 interoperability` with
 `repetitions: 3`; the default remains `1`. Repeats use independent jobs and do
@@ -54,6 +78,20 @@ business scenarios, native mobile bridges and product/platform acceptance remain
 required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
+
+At `171dc4897f04e857e6daf825c881f74bf910d4c7`, the
+[desktop consumer run](https://github.com/endless-net/client-ui/actions/runs/34778025463)
+passed 436 tests with 1 skip on each of Windows, Linux and macOS. Logs from all
+three jobs explicitly pass the all-mutation wire suite and RU/EN recovery and
+primary connection tests. Earlier pending statements for these desktop additions
+are superseded by this execution evidence, not by product acceptance.
+
+[Android job](https://github.com/endless-net/client-ui/actions/runs/34778025462/job/103779646555)
+failed KVM preflight before tests. The separate
+[Windows packaging job](https://github.com/endless-net/client-ui/actions/runs/34778025523/job/103779615485)
+passed 436 tests with 1 skip, then failed `resolve-client-core.ps1:173` with
+`client core manifest target or IPC version mismatch`. Neither blocker is repaired
+by a green consumer suite; no runner permissions or producer files were changed.
 
 At `b210280faf952b9099aa27f7cd1ad11b501fa2fb`, the
 [desktop consumer run](https://github.com/endless-net/client-ui/actions/runs/34777079094)

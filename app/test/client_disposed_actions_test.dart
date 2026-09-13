@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'dart:async';
 import 'package:endlessnet/client_cleanup_panel.dart';
 import 'package:endlessnet/client_create_profile_panel.dart';

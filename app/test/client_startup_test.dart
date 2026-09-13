@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'dart:io';
 import 'package:endlessnet/main.dart';
 import 'package:endlessnet/windows_elevation.dart';

@@ -1,3 +1,6 @@
+@Tags(['integration'])
+library;
+
 import 'dart:io';
 
 import 'package:endlessnet/client_event_stream.dart';

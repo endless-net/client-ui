@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'dart:io';
 import 'package:endlessnet/client_desktop_app.dart';
 import 'package:endlessnet/client_intent_journal.dart';

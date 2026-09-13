@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'package:endlessnet/client_operation_labels.dart';
 import 'package:endlessnet/client_locale.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;

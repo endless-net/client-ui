@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'package:endlessnet/client_peers.dart';
 import 'dart:async';
 import 'package:endlessnet/client_peers_panel.dart';

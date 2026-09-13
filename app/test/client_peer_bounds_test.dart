@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:endlessnet/client_peers.dart';
 import 'package:flutter_test/flutter_test.dart';

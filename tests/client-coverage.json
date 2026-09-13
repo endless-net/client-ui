@@ -19,8 +19,8 @@
       ],
       "workflow": ".github/workflows/contract-consumer.yml",
       "status": "passed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34777079094",
-      "scope": "At b210280faf952b9099aa27f7cd1ad11b501fa2fb all three desktop jobs passed 346 tests with 1 skip each. Logs explicitly confirm both loopback wire scenarios, including ambiguous acceptance and consumer-session restart. Includes pinned producer-host tests; not real runtime/OS/traffic acceptance. The later all-mutation wire-envelope suite is NOT covered by this run"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34778025463",
+      "scope": "At 171dc4897f04e857e6daf825c881f74bf910d4c7 all three desktop jobs passed 436 tests with 1 skip each. Inspected logs explicitly pass all-mutation wire-envelope vectors and RU/EN recovery/connection panels. Includes pinned producer-host tests and loopback session scenarios; not full-app localization or real runtime/OS/traffic acceptance"
     },
     {
       "platforms": ["ios"],
@@ -35,8 +35,8 @@
       ],
       "workflow": ".github/workflows/mobile-contract.yml",
       "status": "failed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34776165077",
-      "scope": "Android job 103774647519 at a218fde9ccf0252970cca85a8f65a012ea7009e5 failed KVM access preflight before tests. No Android scenario pass is claimed; runner access remains an external blocker, and no host permissions were changed"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34778025462",
+      "scope": "Android job 103779646555 at 171dc4897f04e857e6daf825c881f74bf910d4c7 failed KVM access preflight before tests. No Android scenario pass is claimed; runner access remains an external blocker, and no host permissions were changed"
     }
   ],
   "sharedEnvelopeTests": [

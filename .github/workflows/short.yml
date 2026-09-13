@@ -1,0 +1,46 @@
+name: Client UI short
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  short:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.38.1
+          cache: false
+      - name: Check test policy and trace structure
+        run: |
+          node --test scripts/check-contract-workflows.test.mjs scripts/check-client-coverage.test.mjs
+          node scripts/check-client-coverage.mjs
+      - name: Short Go tests
+        run: go test -short ./...
+      - name: Resolve locked Flutter dependencies
+        working-directory: app
+        run: flutter pub get --enforce-lockfile
+      - name: Short Flutter unit and widget tests
+        working-directory: app
+        run: flutter test --no-pub --tags short
+      - name: Reject dependency drift
+        run: git diff --exit-code -- app/pubspec.yaml app/pubspec.lock

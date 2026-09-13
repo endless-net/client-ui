@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'package:endlessnet/client_profiles.dart';
 import 'package:endlessnet/client_networks.dart';
 import 'package:endlessnet/client_resources.dart';

@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'dart:async';
 import 'package:endlessnet/client_locale.dart';
 import 'package:endlessnet/client_runtime_operations_panel.dart';

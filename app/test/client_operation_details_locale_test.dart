@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'dart:convert';
 import 'package:endlessnet/client_locale.dart';
 import 'package:endlessnet/client_operation.dart';

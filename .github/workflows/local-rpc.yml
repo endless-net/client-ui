@@ -1,9 +1,6 @@
 name: Local client v0 interoperability
 
 on:
-  push:
-    branches: [main]
-    paths: ['packages/local_client_rpc/**', 'packages/http2/**', '.github/workflows/local-rpc.yml']
   pull_request:
     paths: ['packages/local_client_rpc/**', 'packages/http2/**', '.github/workflows/local-rpc.yml']
   workflow_dispatch:

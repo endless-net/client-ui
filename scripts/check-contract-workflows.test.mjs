@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 
 // Structural regression guard, not a YAML parser or GitHub expression engine.
@@ -12,6 +12,8 @@ for (const [file, jobs] of [
   test(`${file}: repetitions are opt-in and superseded runs cancel`, () => {
     const source = readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8');
     assert.match(source, /workflow_dispatch:\s+inputs:\s+repetitions:/);
+    assert.doesNotMatch(source, /^  push:/m);
+    assert.match(source, /^  pull_request:/m);
     assert.match(source, /type: choice\s+options: \['1', '3'\]\s+default: '1'/);
     assert.equal(source.split(`pass: ${passExpression}`).length - 1, jobs);
     assert.equal(source.match(/fail-fast: false/g)?.length, jobs);
@@ -21,3 +23,32 @@ for (const [file, jobs] of [
     }
   });
 }
+
+test('branch pushes run only the short workflow', () => {
+  const root = new URL('../.github/workflows/', import.meta.url);
+  for (const file of readdirSync(root).filter((name) => name.endsWith('.yml'))) {
+    const source = readFileSync(new URL(file, root), 'utf8');
+    if (file === 'release.yml') {
+      assert.match(source, /push:\s+tags:/); // Explicit publication is separate.
+      continue;
+    }
+    if (file !== 'short.yml') assert.doesNotMatch(source, /^  push:/m, file);
+  }
+  const source = readFileSync(new URL('short.yml', root), 'utf8');
+  assert.match(source, /push:\s+branches: \[main\]/);
+  assert.match(source, /go test -short \.\/\.\.\./);
+  assert.match(source, /flutter test --no-pub --tags short/);
+  assert.doesNotMatch(source, /matrix:|repository: endless-net\/client|ENDLESSNET_TESTSERVER|flutter build|emulator|simulator/);
+  assert.match(source, /cancel-in-progress: true/);
+});
+
+test('every Flutter suite explicitly chooses short or integration', () => {
+  const root = new URL('../app/test/', import.meta.url);
+  for (const name of readdirSync(root).filter((name) => name.endsWith('_test.dart'))) {
+    const source = readFileSync(new URL(name, root), 'utf8');
+    assert.match(source, /^@Tags\(\['(short|integration)'\]\)\s+library;/, name);
+    if (/process_test|wire_test|loopback_contract_test|local_client_events_test/.test(name)) {
+      assert.match(source, /^@Tags\(\['integration'\]\)/, name);
+    }
+  }
+});

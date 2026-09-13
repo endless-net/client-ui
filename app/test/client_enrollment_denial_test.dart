@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'dart:async';
 
 import 'package:endlessnet/client_enrollment_panel.dart';

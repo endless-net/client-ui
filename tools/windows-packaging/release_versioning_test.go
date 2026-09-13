@@ -204,6 +204,9 @@ func TestReleaseProvenanceKeepsUIAndCoreVersionsIndependent(t *testing.T) {
 
 func releasePowerShell(t *testing.T) string {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("PowerShell integration is excluded from short tests")
+	}
 	if runtime.GOOS != "windows" {
 		t.Skip("release workflow uses the Windows PowerShell runner")
 	}

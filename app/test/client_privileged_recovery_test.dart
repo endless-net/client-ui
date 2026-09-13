@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'dart:convert';
 import 'package:endlessnet/client_privileged_recovery.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;

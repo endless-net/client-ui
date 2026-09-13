@@ -15,9 +15,11 @@
 ### Актуализация source cutover — 2026-09-13
 
 Повторная read-only сверка producer: remote `client/main` на
-`25f58dc468be4fbcf9abafb4793de7eca5f08c27`; `proto/client/v0` и
+`9d73421d3ba40470c9b8ba49ed276bcf14765e4e`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin
 `cd05fcddb858877b10ecefe7b0b4a3819d2c6f3b`. Pin и версии не менялись.
+Нормативный `docs/client-ipc-protobuf.md` также не изменился относительно
+предыдущей сверки `25f58dc468be4fbcf9abafb4793de7eca5f08c27`.
 Актуальные нормативные пояснения readiness требуют rebootstrap после typed
 STALE_STATE. Shared session regression проверяет очистку старой проекции,
 новый snapshot без прежней identity capability и сохранение UUID без replay;
@@ -655,6 +657,24 @@ trace duration и upload требуют отдельного scope/контра�
 Экспорт через пользовательский save/share action не разрешает скрытую отправку.
 
 ## 6. Тестирование и release gates
+
+### Порядок реализации и запусков
+
+Сначала реализуем весь UF/UBR/UI-AC/US scope и проверяем его локальными
+unit/widget-тестами. Ожидание CI не является условием продолжения разработки.
+К интеграционной квалификации пяти платформ переходим после проверки полноты
+реализации всего функционала. Уже существующие интеграционные тесты сохраняются,
+но не подменяют этот порядок и не служат доказательством полноты продукта.
+
+Обычный push на main запускает только `Client UI short`: `go test -short ./...`
+и `flutter test --no-pub --tags short`, без producer host, emulator, packaging
+или межплатформенной матрицы. Каждый Flutter test file явно имеет метку `short`
+или `integration`; новые suites без классификации отклоняются policy-тестом.
+Short включает быстрые unit/widget и bounded temporary-filesystem тесты с
+подставными зависимостями; socket/process fixtures исключены. Полные desktop,
+mobile, local-RPC и packaging проверки выполняются на PR; контрактные workflows
+сохраняют manual dispatch с 1/3 проходами. Релизный tag workflow не меняется.
+Новый запуск отменяет прежний для того же workflow/ref, кроме отдельной публикации.
 
 `app/test/support/mutation_wire_server.dart` — отдельный строгий single-call
 fixture для всех 19 mutation RPC. `client_mutation_wire_test.dart` проверяет

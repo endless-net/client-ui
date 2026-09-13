@@ -10,6 +10,9 @@ import (
 )
 
 func TestReleaseIdempotencyTreatsOnlyNotFoundAsMissing(t *testing.T) {
+	if testing.Short() {
+		t.Skip("PowerShell integration is excluded from short tests")
+	}
 	if runtime.GOOS != "windows" {
 		t.Skip("release workflow uses the Windows PowerShell runner")
 	}
