@@ -2,10 +2,18 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 
 import 'client_peers.dart';
+import 'client_locale.dart';
+import 'client_peer_labels.dart';
 import 'client_state_controller.dart';
 
 class ClientPeersPanel extends StatefulWidget {
-  const ClientPeersPanel({super.key, required this.state, required this.load});
+  const ClientPeersPanel({
+    super.key,
+    required this.state,
+    required this.load,
+    this.locale = ClientLocale.en,
+  });
+  final ClientLocale locale;
   final ClientStateController state;
   final Future<ClientPeerCatalog> Function(String search) load;
 
@@ -16,7 +24,9 @@ class ClientPeersPanel extends StatefulWidget {
 class _ClientPeersPanelState extends State<ClientPeersPanel> {
   final _search = TextEditingController();
   ClientPeerCatalog? _catalog;
-  String? _notice;
+  bool _failed = false;
+  String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
+  String get _missing => _text('not reported', 'не сообщено');
   late String _context;
   var _serial = 0;
   var _busy = false;
@@ -38,7 +48,7 @@ class _ClientPeersPanelState extends State<ClientPeersPanel> {
   void _reset() {
     _serial++;
     _catalog = null;
-    _notice = null;
+    _failed = false;
     _busy = false;
   }
 
@@ -85,7 +95,7 @@ class _ClientPeersPanelState extends State<ClientPeersPanel> {
     setState(() {
       _busy = true;
       _catalog = null;
-      _notice = null;
+      _failed = false;
     });
     bool current() =>
         mounted &&
@@ -106,10 +116,7 @@ class _ClientPeersPanelState extends State<ClientPeersPanel> {
       setState(() => _catalog = result);
     } catch (_) {
       if (current()) {
-        setState(
-          () => _notice =
-              'Peer information could not be confirmed. Refresh to try again.',
-        );
+        setState(() => _failed = true);
       }
     } finally {
       if (current()) setState(() => _busy = false);
@@ -121,58 +128,90 @@ class _ClientPeersPanelState extends State<ClientPeersPanel> {
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
     children: [
-      const Text('Peers'),
+      Text(_text('Peers', 'Устройства')),
       TextField(
         key: const Key('client-peer-search'),
         controller: _search,
         enabled: _allowed,
-        decoration: const InputDecoration(labelText: 'Search peers'),
+        decoration: InputDecoration(
+          labelText: _text('Search peers', 'Поиск устройств'),
+        ),
         onChanged: (_) => setState(_reset),
       ),
       OutlinedButton(
         key: const Key('client-load-peers'),
         onPressed: _allowed && !_busy ? _load : null,
-        child: Text(_busy ? 'Loading peers…' : 'Refresh peers'),
-      ),
-      if (_notice != null) Text(_notice!),
-      if (_catalog case final catalog?) ...[
-        Text('Snapshot: ${catalog.snapshotState.name}'),
-        Text(
-          'Applied map: ${catalog.mapRevision}; target map: ${catalog.targetMapRevision}',
+        child: Text(
+          _busy
+              ? _text('Loading peers…', 'Загрузка устройств…')
+              : _text('Refresh peers', 'Обновить устройства'),
         ),
-        const Text('Runtime observations; this screen does not probe peers.'),
-        if (catalog.peers.isEmpty) const Text('No peers in this response.'),
+      ),
+      if (_failed)
+        Semantics(
+          liveRegion: true,
+          child: Text(
+            _text(
+              'Peer information could not be confirmed. Refresh to try again.',
+              'Не удалось подтвердить сведения об устройствах. Обновите список, чтобы повторить попытку.',
+            ),
+          ),
+        ),
+      if (_catalog case final catalog?) ...[
+        Text(
+          '${_text('Snapshot', 'Состояние снимка')}: ${peerSnapshotLabel(catalog.snapshotState, widget.locale)}',
+        ),
+        Text(
+          '${_text('Applied map', 'Применённая карта')}: ${catalog.mapRevision}; ${_text('target map', 'целевая карта')}: ${catalog.targetMapRevision}',
+        ),
+        Text(
+          _text(
+            'Runtime observations; this screen does not probe peers.',
+            'Наблюдения службы; этот экран не проверяет доступность устройств.',
+          ),
+        ),
+        if (catalog.peers.isEmpty)
+          Text(
+            _text('No peers in this response.', 'В этом ответе нет устройств.'),
+          ),
         for (final peer in catalog.peers)
           ExpansionTile(
             key: ValueKey('client-peer-${peer.id}'),
             title: Text(peer.hostname.isEmpty ? peer.id : peer.hostname),
             subtitle: Text(
-              'ID: ${peer.id}\nSelected path: ${peer.selectedPath.name}',
+              'ID: ${peer.id}\n${_text('Selected path', 'Выбранный путь')}: ${peerPathLabel(peer.selectedPath, widget.locale)}',
             ),
             children: [
-              Text('Overlay addresses: ${peer.overlayAddresses.join(', ')}'),
               Text(
-                'Selected endpoint: ${peer.selectedEndpoint.isEmpty ? 'not reported' : peer.selectedEndpoint}',
+                '${_text('Overlay addresses', 'Адреса оверлейной сети')}: ${peer.overlayAddresses.join(', ')}',
               ),
               Text(
-                'Selection reason: ${peer.selectionReasonKey.isEmpty ? 'not reported' : peer.selectionReasonKey}',
+                '${_text('Selected endpoint', 'Выбранный адрес подключения')}: ${peer.selectedEndpoint.isEmpty ? _missing : peer.selectedEndpoint}',
               ),
               Text(
-                'Last transition: ${peer.hasLastTransitionAt() ? peer.lastTransitionAt.toProto3Json() : 'not reported'}',
+                '${_text('Selection reason', 'Код причины выбора')}: ${peer.selectionReasonKey.isEmpty ? _missing : peer.selectionReasonKey}',
+              ),
+              Text(
+                '${_text('Last transition', 'Последний переход')}: ${peer.hasLastTransitionAt() ? peer.lastTransitionAt.toProto3Json() : _missing}',
               ),
               if (peer.candidates.isEmpty)
-                const Text('No path candidates reported.'),
+                Text(
+                  _text(
+                    'No path candidates reported.',
+                    'Варианты пути не сообщены.',
+                  ),
+                ),
               for (final candidate in peer.candidates)
                 Padding(
                   padding: const EdgeInsets.all(8),
                   child: Text(
-                    'Candidate: ${candidate.kind.name}; ${candidate.health.name}\n'
-                    'Endpoint: ${candidate.endpoint}; relay: ${candidate.relayId}\n'
-                    'Protocol: ${candidate.protocol}; tier: ${candidate.tier}; priority: ${candidate.priority}\n'
-                    'RTT: ${candidate.hasRtt() ? candidate.rtt.toProto3Json() : 'not reported'}\n'
-                    'Checked: ${candidate.hasCheckedAt() ? candidate.checkedAt.toProto3Json() : 'not reported'}\n'
-                    'Last reachable: ${candidate.hasLastReachableAt() ? candidate.lastReachableAt.toProto3Json() : 'not reported'}\n'
-                    'Consecutive failures: ${candidate.consecutiveFailures}; reason: ${candidate.reasonKey}',
+                    '${_text('Candidate', 'Вариант пути')}: ${peerPathLabel(candidate.kind, widget.locale)}; ${peerHealthLabel(candidate.health, widget.locale)}\n'
+                    '${_text('Endpoint', 'Адрес подключения')}: ${candidate.endpoint}; ${_text('relay', 'ретранслятор')}: ${candidate.relayId}\n'
+                    '${_text('Protocol', 'Протокол')}: ${candidate.protocol}; ${_text('tier', 'уровень')}: ${candidate.tier}; ${_text('priority', 'приоритет')}: ${candidate.priority}\n'
+                    'RTT: ${candidate.hasRtt() ? candidate.rtt.toProto3Json() : _missing}\n'
+                    '${_text('Checked', 'Проверено')}: ${candidate.hasCheckedAt() ? candidate.checkedAt.toProto3Json() : _missing}\n'
+                    '${_text('Last reachable', 'Последняя доступность')}: ${candidate.hasLastReachableAt() ? candidate.lastReachableAt.toProto3Json() : _missing}\n'
+                    '${_text('Consecutive failures', 'Ошибок подряд')}: ${candidate.consecutiveFailures}; ${_text('reason', 'код причины')}: ${candidate.reasonKey}',
                   ),
                 ),
             ],

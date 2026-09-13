@@ -541,6 +541,10 @@
           "scope": "12 short widget vectors: queued selection after snapshot/controller/catalog replacement and late old-controller lookup rejection; exact RU/EN catalog and accepted/terminal/unknown/empty messages, locale changes without RPC replay. Component evidence only, not actual network switching or full UI-AC-13"
         },
         {
+          "path": "app/test/client_peer_locale_test.dart",
+          "scope": "All 12 snapshot/path/health enum values have exact RU/EN labels; six short widget vectors compare entire expanded peer details, empty catalog and error text in both locales without repeat queries. Diagnostic codes and observations remain source data. Not full-app UI-AC-13, native accessibility or reachability acceptance"
+        },
+        {
           "path": "app/test/client_recovery_locale_test.dart",
           "scope": "22 shared RU/EN recovery widget vectors compare all panel text for lookup, pending, acknowledgement, browser success/failure and export success/cancellation/failure/unavailable adapter. Rebuilding the same state in the other locale updates notices without repeating lookup or external actions. Runner execution pending; not full-app language switching, native dialogs or product acceptance"
         },

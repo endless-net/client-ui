@@ -176,14 +176,14 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Host first'), findsOneWidget);
         expect(
-          find.textContaining('AGENT_SNAPSHOT_STATE_PREVIOUS'),
+          find.text('Snapshot: Previous'),
           findsOneWidget,
         );
         expect(find.text('Applied map: 11; target map: 12'), findsOneWidget);
         await tester.ensureVisible(find.text('Host first'));
         await tester.tap(find.text('Host first'));
         await tester.pumpAndSettle();
-        expect(find.textContaining('PATH_HEALTH_UNREACHABLE'), findsOneWidget);
+        expect(find.textContaining('Unreachable'), findsOneWidget);
         expect(find.textContaining('path.timeout'), findsOneWidget);
         expect(
           find.text('Selection reason: path.direct_failed'),
