@@ -28,6 +28,16 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+Identity confirmation callback hardening (local evidence): queued inspection and
+checkbox callbacks cannot act after the form is disposed. A checkbox retained
+from an earlier identity cannot confirm while a reload is pending or after a
+new identity object is displayed, even if its wire fields are unchanged. The
+two widget regressions deliberately invoke captured callbacks; they do not
+claim native keyboard, touch or elevation-prompt acceptance. Local Go tests,
+Flutter analysis and 283 Flutter tests passed (28 artifact/CI-only skips).
+The regressions are included in the mobile harness; their runner execution is
+pending and does not follow from the older evidence below.
+
 At `b863ee2e8793437bc390c5d108a7532fd29da5f3`, the
 [three desktop consumer jobs](https://github.com/endless-net/client-ui/actions/runs/34760912272)
 passed. They use the synthetic Go host pinned to

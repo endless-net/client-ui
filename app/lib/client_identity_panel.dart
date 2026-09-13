@@ -58,6 +58,7 @@ class _IdentityFormState extends State<_IdentityForm> {
     state.domainEpoch(api.Domain.DOMAIN_PROFILES),
   );
   bool get _readAllowed =>
+      mounted &&
       _boundContext == _context &&
       state.link == ClientLinkState.ready &&
       state.snapshot != null &&
@@ -191,7 +192,14 @@ class _IdentityFormState extends State<_IdentityForm> {
           ),
           value: _confirmed,
           onChanged: !_busy && _trustAllowed
-              ? (value) => setState(() => _confirmed = value == true)
+              ? (value) {
+                  if (_busy ||
+                      !_trustAllowed ||
+                      !identical(identity, _identity)) {
+                    return;
+                  }
+                  setState(() => _confirmed = value == true);
+                }
               : null,
         ),
         TextButton(
