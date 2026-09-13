@@ -4,8 +4,19 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 
 import 'client_operation.dart';
+import 'client_locale.dart';
 import 'client_profiles.dart';
 import 'client_state_controller.dart';
+
+enum _ProfileNotice {
+  selectionPending,
+  selectionResult,
+  renamePending,
+  renameResult,
+  removalPending,
+  removalResult,
+  failed,
+}
 
 class ClientProfilesPanel extends StatefulWidget {
   const ClientProfilesPanel({
@@ -15,7 +26,9 @@ class ClientProfilesPanel extends StatefulWidget {
     required this.select,
     required this.rename,
     required this.remove,
+    this.locale = ClientLocale.en,
   });
+  final ClientLocale locale;
   final ClientStateController state;
   final Future<ClientProfileCatalog> Function() load;
   final Future<ClientOperation> Function(String profileId) select;
@@ -47,7 +60,38 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
       _epoch == widget.state.cacheEpoch &&
       _domainEpoch == widget.state.domainEpoch(api.Domain.DOMAIN_PROFILES);
   bool _busy = false;
-  String? _notice;
+  _ProfileNotice? _notice;
+  String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
+  String _noticeText(_ProfileNotice notice) => switch (notice) {
+    _ProfileNotice.selectionPending => _text(
+      'Selection accepted. Recover the operation to see its result.',
+      'Выбор профиля принят. Восстановите операцию, чтобы узнать результат.',
+    ),
+    _ProfileNotice.selectionResult => _text(
+      'Selection result received. Refresh profiles and runtime status.',
+      'Получен результат выбора профиля. Обновите профили и состояние клиента.',
+    ),
+    _ProfileNotice.renamePending => _text(
+      'Rename accepted. Recover the operation to see its result.',
+      'Переименование принято. Восстановите операцию, чтобы узнать результат.',
+    ),
+    _ProfileNotice.renameResult => _text(
+      'Rename result received. Refresh profiles and runtime status.',
+      'Получен результат переименования. Обновите профили и состояние клиента.',
+    ),
+    _ProfileNotice.removalPending => _text(
+      'Removal accepted. Recover the operation to see its result.',
+      'Удаление принято. Восстановите операцию, чтобы узнать результат.',
+    ),
+    _ProfileNotice.removalResult => _text(
+      'Removal result received. Refresh profiles and runtime status.',
+      'Получен результат удаления. Обновите профили и состояние клиента.',
+    ),
+    _ProfileNotice.failed => _text(
+      'Profiles could not be updated. Recover any pending operation before retrying.',
+      'Не удалось обновить профили. Восстановите незавершённую операцию перед повторной попыткой.',
+    ),
+  };
   String? _pendingRemoval;
   Object? _pendingRemovalSnapshot;
   int _confirmationEpoch = 0;
@@ -126,22 +170,24 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
         setState(() {
           // Neither acceptance nor success is a replacement runtime snapshot.
           _catalog = null;
-          final action = remove
-              ? 'Removal'
+          _notice = remove
+              ? (operation.terminal
+                    ? _ProfileNotice.removalResult
+                    : _ProfileNotice.removalPending)
               : name == null
-              ? 'Selection'
-              : 'Rename';
-          _notice = operation.terminal
-              ? '$action result received. Refresh profiles and runtime status.'
-              : '$action accepted. Recover the operation to see its result.';
+              ? (operation.terminal
+                    ? _ProfileNotice.selectionResult
+                    : _ProfileNotice.selectionPending)
+              : (operation.terminal
+                    ? _ProfileNotice.renameResult
+                    : _ProfileNotice.renamePending);
         });
       }
     } catch (_) {
       if (!mounted || !_owner || !_catalogCurrent) return;
       setState(() {
         _catalog = null;
-        _notice =
-            'Profiles could not be updated. Recover any pending operation before retrying.';
+        _notice = _ProfileNotice.failed;
       });
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -184,19 +230,24 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                     if (current()) _run();
                   }
                 : null,
-            child: const Text('Refresh profiles'),
+            child: Text(_text('Refresh profiles', 'Обновить профили')),
           ),
-          if (visible && _notice != null) Text(_notice!),
+          if (visible && _notice != null)
+            Semantics(liveRegion: true, child: Text(_noticeText(_notice!))),
           if (visible && _catalog != null) ...[
-            if (_catalog!.profiles.isEmpty) const Text('No profiles'),
+            if (_catalog!.profiles.isEmpty)
+              Text(_text('No profiles', 'Нет профилей')),
             if (_catalog!.profiles.isNotEmpty)
               TextField(
                 key: const Key('client-profile-name'),
                 controller: _name,
                 enabled: !_busy,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: 'New profile name (1–128 UTF-8 bytes)',
+                decoration: InputDecoration(
+                  labelText: _text(
+                    'New profile name (1–128 UTF-8 bytes)',
+                    'Новое имя профиля (1–128 байт UTF-8)',
+                  ),
                 ),
               ),
             for (final profile in _catalog!.profiles)
@@ -223,10 +274,10 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                                   );
                                 }
                               : null,
-                          child: const Text('Rename'),
+                          child: Text(_text('Rename', 'Переименовать')),
                         ),
                         profile.active
-                            ? const Text('Active')
+                            ? Text(_text('Active', 'Активный'))
                             : TextButton(
                                 key: ValueKey('select-profile-${profile.id}'),
                                 onPressed:
@@ -241,7 +292,7 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                                         }
                                       }
                                     : null,
-                                child: const Text('Select'),
+                                child: Text(_text('Select', 'Выбрать')),
                               ),
                         TextButton(
                           key: ValueKey('remove-profile-${profile.id}'),
@@ -261,7 +312,7 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                                   }
                                 }
                               : null,
-                          child: const Text('Remove'),
+                          child: Text(_text('Remove', 'Удалить')),
                         ),
                       ],
                     ),
@@ -270,7 +321,10 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
               ),
             if (removal != null) ...[
               Text(
-                'Remove profile $removal? This does not log out or clean up a remote registration.',
+                _text(
+                  'Remove profile $removal? This does not log out or clean up a remote registration.',
+                  'Удалить профиль $removal? Это не выполняет выход и не удаляет регистрацию на сервере.',
+                ),
               ),
               Wrap(
                 children: [
@@ -286,7 +340,7 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                             }
                           }
                         : null,
-                    child: const Text('Cancel'),
+                    child: Text(_text('Cancel', 'Отмена')),
                   ),
                   TextButton(
                     key: const Key('confirm-profile-removal'),
@@ -297,7 +351,9 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                             }
                           }
                         : null,
-                    child: const Text('Confirm removal'),
+                    child: Text(
+                      _text('Confirm removal', 'Подтвердить удаление'),
+                    ),
                   ),
                 ],
               ),

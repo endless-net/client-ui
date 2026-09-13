@@ -529,6 +529,10 @@
           "scope": "Fourteen typed operation-outcome vectors render exact complete RU/EN component text, including all cleanup outcomes, retryability and sensitive URL/reason/handle suppression. Registered in desktop/mobile harness; local component validation only pending runners. Whole-application locale switching and UI-AC-13 flows remain incomplete"
         },
         {
+          "path": "app/test/client_profiles_locale_test.dart",
+          "scope": "18 short RU/EN profile widget vectors: exact catalog and seven command-notice texts, removal security warning, active/empty catalog, locale changes without command replay or optimistic active state. Local component evidence only; full-app language selection and UI-AC-13 remain incomplete"
+        },
+        {
           "path": "app/test/client_recovery_locale_test.dart",
           "scope": "22 shared RU/EN recovery widget vectors compare all panel text for lookup, pending, acknowledgement, browser success/failure and export success/cancellation/failure/unavailable adapter. Rebuilding the same state in the other locale updates notices without repeating lookup or external actions. Runner execution pending; not full-app language switching, native dialogs or product acceptance"
         },

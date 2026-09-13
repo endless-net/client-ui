@@ -89,6 +89,14 @@ typed outcomes на RU/EN. Два shared widget tests проверяют по 14
 включая remote/local cleanup и suppression секретов. Локаль пока передаётся
 компоненту явно в тестах; production shell ещё не предоставляет смену языка.
 
+ClientProfilesPanel локализован на RU/EN, включая поля, пустой каталог, активный
+профиль, подтверждение удаления и семь типизированных notices. Предупреждение
+явно сохраняет различие локального удаления, выхода и регистрации на сервере.
+18 short widget-векторов проверяют каталог, подтверждение, pending/terminal/error,
+смену языка без повторной команды и live region. Terminal notice не выдаёт
+результат операции за новый runtime snapshot. Это component unit evidence;
+full-app language selection и UI-AC-13 остаются незавершёнными.
+
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
 оставляют открытыми версии ОС, принятые assistive technologies, lifecycle
