@@ -513,6 +513,14 @@ Mobile использует отдельно проверенный native bridg
 
 ## 2. Bootstrap, состояние и права
 
+Native build evidence: [первый compile-only run 2026-09-14](native-ui-build-2026-09-14.md)
+на `88947c2` подтвердил настоящую macOS Debug сборку, включая Swift adapters.
+Linux/Windows остановились на prerequisites/CMake; исходный run failed.
+Compile gate исправлен по логам (AppIndicator dependency, windows-2022,
+CRLF-safe fail-fast trace check). Новые Linux/Windows результаты ещё требуются.
+Исторические записи «Swift не скомпилирован» выше описывают прежний evidence;
+OS permission/IPC/behavior и полная platform acceptance по-прежнему не доказаны.
+
 Native compilation gate: существующий `contract-consumer.yml` теперь собирает
 настоящие Windows/Linux/macOS Debug hosts в тех же трёх OS jobs, без отдельной
 матрицы jobs. Ручной input `native_build_only=true` исключает producer checkout,

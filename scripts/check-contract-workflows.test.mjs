@@ -43,14 +43,16 @@ test('branch pushes run only the short workflow', () => {
   assert.match(source, /cancel-in-progress: true/);
 });
 
-test('native build-only mode compiles real hosts without producer or integration execution', () => {
-  const source = readFileSync(new URL('../.github/workflows/contract-consumer.yml', import.meta.url), 'utf8');
+function assertNativeBuildOnly(raw) {
+  const source = raw.replaceAll('\r\n', '\n');
   assert.match(source, /native_build_only:\s+description: '[^']+'\s+type: boolean\s+default: false/);
-  for (const [os, target] of [['ubuntu-latest', 'linux'], ['windows-latest', 'windows'], ['macos-latest', 'macos']]) {
+  for (const [os, target] of [['ubuntu-latest', 'linux'], ['windows-2022', 'windows'], ['macos-latest', 'macos']]) {
     assert.ok(source.includes(`- os: ${os}\n            target: ${target}`));
   }
   assert.match(source, /run: flutter build \$\{\{ matrix.target \}\} --debug --no-pub/);
   assert.match(source, /run: flutter pub get --enforce-lockfile/);
+  assert.match(source, /Validate complete BA and SA trace scope\s+shell: bash/);
+  assert.match(source, /libayatana-appindicator3-dev/);
   const steps = source.split(/^      - /m).slice(1);
   for (const marker of ['repository: endless-net/client', 'actions/setup-go@', 'Build pinned producer scenario host', 'Test complete native consumer suite', 'Verify app transport after stream cancellation']) {
     const step = steps.find((value) => value.includes(marker));
@@ -58,6 +60,19 @@ test('native build-only mode compiles real hosts without producer or integration
     assert.ok(step.includes('if: ${{ !inputs.native_build_only }}'), marker);
   }
   assert.doesNotMatch(source, /workflow_run:|secrets\.|signing|publish|upload-artifact/);
+}
+
+test('native build-only mode compiles real hosts without producer or integration execution', () => {
+  const source = readFileSync(new URL('../.github/workflows/contract-consumer.yml', import.meta.url), 'utf8');
+  assertNativeBuildOnly(source.replaceAll('\r\n', '\n'));
+  assertNativeBuildOnly(source.replace(/\r?\n/g, '\r\n'));
+});
+
+test('native build-only guard rejects unguarded testserver even with CRLF', () => {
+  const source = readFileSync(new URL('../.github/workflows/contract-consumer.yml', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
+  const unsafe = source.replace('name: Build pinned producer scenario host\n        if: ${{ !inputs.native_build_only }}', 'name: Build pinned producer scenario host');
+  assert.notEqual(unsafe, source);
+  assert.throws(() => assertNativeBuildOnly(unsafe.replaceAll('\n', '\r\n')));
 });
 
 test('every Flutter suite explicitly chooses short or integration', () => {

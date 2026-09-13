@@ -204,6 +204,11 @@ lifecycle event до RPC, что покрыто тремя short negative tests.
 
 ## Внешние границы и CI
 
+[Первый native compile-only run](native-ui-build-2026-09-14.md) на `88947c2`:
+macOS host успешно скомпилирован, Linux/Windows failed до компиляции из-за
+build prerequisites. Native OS effects не запускались. Подготовлены scoped
+CI fixes и CRLF/fail-fast test correction; полный run пока не green, US не закрыты.
+
 Native compile дополнение: три существующих desktop consumer jobs получают
 настоящую Debug host build. Отдельный manual `native_build_only=true` не
 запускает producer/testserver/probe или integration suite. Это compile gate
