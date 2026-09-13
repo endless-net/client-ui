@@ -136,6 +136,15 @@ Reset buttons; lifecycle value selections are injected through widget callbacks,
 not full native dropdown gestures. Producer-process mutation/apply evidence,
 localized presentation and production shell integration are still missing.
 
+Producer-host fixtures now cover GetPreferences/ListManagedSettings before Set
+or Reset, exact Set presence for all eight fields (including three explicit false
+values), two-key Reset, journal contents limited to UUID/kind and recovery by the
+original UUID. Accepted/succeeded operations do not mutate the previously read
+effective projection. Execution of these new fixtures is pending on desktop
+runners; local tests skip them without ENDLESSNET_TESTSERVER. Current local
+validation: 179 passed, 13 skipped, analyze and Go tests passed. These scripted
+responses do not prove actual atomic validation, policy enforcement or OS apply.
+
 ### Operation envelope checks (2026-09-13)
 
 The mutation boundary rejects nil/malformed request UUIDs before submission or

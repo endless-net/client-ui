@@ -56,6 +56,8 @@ void main() {
       'ENROLL',
       'TRUST_SERVER_IDENTITY',
       'CREATE_DIAGNOSTICS_BUNDLE',
+      'SET_PREFERENCES',
+      'RESET_PREFERENCES',
     ]) {
       final operation = ClientOperation.fromProto(
         api.Operation()..mergeFromProto3Json(
@@ -85,9 +87,11 @@ void main() {
     'token',
     'trust',
     'bundle',
+    'set-preferences',
+    'reset-preferences',
   ]) {
     test(
-      'US-01/02/03/06/07: $authentication session submits and recovers while WatchEvents stays open',
+      'US-01/02/03/06/07/10: $authentication session submits and recovers while WatchEvents stays open',
       () async {
         final directory = await Directory.systemTemp.createTemp(
           'en-session-rpc-',
@@ -100,6 +104,10 @@ void main() {
             'trust' => api.OperationKind.OPERATION_KIND_TRUST_SERVER_IDENTITY,
             'bundle' =>
               api.OperationKind.OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE,
+            'set-preferences' =>
+              api.OperationKind.OPERATION_KIND_SET_PREFERENCES,
+            'reset-preferences' =>
+              api.OperationKind.OPERATION_KIND_RESET_PREFERENCES,
             _ => api.OperationKind.OPERATION_KIND_ENROLL,
           },
         );
@@ -151,6 +159,45 @@ void main() {
               },
             ],
           },
+          if (authentication.endsWith('-preferences')) ...[
+            {
+              'method': 'GetPreferences',
+              'request': {
+                'profile': {'profileId': 'profile-a'},
+              },
+              'responses': [
+                {
+                  'preferences': {
+                    'profileId': 'profile-a',
+                    'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+                    'allowInbound': {'effective': true, 'requested': false},
+                    'acceptDns': {'effective': true},
+                  },
+                },
+              ],
+            },
+            {
+              'method': 'ListManagedSettings',
+              'request': {
+                'profile': {'profileId': 'profile-a'},
+              },
+              'responses': [
+                {
+                  'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+                  'settings': [
+                    {
+                      'key': 'PREFERENCE_KEY_ALLOW_INBOUND',
+                      'booleanValue': true,
+                      'control': {
+                        'source': 'SETTING_SOURCE_USER',
+                        'mutation': {'availability': 'AVAILABILITY_AVAILABLE'},
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
           if (authentication == 'trust')
             {
               'method': 'GetServerIdentity',
@@ -176,6 +223,8 @@ void main() {
               'connect' => 'Connect',
               'trust' => 'TrustServerIdentity',
               'bundle' => 'CreateDiagnosticsBundle',
+              'set-preferences' => 'SetPreferences',
+              'reset-preferences' => 'ResetPreferences',
               _ => 'Enroll',
             },
             'request': {
@@ -185,6 +234,22 @@ void main() {
                 'expectedRevision': '7',
               },
               'profile': {'profileId': 'profile-a'},
+              if (authentication == 'set-preferences')
+                'patch': {
+                  'allowInbound': false,
+                  'acceptDns': false,
+                  'acceptRoutes': false,
+                  'runtimeStart': 'LIFECYCLE_BEHAVIOR_KEEP_INTENT',
+                  'uiQuit': 'LIFECYCLE_BEHAVIOR_DISCONNECT',
+                  'userLogoff': 'LIFECYCLE_BEHAVIOR_DISCONNECT',
+                  'suspend': 'LIFECYCLE_BEHAVIOR_DISCONNECT',
+                  'resume': 'LIFECYCLE_BEHAVIOR_CONNECT',
+                },
+              if (authentication == 'reset-preferences')
+                'keys': [
+                  'PREFERENCE_KEY_ALLOW_INBOUND',
+                  'PREFERENCE_KEY_UI_QUIT',
+                ],
               if (authentication == 'trust') ...{
                 'confirmedControlOrigin': 'https://control.example',
                 'confirmedKeyId': 'new-key',
@@ -254,7 +319,49 @@ void main() {
           final identity = authentication == 'trust'
               ? (await session.getServerIdentity()).identity
               : null;
+          final preferences = authentication.endsWith('-preferences')
+              ? await session.getPreferences()
+              : null;
+          if (preferences != null) {
+            expect(preferences.preferences.allowInbound.hasRequested(), isTrue);
+            expect(preferences.preferences.allowInbound.requested, isFalse);
+            expect(preferences.preferences.acceptDns.hasRequested(), isFalse);
+            expect(preferences.managed.single.hasBooleanValue(), isTrue);
+          }
           final result = await session.submit(intent.kind, (commands, context) {
+            if (authentication == 'set-preferences') {
+              return commands.setPreferences(
+                api.SetPreferencesRequest(
+                  mutation: context,
+                  profile: api.ProfileRef(profileId: 'profile-a'),
+                  patch: api.PreferencesPatch(
+                    allowInbound: false,
+                    acceptDns: false,
+                    acceptRoutes: false,
+                    runtimeStart:
+                        api.LifecycleBehavior.LIFECYCLE_BEHAVIOR_KEEP_INTENT,
+                    uiQuit: api.LifecycleBehavior.LIFECYCLE_BEHAVIOR_DISCONNECT,
+                    userLogoff:
+                        api.LifecycleBehavior.LIFECYCLE_BEHAVIOR_DISCONNECT,
+                    suspend:
+                        api.LifecycleBehavior.LIFECYCLE_BEHAVIOR_DISCONNECT,
+                    resume: api.LifecycleBehavior.LIFECYCLE_BEHAVIOR_CONNECT,
+                  ),
+                ),
+              );
+            }
+            if (authentication == 'reset-preferences') {
+              return commands.resetPreferences(
+                api.ResetPreferencesRequest(
+                  mutation: context,
+                  profile: api.ProfileRef(profileId: 'profile-a'),
+                  keys: [
+                    api.PreferenceKey.PREFERENCE_KEY_ALLOW_INBOUND,
+                    api.PreferenceKey.PREFERENCE_KEY_UI_QUIT,
+                  ],
+                ),
+              );
+            }
             if (authentication == 'bundle') {
               return commands.createDiagnosticsBundle(
                 api.CreateDiagnosticsBundleRequest(
@@ -314,6 +421,15 @@ void main() {
           final recovered = await session.recoverPending();
           expect(recovered.single.succeeded, isTrue);
           expect(recovered.single.value.id, result.value.id);
+          if (preferences != null) {
+            // A scripted success is not a fresh effective-settings projection.
+            expect(preferences.preferences.allowInbound.effective, isTrue);
+            expect(preferences.preferences.allowInbound.requested, isFalse);
+            expect(
+              (await journal.pending()).single.requestId,
+              intent.requestId,
+            );
+          }
           if (authentication == 'bundle') {
             expect(await session.readDiagnosticsBundle(intent.requestId), [
               1,

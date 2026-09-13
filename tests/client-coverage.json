@@ -329,6 +329,10 @@
         {
           "path": "app/test/client_session_test.dart",
           "scope": "Owner-scoped preferences read rejects stale metadata and repeated preferences, managed-settings and profile invalidations without writing the intention journal"
+        },
+        {
+          "path": "app/test/client_session_process_test.dart",
+          "scope": "Producer-host fixtures for GetPreferences/ListManagedSettings, exact eight-field Set with explicit false and separate two-key Reset; journaled acceptance and original UUID recovery. Runner execution pending; no actual runtime policy validation/apply evidence"
         }
       ],
       "acceptanceEvidence": []

@@ -369,6 +369,13 @@ patch всех восьми полей, отдельный reset, policy denial 
 и platform lifecycle acceptance остаются незавершёнными; production shell ещё
 использует старый consumer.
 
+Для Set/Reset добавлены producer-host process fixtures: owner-scoped typed reads,
+Set всех восьми полей с явными false и отдельный Reset двух keys, journaled
+acceptance и recovery исходного UUID при открытом WatchEvents. Scripted SUCCEEDED
+не обновляет ранее прочитанный effective projection. Пока desktop runner execution
+этих fixtures не подтверждено; локально они пропускаются без producer-host.
+Это не проверка actual runtime atomic validation, policy enforcement или OS apply.
+
 Session.expires_at и credential.expires_at являются разными фактами. Для каждого
 UI показывает отдельно expiry, warning и доступный следующий шаг; отсутствие
 Timestamp означает неизвестный срок. UI не устанавливает fictitious validity.
