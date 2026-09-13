@@ -23,6 +23,12 @@ reconnect и инвалидирование receipts при смене конт�
 в текущем runtime/caller/profile; restart UI и возврат к прежнему profile
 не обещают сохранения dedup. Общий implementation gate остаётся открытым.
 
+Дополнен [асинхронный диспетчер](../app/lib/client_notification_delivery.dart),
+подписанный на state controller: одна отправка одновременно, отдельные delivery
+outcomes, явный retry после ошибки, stale completion guards, account isolation.
+[11 unit-тестов](../app/test/client_notification_delivery_test.dart) используют
+управляемый adapter; shell/settings/native delivery по-прежнему отсутствуют.
+
 | UF | Наблюдаемая реализация | Что ещё нужно для исходного scope |
 | --- | --- | --- |
 | UF-01 | `main.dart`, Windows runner/package pipeline; Linux/macOS scaffold | Product hosts Android/iOS отсутствуют; дистрибуция и compatible pairing всех платформ не квалифицированы |

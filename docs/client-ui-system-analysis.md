@@ -35,6 +35,19 @@ export/authorization ещё требуют реализации. Archive preview
 permission, доставка/нажатие, persistent policy и остальные значимые события
 остаются незавершёнными. UF-15/US-14 не закрыты.
 
+Следующий слой — [`ClientNotificationDelivery`](../app/lib/client_notification_delivery.dart)
+— подписывается на `ClientStateController`, сериализует delivery и использует
+актуальную локаль при передаче каждого сообщения адаптеру. Adapter получает
+только фиксированные title/body. Permission denied, unsupported, unavailable
+и failed сохраняются раздельно; исключение не раскрывает native error.
+Ошибка требует явного retry, повторные snapshot не создают retry storm.
+Disable, потеря stream, смена profile/account и dispose отбрасывают поздний
+результат. Уже переданное ОС сообщение отозвать этим слоем нельзя; адаптер
+должен завершать каждый вызов, иначе очередь ждёт его завершения.
+[11 short tests](../app/test/client_notification_delivery_test.dart) проверяют
+state subscription и управляемые async completions, не ОС. Shell wiring,
+persisted settings, permissions и native adapters всё ещё не реализованы.
+
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin

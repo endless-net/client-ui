@@ -633,6 +633,10 @@
           "scope": "Journal contains UUID and kind only; not complete privacy/accessibility acceptance"
         },
         {
+          "path": "app/test/client_notification_delivery_test.dart",
+          "scope": "11 short tests: validated state subscription, serial asynchronous deliveries, latest locale without replay, distinct permission/unsupported/unavailable/failure results, explicit retry without snapshot-driven storm, exception privacy, disable/reconnect/profile ABA/account switch/dispose stale completion guards. Controlled adapter only; shell/settings/native delivery still absent, not platform notification acceptance"
+        },
+        {
           "path": "app/test/client_deadline_notifications_test.dart",
           "scope": "11 short unit tests: independent typed session/credential expiry events, fixed RU/EN private-context-free payload, acknowledgement before dedup, reconnect and disabled delivery, deadline changes, profile/runtime changes and stale receipt rejection. Planner only, not wired to shell/settings/native notifications; in-memory dedup in one context, not OS delivery, persistent policy or full UF-15/US-14 acceptance"
         },
