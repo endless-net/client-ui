@@ -111,8 +111,11 @@ invalidation скрывает прежний summary. Shared widget regression �
 `readClientBundleChunks` — transport assembly foundation: frozen handle, 5 MiB
 bound, 64 KiB requests, exact offset/EOF, expiry и caller-context checks до/после
 RPC. Shared tests проверяют two-chunk read, malformed offsets/EOF, отсутствие
-progress, expiry и caller change. Bytes пока НЕ считаются проверенным архивом:
-SHA-256 content verification, session binding и explicit file export ещё нужны.
+progress, expiry и caller change. После EOF проверяется SHA-256 всего содержимого;
+same-size corruption test отклоняется. Используется уже закреплённый crypto 3.0.7
+как direct dependency, версия не повышалась. Checksum подтверждает соответствие
+handle, не redaction/подлинность произвольного архива; session binding и explicit
+file export ещё нужны.
 Helper не пишет файлы, clipboard или сеть вне переданного RPC callback.
 
 Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:

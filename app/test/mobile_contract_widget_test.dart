@@ -25,7 +25,8 @@ void main() {
           'bundleId': 'opaque-handle',
           'sizeBytes': '3',
           'expiresAt': '2030-01-01T00:00:00Z',
-          'sha256': 'a' * 64,
+          'sha256':
+              '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81',
         });
       DateTime now() => DateTime.utc(2029);
       var calls = 0;
@@ -46,6 +47,20 @@ void main() {
         now: now,
       );
       expect(bytes, [1, 2, 3]);
+      await expectLater(
+        readClientBundleChunks(
+          bundle(),
+          (_) async => api.ReadDiagnosticsBundleResponse()
+            ..mergeFromProto3Json({
+              'data': 'AQIE',
+              'nextOffset': '3',
+              'eof': true,
+            }),
+          checkContext: () {},
+          now: now,
+        ),
+        throwsFormatException,
+      );
       for (final chunk in [
         {'data': 'AQI=', 'nextOffset': '1'},
         {'data': 'AQI=', 'nextOffset': '2', 'eof': true},

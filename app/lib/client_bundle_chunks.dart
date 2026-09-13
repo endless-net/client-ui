@@ -1,8 +1,9 @@
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:endlessnet_client_api/client_api.dart' as api;
 
-/// Bounded transport assembly only. Bytes are NOT approved for export until the
-/// caller verifies BundleResult.sha256 and obtains an explicit destination.
+/// Bounded transport assembly with content checksum verification. Export still
+/// requires an explicit destination; this function never writes a file.
 /// The caller must also reject a lost/replaced authenticated session throughout.
 Future<Uint8List> readClientBundleChunks(
   api.BundleResult result,
@@ -58,7 +59,15 @@ Future<Uint8List> readClientBundleChunks(
       throw const FormatException('Invalid diagnostics bundle chunk');
     }
     bytes.add(response.data);
-    if (response.eof) return bytes.takeBytes();
+    if (response.eof) {
+      final content = bytes.takeBytes();
+      if (crypto.sha256.convert(content).toString() !=
+          bundle.sha256.toLowerCase()) {
+        throw const FormatException('Diagnostics bundle checksum mismatch');
+      }
+      check();
+      return content;
+    }
     offset = next;
   }
 }
