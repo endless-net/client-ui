@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:endlessnet_client_api/client_api.dart' as api;
+import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
 import 'package:flutter/foundation.dart';
 
 import 'client_event_stream.dart';
@@ -68,7 +69,13 @@ final class ClientStateController extends ChangeNotifier {
         if (_disposed || epoch != _epoch) return;
         _clear();
         _link = ClientLinkState.unavailable;
-        if (error is ClientEventFailure) _failure = error.failure;
+        final failure = error is ClientEventFailure
+            ? error.failure
+            : failureFromLocalRPCError(error);
+        if (failure != null) {
+          _failure = (api.Failure.fromBuffer(failure.writeToBuffer())
+            ..freeze());
+        }
         _invalidContract = error is FormatException;
         notifyListeners();
       },
