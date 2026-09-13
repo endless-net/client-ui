@@ -62,6 +62,6 @@ jobs:
       - name: Verify app transport after stream cancellation
         working-directory: app
         run: dart --packages=.dart_tool/package_config.json ../packages/local_client_rpc/tool/probe_late_headers.dart
-      - name: Test v0 profile pagination
+      - name: Test v0 shared panels and desktop lifecycle
         working-directory: app
-        run: flutter test --no-pub test/client_profiles_test.dart
+        run: flutter test --no-pub test/client_profiles_test.dart test/client_desktop_app_test.dart

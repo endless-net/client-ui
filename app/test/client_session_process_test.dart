@@ -124,6 +124,7 @@ void main() {
       'SET_RESOURCE_ENABLED',
       'SELECT_EXIT_NODE',
       'CLEAR_EXIT_NODE',
+      'NOTIFY_LIFECYCLE',
     ]) {
       final operation = ClientOperation.fromProto(
         api.Operation()..mergeFromProto3Json(
@@ -163,9 +164,10 @@ void main() {
     'select-exit',
     'clear-exit',
     'failed-exit',
+    'ui-quit',
   ]) {
     test(
-      'US-01/02/03/05/06/07/10/11: $authentication session submits and recovers while WatchEvents stays open',
+      'US-01/02/03/05/06/07/10/11/12: $authentication session submits and recovers while WatchEvents stays open',
       () async {
         final directory = await Directory.systemTemp.createTemp(
           'en-session-rpc-',
@@ -174,6 +176,7 @@ void main() {
         final intent = PendingClientIntent(
           'c06bd29f-7c77-4b27-943a-620081f313df',
           switch (authentication) {
+            'ui-quit' => api.OperationKind.OPERATION_KIND_NOTIFY_LIFECYCLE,
             'select-exit' ||
             'failed-exit' => api.OperationKind.OPERATION_KIND_SELECT_EXIT_NODE,
             'clear-exit' => api.OperationKind.OPERATION_KIND_CLEAR_EXIT_NODE,
@@ -389,6 +392,7 @@ void main() {
             },
           {
             'method': switch (authentication) {
+              'ui-quit' => 'NotifyLifecycle',
               'select-exit' || 'failed-exit' => 'SelectExitNode',
               'clear-exit' => 'ClearExitNode',
               'enable-resource' ||
@@ -408,6 +412,8 @@ void main() {
                 'expectedRevision': '7',
               },
               'profile': {'profileId': 'profile-a'},
+              if (authentication == 'ui-quit')
+                'event': 'LIFECYCLE_EVENT_UI_QUIT',
               if (authentication == 'select-exit' ||
                   authentication == 'failed-exit') ...{
                 'exitNodeId': 'exit-a',
@@ -528,6 +534,15 @@ void main() {
             expect(preferences.managed.single.hasBooleanValue(), isTrue);
           }
           final result = await session.submit(intent.kind, (commands, context) {
+            if (authentication == 'ui-quit') {
+              return commands.notifyLifecycle(
+                api.NotifyLifecycleRequest(
+                  mutation: context,
+                  profile: api.ProfileRef(profileId: 'profile-a'),
+                  event: api.LifecycleEvent.LIFECYCLE_EVENT_UI_QUIT,
+                ),
+              );
+            }
             if (exits != null) {
               if (authentication == 'clear-exit') {
                 return commands.clearExitNode(
@@ -707,6 +722,22 @@ void main() {
             );
           }
           expect(recovered.single.value.id, result.value.id);
+          if (authentication == 'ui-quit') {
+            expect(
+              recovered.single.value.whichOutcome(),
+              api.Operation_Outcome.change,
+            );
+            expect(
+              (await journal.pending()).single.requestId,
+              intent.requestId,
+            );
+            expect(session.state.link, ClientLinkState.ready);
+            // UI notification is not an inferred runtime shutdown/disconnect.
+            expect(
+              session.state.snapshot!.status.connectionPhase,
+              api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED,
+            );
+          }
           if (preferences != null) {
             // A scripted success is not a fresh effective-settings projection.
             expect(preferences.preferences.allowInbound.effective, isTrue);

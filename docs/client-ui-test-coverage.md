@@ -125,7 +125,21 @@ successful compilation as simulator execution or extend the timeout as proof.
 
 ## Validation
 
-### Exit-node reader foundation (2026-09-13)
+### Lifecycle foundation (2026-09-13)
+
+Desktop shell widget tests invoke the explicit Quit callback with native
+window/tray integration disabled. Owner quit sends exactly one UI_QUIT with
+the active profile and snapshot mutation context, retains the pending UUID and
+closes the UI connection. Observer quit sends no mutation. Launch sends no
+lifecycle event; the existing unavailable-runtime test chooses Stay in the
+unconfirmed-exit dialog. These tests now run in the three desktop consumer jobs.
+The ui-quit producer-process case requires exact NotifyLifecycle and original
+UUID recovery while WatchEvents is open; acceptance is not an inferred runtime
+disconnect or shutdown. Local fixture validation passes, process execution awaits
+GitHub. OS logoff/suspend/resume, actual preference effects, crash-versus-quit,
+native tray/window behavior and mobile lifecycle acceptance remain unproven.
+
+### Exit-node reader and UI foundation (2026-09-13)
 
 The typed exit reader requires one catalog/status revision and both address-family
 states. Shared tests preserve IPv4 applied / IPv6 failed without inventing dual-stack

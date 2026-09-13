@@ -342,6 +342,17 @@ Rename никогда не меняет Account identity/control origin.
 
 ## 5. Сроки, предпочтения и диагностика
 
+US-12 foundation: desktop shell отправляет journaled NotifyLifecycle(UI_QUIT)
+при явном Quit owner с активным профилем; observer не отправляет мутацию.
+Открытие UI не означает runtime start. Pending acceptance разрешает закрыть UI,
+но UUID остаётся для recovery; отсутствие подтверждения предлагает Stay/Exit UI,
+а не повтор команды. Widget tests проверяют owner/observer и Stay при unavailable
+runtime с отключённой native window/tray integration; Quit вызывается через
+callback. Producer-process ui-quit case проверяет точный event/context и recovery
+при открытом WatchEvents, execution ожидается на desktop CI. OS logoff/suspend/
+resume, crash-versus-quit, применение preferences и mobile lifecycle acceptance
+остаются незакрытыми; UI не подменяет события OS adapter.
+
 US-05 read foundation: `ClientSession.getExitNodes` читает ListExitNodes и
 GetExitNode через typed local binding. Каталог и status должны иметь одну runtime
 revision; IPv4/IPv6 обязательны и не синтезируются из aggregate. Optional IDs,

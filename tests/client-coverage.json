@@ -389,8 +389,17 @@
         "UI-AC-15",
         "UI-AC-21"
       ],
-      "implementation": "missing",
-      "testEvidence": [],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/client_desktop_app_test.dart",
+          "scope": "Explicit owner Quit sends one journaled UI_QUIT and retains pending UUID; observer exits without mutation; launch does not notify lifecycle; unavailable runtime offers Stay. Native window/tray integration disabled, Quit callback invoked directly; no OS lifecycle acceptance"
+        },
+        {
+          "path": "app/test/client_session_process_test.dart",
+          "scope": "Producer-host UI_QUIT scenario: exact profile/event/context, held-open WatchEvents, original UUID recovery and retained journal; pending GitHub execution. No logoff/suspend/resume or actual runtime policy effect evidence"
+        }
+      ],
       "acceptanceEvidence": []
     },
     {
