@@ -6,6 +6,7 @@ import 'client_mutations.dart';
 import 'client_profiles.dart';
 import 'client_networks.dart';
 import 'client_preferences.dart';
+import 'client_resources.dart';
 
 /// Production local transport binding for the typed event consumer. The shell
 /// must clear domain caches on disconnect and start a fresh subscription.
@@ -16,6 +17,23 @@ final class LocalClientEvents {
   final api.ClientServiceClient _client;
   final api.RuntimeInfo runtime;
   bool _closed = false;
+
+  Future<ClientResourceCatalog> listResources(
+    String profileId,
+    String search,
+    List<api.ResourceKind> kinds,
+    void Function() checkContext,
+  ) => readClientResources(
+    _client.listResources,
+    instanceId: runtime.instanceId,
+    profileId: profileId,
+    search: search,
+    kinds: kinds,
+    checkContext: () {
+      if (_closed) throw StateError('Local client is closed');
+      checkContext();
+    },
+  );
 
   Future<ClientPreferences> getPreferences(
     String profileId,

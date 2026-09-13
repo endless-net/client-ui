@@ -19,8 +19,8 @@
       ],
       "workflow": ".github/workflows/contract-consumer.yml",
       "status": "passed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34730432514",
-      "scope": "All three desktop jobs at ed43df36c8feab083abd9b7b7b41e9ad3112dbd4 passed: 109 consumer tests and 15 profile/network tests per OS, including producer trust/connect/enrollment interoperability; earlier intermittent Windows EOF remains unexplained; not runtime/product acceptance"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34733301626",
+      "scope": "All three desktop jobs at 3b5ad34ead11173c32c22e537cd06e74468968f9 passed: 124 consumer and 15 profile/network tests per OS, including producer bundle and Set/Reset preferences interoperability. No resource catalog runner evidence yet; not runtime/product acceptance"
     },
     {
       "platforms": ["ios"],
@@ -347,8 +347,17 @@
         "UI-AC-20",
         "UI-AC-24"
       ],
-      "implementation": "missing",
-      "testEvidence": [],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/client_profiles_test.dart",
+          "scope": "Resource reader tests shared with native mobile host: four typed targets, fixed search/filter pagination, bounds, duplicate IDs, mixed revisions and stale tokens; no resource UI, browser launch or backend policy acceptance"
+        },
+        {
+          "path": "app/test/client_session_test.dart",
+          "scope": "Owner-scoped resource reads reject stale metadata and repeated resource/profile/network invalidations; no mutation or journal write"
+        }
+      ],
       "acceptanceEvidence": []
     },
     {

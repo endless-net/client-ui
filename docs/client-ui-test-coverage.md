@@ -17,7 +17,17 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
-Latest inspected evidence: consumer `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`.
+Latest inspected desktop evidence: consumer `3b5ad34ead11173c32c22e537cd06e74468968f9`.
+The [desktop run](https://github.com/endless-net/client-ui/actions/runs/34733301626)
+passed on Windows, Linux and macOS: each job reports 124 consumer tests and 15
+profile/network tests, including bundle and exact Set/Reset producer-host scenarios.
+The [iOS job](https://github.com/endless-net/client-ui/actions/runs/34733301621/job/103660029431)
+was cancelled after building and waiting for a VM Service connection; zero tests
+passed. The debug log reader error at cancellation does not establish its root
+cause. Android job 103660029312 failed KVM preflight before tests. No new resource
+catalog execution is covered by these runs, and no full scenario is accepted.
+
+Earlier inspected evidence: consumer `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`.
 The [desktop run](https://github.com/endless-net/client-ui/actions/runs/34730432514)
 passed on all three OSes, each with 109 consumer tests and 15 profile/network
 tests, including exact trust/read requests and terminal recovery. The
@@ -114,6 +124,17 @@ Flutter startup diagnostics; the cause is not yet established. Do not count
 successful compilation as simulator execution or extend the timeout as proof.
 
 ## Validation
+
+### Resource reader foundation (2026-09-13)
+
+The resource reader and local/session bindings preserve one profile/query/revision
+across pages. Shared tests cover all four target kinds, immutable filters and
+results, UTF-8 query/ID/name bounds, duplicates, type mismatches, mixed revisions,
+token cycles and context invalidation without retries or partial publication.
+Overlap IDs are not resolved: visible resources outside a filtered result are
+valid, and UI must not probe hidden resources. Session tests additionally guard
+owner context and repeated resource/profile/network invalidations. Resource UI,
+producer-process scenarios, mutation effects and platform acceptance remain open.
 
 ### Preferences/policy read foundation (2026-09-13)
 

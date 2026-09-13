@@ -342,6 +342,18 @@ Rename никогда не меняет Account identity/control origin.
 
 ## 5. Сроки, предпочтения и диагностика
 
+US-11 read foundation: `ClientSession.listResources` использует typed local RPC
+и immutable каталог. Search ограничен 256 UTF-8 bytes; фильтры фиксируются перед
+первым await. Страницы по 100 entries принимаются только для одной runtime revision,
+без повторных tokens/IDs и несовпадений kind/target. Каталог не публикуется частично.
+Resources/profile/network invalidation отменяет незавершённое чтение; observer
+не вызывает RPC. Overlap IDs сохраняются без дополнительных lookup: resource
+вне текущего search/filter не равнозначен скрытому resource. Авторизация, поиск
+и RESOURCE_CONFLICT остаются обязанностью producer, UI не выбирает route сам.
+Shared reader tests включены в mobile harness; их runner execution ещё не
+подтверждено. Каталог UI, SetResourceEnabled flow и actual runtime acceptance
+остаются незавершёнными.
+
 Реализован read foundation US-10: `ClientSession.getPreferences` через прямой
 typed local binding читает `GetPreferences` и `ListManagedSettings`. Consumer
 публикует immutable projection только при совпадении instance/revision обоих

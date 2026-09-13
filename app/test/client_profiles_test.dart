@@ -1,5 +1,6 @@
 import 'package:endlessnet/client_profiles.dart';
 import 'package:endlessnet/client_networks.dart';
+import 'package:endlessnet/client_resources.dart';
 import 'package:endlessnet/client_networks_panel.dart';
 import 'package:endlessnet/client_create_profile_panel.dart';
 import 'dart:async';
@@ -27,7 +28,193 @@ api.ListProfilesResponse page(
     },
   });
 
+api.ListResourcesResponse _resourcePage(String suffix, {String next = ''}) =>
+    api.ListResourcesResponse()..mergeFromProto3Json({
+      'page': {
+        'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+        'nextPageToken': next,
+      },
+      'resources': [
+        {
+          'id': 'host-$suffix',
+          'displayName': 'Host $suffix',
+          'networkId': 'network-a',
+          'kind': 'RESOURCE_KIND_HOST',
+          'host': {'hostname': 'host.example'},
+          'enabled': {'effective': true, 'requested': false},
+          'overlappingResourceIds': ['visible-outside-query'],
+        },
+        {
+          'id': 'subnet-$suffix',
+          'displayName': 'Subnet',
+          'networkId': 'network-a',
+          'kind': 'RESOURCE_KIND_SUBNET',
+          'subnet': {'cidr': '192.0.2.0/24'},
+        },
+        {
+          'id': 'service-$suffix',
+          'displayName': 'Service',
+          'networkId': 'network-a',
+          'kind': 'RESOURCE_KIND_SERVICE',
+          'service': {
+            'hostname': 'service.example',
+            'port': 443,
+            'protocol': 'tcp',
+          },
+        },
+        {
+          'id': 'application-$suffix',
+          'displayName': 'Application',
+          'networkId': 'network-a',
+          'kind': 'RESOURCE_KIND_APPLICATION',
+          'application': {'browserUrl': 'https://application.example/'},
+        },
+      ],
+    });
+
 void main() {
+  test(
+    'US-11: resource pagination preserves typed targets and a fixed query',
+    () async {
+      final kinds = api.ResourceKind.values
+          .where((k) => k != api.ResourceKind.RESOURCE_KIND_UNSPECIFIED)
+          .toList();
+      var calls = 0;
+      final source = <api.Resource>[];
+      final catalog = await readClientResources(
+        (request) async {
+          expect(request.isFrozen, isTrue);
+          expect(request.profile.profileId, 'profile-a');
+          expect(request.search, 'Мой ресурс');
+          expect(request.kinds, hasLength(4));
+          expect(request.page.pageSize, 100);
+          expect(request.page.pageToken, calls == 0 ? '' : 'opaque');
+          kinds.clear(); // The caller cannot change filters between pages.
+          final response = _resourcePage(
+            calls == 0 ? 'a' : 'b',
+            next: calls++ == 0 ? 'opaque' : '',
+          );
+          source.addAll(response.resources);
+          return response;
+        },
+        instanceId: 'runtime-a',
+        profileId: 'profile-a',
+        search: 'Мой ресурс',
+        kinds: kinds,
+        checkContext: () {},
+      );
+      expect(calls, 2);
+      expect(catalog.resources, hasLength(8));
+      expect(catalog.kinds, hasLength(4));
+      source.first.displayName = 'changed';
+      expect(catalog.resources.first.displayName, 'Host a');
+      expect(catalog.resources.first.enabled.hasRequested(), isTrue);
+      expect(catalog.resources.first.enabled.requested, isFalse);
+      expect(catalog.resources.first.overlappingResourceIds, [
+        'visible-outside-query',
+      ]);
+      expect(catalog.resources.every((r) => r.isFrozen), isTrue);
+      expect(() => catalog.resources.clear(), throwsUnsupportedError);
+    },
+  );
+  test(
+    'US-11: invalid resources or mixed pages never publish a partial catalog',
+    () async {
+      for (final change in <void Function(api.ListResourcesResponse)>[
+        (r) => r.clearPage(),
+        (r) => r.page.clearMetadata(),
+        (r) => r.page.metadata.instanceId = 'other-runtime',
+        (r) => r.page.metadata.revision += 1,
+        (r) => r.page.nextPageToken = 'opaque',
+        (r) => r.resources.first.id = 'host-a',
+        (r) => r.resources.first.displayName = '',
+        (r) => r.resources.first.id = 'x' * 257,
+        (r) => r.resources.first.networkId = '',
+        (r) => r.resources.first.clearHost(),
+        (r) => r.resources.first.kind = api.ResourceKind.RESOURCE_KIND_SERVICE,
+        (r) => r.resources.first.overlappingResourceIds.add(''),
+        (r) {
+          while (r.resources.length <= 100) {
+            r.resources.add(
+              api.Resource.fromBuffer(r.resources.first.writeToBuffer()),
+            );
+          }
+        },
+      ]) {
+        var calls = 0;
+        await expectLater(
+          readClientResources(
+            (_) async {
+              if (calls++ == 0) return _resourcePage('a', next: 'opaque');
+              final invalid = _resourcePage('b');
+              change(invalid);
+              return invalid;
+            },
+            instanceId: 'runtime-a',
+            profileId: 'profile-a',
+            checkContext: () {},
+          ),
+          throwsFormatException,
+        );
+        expect(calls, 2);
+      }
+      await expectLater(
+        readClientResources(
+          (_) async => _resourcePage('a'),
+          instanceId: 'runtime-a',
+          profileId: 'profile-a',
+          kinds: [api.ResourceKind.RESOURCE_KIND_HOST],
+          checkContext: () {},
+        ),
+        throwsFormatException,
+      );
+    },
+  );
+  test(
+    'US-11: query bounds and invalidation stop without RPC retries',
+    () async {
+      for (final query in [
+        (search: 'я' * 129, kinds: <api.ResourceKind>[]),
+        (search: '', kinds: [api.ResourceKind.RESOURCE_KIND_UNSPECIFIED]),
+        (
+          search: '',
+          kinds: [
+            api.ResourceKind.RESOURCE_KIND_HOST,
+            api.ResourceKind.RESOURCE_KIND_HOST,
+          ],
+        ),
+      ]) {
+        await expectLater(
+          readClientResources(
+            (_) => throw TestFailure('Invalid query must not call RPC'),
+            instanceId: 'runtime-a',
+            profileId: 'profile-a',
+            search: query.search,
+            kinds: query.kinds,
+            checkContext: () {},
+          ),
+          throwsFormatException,
+        );
+      }
+      var calls = 0;
+      var checks = 0;
+      await expectLater(
+        readClientResources(
+          (_) async {
+            calls++;
+            return _resourcePage('a', next: 'opaque');
+          },
+          instanceId: 'runtime-a',
+          profileId: 'profile-a',
+          checkContext: () {
+            if (++checks == 2) throw StateError('Invalidated');
+          },
+        ),
+        throwsStateError,
+      );
+      expect(calls, 1);
+    },
+  );
   testWidgets(
     'US-04: network selection uses fresh profile-bound IDs without optimistic state',
     (tester) async {

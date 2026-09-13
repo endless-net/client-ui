@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'package:endlessnet/client_profiles.dart';
 import 'package:endlessnet/client_networks.dart';
 import 'package:endlessnet/client_preferences.dart';
+import 'package:endlessnet/client_resources.dart';
 import 'package:endlessnet/client_session.dart';
 import 'package:endlessnet/client_session_panel.dart';
 import 'package:endlessnet/client_state_controller.dart';
@@ -25,6 +26,20 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 class FakeConnection implements ClientConnection {
+  Future<ClientResourceCatalog> Function(
+    String,
+    String,
+    List<api.ResourceKind>,
+    void Function(),
+  )?
+  resources;
+  @override
+  Future<ClientResourceCatalog> listResources(
+    String profileId,
+    String search,
+    List<api.ResourceKind> kinds,
+    void Function() checkContext,
+  ) => resources!(profileId, search, kinds, checkContext);
   Future<ClientPreferences> Function(String, void Function())? preferences;
   @override
   Future<ClientPreferences> getPreferences(
@@ -183,6 +198,78 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'US-11: resource reads bind owner context and reject repeated invalidations',
+    () async {
+      await expectLater(session.listResources(), throwsStateError);
+      connection.events.add(
+        snapshot()..snapshot.status.activeProfileId = 'profile-a',
+      );
+      await pumpEventQueue();
+      final response = api.ListResourcesResponse()
+        ..mergeFromProto3Json({
+          'page': {
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+          },
+        });
+      Future<ClientResourceCatalog> read(
+        String id,
+        String search,
+        List<api.ResourceKind> kinds,
+        void Function() check,
+      ) => readClientResources(
+        (_) async => response,
+        instanceId: 'runtime-a',
+        profileId: id,
+        search: search,
+        kinds: kinds,
+        checkContext: check,
+      );
+      connection.resources = read;
+      expect((await session.listResources(search: 'abc')).search, 'abc');
+      final domains = [
+        'DOMAIN_RESOURCES',
+        'DOMAIN_RESOURCES',
+        'DOMAIN_PROFILES',
+        'DOMAIN_NETWORKS',
+      ];
+      for (var i = 0; i < domains.length; i++) {
+        final pending = Completer<api.ListResourcesResponse>();
+        connection.resources = (id, search, kinds, check) =>
+            readClientResources(
+              (_) => pending.future,
+              instanceId: 'runtime-a',
+              profileId: id,
+              search: search,
+              kinds: kinds,
+              checkContext: check,
+            );
+        final rejected = expectLater(session.listResources(), throwsStateError);
+        connection.events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '${i + 2}',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'invalidated': {'domain': domains[i], 'profileId': 'profile-a'},
+          }),
+        );
+        await pumpEventQueue();
+        pending.complete(response);
+        await rejected;
+      }
+      connection.resources = read;
+      response.page.metadata.revision -= 1;
+      await expectLater(session.listResources(), throwsStateError);
+      final observer = snapshot()..sequence += 5;
+      observer.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      connection.events.add(observer);
+      await pumpEventQueue();
+      connection.resources = (_, _, _, _) =>
+          throw TestFailure('Observer cannot read resources');
+      await expectLater(session.listResources(), throwsStateError);
+      expect(await session.journal.pending(), isEmpty);
+    },
+  );
 
   test(
     'privileged recovery journals before launch and retains ambiguous outcomes',

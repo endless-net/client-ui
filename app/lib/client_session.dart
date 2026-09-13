@@ -11,10 +11,17 @@ import 'client_privileged_recovery.dart';
 import 'client_profiles.dart';
 import 'client_networks.dart';
 import 'client_preferences.dart';
+import 'client_resources.dart';
 import 'client_state_controller.dart';
 import 'local_client_events.dart';
 
 abstract interface class ClientConnection {
+  Future<ClientResourceCatalog> listResources(
+    String profileId,
+    String search,
+    List<api.ResourceKind> kinds,
+    void Function() checkContext,
+  );
   Future<ClientPreferences> getPreferences(
     String profileId,
     void Function() checkContext,
@@ -38,6 +45,13 @@ abstract interface class ClientConnection {
 final class _LocalConnection implements ClientConnection {
   _LocalConnection(this.source);
   final LocalClientEvents source;
+  @override
+  Future<ClientResourceCatalog> listResources(
+    String profileId,
+    String search,
+    List<api.ResourceKind> kinds,
+    void Function() checkContext,
+  ) => source.listResources(profileId, search, kinds, checkContext);
   @override
   Future<ClientPreferences> getPreferences(
     String profileId,
@@ -203,6 +217,57 @@ final class ClientSession {
     final (exitCode, output) = await launch(request);
     return request.decodeResult(exitCode, output);
   });
+
+  Future<ClientResourceCatalog> listResources({
+    String search = '',
+    List<api.ResourceKind> kinds = const [],
+  }) async {
+    final connection = _connection;
+    final snapshot = state.snapshot;
+    if (_closed ||
+        connection == null ||
+        snapshot == null ||
+        state.link != ClientLinkState.ready ||
+        snapshot.runtime.callerAccess == api.Access.ACCESS_OBSERVER ||
+        snapshot.status.activeProfileId.isEmpty) {
+      throw StateError('Resources require a current owner profile');
+    }
+    final epoch = _epoch;
+    final cacheEpoch = state.cacheEpoch;
+    final domains = {
+      for (final domain in [
+        api.Domain.DOMAIN_PROFILES,
+        api.Domain.DOMAIN_RESOURCES,
+        api.Domain.DOMAIN_NETWORKS,
+      ])
+        domain: state.domainEpoch(domain),
+    };
+    void checkContext() {
+      if (_closed ||
+          epoch != _epoch ||
+          cacheEpoch != state.cacheEpoch ||
+          state.link != ClientLinkState.ready ||
+          domains.entries.any(
+            (entry) => state.domainEpoch(entry.key) != entry.value,
+          )) {
+        throw StateError('Resource context changed during read');
+      }
+    }
+
+    final result = await connection.listResources(
+      snapshot.status.activeProfileId,
+      search,
+      List.unmodifiable(kinds),
+      checkContext,
+    );
+    checkContext();
+    if (result.profileId != snapshot.status.activeProfileId ||
+        result.metadata.instanceId != snapshot.runtime.instanceId ||
+        result.metadata.revision < state.snapshot!.status.metadata.revision) {
+      throw StateError('Stale resource catalog');
+    }
+    return result;
+  }
 
   Future<ClientPreferences> getPreferences() async {
     final connection = _connection;
