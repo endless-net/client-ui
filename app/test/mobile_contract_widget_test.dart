@@ -5,6 +5,7 @@ import 'package:endlessnet/client_connection_panel.dart';
 import 'package:endlessnet/client_operation.dart';
 import 'package:endlessnet/client_operation_details.dart';
 import 'package:endlessnet/client_enrollment_panel.dart';
+import 'package:endlessnet/client_cleanup_panel.dart';
 import 'package:endlessnet/client_recovery_panel.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
@@ -12,6 +13,113 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Reused by the native integration-test host; no desktop channel is imported.
 void main() {
+  testWidgets(
+    'US-08: failed logout never falls back to administrator local forget',
+    (tester) async {
+      final state = ClientStateController();
+      final source = StreamController<api.WatchEventsResponse>();
+      await state.attach(source.stream);
+      final logout = <String>[];
+      final forget = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ClientCleanupPanel(
+              state: state,
+              logout: (id) async {
+                logout.add(id);
+                throw StateError('raw cleanup failure');
+              },
+              forget: (id) async {
+                forget.add(id);
+                return ClientOperation.fromProto(
+                  api.Operation(
+                    id: 'forget',
+                    kind: api
+                        .OperationKind
+                        .OPERATION_KIND_FORGET_LOCAL_ENROLLMENT,
+                    state: api.OperationState.OPERATION_STATE_PENDING,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      final snapshot = api.WatchEventsResponse()
+        ..mergeFromProto3Json({
+          'sequence': '1',
+          'metadata': {'instanceId': 'cleanup-test', 'revision': '1'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'cleanup-test',
+              'callerAccess': 'ACCESS_OWNER',
+              'capabilities': [
+                for (final cap in ['LOGOUT', 'LOCAL_FORGET'])
+                  {
+                    'capability': 'CAPABILITY_$cap',
+                    'restriction': {'availability': 'AVAILABILITY_AVAILABLE'},
+                  },
+              ],
+            },
+            'status': {
+              'activeProfileId': 'profile-a',
+              'metadata': {'instanceId': 'cleanup-test', 'revision': '1'},
+            },
+          },
+        });
+      source.add(snapshot);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.byKey(const Key('client-local-forget')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const Key('client-logout')));
+      await tester.pump();
+      expect(logout, isEmpty);
+      await tester.tap(find.byKey(const Key('cancel-client-cleanup')));
+      await tester.pump();
+      expect(logout, isEmpty);
+      await tester.tap(find.byKey(const Key('client-logout')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('confirm-client-cleanup')));
+      await tester.pump();
+      expect(logout, ['profile-a']);
+      expect(forget, isEmpty);
+      expect(find.textContaining('raw cleanup failure'), findsNothing);
+      snapshot.sequence += 1;
+      snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_ADMINISTRATOR;
+      source.add(snapshot);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('client-local-forget')));
+      await tester.pump();
+      expect(
+        find.textContaining('without confirmed remote cleanup'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('confirm-client-cleanup')));
+      await tester.pump();
+      expect(forget, ['profile-a']);
+      await tester.tap(find.byKey(const Key('client-local-forget')));
+      await tester.pump();
+      snapshot.sequence += 1;
+      snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      snapshot.snapshot.status.clearActiveProfileId();
+      source.add(snapshot);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('confirm-client-cleanup')), findsNothing);
+      expect(forget, ['profile-a']);
+      await source.close();
+      await tester.pumpWidget(const SizedBox());
+      state.dispose();
+    },
+  );
   testWidgets(
     'US-02: enrollment requires capability and clears token before sending',
     (tester) async {

@@ -92,6 +92,13 @@ logout/local forget не снимают ownership. UI не обещает воз
 
 ## 3. Команды и восстановление
 
+`client_cleanup_panel.dart` подключает отдельные journaled Logout и
+ForgetLocalEnrollment(confirmed=true) для active profile. Каждое действие требует
+подтверждения; local forget дополнительно требует ACCESS_ADMINISTRATOR и capability.
+Неудачный logout не вызывает local forget, а смена cache/caller скрывает confirmation.
+Shared widget-тест проверяет cancel, явный dispatch, administrator gating и отсутствие
+fallback; реальное remote cleanup, elevation helper и platform acceptance ещё нужны.
+
 `client_enrollment_panel.dart` подключает явный Enroll выбранного профиля через
 session journal: hostname, typed mode и ровно одна authentication alternative
 (browser_login=true или enrollment_token). Форма требует owner, active profile
