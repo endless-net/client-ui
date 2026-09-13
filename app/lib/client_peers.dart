@@ -80,6 +80,33 @@ Future<ClientPeerCatalog> readClientPeers(
           !ids.add(peer.id)) {
         throw const FormatException('Invalid peer catalog entry');
       }
+      if (peer.hasLastTransitionAt()) {
+        _checkPeerTimestamp(
+          peer.lastTransitionAt.seconds.toInt(),
+          peer.lastTransitionAt.nanos,
+        );
+      }
+      for (final candidate in peer.candidates) {
+        if (candidate.hasCheckedAt()) {
+          _checkPeerTimestamp(
+            candidate.checkedAt.seconds.toInt(),
+            candidate.checkedAt.nanos,
+          );
+        }
+        if (candidate.hasLastReachableAt()) {
+          _checkPeerTimestamp(
+            candidate.lastReachableAt.seconds.toInt(),
+            candidate.lastReachableAt.nanos,
+          );
+        }
+        if (candidate.hasRtt() &&
+            (candidate.rtt.seconds.toInt() < 0 ||
+                candidate.rtt.seconds.toInt() > 315576000000 ||
+                candidate.rtt.nanos < 0 ||
+                candidate.rtt.nanos >= 1000000000)) {
+          throw const FormatException('Invalid peer RTT');
+        }
+      }
       peers.add(peer);
     }
     token = response.page.nextPageToken;
@@ -92,4 +119,13 @@ Future<ClientPeerCatalog> readClientPeers(
     first.snapshotState,
     first,
   );
+}
+
+void _checkPeerTimestamp(int seconds, int nanos) {
+  if (seconds < -62135596800 ||
+      seconds > 253402300799 ||
+      nanos < 0 ||
+      nanos >= 1000000000) {
+    throw const FormatException('Invalid peer timestamp');
+  }
 }
