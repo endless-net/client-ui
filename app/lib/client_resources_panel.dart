@@ -4,6 +4,12 @@ import 'package:flutter/material.dart';
 import 'client_operation.dart';
 import 'client_resources.dart';
 import 'client_state_controller.dart';
+import 'client_locale.dart';
+import 'client_resource_labels.dart';
+import 'client_update_labels.dart';
+import 'client_operation_labels.dart';
+
+enum _ResourceNotice { opened, notOpened, destination, received, unknown }
 
 class ClientResourcesPanel extends StatefulWidget {
   const ClientResourcesPanel({
@@ -12,8 +18,10 @@ class ClientResourcesPanel extends StatefulWidget {
     required this.load,
     required this.setEnabled,
     this.openBrowser,
+    this.locale = ClientLocale.en,
   });
   final ClientStateController state;
+  final ClientLocale locale;
   final Future<ClientResourceCatalog> Function(String, List<api.ResourceKind>)
   load;
   final Future<ClientOperation> Function(String, String, bool, void Function())
@@ -28,7 +36,32 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
   final _kinds = <api.ResourceKind>{};
   ClientResourceCatalog? _catalog;
   String? _context;
-  String? _notice;
+  _ResourceNotice? _notice;
+  String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
+  String _boolean(bool value) =>
+      value ? _text('Yes', 'Да') : _text('No', 'Нет');
+  String _noticeText(_ResourceNotice notice) => switch (notice) {
+    _ResourceNotice.opened => _text(
+      'Resource opened in the browser.',
+      'Ресурс открыт в браузере.',
+    ),
+    _ResourceNotice.notOpened => _text(
+      'Browser could not open the resource.',
+      'Браузер не смог открыть ресурс.',
+    ),
+    _ResourceNotice.destination => _text(
+      'Resource access or destination could not be confirmed. Refresh before opening.',
+      'Не удалось подтвердить доступ к ресурсу или его адрес. Обновите сведения перед открытием.',
+    ),
+    _ResourceNotice.received => _text(
+      'Resource operation received. Recover its result and refresh effective values.',
+      'Операция с ресурсом получена. Восстановите её результат и обновите фактические значения.',
+    ),
+    _ResourceNotice.unknown => _text(
+      'Resource request could not be confirmed. Recover pending operations before retrying.',
+      'Не удалось подтвердить запрос ресурса. Восстановите незавершённые операции перед повторной попыткой.',
+    ),
+  };
   int _query = 0;
   bool _busy = false;
   String? _seenContext;
@@ -162,9 +195,7 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
       check();
       setState(() {
         _catalog = fresh;
-        _notice = opened
-            ? 'Resource opened in the browser.'
-            : 'Browser could not open the resource.';
+        _notice = opened ? _ResourceNotice.opened : _ResourceNotice.notOpened;
       });
     } catch (_) {
       if (!mounted || !current || context != _context || query != _query) {
@@ -172,8 +203,7 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
       }
       setState(() {
         _catalog = null;
-        _notice =
-            'Resource access or destination could not be confirmed. Refresh before opening.';
+        _notice = _ResourceNotice.destination;
       });
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -228,16 +258,14 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
         check();
         setState(() {
           _catalog = null;
-          _notice =
-              'Resource operation received. Recover its result and refresh effective values.';
+          _notice = _ResourceNotice.received;
         });
       }
     } catch (_) {
       if (!mounted || !current || query != _query) return;
       setState(() {
         _catalog = null;
-        _notice =
-            'Resource request could not be confirmed. Recover pending operations before retrying.';
+        _notice = _ResourceNotice.unknown;
       });
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -265,9 +293,9 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
             controller: _search,
             enabled: allowed,
             decoration: InputDecoration(
-              labelText: 'Search resources',
+              labelText: _text('Search resources', 'Поиск ресурсов'),
               errorText: utf8.encode(_search.text).length > 256
-                  ? 'Maximum 256 UTF-8 bytes'
+                  ? _text('Maximum 256 UTF-8 bytes', 'Не более 256 байт UTF-8')
                   : null,
             ),
             onChanged: (_) => setState(_clear),
@@ -278,7 +306,7 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
                 if (kind != api.ResourceKind.RESOURCE_KIND_UNSPECIFIED)
                   FilterChip(
                     key: ValueKey('resource-kind-${kind.value}'),
-                    label: Text(kind.name),
+                    label: Text(resourceKindLabel(kind, widget.locale)),
                     selected: _kinds.contains(kind),
                     onSelected: allowed
                         ? (selected) {
@@ -297,11 +325,13 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
                 allowed && !_busy && utf8.encode(_search.text).length <= 256
                 ? () => _run()
                 : null,
-            child: const Text('Search resources'),
+            child: Text(_text('Search resources', 'Поиск ресурсов')),
           ),
-          if (current && _notice != null) Text(_notice!),
+          if (current && _notice != null)
+            Semantics(liveRegion: true, child: Text(_noticeText(_notice!))),
           if (current && view != null) ...[
-            if (view.resources.isEmpty) const Text('No matching resources'),
+            if (view.resources.isEmpty)
+              Text(_text('No matching resources', 'Подходящих ресурсов нет')),
             for (final resource in view.resources)
               Column(
                 mainAxisSize: MainAxisSize.min,
@@ -316,28 +346,35 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
                               if (validView()) _open(resource);
                             }
                           : null,
-                      child: const Text('Open resource in browser'),
+                      child: Text(
+                        _text(
+                          'Open resource in browser',
+                          'Открыть ресурс в браузере',
+                        ),
+                      ),
                     ),
-                  Text('${resource.kind.name}: ${_target(resource)}'),
                   Text(
-                    'Effective: ${resource.enabled.effective}; requested: '
-                    '${resource.enabled.hasRequested() ? resource.enabled.requested : 'No override'}',
+                    '${resourceKindLabel(resource.kind, widget.locale)}: ${_target(resource, widget.locale)}',
                   ),
                   Text(
-                    'Availability: ${resource.availability.availability.name}; reason: '
-                    '${resource.availability.reasonKey}; owner: ${resource.availability.actionOwner.name}',
+                    '${_text('Effective', 'Фактически')}: ${_boolean(resource.enabled.effective)}; ${_text('requested', 'Запрошено')}: '
+                    '${resource.enabled.hasRequested() ? _boolean(resource.enabled.requested) : _text('No override', 'Без переопределения')}',
                   ),
                   Text(
-                    'Source: ${resource.enabled.control.source.name}; locked: ${resource.enabled.control.locked}',
+                    '${_text('Availability', 'Доступность')}: ${updateAvailabilityLabel(resource.availability.availability, widget.locale)}; ${_text('reason', 'Код причины')}: '
+                    '${resource.availability.reasonKey}; ${_text('owner', 'Ответственный')}: ${clientActionOwnerLabel(resource.availability.actionOwner, locale: widget.locale)}',
                   ),
                   Text(
-                    'Mutation: ${resource.enabled.control.mutation.availability.name}; '
-                    'reason: ${resource.enabled.control.mutation.reasonKey}; '
-                    'owner: ${resource.enabled.control.mutation.actionOwner.name}',
+                    '${_text('Source', 'Источник')}: ${settingSourceLabel(resource.enabled.control.source, widget.locale)}; ${_text('locked', 'Заблокировано')}: ${_boolean(resource.enabled.control.locked)}',
+                  ),
+                  Text(
+                    '${_text('Mutation', 'Изменение')}: ${updateAvailabilityLabel(resource.enabled.control.mutation.availability, widget.locale)}; '
+                    '${_text('reason', 'Код причины')}: ${resource.enabled.control.mutation.reasonKey}; '
+                    '${_text('owner', 'Ответственный')}: ${clientActionOwnerLabel(resource.enabled.control.mutation.actionOwner, locale: widget.locale)}',
                   ),
                   if (resource.overlappingResourceIds.isNotEmpty)
                     Text(
-                      'Overlap: ${resource.overlappingResourceIds.join(', ')}; ${resource.overlapReasonKey}',
+                      '${_text('Overlap', 'Пересечение')}: ${resource.overlappingResourceIds.join(', ')}; ${resource.overlapReasonKey}',
                     ),
                   Wrap(
                     children: [
@@ -356,7 +393,9 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
                                 }
                               : null,
                           child: Text(
-                            enabled ? 'Enable resource' : 'Disable resource',
+                            enabled
+                                ? _text('Enable resource', 'Включить ресурс')
+                                : _text('Disable resource', 'Отключить ресурс'),
                           ),
                         ),
                     ],
@@ -370,12 +409,13 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
   );
 }
 
-String _target(api.Resource resource) => switch (resource.whichTarget()) {
+String _target(api.Resource resource, ClientLocale locale) => switch (resource
+    .whichTarget()) {
   api.Resource_Target.host =>
     '${resource.host.hostname} ${resource.host.addresses.join(', ')}',
   api.Resource_Target.subnet => resource.subnet.cidr,
   api.Resource_Target.service =>
     '${resource.service.hostname}:${resource.service.port}/${resource.service.protocol}',
   api.Resource_Target.application => resource.application.displayAddress,
-  _ => 'Unavailable',
+  _ => locale.text(en: 'Unavailable', ru: 'Недоступно'),
 };

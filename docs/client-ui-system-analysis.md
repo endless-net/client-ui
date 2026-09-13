@@ -175,6 +175,15 @@ ClientDiagnosticsPanel поддерживает RU/EN для сводки, жу�
 после повторного подтверждения. Это component evidence, не полная детальная
 диагностика, native export или full-app UI-AC-13.
 
+ClientResourcesPanel локализует RU/EN поиск, фильтры, effective/requested,
+availability/mutation, источник/lock, overlap и пять typed notices. Коды причин,
+идентификаторы и адреса остаются данными службы. Два unit-теста покрывают все
+11 resource-kind/setting-source значений; 14 widget-векторов сравнивают полный
+каталог приложения, пустой результат и все notices в обеих локалях, без
+повторного lookup/browser/mutation при смене языка. Фактическое значение не
+заменяется запрошенным после принятия команды. Это component evidence, не
+реальный доступ к ресурсам или full-app UI-AC-13.
+
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
 оставляют открытыми версии ОС, принятые assistive technologies, lifecycle

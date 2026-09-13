@@ -1311,7 +1311,7 @@ void main() {
           await tester.pump();
         }
         expect(find.text('Host a'), findsOneWidget);
-        expect(find.text('Effective: false; requested: true'), findsOneWidget);
+        expect(find.text('Effective: No; requested: Yes'), findsOneWidget);
         expect(
           tester
               .widget<TextButton>(
