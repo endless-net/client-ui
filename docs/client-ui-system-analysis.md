@@ -660,6 +660,11 @@ evidence и не меняет датированные свидетельств�
 
 ## 7. Реализация и открытые platform решения
 
+Сверка wiring на `4d063f1e3dc4020118bce6215a2fb7f5320d75fa`: main создаёт
+ClientSession/ClientDesktopApp, desktop shell включает ClientSessionPanel, а
+панель связывает native reads/mutations/recovery. Нижеследующее описывает текущую
+consumer реализацию; это не повторная сверка BA и не platform acceptance.
+
 Промежуточная consumer foundation: `app/lib/client_runtime_snapshot.dart`
 использует generated SDK, закреплённый в pubspec по immutable client revision.
 `app/test/client_runtime_snapshot_test.dart` проверяет часть US-01/03/10:
@@ -668,7 +673,8 @@ capability availability. Workflow `contract-consumer.yml` запускает э�
 проверки вместе с `client_event_stream_test.dart`: повторный snapshot при смене
 capabilities, stream ordering/context, typed overflow, observer session denial
 и независимый cursor новой подписки. EOF считается потерей подписки, а не
-подтверждением Connected; cache/reconnect orchestration остаётся application work.
+подтверждением Connected; cache epoch управляется ClientStateController,
+а явный reconnect подключён в ClientDesktopApp.
 `local_client_events.dart` связывает bootstrap/local gRPC с проверенным потоком.
 `client_connection_panel.dart` — общий typed UI-компонент connection/status;
 `client_session_panel.dart` связывает его кнопки с journaled v0-командами.
@@ -707,7 +713,8 @@ Producer окончательно проверяет отсутствие regist
 к общей session panel. Выбор использует opaque ID и profile.selection restriction;
 acceptance очищает каталог, но не синтезирует active profile. Widget-тест включён
 в desktop/mobile suite и проверяет owner/observer cleanup. Create/rename/remove,
-logout/forget, domain invalidation refresh и production shell ещё не перенесены.
+logout/forget и domain invalidation подключены к native session panel; полнота
+profile lifecycle и реальные runtime effects требуют отдельной приёмки.
 Общая панель отдельно отображает authoritative session/credential expires_at в
 UTC; отсутствие срока означает Unknown. Observer не видит эти поля, смена
 контекста заменяет сроки, UI clock не синтезирует expired/connected state.
@@ -717,27 +724,31 @@ Shared widget test проверяет разные сроки и исчезно�
 owner/profile, доступной capability и session.renewal; renewing отключает её.
 Принятие операции не меняет сроки; credential renewal не вызывается из UI.
 Shared widget suite проверяет gating и сохранение deadlines после acceptance.
-Browser action, terminal-result recovery и production shell wiring ещё требуются.
+Terminal-result lookup/acknowledgement и явные browser actions подключены через
+ClientRecoveryPanel в desktop shell. Это не реальное browser/renewal acceptance.
 `client_recovery_panel.dart` добавляет явный lookup сохранённых намерений через
 session.recoverPending и подтверждение только terminal result через journal.
 Pending не удаляется; ошибка lookup сохраняет намерения и не раскрывает raw
 exception. Результаты скрываются при смене cache/caller context. Shared widget
 suite проверяет pending/terminal и observer cleanup. Это ещё не полный recovery
-UX: domain outcome details, NOT_FOUND resolution и browser actions остаются.
+UX: typed outcome details и явные browser actions уже отображаются;
+unresolved NOT_FOUND сохраняет journal и остаётся открытым recovery решением.
 Shared mobile/desktop widget test проверяет pending Connect, доступный Disconnect,
 отсутствие ложного Connected и очистку owner controls/context при observer snapshot.
-Панель ещё не заменяет старый main/shell; localization, полный recovery UX и
-остальные экраны остаются незавершёнными, как и product acceptance.
+Панель используется текущим native main/shell; localization, полный recovery UX
+и функциональная полнота всех сценариев остаются незавершёнными, как и product acceptance.
 `client_session.dart` объединяет connection, typed state и intention journal:
 до snapshot команды запрещены, запись предшествует отправке, поздний ответ после
 смены контекста требует recovery. Pending recovery выполняет только GetOperation,
 без replay payload и автоматической смены UUID. Session-тесты проверяют эти
-границы. Перевод существующих экранов на этот session ещё не выполнен.
+границы. Текущие native панели используют этот session; удаление старых экранов
+не доказывает перенос всех их бизнес-сценариев.
 `client_state_controller.dart` содержит typed application state: ожидает первый
 snapshot, очищает данные при stream loss/reconnect, меняет cache epoch при смене
 profile/account/network, хранит caller-visible операции и domain invalidations.
 Отмена idle subscription передаётся source без ожидания следующего события.
-Тесты покрывают эти границы; прежний production controller ещё не заменён.
+Тесты покрывают эти границы; native desktop shell использует этот controller
+через ClientSession, прежний HTTP controller удалён.
 `client_mutations.dart` предоставляет typed SDK вызовы всех 19 mutation RPC,
 проверяет UUID/instance/revision до отправки и соответствие kind/request ID
 принятой операции. Запрос копируется перед отправкой; автоматического retry и
@@ -747,13 +758,15 @@ profile/account/network, хранит caller-visible операции и domain 
 только после обработки matching terminal result. Повреждённые записи сохраняются
 и блокируют новые намерения вместо неявного повторного исполнения. Unit-тесты
 переоткрывают storage, а process test использует сохранённый UUID для Connect и
-GetOperation. Выбор caller-private installation-scoped directory, startup recovery
-UI и обработка unresolved NOT_FOUND ещё требуют интеграции с production shell.
+GetOperation. Main задаёт endpoint-scoped directory через clientJournalDirectory,
+а shell предоставляет явный recovery UI. Защита directory средствами каждой OS
+и обработка unresolved NOT_FOUND ещё требуют отдельного решения/подтверждения.
 Это process-restart foundation, не доказательство power-loss durability или
 защиты platform storage; mobile storage/OS acceptance остаются отдельными gates.
 
 `client_session_process_test.dart` объединяет эти слои с producer fixture,
-закреплённым на `ac30bfe0e959f3c93ef1059495f2356fa5476b06`: WatchEvents с
+закреплённым в `contract-consumer.yml` на
+`80d9cdc16241ca03200381b6b1b04fa5acca1987`: WatchEvents с
 hold_open, snapshot-gated Connect, pending acceptance, lookup и journal
 acknowledgement после terminal result. Подготовка ID в fixture выполняется заранее
 для exact request matching через injected UUID factory; запись в outbox происходит
@@ -777,8 +790,9 @@ request ID; scripted lookup не является доказательством
 Workflow запускает unit и process integration на Windows/Linux/macOS с прежним
 закреплённым Flutter SDK. Без ENDLESSNET_TESTSERVER process test пропускается;
 такой локальный запуск не является interoperability evidence. До успешного CI
-свидетельство остаётся pending. Этот слой ещё не подключён к production shell и
-не подтверждает полный US, Android/iOS execution или UI/runtime cutover.
+свидетельство конкретного изменения остаётся pending. Слой подключён к native
+desktop shell; это не подтверждает полный US, Android/iOS native transport
+или полноту UI/runtime cutover. Результаты закреплены в test coverage ledger.
 
 Отдельный `mobile-contract.yml` запускает `tests/mobile_contract` внутри Android
 emulator и iOS simulator. Общий `mobile_contract_widget_test.dart` проверяет
