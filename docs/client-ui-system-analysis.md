@@ -92,6 +92,14 @@ logout/local forget не снимают ownership. UI не обещает воз
 
 ## 3. Команды и восстановление
 
+Повторный iOS job на `52eac5c` завершился до тестов: 0 passed, timeout ожидания
+VM Service после успешного build/simctl launch
+([job](https://github.com/endless-net/client-ui/actions/runs/34728449505/job/103646732566)).
+SafeArea этим запуском не проверена. Workflow теперь сохраняет при failure screenshot
+изолированного synthetic simulator и последние 5 минут Runner log до shutdown;
+это диагностический шаг, не исправление VM Service и не platform acceptance.
+Тайм-аут и права runner не менялись; artifacts хранятся 3 дня.
+
 Native iOS run на `840a6f5` впервые выполнил suite: 16 passed / 5 failed
 ([job](https://github.com/endless-net/client-ui/actions/runs/34727879154/job/103645229712)).
 Пять failures сопровождались hit-test miss верхних кнопок на y=24. Shared test

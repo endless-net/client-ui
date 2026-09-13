@@ -79,9 +79,32 @@ jobs:
         run: |
           set -euo pipefail
           read -r device state <<< "$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); a=[v for k,vs in d["devices"].items() if ".iOS-" in k for v in vs if v["name"].startswith("iPhone")]; assert a, "No available iPhone simulator"; print(a[0]["udid"], a[0]["state"])')"
+          finish_simulator() {
+            result=$?
+            if [ "$result" -ne 0 ]; then
+              # This is the isolated synthetic contract host, never a signed-in
+              # product session. Collect before shutdown; preserve test failure.
+              mkdir -p diagnostics
+              xcrun simctl io "$device" screenshot diagnostics/simulator.png || true
+              xcrun simctl spawn "$device" log show --last 5m --style compact \
+                --predicate 'process == "Runner"' > diagnostics/runner.log 2>&1 || true
+            fi
+            if [ "$state" != Booted ]; then
+              xcrun simctl shutdown "$device" || true
+            fi
+            return "$result"
+          }
+          trap finish_simulator EXIT
           if [ "$state" != Booted ]; then
             xcrun simctl boot "$device"
-            trap 'xcrun simctl shutdown "$device"' EXIT
           fi
           xcrun simctl bootstatus "$device" -b
           flutter test integration_test/contract_test.dart -d "$device" --no-pub --verbose
+      - name: Preserve synthetic simulator failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ios-contract-failure-${{ github.run_id }}
+          path: tests/mobile_contract/diagnostics/
+          if-no-files-found: warn
+          retention-days: 3
