@@ -20,7 +20,7 @@ import 'client_notifications_panel.dart';
 import 'client_notification_permission_panel.dart';
 import 'client_native_notifications.dart';
 import 'client_autostart_panel.dart';
-import 'client_linux_autostart.dart';
+import 'client_autostart_setting.dart';
 
 Directory clientJournalDirectory(String endpoint) {
   final home =

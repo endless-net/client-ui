@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-enum ClientAutostartSetting { notConfigured, enabled, disabled }
+import 'client_autostart_setting.dart';
 
 String clientAutostartExec(String executable) {
   if (!executable.startsWith('/') ||

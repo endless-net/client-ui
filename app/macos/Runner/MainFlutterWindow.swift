@@ -1,10 +1,12 @@
 import Cocoa
 import FlutterMacOS
 import UserNotifications
+import ServiceManagement
 
 class MainFlutterWindow: NSWindow {
   private var diagnosticsDestination: DiagnosticsDestination?
   private var deadlineNotifications: DeadlineNotifications?
+  private var autostartChannel: FlutterMethodChannel?
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame
@@ -16,6 +18,41 @@ class MainFlutterWindow: NSWindow {
       messenger: flutterViewController.engine.binaryMessenger, window: self)
     deadlineNotifications = DeadlineNotifications(
       messenger: flutterViewController.engine.binaryMessenger, window: self)
+    let autostart = FlutterMethodChannel(name: "endlessnet/ui-autostart",
+      binaryMessenger: flutterViewController.engine.binaryMessenger)
+    autostart.setMethodCallHandler { call, result in
+      guard call.method == "read" || call.method == "setEnabled" else {
+        result(FlutterMethodNotImplemented); return
+      }
+      guard #available(macOS 13.0, *) else { result("unsupported"); return }
+      let service = SMAppService.mainApp
+      if call.method == "read" {
+        guard call.arguments == nil else {
+          result(FlutterError(code: "invalid_arguments", message: "No arguments expected", details: nil)); return
+        }
+      } else {
+        guard let enabled = call.arguments as? Bool else {
+          result(FlutterError(code: "invalid_arguments", message: "Boolean expected", details: nil)); return
+        }
+        do {
+          if enabled {
+            if service.status != .enabled && service.status != .requiresApproval { try service.register() }
+          } else if service.status != .notRegistered { try service.unregister() }
+        } catch {
+          if service.status != .requiresApproval {
+            result(FlutterError(code: "autostart_unavailable", message: "Autostart unavailable", details: nil)); return
+          }
+        }
+      }
+      switch service.status {
+      case .enabled: result("enabled")
+      case .notRegistered: result("disabled")
+      case .requiresApproval: result("requiresApproval")
+      case .notFound: result(FlutterError(code: "autostart_unavailable", message: "Autostart unavailable", details: nil))
+      @unknown default: result(FlutterError(code: "autostart_unavailable", message: "Autostart unavailable", details: nil))
+      }
+    }
+    autostartChannel = autostart
 
     super.awakeFromNib()
   }

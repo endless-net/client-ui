@@ -84,6 +84,12 @@ explicit enable/Hidden=true disable, no runtime connection flags, строгий
 5 widget tests — local component evidence. Реальный login, system policy,
 перенос executable/upgrade и остальные платформы остаются открытыми.
 
+macOS autostart source дополнена через SMAppService.mainApp (macOS 13+), без
+смены deployment target и без старого Login Items API. Общая модель различает
+requiresApproval/unsupported; 9 channel/widget tests проверяют read/write
+и RU/EN UI. Native compile/registration/login и macOS 12 feature availability
+остаются границами приёмки; UF-02 целиком не закрыт.
+
 | UF | Наблюдаемая реализация | Что ещё нужно для исходного scope |
 | --- | --- | --- |
 | UF-01 | `main.dart`, Windows runner/package pipeline; Linux/macOS scaffold | Product hosts Android/iOS отсутствуют; дистрибуция и compatible pairing всех платформ не квалифицированы |

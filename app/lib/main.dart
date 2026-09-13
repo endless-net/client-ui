@@ -15,6 +15,7 @@ import 'client_locale_store.dart';
 import 'client_notification_store.dart';
 import 'client_native_notifications.dart';
 import 'client_linux_autostart.dart';
+import 'client_native_autostart.dart';
 import 'client_session.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
@@ -111,14 +112,18 @@ Future<void> main(List<String> args) async {
   runApp(
     ClientDesktopApp(
       initialLocale: locale,
-      readAutostart: Platform.isLinux
+      readAutostart: Platform.isMacOS
+          ? readNativeClientAutostart
+          : Platform.isLinux
           ? () async {
               final store = autostart;
               if (store == null) throw StateError('Autostart unavailable');
               return store.read();
             }
           : null,
-      writeAutostart: Platform.isLinux
+      writeAutostart: Platform.isMacOS
+          ? writeNativeClientAutostart
+          : Platform.isLinux
           ? (enabled) async {
               final store = autostart;
               if (store == null) throw StateError('Autostart unavailable');

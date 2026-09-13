@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'client_linux_autostart.dart';
+import 'client_autostart_setting.dart';
 import 'client_locale.dart';
 
 class ClientAutostartPanel extends StatefulWidget {
@@ -33,7 +33,8 @@ class _AutostartState extends State<ClientAutostartPanel> {
     if (!mounted ||
         _busy ||
         (!widget.enabled && value != null) ||
-        (_failed && value != null)) {
+        ((_failed || _setting == ClientAutostartSetting.unsupported) &&
+            value != null)) {
       return;
     }
     setState(() {
@@ -90,6 +91,14 @@ class _AutostartState extends State<ClientAutostartPanel> {
                     'No user autostart entry. System-wide policy is not evaluated.',
                     'Пользовательская запись отсутствует. Системная политика не проверялась.',
                   ),
+                  ClientAutostartSetting.requiresApproval => text(
+                    'Autostart requires your approval in system Login Items settings.',
+                    'Для автозапуска требуется ваше одобрение в системных настройках объектов входа.',
+                  ),
+                  ClientAutostartSetting.unsupported => text(
+                    'UI autostart is not supported on this operating system version.',
+                    'Эта версия операционной системы не поддерживает автозапуск интерфейса.',
+                  ),
                   null => text('Reading autostart…', 'Чтение автозапуска…'),
                 },
         ),
@@ -103,14 +112,22 @@ class _AutostartState extends State<ClientAutostartPanel> {
           ),
           TextButton(
             key: const Key('ui-autostart-enable'),
-            onPressed: _busy || !widget.enabled || _failed
+            onPressed:
+                _busy ||
+                    !widget.enabled ||
+                    _failed ||
+                    _setting == ClientAutostartSetting.unsupported
                 ? null
                 : () => _run(true),
             child: Text(text('Enable', 'Включить')),
           ),
           TextButton(
             key: const Key('ui-autostart-disable'),
-            onPressed: _busy || !widget.enabled || _failed
+            onPressed:
+                _busy ||
+                    !widget.enabled ||
+                    _failed ||
+                    _setting == ClientAutostartSetting.unsupported
                 ? null
                 : () => _run(false),
             child: Text(text('Disable', 'Выключить')),

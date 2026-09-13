@@ -190,6 +190,23 @@ read при построении и explicit enable/disable/refresh; ошибк�
 компоненты; фактический login launch, desktop policy, install/upgrade/uninstall
 и другие платформенные autostart adapters не квалифицированы.
 
+macOS autostart source дополнена через
+[`SMAppService.mainApp`](https://developer.apple.com/documentation/servicemanagement/smappservice)
+и UI-only `endlessnet/ui-autostart` channel. Read передаёт только состояние,
+explicit setEnabled — boolean; endpoint, executable path и runtime commands
+через канал не передаются. Enabled/notRegistered/requiresApproval различаются,
+notFound/error не становится disabled. Повторный enable уже registered/pending
+service не вызывает register снова. Требование одобрения показывается в RU/EN
+как необходимость действия в Login Items; UI не считает registration доказанным
+запуском и не меняет runtime connection intent.
+Модель вынесена в [`client_autostart_setting.dart`](../app/lib/client_autostart_setting.dart).
+[9 short channel/widget tests](../app/test/client_native_autostart_test.dart)
+проверяют все исходы чтения/записи, shape, missing/malformed/error response,
+RU/EN approval/unsupported и запрет write при unsupported. На macOS <13
+возвращается unsupported; deployment target 12.0 не повышался и старый API
+не добавлялся. Реальная ServiceManagement compilation/registration, system
+approval, login launch, install/upgrade и Windows/mobile scope ещё не проверены.
+
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin

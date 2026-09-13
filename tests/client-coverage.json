@@ -73,6 +73,10 @@
       "implementation": "partial",
       "testEvidence": [
         {
+          "path": "app/test/client_native_autostart_test.dart",
+          "scope": "Nine short channel/widget tests: authoritative enabled/disabled/requiresApproval/unsupported on read and boolean-only set, missing/malformed/error distinction, RU/EN approval and unsupported UI with writes disabled. macOS SMAppService source added for 13+, older OS unsupported without fallback; native compilation, registration/approval/login and install/upgrade unverified"
+        },
+        {
           "path": "app/test/client_linux_autostart_test.dart",
           "scope": "Six short tests: XDG user config resolution, Exec two-layer escaping/control rejection, explicit enable/Hidden disable, store recreation and serialized writes, foreign/non-file preservation. UI executable only; no login execution, system-wide policy, moved executable migration or install/upgrade/uninstall acceptance"
         },

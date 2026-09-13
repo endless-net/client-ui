@@ -3,7 +3,7 @@ library;
 
 import 'dart:async';
 import 'package:endlessnet/client_autostart_panel.dart';
-import 'package:endlessnet/client_linux_autostart.dart';
+import 'package:endlessnet/client_autostart_setting.dart';
 import 'package:endlessnet/client_locale.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

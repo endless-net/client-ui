@@ -3,6 +3,7 @@ library;
 
 import 'dart:io';
 import 'package:endlessnet/client_linux_autostart.dart';
+import 'package:endlessnet/client_autostart_setting.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
