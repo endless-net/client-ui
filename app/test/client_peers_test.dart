@@ -1,12 +1,144 @@
 import 'package:endlessnet/client_peers.dart';
+import 'dart:async';
+import 'package:endlessnet/client_peers_panel.dart';
+import 'package:endlessnet/client_state_controller.dart';
+import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:endlessnet/client_intent_journal.dart';
 import 'package:endlessnet/client_session.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter_test/flutter_test.dart';
 import 'client_session_test.dart' as fixtures;
+import 'support/contract_test_scaffold.dart';
 
 void main() {
+  for (final scenario in ['display', 'query-race', 'invalidated', 'observer']) {
+    testWidgets('US-04: peer panel $scenario', (tester) async {
+      final state = ClientStateController();
+      final events = StreamController<api.WatchEventsResponse>();
+      await state.attach(events.stream);
+      addTearDown(() async {
+        await state.detach();
+        await events.close();
+        state.dispose();
+      });
+      Future<ClientPeerCatalog> catalog(String query) => readClientPeers(
+        (_) async => api.ListPeersResponse()
+          ..mergeFromProto3Json({
+            'page': {
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            },
+            'snapshotState': 'AGENT_SNAPSHOT_STATE_PREVIOUS',
+            'mapRevision': '11',
+            'targetMapRevision': '12',
+            'peers': [
+              {
+                'id': 'peer-$query',
+                'hostname': 'Host $query',
+                'selectedPath': 'PATH_KIND_RELAY',
+                'selectedEndpoint': 'relay.example:443',
+                'selectionReasonKey': 'path.direct_failed',
+                'candidates': [
+                  {
+                    'kind': 'PATH_KIND_DIRECT',
+                    'health': 'PATH_HEALTH_UNREACHABLE',
+                    'endpoint': '192.0.2.1:1234',
+                    'consecutiveFailures': 2,
+                    'reasonKey': 'path.timeout',
+                  },
+                ],
+              },
+            ],
+          }),
+        instanceId: 'runtime-a',
+        profileId: 'profile-a',
+        search: query,
+      );
+      final pending = Completer<ClientPeerCatalog>();
+      var reads = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ContractTestScaffold(
+            body: SingleChildScrollView(
+              child: ClientPeersPanel(
+                state: state,
+                load: (query) {
+                  reads++;
+                  if (reads == 1 &&
+                      ['query-race', 'invalidated'].contains(scenario)) {
+                    return pending.future;
+                  }
+                  return catalog(query);
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      final snapshot = fixtures.snapshot()
+        ..snapshot.status.activeProfileId = 'profile-a';
+      if (scenario == 'observer') {
+        snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      }
+      events.add(snapshot);
+      await tester.pump();
+      final refresh = find.byKey(const Key('client-load-peers'));
+      final search = find.byKey(const Key('client-peer-search'));
+      expect(reads, 0);
+      if (scenario == 'observer') {
+        expect(tester.widget<OutlinedButton>(refresh).onPressed, isNull);
+        expect(tester.widget<TextField>(search).enabled, isFalse);
+        return;
+      }
+      await tester.enterText(search, 'first');
+      expect(reads, 0);
+      tester.widget<OutlinedButton>(refresh).onPressed!();
+      await tester.pump();
+      if (scenario == 'query-race') {
+        await tester.enterText(search, 'second');
+        await tester.pump();
+        tester.widget<OutlinedButton>(refresh).onPressed!();
+        await tester.pumpAndSettle();
+        pending.complete(await catalog('first'));
+        await tester.pumpAndSettle();
+        expect(find.text('Host second'), findsOneWidget);
+        expect(find.text('Host first'), findsNothing);
+        expect(reads, 2);
+      } else if (scenario == 'invalidated') {
+        events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '2',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'invalidated': {'domain': 'DOMAIN_PEERS'},
+          }),
+        );
+        await tester.pump();
+        pending.complete(await catalog('first'));
+        await tester.pumpAndSettle();
+        expect(find.text('Host first'), findsNothing);
+        expect(tester.widget<TextField>(search).controller!.text, isEmpty);
+        expect(reads, 1);
+      } else {
+        await tester.pumpAndSettle();
+        expect(find.text('Host first'), findsOneWidget);
+        expect(
+          find.textContaining('AGENT_SNAPSHOT_STATE_PREVIOUS'),
+          findsOneWidget,
+        );
+        expect(find.text('Applied map: 11; target map: 12'), findsOneWidget);
+        await tester.ensureVisible(find.text('Host first'));
+        await tester.tap(find.text('Host first'));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('PATH_HEALTH_UNREACHABLE'), findsOneWidget);
+        expect(find.textContaining('path.timeout'), findsOneWidget);
+        expect(
+          find.text('Selection reason: path.direct_failed'),
+          findsOneWidget,
+        );
+        expect(reads, 1);
+      }
+    });
+  }
   test(
     'US-04: peer session guards owner context and stops stale pagination',
     () async {
@@ -98,7 +230,7 @@ void main() {
             if (change == 'profile') {
               changed.snapshot.status.activeProfileId = 'profile-b';
             } else if (change == 'network') {
-            changed.snapshot.status.network = api.Network(id: 'network-b');
+              changed.snapshot.status.network = api.Network(id: 'network-b');
             } else {
               changed.snapshot.runtime.callerAccess =
                   api.Access.ACCESS_OBSERVER;

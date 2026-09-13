@@ -11,6 +11,7 @@ import 'client_create_profile_panel.dart';
 import 'client_enrollment_panel.dart';
 import 'client_cleanup_panel.dart';
 import 'client_networks_panel.dart';
+import 'client_peers_panel.dart';
 import 'client_identity_panel.dart';
 import 'client_diagnostics_panel.dart';
 import 'client_preferences_panel.dart';
@@ -241,6 +242,10 @@ class ClientSessionPanel extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+          ClientPeersPanel(
+            state: session.state,
+            load: (search) => session.listPeers(search: search),
           ),
           ClientCleanupPanel(
             state: session.state,

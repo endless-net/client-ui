@@ -30,8 +30,13 @@ The reader is bound to the native ListPeers RPC through ClientSession. Each page
 checks session/cache and PEERS/NETWORKS/PROFILES invalidation epochs, with owner
 and active-profile admission and stale final revision rejection. Shared tests
 cover repeated invalidations and profile/network/owner changes before a later
-page can be requested; reads leave the intention journal untouched. A peer
-screen, producer-process scenarios and native IPC/path acceptance remain open.
+page can be requested; reads leave the intention journal untouched.
+ClientPeersPanel is connected to the session and displays explicit search,
+snapshot/map state and expandable path observations without launching probes.
+Shared widget tests cover previous snapshot/unreachable candidate display,
+observer gating, late response after query replacement and invalidation cleanup.
+Producer-process scenarios, complete localization/accessibility and native
+IPC/path acceptance remain open.
 
 Consumer `5d5c979f0ac539e23c4e2b6e102201f3b4cb9bce` has verified individual
 [Windows](https://github.com/endless-net/client-ui/actions/runs/34737934018/job/103672549796)

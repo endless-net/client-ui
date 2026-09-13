@@ -178,7 +178,7 @@
         },
         {
           "path": "app/test/client_peers_test.dart",
-          "scope": "Immutable paginated peer reader preserves exact profile/search, snapshot state and applied/target map revisions; inconsistent pages, duplicate IDs, oversized query/page and token cycles fail closed. Native session binding checks owner/profile readiness, stale revisions, repeated PEERS/NETWORKS/PROFILES invalidations and profile/network/owner changes before further pagination without journal writes. Included in desktop/mobile suites, local fixtures only; no peer screen, producer-process or actual path reachability acceptance"
+          "scope": "Immutable paginated peer reader preserves exact profile/search, snapshot state and applied/target map revisions; inconsistent pages, duplicate IDs, oversized query/page and token cycles fail closed. Native session binding checks owner/profile readiness, stale revisions, repeated PEERS/NETWORKS/PROFILES invalidations and profile/network/owner changes before further pagination without journal writes. Connected peer panel tests cover explicit search, previous snapshot/path diagnostics, observer denial, late query response and invalidation cleanup. Included in desktop/mobile suites, local fixtures only; no producer-process, complete localization/accessibility or actual path reachability acceptance"
         }
       ],
       "acceptanceEvidence": []

@@ -269,6 +269,17 @@ invalidation и observer cleanup. Это ещё не доказательств�
 acceptance или смены реального туннеля; подключение production entrypoint
 проверено отдельно в source cutover, не этим reader test.
 
+US-04 peer foundation: ClientPeersPanel подключён к Session.listPeers и native
+ListPeers. Поиск выполняется явно; редактирование запроса сбрасывает прежний
+результат, а request serial не позволяет поздней странице заменить новый запрос.
+Session проверяет owner/profile, revision и повторные PEERS/NETWORKS/PROFILES
+invalidations между страницами. Экран показывает snapshot_state, applied/target
+map revisions, stable peer ID, overlay addresses, selected path/endpoint и
+переданные producer причины, health, RTT и timestamps кандидатов. Он не запускает
+сетевые probes и не считает PREVIOUS snapshot доказательством текущей связности.
+Shared tests входят в desktop/mobile harness; локальные результаты не закрывают
+native IPC interoperability, локализацию, accessibility или platform acceptance.
+
 Составная ClientSessionPanel имеет общий scroll container, enrollment mode dropdown
 ограничен доступной шириной. US-14 widget regression проверяет всю session panel
 при 360×640 и text scale 2, отсутствие RenderFlex overflow и достижимость profile
