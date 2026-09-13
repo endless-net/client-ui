@@ -40,6 +40,7 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
       '${widget.state.cacheEpoch}:'
       '${[api.Domain.DOMAIN_EXIT_NODE, api.Domain.DOMAIN_PROFILES, api.Domain.DOMAIN_NETWORKS, api.Domain.DOMAIN_PEERS].map(widget.state.domainEpoch).join(',')}';
   bool get allowed =>
+      mounted &&
       widget.state.link == ClientLinkState.ready &&
       widget.state.snapshot != null &&
       widget.state.snapshot!.runtime.callerAccess !=

@@ -41,6 +41,7 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
       '${widget.state.cacheEpoch}:'
       '${[api.Domain.DOMAIN_PROFILES, api.Domain.DOMAIN_PREFERENCES, api.Domain.DOMAIN_MANAGED_SETTINGS].map(widget.state.domainEpoch).join(',')}';
   bool get allowed =>
+      mounted &&
       widget.state.link == ClientLinkState.ready &&
       widget.state.snapshot != null &&
       widget.state.snapshot!.runtime.callerAccess !=

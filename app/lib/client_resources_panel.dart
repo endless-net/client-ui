@@ -36,6 +36,7 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
       '${widget.state.cacheEpoch}:'
       '${[api.Domain.DOMAIN_PROFILES, api.Domain.DOMAIN_RESOURCES, api.Domain.DOMAIN_NETWORKS].map(widget.state.domainEpoch).join(',')}';
   bool get allowed =>
+      mounted &&
       widget.state.link == ClientLinkState.ready &&
       widget.state.snapshot != null &&
       widget.state.snapshot!.runtime.callerAccess !=

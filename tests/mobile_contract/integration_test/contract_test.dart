@@ -7,6 +7,7 @@ import '../../../app/test/client_peer_bounds_test.dart' as peerBounds;
 import '../../../app/test/client_peer_time_test.dart' as peerTime;
 import '../../../app/test/mobile_contract_widget_test.dart' as shared;
 import '../../../app/test/client_profiles_test.dart' as profiles;
+import '../../../app/test/client_disposed_actions_test.dart' as disposedActions;
 import '../../../app/test/client_connection_activation_test.dart' as activation;
 import '../../../app/test/client_identity_activation_test.dart'
     as identityActivation;
@@ -17,6 +18,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   shared.main();
   profiles.main();
+  group('Disposed panel action admission', disposedActions.main);
   group('Queued primary action context binding', activation.main);
   group('Queued identity confirmation binding', identityActivation.main);
   group('Lifecycle preference projection validation', preferences.main);

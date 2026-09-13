@@ -48,6 +48,7 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
   String? _notice;
   String? _pendingRemoval;
   bool get _owner =>
+      mounted &&
       widget.state.link == ClientLinkState.ready &&
       widget.state.snapshot != null &&
       widget.state.snapshot!.runtime.callerAccess != api.Access.ACCESS_OBSERVER;

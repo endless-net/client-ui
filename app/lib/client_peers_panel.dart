@@ -22,6 +22,7 @@ class _ClientPeersPanelState extends State<ClientPeersPanel> {
   var _busy = false;
 
   bool get _allowed =>
+      mounted &&
       widget.state.link == ClientLinkState.ready &&
       widget.state.snapshot != null &&
       widget.state.snapshot!.runtime.callerAccess !=

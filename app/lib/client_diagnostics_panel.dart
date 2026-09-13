@@ -70,6 +70,7 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
   String get contextId =>
       '${widget.state.cacheEpoch}:${api.Domain.values.map(widget.state.domainEpoch).join(',')}';
   bool get allowed =>
+      mounted &&
       widget.state.link == ClientLinkState.ready &&
       widget.state.snapshot != null &&
       widget.state.snapshot!.runtime.callerAccess !=

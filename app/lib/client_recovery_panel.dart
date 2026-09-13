@@ -36,6 +36,7 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
   bool _busy = false;
 
   bool get _owner =>
+      mounted &&
       widget.state.link == ClientLinkState.ready &&
       widget.state.snapshot != null &&
       widget.state.snapshot!.runtime.callerAccess != api.Access.ACCESS_OBSERVER;

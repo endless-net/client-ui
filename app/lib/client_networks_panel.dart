@@ -27,6 +27,7 @@ class _ClientNetworksPanelState extends State<ClientNetworksPanel> {
   bool _busy = false;
   String? _notice;
   bool get _owner =>
+      mounted &&
       widget.state.link == ClientLinkState.ready &&
       widget.state.snapshot != null &&
       widget.state.snapshot!.runtime.callerAccess !=
