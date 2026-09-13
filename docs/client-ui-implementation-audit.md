@@ -137,6 +137,16 @@ requiresApproval/unsupported; 9 channel/widget tests проверяют read/wri
 
 ## Последовательность оставшейся работы
 
+Ownership correction после исторического snapshot: `client/main`
+`c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1` разрешает NotifyLifecycle только для
+UI_QUIT; logoff/suspend/resume принадлежат runtime adapters (см. ссылки и
+сверку в [SA](client-ui-system-analysis.md)). Упоминания отсутствующих OS event
+adapters в исходной таблице — external acceptance gap, не поручение добавить
+их отправку из UI. `ClientMutations` отклоняет missing/UNSPECIFIED/unknown
+lifecycle event до RPC, что покрыто тремя short negative tests. Политики и
+реальное OS поведение требуют evidence owning `client`; его изменения здесь
+не выполняются. UI восстановление после interruption остаётся в полном scope.
+
 Дополнение после audit commit: pre-create preview в ClientDiagnosticsPanel
 теперь содержит RU/EN описание snapshot/recent logs, ограничений 5 MiB /
 15 минут / 256 KiB, отсутствие timed capture/upload и негарантированную

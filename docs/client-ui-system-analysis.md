@@ -941,6 +941,20 @@ callback. Producer-process ui-quit case проверяет точный event/co
 resume, crash-versus-quit, применение preferences и mobile lifecycle acceptance
 остаются незакрытыми; UI не подменяет события OS adapter.
 
+Уточнение ownership по повторно сверенным `client/origin/main` и remote main
+`c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`: комментарий
+[NotifyLifecycle в service.proto](https://github.com/endless-net/client/blob/main/proto/client/v0/service.proto)
+явно оставляет OS lifecycle runtime adapters; enum
+[LifecycleEvent](https://github.com/endless-net/client/blob/main/proto/client/v0/features.proto)
+содержит только UNSPECIFIED и UI_QUIT. UI не должен создавать RPC для
+logoff/suspend/resume или считать скрытие/потерю фокуса окна таким событием.
+Consumer теперь отвергает event, отличный от UI_QUIT, до транспорта;
+три short negative tests проверяют missing/UNSPECIFIED/unknown wire value при
+валидном mutation context. Native OS events и применение lifecycle policy —
+внешняя реализация `client`, а не недостающий UI RPC adapter. В UI остаются
+настройки, явный quit, восстановление свежего состояния после interruption и
+platform acceptance; это уточнение не закрывает US-12 и не меняет BA.
+
 US-05 read foundation: `ClientSession.getExitNodes` читает ListExitNodes и
 GetExitNode через typed local binding. Каталог и status должны иметь одну runtime
 revision; IPv4/IPv6 обязательны и не синтезируются из aggregate. Optional IDs,

@@ -489,6 +489,10 @@
       "implementation": "partial",
       "testEvidence": [
         {
+          "path": "app/test/client_mutations_test.dart",
+          "scope": "Three short negatives reject missing/UNSPECIFIED/unknown-wire lifecycle event with valid mutation context before RPC. Producer v0 permits only UI_QUIT; OS logoff/suspend/resume are runtime-owned, not UI-generated RPC. No native policy/OS acceptance claim"
+        },
+        {
           "path": "app/test/client_desktop_app_test.dart",
           "scope": "Explicit owner Quit sends one journaled UI_QUIT and retains pending UUID; observer exits without mutation; launch does not notify lifecycle; unavailable runtime offers Stay. Native window/tray integration disabled, Quit callback invoked directly; no OS lifecycle acceptance"
         },

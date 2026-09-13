@@ -310,6 +310,11 @@ final class ClientMutations {
     final copy = api.NotifyLifecycleRequest.fromBuffer(request.writeToBuffer())
       ..freeze();
     _validate(copy.mutation);
+    // v0 exposes only graceful UI quit. OS lifecycle belongs to runtime
+    // adapters, not to window focus/visibility or a fabricated UI event.
+    if (copy.event != api.LifecycleEvent.LIFECYCLE_EVENT_UI_QUIT) {
+      throw const FormatException('Unsupported UI lifecycle event');
+    }
     final response = await _client.notifyLifecycle(copy);
     return validateAcceptance(
       response.operation,

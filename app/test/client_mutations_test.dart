@@ -175,6 +175,32 @@ void main() {
     },
   );
 
+  for (final variant in ['missing', 'unspecified', 'unknown wire value']) {
+    test(
+      'NotifyLifecycle rejects $variant with valid context before RPC',
+      () async {
+        final request = api.NotifyLifecycleRequest()
+          ..mergeFromProto3Json({
+            'mutation': {
+              'requestId': requestId,
+              'expectedInstanceId': 'runtime-a',
+              'expectedRevision': '1',
+            },
+            'profile': {'profileId': 'profile-a'},
+          });
+        if (variant == 'unspecified') {
+          request.event = api.LifecycleEvent.LIFECYCLE_EVENT_UNSPECIFIED;
+        } else if (variant == 'unknown wire value') {
+          request.mergeFromBuffer([24, 99]); // event field 3, unknown enum 99.
+        }
+        await expectLater(
+          commands.notifyLifecycle(request),
+          throwsFormatException,
+        );
+      },
+    );
+  }
+
   api.Operation accepted() => api.Operation(
     id: 'operation-a',
     requestId: requestId,
