@@ -500,6 +500,10 @@
       "implementation": "partial",
       "testEvidence": [
         {
+          "path": "app/test/client_operation_details_locale_test.dart",
+          "scope": "Fourteen typed operation-outcome vectors render exact complete RU/EN component text, including all cleanup outcomes, retryability and sensitive URL/reason/handle suppression. Registered in desktop/mobile harness; local component validation only pending runners. Whole-application locale switching and UI-AC-13 flows remain incomplete"
+        },
+        {
           "path": "app/test/client_operation_labels_test.dart",
           "scope": "Closed operation state, continuity, action owner, required action and failure enums have RU/EN catalog entries; exact Russian enum mappings and existing English mappings are tested in the shared desktop/mobile harness. Application locale switching and complete localized flows remain unimplemented. Runner execution pending; not full localization or accessibility acceptance"
         },

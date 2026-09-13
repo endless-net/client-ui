@@ -11,6 +11,7 @@ import '../../../app/test/client_disposed_actions_test.dart' as disposedActions;
 import '../../../app/test/client_connection_activation_test.dart' as activation;
 import '../../../app/test/client_session_layout_test.dart' as sessionLayout;
 import '../../../app/test/client_operation_labels_test.dart' as operationLabels;
+import '../../../app/test/client_operation_details_locale_test.dart' as operationLocales;
 import '../../../app/test/client_identity_activation_test.dart'
     as identityActivation;
 import '../../../app/test/client_preferences_validation_test.dart'
@@ -24,6 +25,7 @@ void main() {
   group('Queued primary action context binding', activation.main);
   group('Active session large-text layout', sessionLayout.main);
   group('Typed operation presentation', operationLabels.main);
+  group('Bilingual operation outcomes', operationLocales.main);
   group('Queued identity confirmation binding', identityActivation.main);
   group('Lifecycle preference projection validation', preferences.main);
   group('Native sandbox durable intention journal', journal.main);
