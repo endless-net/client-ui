@@ -13,6 +13,16 @@ BA прочитан из разрешённого пользователем ф�
 
 ## UF: текущая реализация и недостающий результат
 
+Последующее дополнение, не изменение исторического snapshot `ce98fa4`:
+реализован [deadline notification planner](../app/lib/client_deadline_notifications.dart)
+с [11 unit-тестами](../app/test/client_deadline_notifications_test.dart):
+typed session/credential события, RU/EN fixed payload, acknowledge/dedup после
+reconnect и инвалидирование receipts при смене контекста. Planner пока не
+подключён к UI/native delivery; настройки, permissions, click handling и
+прочие значимые события остаются пробелами UF-15. История только in-memory
+в текущем runtime/caller/profile; restart UI и возврат к прежнему profile
+не обещают сохранения dedup. Общий implementation gate остаётся открытым.
+
 | UF | Наблюдаемая реализация | Что ещё нужно для исходного scope |
 | --- | --- | --- |
 | UF-01 | `main.dart`, Windows runner/package pipeline; Linux/macOS scaffold | Product hosts Android/iOS отсутствуют; дистрибуция и compatible pairing всех платформ не квалифицированы |

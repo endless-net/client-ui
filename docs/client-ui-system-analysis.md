@@ -21,6 +21,20 @@ export/authorization ещё требуют реализации. Archive preview
 это не пересмотр исторического audit commit. Unit totals
 и исторические CI runs не заменяют этот gate.
 
+Дополнение 2026-09-14: общий planner
+[`ClientDeadlineNotifications`](../app/lib/client_deadline_notifications.dart)
+разделяет четыре typed события session/credential EXPIRING/EXPIRED и выдаёт
+фиксированные RU/EN тексты без identity, URL, deadline или raw reason.
+Состояние доставки ограничено одним runtime/caller/profile context; успешная
+доставка требует явного acknowledge. Reconnect сохраняет dedup подтверждённых
+событий, но инвалидирует незавершённые receipts; смена контекста и observer
+очищают историю. Дедупликация только in-memory: restart UI или возврат к ранее
+покинутому profile может повторить уведомление. UI clock не создаёт expiry.
+[11 short unit tests](../app/test/client_deadline_notifications_test.dart)
+проверяют planner, не OS delivery. Он ещё не подключён к shell: настройки,
+permission, доставка/нажатие, persistent policy и остальные значимые события
+остаются незавершёнными. UF-15/US-14 не закрыты.
+
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin
