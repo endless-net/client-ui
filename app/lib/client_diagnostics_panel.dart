@@ -2,6 +2,30 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'client_state_controller.dart';
 import 'client_operation.dart';
+import 'client_locale.dart';
+
+enum _DiagnosticsNotice { logs, preview, succeeded, received, unknown }
+
+String diagnosticPhaseLabel(api.ConnectionPhase phase, ClientLocale locale) =>
+    switch (phase) {
+      api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED => locale.text(
+        en: 'Disconnected',
+        ru: 'Отключено',
+      ),
+      api.ConnectionPhase.CONNECTION_PHASE_CONNECTING => locale.text(
+        en: 'Connecting',
+        ru: 'Подключение',
+      ),
+      api.ConnectionPhase.CONNECTION_PHASE_CONNECTED => locale.text(
+        en: 'Connected',
+        ru: 'Подключено',
+      ),
+      api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTING => locale.text(
+        en: 'Disconnecting',
+        ru: 'Отключение',
+      ),
+      _ => locale.text(en: 'Not specified', ru: 'Не указано'),
+    };
 
 /// Local summary only. Never serialize the full message into logs/clipboard:
 /// diagnostics can contain addresses, pending browser actions and log entries.
@@ -12,8 +36,10 @@ class ClientDiagnosticsPanel extends StatefulWidget {
     required this.load,
     required this.createBundle,
     this.loadLogs,
+    this.locale = ClientLocale.en,
   });
   final ClientStateController state;
+  final ClientLocale locale;
   final Future<api.Diagnostics> Function() load;
   final Future<ClientOperation> Function(String profileId) createBundle;
   final Future<List<api.LogEntry>> Function()? loadLogs;
@@ -25,7 +51,31 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
   api.Diagnostics? _preview;
   List<api.LogEntry>? _logs;
   String? _context;
-  String? _notice;
+  _DiagnosticsNotice? _notice;
+  int _confirmationSerial = 0;
+  String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
+  String _noticeText(_DiagnosticsNotice notice) => switch (notice) {
+    _DiagnosticsNotice.logs => _text(
+      'Logs could not be read. Refresh to start a new snapshot.',
+      'Не удалось прочитать журнал. Обновите его, чтобы получить новый снимок.',
+    ),
+    _DiagnosticsNotice.preview => _text(
+      'Diagnostics could not be read.',
+      'Не удалось прочитать диагностику.',
+    ),
+    _DiagnosticsNotice.succeeded => _text(
+      'Bundle operation succeeded. Recover its handle before verified download; nothing was exported.',
+      'Операция создания архива завершилась успешно. Восстановите дескриптор для проверенной загрузки; ничего не экспортировано.',
+    ),
+    _DiagnosticsNotice.received => _text(
+      'Bundle operation received. Recover its result; archive readiness is not confirmed.',
+      'Операция создания архива получена. Восстановите её результат; готовность архива не подтверждена.',
+    ),
+    _DiagnosticsNotice.unknown => _text(
+      'Bundle creation could not be confirmed. Recover the intention before another attempt.',
+      'Не удалось подтвердить создание архива. Восстановите исходное намерение перед повторной попыткой.',
+    ),
+  };
   bool _busy = false;
   bool _confirmBundle = false;
   @override
@@ -49,6 +99,7 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
     _logs = null;
     _notice = null;
     _confirmBundle = false;
+    _confirmationSerial++;
     _context = null;
   }
 
@@ -95,10 +146,7 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
       setState(() => _logs = logs);
     } catch (_) {
       if (mounted && _context == context && contextId == context && allowed) {
-        setState(
-          () => _notice =
-              'Logs could not be read. Refresh to start a new snapshot.',
-        );
+        setState(() => _notice = _DiagnosticsNotice.logs);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -114,6 +162,7 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
       _preview = null;
       _notice = null;
       _confirmBundle = false;
+      _confirmationSerial++;
     });
     try {
       final preview = await widget.load();
@@ -133,7 +182,7 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
       );
     } catch (_) {
       if (mounted && context == _context && context == contextId) {
-        setState(() => _notice = 'Diagnostics could not be read.');
+        setState(() => _notice = _DiagnosticsNotice.preview);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -153,6 +202,7 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
     setState(() {
       _busy = true;
       _confirmBundle = false;
+      _confirmationSerial++;
       _notice = null;
     });
     try {
@@ -162,15 +212,12 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
       }
       setState(
         () => _notice = operation.succeeded
-            ? 'Bundle operation succeeded. Recover its handle before verified download; nothing was exported.'
-            : 'Bundle operation received. Recover its result; archive readiness is not confirmed.',
+            ? _DiagnosticsNotice.succeeded
+            : _DiagnosticsNotice.received,
       );
     } catch (_) {
       if (mounted && context == _context && context == contextId) {
-        setState(
-          () => _notice =
-              'Bundle creation could not be confirmed. Recover the intention before another attempt.',
-        );
+        setState(() => _notice = _DiagnosticsNotice.unknown);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -182,6 +229,17 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
     animation: widget.state,
     builder: (context, _) {
       final preview = allowed && _context == contextId ? _preview : null;
+      final originalState = widget.state;
+      final snapshot = widget.state.snapshot;
+      final id = contextId;
+      final serial = _confirmationSerial;
+      bool current() =>
+          mounted &&
+          identical(widget.state, originalState) &&
+          identical(snapshot, widget.state.snapshot) &&
+          identical(preview, _preview) &&
+          id == contextId &&
+          serial == _confirmationSerial;
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -189,13 +247,24 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
             OutlinedButton(
               key: const Key('load-client-logs'),
               onPressed: allowed && !_busy ? _loadLogs : null,
-              child: const Text('Read recent logs'),
+              child: Text(
+                _text('Read recent logs', 'Прочитать последние записи журнала'),
+              ),
             ),
           if (allowed && _context == contextId && _logs != null) ...[
-            const Text(
-              'Recent local log window — not a complete history. Nothing uploaded.',
+            Text(
+              _text(
+                'Recent local log window — not a complete history. Nothing uploaded.',
+                'Последние записи локального журнала — не полная история. Ничего не отправлено.',
+              ),
             ),
-            if (_logs!.isEmpty) const Text('No recent log entries.'),
+            if (_logs!.isEmpty)
+              Text(
+                _text(
+                  'No recent log entries.',
+                  'Нет последних записей журнала.',
+                ),
+              ),
             SizedBox(
               height: 180,
               child: ListView.builder(
@@ -212,61 +281,105 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
           OutlinedButton(
             key: const Key('load-client-diagnostics'),
             onPressed: allowed && !_busy ? _load : null,
-            child: const Text('Inspect diagnostics'),
+            child: Text(
+              _text('Inspect diagnostics', 'Просмотреть диагностику'),
+            ),
           ),
           if (preview != null) ...[
-            const Text(
-              'Local diagnostics summary — no data copied or uploaded.',
+            Text(
+              _text(
+                'Local diagnostics summary — no data copied or uploaded.',
+                'Сводка локальной диагностики — данные не скопированы и не отправлены.',
+              ),
             ),
-            Text('OS: ${preview.osName} ${preview.osVersion}'),
+            Text(
+              '${_text('OS', 'ОС')}: ${preview.osName} ${preview.osVersion}',
+            ),
             Text('Go: ${preview.goVersion}'),
             Text(
-              'Interfaces: ${preview.interfaces.length}; routes: ${preview.routes.length}; peers: ${preview.peers.length}',
+              '${_text('Interfaces', 'Интерфейсы')}: ${preview.interfaces.length}; ${_text('routes', 'маршруты')}: ${preview.routes.length}; ${_text('peers', 'устройства')}: ${preview.peers.length}',
             ),
             Text(
-              'Route conflicts: ${preview.routeConflicts.length}; failures: ${preview.failures.length}',
+              '${_text('Route conflicts', 'Конфликты маршрутов')}: ${preview.routeConflicts.length}; ${_text('failures', 'ошибки')}: ${preview.failures.length}',
             ),
             if (preview.truncated)
-              const Text(
-                'Diagnostics are truncated; this is not a complete report.',
+              Text(
+                _text(
+                  'Diagnostics are truncated; this is not a complete report.',
+                  'Диагностика сокращена; это не полный отчёт.',
+                ),
               ),
             if (preview.hasStatus())
-              Text('Connection phase: ${preview.status.connectionPhase.name}'),
-            const Text(
-              'Detailed inspection and archive export are not yet available.',
+              Text(
+                '${_text('Connection phase', 'Состояние подключения')}: ${diagnosticPhaseLabel(preview.status.connectionPhase, widget.locale)}',
+              ),
+            Text(
+              _text(
+                'This is a summary. Recover the archive operation for verified download and a separate export, when supported.',
+                'Это сводка. Восстановите операцию создания архива для проверенной загрузки и отдельного экспорта, если он поддерживается.',
+              ),
             ),
             OutlinedButton(
               key: const Key('create-client-bundle'),
               onPressed: !_busy
                   ? () {
-                      if (!allowed || _context != contextId) return;
-                      setState(() => _confirmBundle = true);
+                      if (!current() || !allowed || _context != contextId) {
+                        return;
+                      }
+                      setState(() {
+                        _confirmBundle = true;
+                        _confirmationSerial++;
+                      });
                     }
                   : null,
-              child: const Text('Create diagnostics archive'),
+              child: Text(
+                _text(
+                  'Create diagnostics archive',
+                  'Создать архив диагностики',
+                ),
+              ),
             ),
             if (_confirmBundle) ...[
-              const Text(
-                'Create a local redacted diagnostics archive? This does not upload or export it.',
+              Text(
+                _text(
+                  'Create a local redacted diagnostics archive? This does not upload or export it.',
+                  'Создать локальный архив диагностики с удалёнными конфиденциальными данными? Это не отправляет и не экспортирует архив.',
+                ),
               ),
               Wrap(
                 children: [
                   TextButton(
                     key: const Key('cancel-client-bundle'),
-                    onPressed: () => setState(() => _confirmBundle = false),
-                    child: const Text('Cancel'),
+                    onPressed: () {
+                      if (current()) {
+                        setState(() {
+                          _confirmBundle = false;
+                          _confirmationSerial++;
+                        });
+                      }
+                    },
+                    child: Text(_text('Cancel', 'Отмена')),
                   ),
                   TextButton(
                     key: const Key('confirm-client-bundle'),
-                    onPressed: !_busy ? _create : null,
-                    child: const Text('Confirm archive creation'),
+                    onPressed: !_busy
+                        ? () {
+                            if (current()) _create();
+                          }
+                        : null,
+                    child: Text(
+                      _text(
+                        'Confirm archive creation',
+                        'Подтвердить создание архива',
+                      ),
+                    ),
                   ),
                 ],
               ),
             ],
           ],
           if (_context == contextId && allowed && _notice != null)
-            Text(_notice!),
+            Semantics(liveRegion: true, child: Text(_noticeText(_notice!))),
         ],
       );
     },

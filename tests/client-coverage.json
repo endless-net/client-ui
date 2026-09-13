@@ -565,6 +565,10 @@
           "scope": "Six unit tests cover all 32 update/compatibility/classification/channel/platform/availability enum labels in RU/EN; four widget vectors compare full source-unavailable/incompatible-pair and error text without repeated lookup during locale switching. Not verified distribution installation or full-app UI-AC-13"
         },
         {
+          "path": "app/test/client_diagnostics_locale_test.dart",
+          "scope": "15 short tests: all five connection-phase labels, full RU/EN summary/empty-log and five notice texts, no private browser-action projection, no read/create replay on locale switch and no reuse of stale archive consent. Component evidence only, not complete detailed diagnostics, native export or full UI-AC-13"
+        },
+        {
           "path": "app/test/client_recovery_locale_test.dart",
           "scope": "22 shared RU/EN recovery widget vectors compare all panel text for lookup, pending, acknowledgement, browser success/failure and export success/cancellation/failure/unavailable adapter. Rebuilding the same state in the other locale updates notices without repeating lookup or external actions. Runner execution pending; not full-app language switching, native dialogs or product acceptance"
         },

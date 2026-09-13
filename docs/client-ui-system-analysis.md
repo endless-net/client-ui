@@ -165,6 +165,16 @@ classification/channel, срок проверки и notices. Шесть unit-т
 ничего не устанавливает и не отключает. Это component evidence, не
 distribution acceptance, full-app localization или реальная проверка обновления.
 
+ClientDiagnosticsPanel поддерживает RU/EN для сводки, журнала, предупреждений
+о сокращении/экспорте и пяти typed notices. Устаревшее blanket-сообщение об
+отсутствии экспорта заменено указанием отдельного recovery/download/export пути.
+Создание архива не означает экспорт или отправку. Подтверждение и отмена
+привязаны к snapshot, preview, controller и поколению согласия. 15 short тестов
+проверяют пять connection phases, полные RU/EN тексты сводки/пустого журнала,
+все notices, сокрытие browser action из diagnostics и запрет старого согласия
+после повторного подтверждения. Это component evidence, не полная детальная
+диагностика, native export или full-app UI-AC-13.
+
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
 оставляют открытыми версии ОС, принятые assistive technologies, lifecycle
