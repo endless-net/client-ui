@@ -7,6 +7,7 @@ import 'package:endlessnet/client_operation_details.dart';
 import 'package:endlessnet/client_enrollment_panel.dart';
 import 'package:endlessnet/client_cleanup_panel.dart';
 import 'package:endlessnet/client_recovery_panel.dart';
+import 'package:endlessnet/client_identity_panel.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +15,135 @@ import 'support/contract_test_scaffold.dart';
 
 /// Reused by the native integration-test host; no desktop channel is imported.
 void main() {
+  testWidgets(
+    'US-06: explicit trust compares fresh announcement and clears invalidated data',
+    (tester) async {
+      final state = ClientStateController();
+      final events = StreamController<api.WatchEventsResponse>();
+      await state.attach(events.stream);
+      var announcement = 'announcement-a';
+      final sent = <api.ServerIdentity>[];
+      api.GetServerIdentityResponse response() =>
+          api.GetServerIdentityResponse()..mergeFromProto3Json({
+            'identity': {
+              'profileId': 'profile-a',
+              'controlOrigin': 'https://control.example',
+              'trustedKeyId': 'old-key',
+              'announcedKeyId': 'new-key',
+              'announcementId': announcement,
+              'changed': true,
+            },
+            'metadata': {'instanceId': 'identity-test', 'revision': '1'},
+          });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ContractTestScaffold(
+            body: ClientIdentityPanel(
+              state: state,
+              load: () async => response(),
+              trust: (identity) async {
+                sent.add(identity);
+                return ClientOperation.fromProto(
+                  api.Operation(
+                    id: 'trust-a',
+                    kind:
+                        api.OperationKind.OPERATION_KIND_TRUST_SERVER_IDENTITY,
+                    state: api.OperationState.OPERATION_STATE_PENDING,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      var sequence = 0;
+      void snapshot(String access) => events.add(
+        api.WatchEventsResponse()..mergeFromProto3Json({
+          'sequence': '${++sequence}',
+          'metadata': {'instanceId': 'identity-test', 'revision': '1'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'identity-test',
+              'callerAccess': access,
+              'capabilities': [
+                {
+                  'capability': 'CAPABILITY_IDENTITY_RECOVERY',
+                  'restriction': {'availability': 'AVAILABILITY_AVAILABLE'},
+                },
+              ],
+            },
+            'status': {
+              'activeProfileId': 'profile-a',
+              'metadata': {'instanceId': 'identity-test', 'revision': '1'},
+            },
+          },
+        }),
+      );
+      final load = find.byKey(const Key('load-client-identity'));
+      final confirm = find.byKey(const Key('compare-client-identity'));
+      final trust = find.byKey(const Key('trust-client-identity'));
+      snapshot('ACCESS_OWNER');
+      await tester.pump();
+      await tester.tap(load);
+      await tester.pump();
+      expect(find.text('Trusted key: old-key'), findsOneWidget);
+      expect(tester.widget<TextButton>(trust).onPressed, isNull);
+      expect(sent, isEmpty);
+      snapshot('ACCESS_ADMINISTRATOR');
+      await tester.pump();
+      expect(find.text('Trusted key: old-key'), findsNothing);
+      await tester.tap(load);
+      await tester.pump();
+      await tester.tap(confirm);
+      await tester.pump();
+      announcement = 'announcement-b';
+      await tester.tap(trust);
+      await tester.pump();
+      expect(sent, isEmpty);
+      expect(find.textContaining('no trust command was sent'), findsOneWidget);
+      await tester.tap(load);
+      await tester.pump();
+      await tester.tap(confirm);
+      await tester.pump();
+      await tester.tap(trust);
+      await tester.pump();
+      expect(sent.single.announcementId, 'announcement-b');
+      expect(sent.single.controlOrigin, 'https://control.example');
+      expect(sent.single.announcedKeyId, 'new-key');
+      expect(sent.single.isFrozen, isTrue);
+      expect(
+        find.textContaining('not inferred from acceptance'),
+        findsOneWidget,
+      );
+      await tester.tap(load);
+      await tester.pump();
+      await tester.tap(confirm);
+      await tester.pump();
+      events.add(
+        api.WatchEventsResponse()..mergeFromProto3Json({
+          'sequence': '${++sequence}',
+          'metadata': {'instanceId': 'identity-test', 'revision': '1'},
+          'invalidated': {
+            'domain': 'DOMAIN_SERVER_IDENTITY',
+            'profileId': 'profile-a',
+          },
+        }),
+      );
+      await tester.pump();
+      expect(confirm, findsNothing);
+      expect(find.text('Announced key: new-key'), findsNothing);
+      expect(sent.length, 1);
+      snapshot('ACCESS_OBSERVER');
+      await tester.pump();
+      expect(tester.widget<OutlinedButton>(load).onPressed, isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await events.close();
+      state.dispose();
+    },
+  );
+
   testWidgets('US-14: shared host respects system safe-area hit testing', (
     tester,
   ) async {

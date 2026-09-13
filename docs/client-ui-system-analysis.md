@@ -98,8 +98,15 @@ US-06 read foundation: `ClientSession.getServerIdentity` вызывает typed 
 после смены cache/context, DOMAIN_SERVER_IDENTITY или DOMAIN_PROFILES invalidation.
 Результат — отдельная frozen protobuf copy, не разрешение доверять ключу.
 Две session regressions проверяют также повторную invalidation и observer denial.
-Origin/key/announcement confirmation UI, privileged helper и actual runtime
-acceptance ещё требуются; этот read foundation не закрывает US-06.
+`ClientIdentityPanel` в составной session panel показывает origin, trusted/announced
+key и announcement. Explicit checkbox и отдельный confirm требуют administrator
+и AVAILABLE IDENTITY_RECOVERY. Перед journaled mutation выполняется повторный read:
+любое расхождение показанных полей отменяет отправку и требует нового сравнения.
+Cache/domain changes очищают UI; invalidation во время записи intention также
+проверяется перед RPC. Shared mobile widget test проверяет owner denial, смену
+announcement, точные подтверждённые поля и сброс invalidated data без автодоверия.
+Privileged helper, production shell cutover и actual runtime acceptance ещё
+требуются; этот partial consumer flow не закрывает US-06.
 
 На `b2d218420af01e69739447c9b3d802554dd8912b` iOS simulator job успешно
 выполнил **22 tests passed**

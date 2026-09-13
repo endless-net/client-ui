@@ -209,6 +209,10 @@
         {
           "path": "app/test/client_session_test.dart",
           "scope": "ServerIdentity owner/active-profile read, metadata checks, immutable copy and rejection after repeated identity/profile invalidations or profile switch; not trust confirmation, elevation or runtime acceptance"
+        },
+        {
+          "path": "app/test/mobile_contract_widget_test.dart",
+          "scope": "Identity comparison UI, administrator gating, explicit confirmation with fresh announcement comparison and invalidation reset; native execution of this new test pending, no privileged helper or actual runtime acceptance"
         }
       ],
       "acceptanceEvidence": []

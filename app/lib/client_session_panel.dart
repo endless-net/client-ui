@@ -10,6 +10,7 @@ import 'client_create_profile_panel.dart';
 import 'client_enrollment_panel.dart';
 import 'client_cleanup_panel.dart';
 import 'client_networks_panel.dart';
+import 'client_identity_panel.dart';
 
 /// Desktop application binding. A mobile runtime adapter can supply the same
 /// shared connection panel without using a desktop local channel.
@@ -23,6 +24,44 @@ class ClientSessionPanel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          ClientIdentityPanel(
+            state: session.state,
+            load: session.getServerIdentity,
+            trust: (identity) {
+              final identityEpoch = session.state.domainEpoch(
+                api.Domain.DOMAIN_SERVER_IDENTITY,
+              );
+              final profileEpoch = session.state.domainEpoch(
+                api.Domain.DOMAIN_PROFILES,
+              );
+              return session.submit(
+                api.OperationKind.OPERATION_KIND_TRUST_SERVER_IDENTITY,
+                (commands, mutation) {
+                  if (identityEpoch !=
+                          session.state.domainEpoch(
+                            api.Domain.DOMAIN_SERVER_IDENTITY,
+                          ) ||
+                      profileEpoch !=
+                          session.state.domainEpoch(
+                            api.Domain.DOMAIN_PROFILES,
+                          )) {
+                    throw StateError(
+                      'Identity changed before trust submission',
+                    );
+                  }
+                  return commands.trustServerIdentity(
+                    api.TrustServerIdentityRequest(
+                      mutation: mutation,
+                      profile: api.ProfileRef(profileId: identity.profileId),
+                      confirmedControlOrigin: identity.controlOrigin,
+                      confirmedKeyId: identity.announcedKeyId,
+                      confirmedAnnouncementId: identity.announcementId,
+                    ),
+                  );
+                },
+              );
+            },
+          ),
           ClientNetworksPanel(
             state: session.state,
             load: session.listNetworks,
