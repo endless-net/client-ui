@@ -1,5 +1,6 @@
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/widgets.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'client_connection_panel.dart';
 import 'client_session.dart';
@@ -74,6 +75,8 @@ class ClientSessionPanel extends StatelessWidget {
         state: session.state,
         recover: session.recoverPending,
         acknowledge: session.journal.acknowledge,
+        openBrowser: (uri) =>
+            launchUrl(uri, mode: LaunchMode.externalApplication),
       ),
       ClientProfilesPanel(
         state: session.state,

@@ -12,10 +12,12 @@ class ClientRecoveryPanel extends StatefulWidget {
     required this.state,
     required this.recover,
     required this.acknowledge,
+    this.openBrowser,
   });
   final ClientStateController state;
   final Future<List<ClientOperation>> Function() recover;
   final Future<void> Function(ClientOperation) acknowledge;
+  final Future<bool> Function(Uri)? openBrowser;
 
   @override
   State<ClientRecoveryPanel> createState() => _ClientRecoveryPanelState();
@@ -31,6 +33,75 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
       widget.state.link == ClientLinkState.ready &&
       widget.state.snapshot != null &&
       widget.state.snapshot!.runtime.callerAccess != api.Access.ACCESS_OBSERVER;
+
+  Future<void> _openBrowser(ClientOperation displayed) async {
+    if (_busy ||
+        !_owner ||
+        _epoch != widget.state.cacheEpoch ||
+        widget.openBrowser == null) {
+      return;
+    }
+    final epoch = widget.state.cacheEpoch;
+    setState(() {
+      _busy = true;
+      _notice = null;
+    });
+    try {
+      // Re-read the operation immediately before using its sensitive action.
+      // A displayed URL may have expired or been replaced since the last lookup.
+      final results = await widget.recover();
+      if (!mounted || !_owner || epoch != widget.state.cacheEpoch) return;
+      final current = results.singleWhere(
+        (op) =>
+            op.value.id == displayed.value.id &&
+            op.value.requestId == displayed.value.requestId,
+      );
+      setState(() => _results = List.unmodifiable(results));
+      final value = current.value;
+      if (value.state != api.OperationState.OPERATION_STATE_WAITING_FOR_USER ||
+          value.userAction.kind != api.UserAction_Kind.KIND_OPEN_BROWSER) {
+        throw StateError('Browser action is no longer pending');
+      }
+      final action = value.userAction;
+      final uri = Uri.tryParse(action.browserUrl);
+      if (uri == null ||
+          uri.scheme != 'https' ||
+          uri.host.isEmpty ||
+          uri.userInfo.isNotEmpty) {
+        throw StateError('Invalid browser action');
+      }
+      if (action.hasExpiresAt()) {
+        final deadline = action.expiresAt;
+        if (deadline.seconds.toInt() < -62135596800 ||
+            deadline.seconds.toInt() > 253402300799 ||
+            deadline.nanos < 0 ||
+            deadline.nanos >= 1000000000 ||
+            !DateTime.fromMicrosecondsSinceEpoch(
+              deadline.seconds.toInt() * 1000000 + deadline.nanos ~/ 1000,
+              isUtc: true,
+            ).isAfter(DateTime.now().toUtc())) {
+          throw StateError('Browser action expired');
+        }
+      }
+      // Producer validates the URL against trusted origin/provider policy.
+      // No URL, token or launch exception is logged or placed in a notice.
+      final opened = await widget.openBrowser!(uri);
+      if (!mounted || !_owner || epoch != widget.state.cacheEpoch) return;
+      setState(
+        () => _notice = opened
+            ? 'Browser opened. The operation is still pending; recover its result.'
+            : 'Browser could not be opened. The operation is retained.',
+      );
+    } catch (_) {
+      if (!mounted || !_owner || epoch != widget.state.cacheEpoch) return;
+      setState(
+        () => _notice =
+            'Browser action could not be completed. Refresh the operation; no command was replayed.',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   Future<void> _run(ClientOperation? acknowledgement) async {
     if (_busy || !_owner) return;
@@ -98,6 +169,16 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
                         key: ValueKey('ack-${operation.value.requestId}'),
                         onPressed: !_busy ? () => _run(operation) : null,
                         child: const Text('Acknowledge result'),
+                      )
+                    : operation.value.userAction.kind ==
+                              api.UserAction_Kind.KIND_OPEN_BROWSER &&
+                          widget.openBrowser != null
+                    ? TextButton(
+                        key: ValueKey('browser-${operation.value.requestId}'),
+                        onPressed: !_busy
+                            ? () => _openBrowser(operation)
+                            : null,
+                        child: const Text('Open browser'),
                       )
                     : const Text('Still pending'),
               ),

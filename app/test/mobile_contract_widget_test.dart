@@ -12,6 +12,102 @@ import 'package:flutter_test/flutter_test.dart';
 /// Reused by the native integration-test host; no desktop channel is imported.
 void main() {
   testWidgets(
+    'US-02/03: browser action is refreshed, explicit and never completes operation',
+    (tester) async {
+      final state = ClientStateController();
+      final source = StreamController<api.WatchEventsResponse>();
+      await state.attach(source.stream);
+      var url = 'https://example.test/old';
+      var expired = false;
+      var lookups = 0;
+      final launched = <Uri>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ClientRecoveryPanel(
+              state: state,
+              recover: () async {
+                lookups++;
+                return [
+                  ClientOperation.fromProto(
+                    api.Operation()..mergeFromProto3Json({
+                      'id': 'browser',
+                      'requestId': 'browser-request',
+                      'kind': 'OPERATION_KIND_ENROLL',
+                      'state': 'OPERATION_STATE_WAITING_FOR_USER',
+                      'userAction': {
+                        'kind': 'KIND_OPEN_BROWSER',
+                        'browserUrl': url,
+                        if (expired) 'expiresAt': '2000-01-01T00:00:00Z',
+                      },
+                    }),
+                  ),
+                ];
+              },
+              acknowledge: (_) async =>
+                  fail('Browser launch must not acknowledge'),
+              openBrowser: (uri) async {
+                launched.add(uri);
+                return true;
+              },
+            ),
+          ),
+        ),
+      );
+      source.add(
+        api.WatchEventsResponse()..mergeFromProto3Json({
+          'sequence': '1',
+          'metadata': {'instanceId': 'browser-test', 'revision': '1'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'browser-test',
+              'callerAccess': 'ACCESS_OWNER',
+            },
+            'status': {
+              'metadata': {'instanceId': 'browser-test', 'revision': '1'},
+            },
+          },
+        }),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('client-recover')));
+      await tester.pump();
+      expect(launched, isEmpty);
+      url = 'https://example.test/new';
+      await tester.tap(find.byKey(const Key('browser-browser-request')));
+      await tester.pump();
+      expect(lookups, 2);
+      expect(launched, [Uri.parse(url)]);
+      expect(
+        find.text(
+          'Browser opened. The operation is still pending; recover its result.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('ack-browser-request')), findsNothing);
+      for (final rejected in [
+        'file:///tmp/token',
+        'https://user@example.test/token',
+      ]) {
+        url = rejected;
+        await tester.tap(find.byKey(const Key('browser-browser-request')));
+        await tester.pump();
+        expect(launched, hasLength(1));
+        expect(find.textContaining(rejected), findsNothing);
+      }
+      url = 'https://example.test/expired';
+      expired = true;
+      await tester.tap(find.byKey(const Key('browser-browser-request')));
+      await tester.pump();
+      expect(launched, hasLength(1));
+      await source.close();
+      await tester.pumpWidget(const SizedBox());
+      state.dispose();
+    },
+  );
+  testWidgets(
     'US-03/08: typed cleanup and failure keep remote and local outcomes distinct',
     (tester) async {
       for (final outcome in [

@@ -97,8 +97,15 @@ remote cleanup confirmation отдельно от local registration removal, fa
 action owner и correlation ID, selection/enrollment IDs и connection continuity.
 Произвольные reason strings и browser URL не рендерятся. Shared mobile/desktop
 widget-тест проверяет cleanup distinction, failed logout и сокрытие browser URL.
-Это presentation foundation: открытие браузера, native permission/helper actions,
+Это presentation foundation: native permission/helper actions,
 загрузка bundle и полная outcome-specific UX ещё требуют реализации и acceptance.
+OPEN_BROWSER в recovery panel теперь запускается только по явной кнопке после
+нового lookup той же operation/request identity. UI проверяет HTTPS, отсутствие
+userinfo и переданный expires_at; producer отвечает за trusted origin/provider
+policy. Launcher подключён через externalApplication без логирования URL/errors.
+Запуск не подтверждает intention и не меняет operation state. Shared widget-тест
+проверяет fresh URL, invalid schemes/userinfo и expiry; реальный OS browser flow
+и завершение enrollment пока не являются подтверждённой platform acceptance.
 
 UI сохраняет request ID до отправки намерения, не сохраняя enrollment token в
 журнале операций. Mutations включают ожидаемые instance/revision из свежего
