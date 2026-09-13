@@ -19,15 +19,15 @@
       ],
       "workflow": ".github/workflows/contract-consumer.yml",
       "status": "passed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34733301626",
-      "scope": "All three desktop jobs at 3b5ad34ead11173c32c22e537cd06e74468968f9 passed: 124 consumer and 15 profile/network tests per OS, including producer bundle and Set/Reset preferences interoperability. No resource catalog runner evidence yet; not runtime/product acceptance"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34736166400",
+      "scope": "All three desktop jobs at e2e6f6cca085125592aca899f5d7ede9acabf082 passed: 136 consumer and 39 shared panel/desktop lifecycle tests per OS. Logs confirm select-exit, clear-exit, failed-exit and ui-quit producer process cases. No new update-reader execution or actual runtime/product acceptance"
     },
     {
       "platforms": ["ios"],
       "workflow": ".github/workflows/mobile-contract.yml",
       "status": "passed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34730432531",
-      "scope": "iOS job 103652189494 at ed43df36c8feab083abd9b7b7b41e9ad3112dbd4 passed 23 shared widget/profile/network tests, including trust confirmation races, in native simulator; job evidence only, not whole run, native VPN bridge, producer-process interoperability or real traffic acceptance"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34736166389",
+      "scope": "iOS job 103667879995 at e2e6f6cca085125592aca899f5d7ede9acabf082 passed 51 shared simulator tests, including exit select/clear/lock/invalidation. Individual job only, not whole mobile run, update reader, desktop lifecycle plugins, native VPN bridge, producer-process interoperability or real traffic acceptance"
     },
     {
       "platforms": [
@@ -35,8 +35,8 @@
       ],
       "workflow": ".github/workflows/mobile-contract.yml",
       "status": "failed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34730432531",
-      "scope": "Android job 103652189664 at ed43df3 failed KVM preflight before tests; no runner permission changes authorized, native execution and VPN/real traffic acceptance remain unproven"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34736166389",
+      "scope": "Android job 103667880100 at e2e6f6cca085125592aca899f5d7ede9acabf082 failed KVM read/write preflight before tests; no runner permission changes authorized, native execution and VPN/real traffic acceptance remain unproven"
     }
   ],
   "sharedEnvelopeTests": [

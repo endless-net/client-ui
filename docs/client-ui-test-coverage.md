@@ -7,17 +7,35 @@ subset already implemented. The canonical machine-readable trace is
 It maps all UF-01–23, UBR-01–40 and UI-AC-01–27 to US-01–14 and retains all five
 target platforms. Test evidence describes only what a test actually checks.
 Shared operation-envelope tests do not close enrollment, trust, profiles,
-resources or other product flows. Existing HTTP v2 tests are not v0 evidence.
+resources or other product flows. Historical HTTP v2 tests are not v0 evidence.
 
 Current state: zero fully accepted SA scenarios. Some consumer foundations are
 tested locally; GitHub evidence is scoped to the inspected jobs below and does
-not close any full scenario. Production shell cutover, complete
+not close any full scenario. Production shell source cutover is recorded in
+[native desktop cutover](native-desktop-cutover.md); complete
 business scenarios, native mobile bridges and product/platform acceptance remain
 required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
-Latest inspected desktop evidence: consumer `3b5ad34ead11173c32c22e537cd06e74468968f9`.
+Latest inspected evidence: consumer `e2e6f6cca085125592aca899f5d7ede9acabf082`.
+The [desktop run](https://github.com/endless-net/client-ui/actions/runs/34736166400)
+passed with 136 consumer and 39 shared panel/desktop lifecycle tests per OS:
+[Windows](https://github.com/endless-net/client-ui/actions/runs/34736166400/job/103667880332),
+[Linux](https://github.com/endless-net/client-ui/actions/runs/34736166400/job/103667880446),
+[macOS](https://github.com/endless-net/client-ui/actions/runs/34736166400/job/103667880478).
+Each inspected log confirms select-exit, clear-exit, failed-exit and ui-quit
+producer-host cases. The
+[iOS job](https://github.com/endless-net/client-ui/actions/runs/34736166389/job/103667879995)
+passed 51 shared simulator tests, including exit UI select/clear/lock/invalidation.
+The [Android job](https://github.com/endless-net/client-ui/actions/runs/34736166389/job/103667880100)
+failed the existing `/dev/kvm` read/write preflight before tests. Its log explicitly
+requires runner-owner approval for permission changes; no such change was made.
+This does not validate the subsequently added update reader, native OS lifecycle,
+mobile VPN bridges, actual routing or installer outcomes. The mobile run as a
+whole did not pass; all 14 full scenarios remain incomplete.
+
+Earlier inspected desktop evidence: consumer `3b5ad34ead11173c32c22e537cd06e74468968f9`.
 The [desktop run](https://github.com/endless-net/client-ui/actions/runs/34733301626)
 passed on Windows, Linux and macOS: each job reports 124 consumer tests and 15
 profile/network tests, including bundle and exact Set/Reset producer-host scenarios.
