@@ -45,6 +45,7 @@ dependencies:
   ffi: ^2.2.0
 
 dev_dependencies:
+  grpc: 5.1.0
   flutter_test:
     sdk: flutter
 

@@ -4,6 +4,10 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 
 import 'client_operation.dart';
 
+/// No process outcome confirms the requested runtime effect. Even exit zero
+/// must be followed by authenticated operation lookup when stdout is unavailable.
+enum ClientElevationOutcome { exited, canceled, unconfirmed }
+
 /// Public, immutable arguments for the fixed installed helper. No endpoint,
 /// file path, credential or executable can be supplied through this request.
 final class ClientPrivilegedRecovery {
@@ -104,15 +108,7 @@ final class ClientPrivilegedRecovery {
         throw ClientPrivilegedFailure(failure.code);
       }
       final value = api.Operation()..mergeFromProto3Json(json);
-      if (value.requestId != mutation.requestId ||
-          value.kind != kind ||
-          value.profileId != profileId ||
-          !value.hasMetadata() ||
-          value.metadata.instanceId != mutation.expectedInstanceId ||
-          value.metadata.revision < mutation.expectedRevision) {
-        throw const FormatException();
-      }
-      return ClientOperation.fromProto(value);
+      return validateOperation(ClientOperation.fromProto(value));
     } on ClientPrivilegedFailure {
       rethrow;
     } catch (_) {
@@ -120,6 +116,21 @@ final class ClientPrivilegedRecovery {
         'Invalid helper response; recover the retained intention',
       );
     }
+  }
+
+  ClientOperation validateOperation(ClientOperation operation) {
+    final value = operation.value;
+    if (value.requestId != mutation.requestId ||
+        value.kind != kind ||
+        value.profileId != profileId ||
+        !value.hasMetadata() ||
+        value.metadata.instanceId != mutation.expectedInstanceId ||
+        value.metadata.revision < mutation.expectedRevision) {
+      throw const FormatException(
+        'Recovery operation does not match the retained context',
+      );
+    }
+    return operation;
   }
 }
 
