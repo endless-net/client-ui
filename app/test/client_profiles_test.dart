@@ -299,6 +299,7 @@ void main() {
     'expired',
     'invalidated',
     'observer',
+    'disposed-callback',
   ]) {
     testWidgets('US-13: update panel $scenario', (tester) async {
       final state = ClientStateController();
@@ -380,6 +381,15 @@ void main() {
       expect(find.textContaining('UI build: ui-dev'), findsOneWidget);
       expect(find.textContaining('Runtime build: core-dev'), findsOneWidget);
       final button = find.byKey(const Key('client-check-updates'));
+      if (scenario == 'disposed-callback') {
+        final callback = tester.widget<OutlinedButton>(button).onPressed!;
+        await tester.pumpWidget(const SizedBox());
+        callback();
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+        expect(calls, 0);
+        return;
+      }
       if (scenario == 'observer') {
         expect(tester.widget<OutlinedButton>(button).onPressed, isNull);
       } else {

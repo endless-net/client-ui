@@ -67,7 +67,7 @@ class _ClientUpdatePanelState extends State<ClientUpdatePanel> {
   }
 
   Future<void> _load() async {
-    if (!allowed || _busy) return;
+    if (!mounted || !allowed || _busy) return;
     final context = contextId;
     final ui = api.BuildIdentity.fromBuffer(widget.uiBuild.writeToBuffer())
       ..freeze();
