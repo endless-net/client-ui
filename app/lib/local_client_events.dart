@@ -16,6 +16,13 @@ final class LocalClientEvents {
   final api.RuntimeInfo runtime;
   bool _closed = false;
 
+  Future<api.GetDiagnosticsResponse> getDiagnostics(String profileId) {
+    if (_closed) throw StateError('Local client is closed');
+    return _client.getDiagnostics(
+      api.GetDiagnosticsRequest(profile: api.ProfileRef(profileId: profileId)),
+    );
+  }
+
   Future<api.GetServerIdentityResponse> getServerIdentity(String profileId) {
     if (_closed) throw StateError('Local client is closed');
     return _client.getServerIdentity(

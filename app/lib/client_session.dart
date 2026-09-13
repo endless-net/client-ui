@@ -9,6 +9,7 @@ import 'client_state_controller.dart';
 import 'local_client_events.dart';
 
 abstract interface class ClientConnection {
+  Future<api.GetDiagnosticsResponse> getDiagnostics(String profileId);
   Future<api.GetServerIdentityResponse> getServerIdentity(String profileId);
   Future<ClientNetworkCatalog> listNetworks(String profileId);
   Future<ClientProfileCatalog> listProfiles();
@@ -20,6 +21,9 @@ abstract interface class ClientConnection {
 final class _LocalConnection implements ClientConnection {
   _LocalConnection(this.source);
   final LocalClientEvents source;
+  @override
+  Future<api.GetDiagnosticsResponse> getDiagnostics(String profileId) =>
+      source.getDiagnostics(profileId);
   @override
   Future<api.GetServerIdentityResponse> getServerIdentity(String profileId) =>
       source.getServerIdentity(profileId);
@@ -184,6 +188,55 @@ final class ClientSession {
     }
     return api.GetServerIdentityResponse.fromBuffer(response.writeToBuffer())
       ..freeze();
+  }
+
+  /// Preview only: no archive creation, clipboard write or upload is implicit.
+  Future<api.Diagnostics> getDiagnostics() async {
+    final connection = _connection;
+    final snapshot = state.snapshot;
+    if (_closed ||
+        connection == null ||
+        snapshot == null ||
+        state.link != ClientLinkState.ready ||
+        snapshot.runtime.callerAccess == api.Access.ACCESS_OBSERVER ||
+        snapshot.status.activeProfileId.isEmpty) {
+      throw StateError('Diagnostics require a current owner profile');
+    }
+    final epoch = _epoch;
+    final cacheEpoch = state.cacheEpoch;
+    // Diagnostics aggregate status, peers, routes and settings. Any domain
+    // invalidation during the read invalidates the aggregate, even if repeated.
+    final domains = {
+      for (final domain in api.Domain.values) domain: state.domainEpoch(domain),
+    };
+    final profileId = snapshot.status.activeProfileId;
+    final response = await connection.getDiagnostics(profileId);
+    final diagnostics = response.diagnostics;
+    if (_closed ||
+        epoch != _epoch ||
+        cacheEpoch != state.cacheEpoch ||
+        domains.entries.any(
+          (entry) => state.domainEpoch(entry.key) != entry.value,
+        ) ||
+        state.link != ClientLinkState.ready ||
+        state.snapshot == null ||
+        state.snapshot!.status.activeProfileId != profileId ||
+        !response.hasDiagnostics() ||
+        !diagnostics.hasMetadata() ||
+        diagnostics.metadata.instanceId != snapshot.runtime.instanceId ||
+        diagnostics.metadata.revision <= 0 ||
+        diagnostics.metadata.revision <
+            state.snapshot!.status.metadata.revision ||
+        (diagnostics.hasStatus() &&
+            (!diagnostics.status.hasMetadata() ||
+                diagnostics.status.metadata.instanceId !=
+                    diagnostics.metadata.instanceId ||
+                diagnostics.status.metadata.revision !=
+                    diagnostics.metadata.revision ||
+                diagnostics.status.activeProfileId != profileId))) {
+      throw StateError('Invalid or stale diagnostics context');
+    }
+    return api.Diagnostics.fromBuffer(diagnostics.writeToBuffer())..freeze();
   }
 
   Future<ClientProfileCatalog> listProfiles() async {

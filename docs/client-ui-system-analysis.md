@@ -92,6 +92,16 @@ logout/local forget не снимают ownership. UI не обещает воз
 
 ## 3. Команды и восстановление
 
+US-07 read foundation: `ClientSession.getDiagnostics` и local RPC binding читают
+typed preview для текущего owner profile. Проверяются runtime/revision и metadata
+вложенного status, если он присутствует; возвращается frozen copy с сохранённым
+truncated. Любая domain invalidation во время aggregate read отклоняет ответ,
+включая повторную invalidation peers. Чтение не создаёт bundle, не пишет clipboard,
+не выполняет upload и не добавляет intention. Локальная session regression
+проверяет эти границы; UI preview, redaction/export policy, chunks, native execution
+и actual runtime acceptance ещё требуются. Production main пока использует старую
+диагностику; этот слой не означает её cutover.
+
 Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:
 [desktop run](https://github.com/endless-net/client-ui/actions/runs/34730432514)
 успешен на Windows/Linux/macOS, по 109 consumer + 15 profile/network tests;

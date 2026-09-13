@@ -20,6 +20,10 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 class FakeConnection implements ClientConnection {
+  Future<api.GetDiagnosticsResponse> Function(String)? diagnostics;
+  @override
+  Future<api.GetDiagnosticsResponse> getDiagnostics(String profileId) =>
+      diagnostics!(profileId);
   Future<api.GetServerIdentityResponse> Function(String)? identity;
   @override
   Future<api.GetServerIdentityResponse> getServerIdentity(String profileId) =>
@@ -102,6 +106,78 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'US-07: diagnostics preview rejects stale context and freezes its copy',
+    () async {
+      await expectLater(session.getDiagnostics(), throwsStateError);
+      connection.events.add(
+        snapshot()..snapshot.status.activeProfileId = 'profile-a',
+      );
+      await pumpEventQueue();
+      api.GetDiagnosticsResponse response() =>
+          api.GetDiagnosticsResponse()..mergeFromProto3Json({
+            'diagnostics': {
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+              'osName': 'synthetic-os',
+              'truncated': true,
+              'status': {
+                'activeProfileId': 'profile-a',
+                'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+              },
+            },
+          });
+      final original = response();
+      connection.diagnostics = (id) async {
+        expect(id, 'profile-a');
+        return original;
+      };
+      final preview = await session.getDiagnostics();
+      original.diagnostics.osName = 'changed';
+      expect(preview.osName, 'synthetic-os');
+      expect(preview.truncated, isTrue);
+      expect(preview.isFrozen, isTrue);
+      for (final mutate in <void Function(api.GetDiagnosticsResponse)>[
+        (r) => r.clearDiagnostics(),
+        (r) => r.diagnostics.clearMetadata(),
+        (r) => r.diagnostics.metadata.instanceId = 'runtime-b',
+        (r) => r.diagnostics.metadata.revision -= 1,
+        (r) => r.diagnostics.status.metadata.revision += 1,
+        (r) => r.diagnostics.status.activeProfileId = 'profile-b',
+      ]) {
+        final invalid = response();
+        mutate(invalid);
+        connection.diagnostics = (_) async => invalid;
+        await expectLater(session.getDiagnostics(), throwsStateError);
+      }
+      for (var i = 0; i < 2; i++) {
+        final pending = Completer<api.GetDiagnosticsResponse>();
+        connection.diagnostics = (_) => pending.future;
+        final rejected = expectLater(
+          session.getDiagnostics(),
+          throwsStateError,
+        );
+        connection.events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '${i + 2}',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'invalidated': {'domain': 'DOMAIN_PEERS', 'profileId': 'profile-a'},
+          }),
+        );
+        await pumpEventQueue();
+        pending.complete(response());
+        await rejected;
+      }
+      final observer = snapshot()..sequence += 3;
+      observer.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      connection.events.add(observer);
+      await pumpEventQueue();
+      connection.diagnostics = (_) =>
+          throw TestFailure('Observer cannot request diagnostics');
+      await expectLater(session.getDiagnostics(), throwsStateError);
+      expect(await session.journal.pending(), isEmpty);
+    },
+  );
 
   test(
     'US-06: identity read binds profile, metadata and immutable result',

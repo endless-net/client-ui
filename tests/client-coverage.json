@@ -235,8 +235,13 @@
         "UI-AC-08",
         "UI-AC-27"
       ],
-      "implementation": "missing",
-      "testEvidence": [],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/client_session_test.dart",
+          "scope": "Typed diagnostics preview read: owner/profile guard, metadata and nested status consistency, immutable copy, truncation preserved and repeated domain invalidation rejection; no bundle/export, native execution or actual runtime acceptance"
+        }
+      ],
       "acceptanceEvidence": []
     },
     {
