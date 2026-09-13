@@ -102,8 +102,21 @@
         "UI-AC-07",
         "UI-AC-22"
       ],
-      "implementation": "missing",
-      "testEvidence": [],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/mobile_contract_widget_test.dart",
+          "scope": "Selected-profile enrollment capability gating, browser/token callbacks, token clearing, explicit refreshed browser action and expiry; not backend enrollment or native browser acceptance"
+        },
+        {
+          "path": "app/test/client_profiles_test.dart",
+          "scope": "CreateProfile form input validation and observer-to-owner context clearing; not a real ownership race"
+        },
+        {
+          "path": "app/test/client_session_process_test.dart",
+          "scope": "Defined exact-request browser/token Enroll fixtures, terminal lookup and UUID/kind-only journal assertions; execution of new enrollment fixtures is pending CI"
+        }
+      ],
       "acceptanceEvidence": []
     },
     {
@@ -132,7 +145,7 @@
         },
         {
           "path": "app/test/client_session_process_test.dart",
-          "scope": "Pinned synthetic host; live stream, Connect and operation lookup"
+          "scope": "Pinned synthetic host; live stream, Connect and operation lookup; separate browser/token enrollment fixtures do not prove actual runtime behavior"
         }
       ],
       "acceptanceEvidence": []
@@ -228,11 +241,15 @@
       "testEvidence": [
         {
           "path": "app/test/client_state_controller_test.dart",
-          "scope": "Profile context replacement only; no profile lifecycle UI"
+          "scope": "Profile context replacement only"
         },
         {
           "path": "app/test/client_profiles_test.dart",
-          "scope": "Complete immutable catalog, opaque pagination, shared profile selection by ID without optimistic activation and caller cleanup; not full profile lifecycle or production shell"
+          "scope": "Immutable paginated catalog; create, select, rename and confirmed inactive-empty removal UI; repeated invalidation and caller cleanup; not full lifecycle or production shell acceptance"
+        },
+        {
+          "path": "app/test/mobile_contract_widget_test.dart",
+          "scope": "Separate logout/local-forget confirmation, administrator gating, no fallback after failed logout, typed remote/local cleanup distinctions; not real remote cleanup"
         }
       ],
       "acceptanceEvidence": []
@@ -353,6 +370,14 @@
         {
           "path": "app/test/client_intent_journal_test.dart",
           "scope": "Journal contains UUID and kind only; not complete privacy/accessibility acceptance"
+        },
+        {
+          "path": "app/test/client_session_test.dart",
+          "scope": "Whole session panel at 360x640 with text scale 2: no overflow and scroll reachability; not full accessibility or native mobile product acceptance"
+        },
+        {
+          "path": "app/test/mobile_contract_widget_test.dart",
+          "scope": "Token-field clearing and suppression of browser URLs/raw errors in shared widgets; not comprehensive privacy acceptance"
         }
       ],
       "acceptanceEvidence": []
