@@ -48,3 +48,21 @@ tests in `client_enrollment_denial_test.dart` instead check owner denial without
 automatic resubmission, token clearing before dispatch, sanitized failure text,
 and observer gating. They do not claim end-to-end OS/process or runtime admission
 coverage. The rest of the retired HTTP controller/test suite still needs cutover.
+
+## Retired privileged recovery removed — 2026-09-13
+
+Removed the old request model and launcher that omitted the v0 request UUID,
+profile and CAS fields, old UAC result-to-runtime-success inference, and the
+logout-error-to-local-forget fallback. Their obsolete dialogs/controller actions
+and tests were removed, as was the unused fire-and-forget enrollment process
+launcher. Native explicitly confirmed recovery remains available in the current
+entrypoint. Remaining direct HTTP bridge/controller methods are not a fallback
+for that entrypoint and still require deletion.
+
+Replacement evidence: `client_privileged_recovery_test.dart` checks immutable
+arguments and exact operation correlation; `client_privileged_session_test.dart`
+checks exited/uncertain/canceled/mismatched results and now context changes during
+elevation and launcher exceptions, preserving the journal without replay;
+`client_elevation_panel_test.dart` checks owner confirmation and observer gating;
+the US-08 scenario in `mobile_contract_widget_test.dart` checks that failed logout
+never triggers local forget. These do not replace real platform UAC acceptance.

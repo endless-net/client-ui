@@ -5,30 +5,6 @@ import 'package:win32/win32.dart';
 // Process-level outcome only, never proof that a runtime operation completed.
 enum PrivilegedHelperResult { completed, canceled, failed }
 
-bool launchWindowsProcessElevated(String executable, List<String> arguments) {
-  final verbPtr = 'runas'.toNativeUtf16();
-  final executablePtr = executable.toNativeUtf16();
-  final parametersPtr = arguments
-      .map(quoteWindowsCommandLineArgument)
-      .join(' ')
-      .toNativeUtf16();
-  try {
-    final result = ShellExecute(
-      null,
-      PCWSTR(verbPtr),
-      PCWSTR(executablePtr),
-      PCWSTR(parametersPtr),
-      null,
-      SW_SHOWNORMAL,
-    );
-    return result.address > 32;
-  } finally {
-    calloc.free(verbPtr);
-    calloc.free(executablePtr);
-    calloc.free(parametersPtr);
-  }
-}
-
 PrivilegedHelperResult launchWindowsProcessElevatedAndWait(
   String executable,
   List<String> arguments,

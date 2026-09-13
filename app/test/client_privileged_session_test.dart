@@ -49,7 +49,14 @@ class ImmediateResponse<T> implements ResponseFuture<T> {
 }
 
 void main() {
-  for (final scenario in ['exited', 'unconfirmed', 'canceled', 'mismatch']) {
+  for (final scenario in [
+    'exited',
+    'unconfirmed',
+    'canceled',
+    'mismatch',
+    'context-changed',
+    'launcher-error',
+  ]) {
     test('elevation $scenario uses retained lookup without replay', () async {
       final directory = await Directory.systemTemp.createTemp('en-elevation-');
       final rpc = LookupOnlyClient();
@@ -84,6 +91,17 @@ void main() {
                 request.mutation.requestId,
               );
               if (scenario == 'mismatch') rpc.profile = 'other';
+              if (scenario == 'context-changed') {
+                connection.events.add(
+                  fixtures.snapshot()
+                    ..sequence += 1
+                    ..snapshot.status.activeProfileId = 'profile-b',
+                );
+                await pumpEventQueue();
+              }
+              if (scenario == 'launcher-error') {
+                throw StateError('Elevation result unavailable');
+              }
               return scenario == 'canceled'
                   ? ClientElevationOutcome.canceled
                   : scenario == 'unconfirmed'
@@ -94,14 +112,19 @@ void main() {
           expect(result.terminal, false);
         }
 
-        if (scenario == 'canceled') {
+        final noLookup = [
+          'canceled',
+          'context-changed',
+          'launcher-error',
+        ].contains(scenario);
+        if (noLookup) {
           await expectLater(submit(), throwsStateError);
         } else if (scenario == 'mismatch') {
           await expectLater(submit(), throwsFormatException);
         } else {
           await submit();
         }
-        expect(rpc.calls, scenario == 'canceled' ? 0 : 1);
+        expect(rpc.calls, noLookup ? 0 : 1);
         expect(await session.journal.pending(), hasLength(1));
         await expectLater(submit(), throwsStateError);
         expect(launches, 1);

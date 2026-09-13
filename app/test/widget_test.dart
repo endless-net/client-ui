@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:endlessnet/main.dart';
+import 'package:endlessnet/windows_elevation.dart';
 import 'package:endlessnet/named_pipe_http.dart';
 import 'package:endlessnet/service_contract.dart';
 
@@ -18,43 +19,6 @@ void main() {
     expect(request.server, isEmpty);
   });
 
-  test('privileged trust helper receives only fixed operation values', () {
-    final arguments = privilegedRecoveryArguments(
-      const PrivilegedRecoveryRequest.trustServerIdentity(
-        confirmedControlOrigin: 'https://api.example.test',
-        confirmedKeyID: 'ed25519:new',
-      ),
-    );
-
-    expect(arguments, [
-      '--operation',
-      'trust-server-identity',
-      '--confirmed-control-origin',
-      'https://api.example.test',
-      '--confirmed-key-id',
-      'ed25519:new',
-    ]);
-    expect(arguments, isNot(contains('--pipe')));
-    expect(arguments, isNot(contains('--debug-log-dir')));
-    expect(arguments, isNot(contains('--token')));
-  });
-
-  test('privileged recovery uses only the fixed installed helper path', () {
-    expect(
-      installedRecoveryHelperPath(),
-      r'C:\Program Files\EndlessNet\endlessnet-client-recovery-helper.exe',
-    );
-  });
-
-  test('privileged local forget helper uses one fixed confirmation flag', () {
-    expect(
-      privilegedRecoveryArguments(
-        const PrivilegedRecoveryRequest.forgetLocalEnrollment(),
-      ),
-      ['--operation', 'forget-local-enrollment', '--confirmed-local-forget'],
-    );
-  });
-
   test('Windows elevation arguments are quoted for ShellExecute', () {
     expect(quoteWindowsCommandLineArgument('plain'), 'plain');
     expect(
@@ -62,29 +26,6 @@ void main() {
         r'C:\Program Files\EndlessNet\endlessnet.exe',
       ),
       r'"C:\Program Files\EndlessNet\endlessnet.exe"',
-    );
-  });
-
-  test('server trust elevation only accepts administrator_required', () {
-    expect(
-      requiresAdministratorTrustElevation(
-        const ServiceIPCException(
-          statusCode: 403,
-          errorCode: ServiceIPCErrorCode.administratorRequired,
-          message: 'administrator required',
-        ),
-      ),
-      isTrue,
-    );
-    expect(
-      requiresAdministratorTrustElevation(
-        const ServiceIPCException(
-          statusCode: 403,
-          errorCode: ServiceIPCErrorCode.ownerRequired,
-          message: 'owner required',
-        ),
-      ),
-      isFalse,
     );
   });
 

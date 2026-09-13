@@ -1,9 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'windows_elevation.dart';
-export 'windows_elevation.dart';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
@@ -417,104 +414,6 @@ EnrollmentRequest parseEnrollment(
   );
 }
 
-typedef PrivilegedRecoveryLauncher =
-    Future<PrivilegedHelperResult> Function(PrivilegedRecoveryRequest request);
-typedef LocalForgetConfirmationPresenter =
-    Future<bool> Function(String remoteRequestID);
-
-const _windowsRecoveryHelperPath =
-    r'C:\Program Files\EndlessNet\endlessnet-client-recovery-helper.exe';
-
-class PrivilegedRecoveryRequest {
-  const PrivilegedRecoveryRequest._({
-    required this.operation,
-    this.confirmedControlOrigin = '',
-    this.confirmedKeyID = '',
-  });
-
-  const PrivilegedRecoveryRequest.trustServerIdentity({
-    required String confirmedControlOrigin,
-    required String confirmedKeyID,
-  }) : this._(
-         operation: RecoveryOperation.trustServerIdentity,
-         confirmedControlOrigin: confirmedControlOrigin,
-         confirmedKeyID: confirmedKeyID,
-       );
-
-  const PrivilegedRecoveryRequest.forgetLocalEnrollment()
-    : this._(operation: RecoveryOperation.forgetLocalEnrollment);
-
-  final String operation;
-  final String confirmedControlOrigin;
-  final String confirmedKeyID;
-}
-
-bool requiresAdministratorTrustElevation(Object error) {
-  return error is ServiceIPCException &&
-      error.errorCode == ServiceIPCErrorCode.administratorRequired;
-}
-
-bool requiresLocalForget(Object error) {
-  return error is ServiceIPCException &&
-      error.errorCode == ServiceIPCErrorCode.remoteCleanupRequired;
-}
-
-Future<PrivilegedHelperResult> launchPrivilegedRecoveryHelper(
-  PrivilegedRecoveryRequest request,
-) async {
-  if (!Platform.isWindows) {
-    throw UnsupportedError(
-      'Administrative recovery is not available on this platform.',
-    );
-  }
-  final executable = installedRecoveryHelperPath();
-  if (!File(executable).existsSync()) {
-    throw StateError(
-      'The installed EndlessNet recovery helper is unavailable. Repair the '
-      'EndlessNet installation and try again.',
-    );
-  }
-  final arguments = privilegedRecoveryArguments(request);
-  return Isolate.run(
-    () => launchWindowsProcessElevatedAndWait(executable, arguments),
-  );
-}
-
-String installedRecoveryHelperPath() => _windowsRecoveryHelperPath;
-
-List<String> privilegedRecoveryArguments(PrivilegedRecoveryRequest request) {
-  switch (request.operation) {
-    case RecoveryOperation.trustServerIdentity:
-      final origin = request.confirmedControlOrigin.trim();
-      final keyID = request.confirmedKeyID.trim();
-      if (origin.isEmpty || keyID.isEmpty) {
-        throw ArgumentError(
-          'Server identity recovery requires a confirmed origin and key ID.',
-        );
-      }
-      return [
-        '--operation',
-        'trust-server-identity',
-        '--confirmed-control-origin',
-        origin,
-        '--confirmed-key-id',
-        keyID,
-      ];
-    case RecoveryOperation.forgetLocalEnrollment:
-      return const [
-        '--operation',
-        'forget-local-enrollment',
-        '--confirmed-local-forget',
-      ];
-    default:
-      throw ArgumentError.value(
-        request.operation,
-        'operation',
-        'Unsupported privileged recovery operation.',
-      );
-  }
-}
-
 class EndlessNetClientBridge {
   EndlessNetClientBridge({
     required this.config,
@@ -618,9 +517,6 @@ class EndlessNetController extends ChangeNotifier
     this.desktopIntegrationEnabled = true,
     Future<bool> Function(Uri uri)? externalURLLauncher,
     Future<void> Function(String title, String message)? messagePresenter,
-    PrivilegedRecoveryLauncher? privilegedRecoveryLauncher,
-    bool? privilegedRecoverySupported,
-    LocalForgetConfirmationPresenter? localForgetConfirmationPresenter,
     this.enrollmentPollInterval = _defaultEnrollmentPollInterval,
     this.enrollmentPollTimeout = _defaultEnrollmentPollTimeout,
     this.connectionPollInterval = _defaultConnectionPollInterval,
@@ -628,13 +524,7 @@ class EndlessNetController extends ChangeNotifier
     this.recoveryPollInterval = _defaultRecoveryPollInterval,
     this.recoveryPollTimeout = _defaultRecoveryPollTimeout,
   }) : externalURLLauncher = externalURLLauncher ?? launchExternalURL,
-       messagePresenter = messagePresenter ?? showMessageBox,
-       privilegedRecoveryLauncher =
-           privilegedRecoveryLauncher ?? launchPrivilegedRecoveryHelper,
-       privilegedRecoverySupported =
-           privilegedRecoverySupported ?? Platform.isWindows,
-       localForgetConfirmationPresenter =
-           localForgetConfirmationPresenter ?? showLocalForgetConfirmation;
+       messagePresenter = messagePresenter ?? showMessageBox;
 
   final AppConfig config;
   final EndlessNetClientBridge bridge;
@@ -642,9 +532,6 @@ class EndlessNetController extends ChangeNotifier
   final bool desktopIntegrationEnabled;
   final Future<bool> Function(Uri uri) externalURLLauncher;
   final Future<void> Function(String title, String message) messagePresenter;
-  final PrivilegedRecoveryLauncher privilegedRecoveryLauncher;
-  final bool privilegedRecoverySupported;
-  final LocalForgetConfirmationPresenter localForgetConfirmationPresenter;
   final Duration enrollmentPollInterval;
   final Duration enrollmentPollTimeout;
   final Duration connectionPollInterval;
@@ -882,75 +769,8 @@ class EndlessNetController extends ChangeNotifier
       }
       busy = true;
       notifyListeners();
-      late Map<String, dynamic> payload;
-      try {
-        await bridge.trustServer(controlOrigin, announcedKeyID);
-        payload = await bridge.status();
-      } catch (err) {
-        if (!privilegedRecoverySupported ||
-            !requiresAdministratorTrustElevation(err)) {
-          rethrow;
-        }
-        logger.info('administrator approval required to trust server identity');
-        busy = false;
-        notifyListeners();
-        if (!context.mounted) {
-          return;
-        }
-        final approveElevation =
-            await showServerTrustAdministratorRequiredDialog(
-              context,
-              controlOrigin: controlOrigin,
-              trustedKeyID: trustedKeyID,
-              announcedKeyID: announcedKeyID,
-            );
-        if (!approveElevation) {
-          return;
-        }
-        busy = true;
-        notifyListeners();
-        final helperResult = await privilegedRecoveryLauncher(
-          PrivilegedRecoveryRequest.trustServerIdentity(
-            confirmedControlOrigin: controlOrigin,
-            confirmedKeyID: announcedKeyID,
-          ),
-        );
-        payload = await bridge.status();
-        final status = ServiceStatus(payload);
-        if (helperResult == PrivilegedHelperResult.canceled) {
-          errorText =
-              'Administrator approval was canceled. No server trust setting '
-              'was changed.';
-          statusPayload = payload;
-          logger.info('administrator canceled server identity recovery');
-          return;
-        }
-        if (status.serverIdentityChanged) {
-          final currentIdentity = await bridge.serverIdentity();
-          final currentOrigin = valueText(
-            currentIdentity['control_origin'],
-            fallback: '',
-          );
-          final currentKeyID = valueText(
-            currentIdentity['announced_key_id'],
-            fallback: '',
-          );
-          if (currentOrigin != controlOrigin ||
-              currentKeyID != announcedKeyID) {
-            errorText =
-                'The server identity changed again before confirmation. '
-                'Review the current origin and key IDs before trying again.';
-          } else {
-            errorText =
-                'Administrator confirmation did not complete. No server '
-                'trust setting was changed.';
-          }
-          statusPayload = payload;
-          logger.info('privileged server identity recovery was not applied');
-          return;
-        }
-        logger.info('privileged server identity recovery helper completed');
-      }
+      await bridge.trustServer(controlOrigin, announcedKeyID);
+      final payload = await bridge.status();
       statusPayload = payload;
       errorText = null;
       await _advanceRecoveryState(payload);
@@ -1468,61 +1288,8 @@ class EndlessNetController extends ChangeNotifier
       }
       logger.info('logout completed outcome=${logout.outcome}');
     } catch (err, stack) {
-      if (requiresLocalForget(err)) {
-        final requestID = err is ServiceIPCException ? err.requestID : '';
-        busy = false;
-        notifyListeners();
-        await requestLocalForget(remoteRequestID: requestID);
-        return;
-      }
       errorText = safeErrorText(err);
       logger.error('logout failed', err, stack);
-      await messagePresenter('EndlessNet', errorText!);
-    } finally {
-      busy = false;
-      await _updateTray();
-      notifyListeners();
-    }
-  }
-
-  Future<void> requestLocalForget({String remoteRequestID = ''}) async {
-    final requestID = remoteRequestID.trim();
-    final confirmed = await localForgetConfirmationPresenter(requestID);
-    if (!confirmed) {
-      errorText =
-          'Local enrollment was kept. No device keys or trust settings were '
-          'changed.';
-      notifyListeners();
-      return;
-    }
-
-    busy = true;
-    errorText = null;
-    notifyListeners();
-    try {
-      final helperResult = await privilegedRecoveryLauncher(
-        const PrivilegedRecoveryRequest.forgetLocalEnrollment(),
-      );
-      statusPayload = await bridge.status();
-      if (helperResult == PrivilegedHelperResult.canceled) {
-        errorText =
-            'Administrator approval was canceled. Local enrollment was kept.';
-        logger.info('administrator canceled local enrollment forget');
-        return;
-      }
-      if (helperResult != PrivilegedHelperResult.completed ||
-          !serviceStatus.needsEnrollment) {
-        errorText =
-            'EndlessNet did not forget the local enrollment. Device keys and '
-            'trust settings were preserved.';
-        logger.info('privileged local enrollment forget was not applied');
-        return;
-      }
-      await _showRemoteCleanupWarning(requestID);
-      logger.info('local enrollment forgotten with remote cleanup unconfirmed');
-    } catch (err, stack) {
-      errorText = safeErrorText(err);
-      logger.error('local enrollment forget failed', err, stack);
       await messagePresenter('EndlessNet', errorText!);
     } finally {
       busy = false;
@@ -1696,14 +1463,6 @@ class HomeScreen extends StatelessWidget {
                           : controller.retryRecovery,
                       icon: const Icon(Icons.refresh),
                       label: const Text('Retry recovery'),
-                    ),
-                  if (controller.recoveryBlocked)
-                    OutlinedButton.icon(
-                      onPressed: controller.busy
-                          ? null
-                          : controller.requestLocalForget,
-                      icon: const Icon(Icons.phonelink_erase_outlined),
-                      label: const Text('Forget enrollment locally'),
                     ),
                   if (controller.deviceEnrolled &&
                       !controller.recovering &&
@@ -2173,116 +1932,6 @@ Future<bool> showServerIdentityChangeDialog(
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Trust and connect'),
-            ),
-          ],
-        ),
-      ) ??
-      false;
-}
-
-Future<bool> showServerTrustAdministratorRequiredDialog(
-  BuildContext context, {
-  required String controlOrigin,
-  required String trustedKeyID,
-  required String announcedKeyID,
-}) async {
-  return await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text('Administrator approval required'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Trusting a new server signing key changes a security setting '
-                  'for this device. Windows requires administrator approval.',
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'EndlessNet will open a User Account Control prompt. The main '
-                  'desktop app will remain unprivileged.',
-                ),
-                const SizedBox(height: 12),
-                SelectableText('Control origin:\n$controlOrigin'),
-                const SizedBox(height: 8),
-                SelectableText(
-                  'Previously trusted:\n${trustedKeyID.isEmpty ? '(none)' : trustedKeyID}',
-                ),
-                const SizedBox(height: 8),
-                SelectableText('Now announced:\n$announcedKeyID'),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton.icon(
-              onPressed: () => Navigator.of(context).pop(true),
-              icon: const Icon(Icons.admin_panel_settings_outlined),
-              label: const Text('Confirm as administrator'),
-            ),
-          ],
-        ),
-      ) ??
-      false;
-}
-
-Future<bool> showLocalForgetConfirmation(String remoteRequestID) async {
-  final context = navigatorKey.currentContext;
-  if (context == null || !context.mounted) {
-    return false;
-  }
-  return await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text('Forget enrollment on this device?'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'EndlessNet could not confirm removal of this device from '
-                  'the server. You can remove the local enrollment with '
-                  'administrator approval and enroll again.',
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'The old remote credential may remain active. Revoke this '
-                  'device in the Management console after continuing.',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Local forget removes the node credential, session, cached '
-                  'network map, and resets connection intent to disconnected. '
-                  'This device’s identity '
-                  'keys, local owner, and trusted server key are preserved.',
-                ),
-                if (remoteRequestID.trim().isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  SelectableText(
-                    'Support request ID: ${remoteRequestID.trim()}',
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Keep enrollment'),
-            ),
-            FilledButton.icon(
-              onPressed: () => Navigator.of(context).pop(true),
-              icon: const Icon(Icons.admin_panel_settings_outlined),
-              label: const Text('Forget locally as administrator'),
             ),
           ],
         ),
