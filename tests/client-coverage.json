@@ -147,7 +147,7 @@
         },
         {
           "path": "app/test/client_intent_journal_test.dart",
-          "scope": "Real local 4096-record outbox boundary: ordinary admission denied, extra durable Disconnect survives uncertain send and reopen, overflow denied, original UUID acknowledged explicitly without evicting work. Local test only pending CI; not producer nonterminal admission or 24-hour retention acceptance"
+          "scope": "Real local 4096-record outbox boundary: competing ordinary admissions serialized, extra durable Disconnect survives uncertain send and reopen, overflow denied, original UUID acknowledged explicitly without evicting work. Stalled command RPC does not hold the journal queue or block separate Disconnect submission. Shared desktop/mobile suite, local execution only pending CI; not cross-process locking, producer nonterminal admission or 24-hour retention acceptance"
         },
         {
           "path": "app/test/client_session_process_test.dart",

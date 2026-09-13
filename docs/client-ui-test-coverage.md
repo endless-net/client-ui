@@ -59,6 +59,12 @@ The Android/iOS integration host now imports the same journal suite in a scoped
 test group. Its temporary files are native sandbox files, not host-side mocks;
 this schedules the boundary checks but does not establish mobile execution,
 crash durability, filesystem permission enforcement or actual runtime behavior.
+Filesystem transactions on the session journal are serialized: two ordinary
+commands competing for its last normal slot admit only one, and admission
+failure does not poison subsequent recovery or Disconnect admission. A stalled
+command RPC does not hold this filesystem queue or delay a separate Disconnect
+submission. The shared suite checks both cases. This is in-process serialization
+for one journal object, not a cross-process or cross-isolate locking claim.
 
 Earlier inspected desktop evidence: consumer `3b5ad34ead11173c32c22e537cd06e74468968f9`.
 The [desktop run](https://github.com/endless-net/client-ui/actions/runs/34733301626)

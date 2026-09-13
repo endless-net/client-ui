@@ -52,6 +52,26 @@ void main() {
             ),
         ]);
       }
+      // Two command kinds compete for the final ordinary slot. A failed
+      // admission must not poison the queue or consume Disconnect's reserve.
+      await File.fromUri(
+        directory.uri.resolve('12345678-1234-4234-8234-000000000fff.json'),
+      ).delete();
+      final competing = await Future.wait<Object>([
+        for (final kind in [
+          api.OperationKind.OPERATION_KIND_CONNECT,
+          api.OperationKind.OPERATION_KIND_RENEW_SESSION,
+        ])
+          journal
+              .prepare(kind)
+              .then<Object>(
+                (intent) => intent,
+                onError: (Object error) => error,
+              ),
+      ]);
+      expect(competing.whereType<PendingClientIntent>(), hasLength(1));
+      expect(competing.whereType<StateError>(), hasLength(1));
+      expect(await journal.pending(), hasLength(4096));
       await expectLater(
         journal.prepare(api.OperationKind.OPERATION_KIND_CONNECT),
         throwsStateError,
@@ -91,6 +111,40 @@ void main() {
       expect(next.requestId, isNot(disconnect!.requestId));
     },
     timeout: const Timeout(Duration(minutes: 2)),
+  );
+
+  test(
+    'US-03: journal serialization does not wait for a stalled command RPC',
+    () async {
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      final connecting = journal.submit(
+        api.OperationKind.OPERATION_KIND_CONNECT,
+        (intent) async {
+          entered.complete();
+          await release.future;
+          return operation(intent);
+        },
+      );
+      try {
+        await entered.future;
+        final disconnect = await journal
+            .submit(
+              api.OperationKind.OPERATION_KIND_DISCONNECT,
+              (intent) async => operation(intent),
+            )
+            .timeout(const Duration(seconds: 5));
+        expect(
+          disconnect.value.kind,
+          api.OperationKind.OPERATION_KIND_DISCONNECT,
+        );
+        expect(await journal.pending(), hasLength(2));
+        expect(release.isCompleted, isFalse);
+      } finally {
+        release.complete();
+        await connecting;
+      }
+    },
   );
 
   test(

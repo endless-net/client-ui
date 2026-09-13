@@ -20,6 +20,17 @@ base class ClientIntentJournal {
     : _requestIdFactory = requestIdFactory ?? _randomRequestId;
   final Directory directory;
   final String Function() _requestIdFactory;
+  Future<void> _access = Future<void>.value();
+
+  // Serialize this session's filesystem transactions, not its RPCs. Otherwise
+  // different command kinds can both admit against the same free slot, or a
+  // recovery read can observe a record between exclusive create and write.
+  Future<T> _exclusive<T>(Future<T> Function() action) {
+    final result = _access.then((_) => action());
+    _access = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return result;
+  }
+
   static final _uuid = RegExp(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
   );
@@ -39,13 +50,16 @@ base class ClientIntentJournal {
     return result;
   }
 
-  Future<PendingClientIntent> prepare(api.OperationKind kind) async {
+  Future<PendingClientIntent> prepare(api.OperationKind kind) =>
+      _exclusive(() => _prepare(kind));
+
+  Future<PendingClientIntent> _prepare(api.OperationKind kind) async {
     if (kind == api.OperationKind.OPERATION_KIND_UNSPECIFIED) {
       throw const FormatException('Intention requires a known operation kind');
     }
     await directory.create(recursive: true);
     // Fail closed on old incomplete/corrupt records, rather than replacing them.
-    final retained = await pending();
+    final retained = await _pending();
     // Keep one emergency outbox slot for Disconnect. This is a UI storage
     // bound, not the runtime's nonterminal-operation admission policy.
     if (retained.length >= 4097 ||
@@ -79,7 +93,9 @@ base class ClientIntentJournal {
     return File.fromUri(directory.absolute.uri.resolve('$id.json'));
   }
 
-  Future<List<PendingClientIntent>> pending() async {
+  Future<List<PendingClientIntent>> pending() => _exclusive(_pending);
+
+  Future<List<PendingClientIntent>> _pending() async {
     if (!await directory.exists()) return [];
     final result = <PendingClientIntent>[];
     await for (final entity in directory.list(followLinks: false)) {
@@ -122,9 +138,12 @@ base class ClientIntentJournal {
 
   /// Call only after displaying/handling a validated terminal result. An
   /// unresolved NOT_FOUND must remain pending for explicit recovery policy.
-  Future<void> acknowledge(ClientOperation result) async {
+  Future<void> acknowledge(ClientOperation result) =>
+      _exclusive(() => _acknowledge(result));
+
+  Future<void> _acknowledge(ClientOperation result) async {
     if (!result.terminal) throw StateError('Cannot acknowledge accepted work');
-    final matches = (await pending()).where(
+    final matches = (await _pending()).where(
       (p) => p.requestId == result.value.requestId,
     );
     if (matches.length != 1 || matches.single.kind != result.value.kind) {
