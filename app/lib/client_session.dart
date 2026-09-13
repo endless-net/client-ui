@@ -521,21 +521,39 @@ final class ClientSession {
     final profileEpoch = state.domainEpoch(api.Domain.DOMAIN_PROFILES);
     final profileId = snapshot.status.activeProfileId;
     final response = await connection.getServerIdentity(profileId);
-    if (_closed ||
-        epoch != _epoch ||
-        cacheEpoch != state.cacheEpoch ||
-        identityEpoch != state.domainEpoch(api.Domain.DOMAIN_SERVER_IDENTITY) ||
-        profileEpoch != state.domainEpoch(api.Domain.DOMAIN_PROFILES) ||
-        state.link != ClientLinkState.ready ||
-        state.snapshot == null ||
-        state.snapshot!.status.activeProfileId != profileId ||
-        !response.hasIdentity() ||
-        !response.hasMetadata() ||
-        response.identity.profileId != profileId ||
-        response.metadata.instanceId != snapshot.runtime.instanceId ||
-        response.metadata.revision <= 0 ||
-        response.metadata.revision < state.snapshot!.status.metadata.revision) {
-      throw StateError('Invalid or stale server identity context');
+    final current = state.snapshot;
+    // Fixed diagnostic codes only: never include response contents, identities,
+    // origins, keys, request IDs or underlying transport error text.
+    final rejected = <String>[
+      if (_closed) 'closed',
+      if (epoch != _epoch) 'session_epoch',
+      if (cacheEpoch != state.cacheEpoch) 'cache_epoch',
+      if (identityEpoch != state.domainEpoch(api.Domain.DOMAIN_SERVER_IDENTITY))
+        'identity_epoch',
+      if (profileEpoch != state.domainEpoch(api.Domain.DOMAIN_PROFILES))
+        'profile_epoch',
+      if (state.link != ClientLinkState.ready) 'link_not_ready',
+      if (current == null) 'snapshot_missing',
+      if (current != null && current.status.activeProfileId != profileId)
+        'active_profile',
+      if (!response.hasIdentity()) 'identity_missing',
+      if (!response.hasMetadata()) 'metadata_missing',
+      if (response.hasIdentity() && response.identity.profileId != profileId)
+        'response_profile',
+      if (response.hasMetadata() &&
+          response.metadata.instanceId != snapshot.runtime.instanceId)
+        'response_instance',
+      if (response.hasMetadata() && response.metadata.revision <= 0)
+        'revision_invalid',
+      if (response.hasMetadata() &&
+          current != null &&
+          response.metadata.revision < current.status.metadata.revision)
+        'revision_stale',
+    ];
+    if (rejected.isNotEmpty) {
+      throw StateError(
+        'Invalid or stale server identity context: ${rejected.join(',')}',
+      );
     }
     return api.GetServerIdentityResponse.fromBuffer(response.writeToBuffer())
       ..freeze();

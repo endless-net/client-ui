@@ -853,19 +853,35 @@ void main() {
       response.identity.announcementId = 'announcement-b';
       expect(result.identity.announcementId, 'announcement-a');
       expect(result.isFrozen, isTrue);
-      for (final change in <void Function(api.GetServerIdentityResponse)>[
-        (r) => r.clearIdentity(),
-        (r) => r.clearMetadata(),
-        (r) => r.identity.profileId = 'profile-b',
-        (r) => r.metadata.instanceId = 'runtime-b',
-        (r) => r.metadata.revision -= 1,
-      ]) {
+      for (final (reason, change)
+          in <(String, void Function(api.GetServerIdentityResponse))>[
+            ('identity_missing', (r) => r.clearIdentity()),
+            ('metadata_missing', (r) => r.clearMetadata()),
+            (
+              'response_profile',
+              (r) => r.identity.profileId = 'private-profile-marker',
+            ),
+            (
+              'response_instance',
+              (r) => r.metadata.instanceId = 'private-runtime-marker',
+            ),
+            ('revision_stale', (r) => r.metadata.revision -= 1),
+          ]) {
         final invalid = api.GetServerIdentityResponse.fromBuffer(
           response.writeToBuffer(),
         );
         change(invalid);
         connection.identity = (_) async => invalid;
-        await expectLater(session.getServerIdentity(), throwsStateError);
+        await expectLater(
+          session.getServerIdentity(),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'safe rejection reason',
+              'Invalid or stale server identity context: $reason',
+            ),
+          ),
+        );
       }
       final observer = snapshot()..sequence += 1;
       observer.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;

@@ -18,6 +18,19 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+At `d7746b8fbf475d29264e757b0ca385e374138145`, the
+[Windows consumer job](https://github.com/endless-net/client-ui/actions/runs/34740483570/job/103679234050)
+passed 251 tests and failed the trust process scenario with an aggregate stale
+server-identity context error. Its initial-snapshot barrier and scripted response
+were inspected; the failing predicate is not yet established. Identity rejection
+now reports fixed reason codes (session/cache/domain, readiness, response shape
+or revision) without identity values, keys, origins or transport payloads. This
+is diagnostic instrumentation, not proof that the underlying race is fixed.
+The separate [Windows packaging job](https://github.com/endless-net/client-ui/actions/runs/34740483666/job/103679234038)
+passed its consumer suite but rejected the pinned v0.4.1 core manifest because it
+declares IPC v2. Public v0.4.2 and v0.5.0 manifests also declare v2. No release,
+lock, compatibility fallback or version was changed to bypass that gate.
+
 Latest completed inspected snapshot: `02515e07deed10b40da72c4fac17097ae28331b5`.
 [Windows](https://github.com/endless-net/client-ui/actions/runs/34740023685/job/103678075723),
 [Linux](https://github.com/endless-net/client-ui/actions/runs/34740023685/job/103678075876)
