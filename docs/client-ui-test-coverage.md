@@ -14,6 +14,14 @@ Status: incomplete. Owner: client-ui. Scope: the complete BA/SA goal, not the
 subset already implemented. The canonical machine-readable trace is
 [`tests/client-coverage.json`](../tests/client-coverage.json).
 
+Build-target regression: the UI no longer defaults to Windows/amd64 on every
+process. Eighteen short tests cover 16 ABI-to-platform/architecture mappings,
+explicit build override and unsupported ABI rejection; each mapped target agrees
+with `--version`. These are pure metadata checks, not execution/support evidence
+for those architectures. No application/bundle identifier was assigned.
+Local validation passed 370 short Flutter tests with 1 skip, Flutter analysis,
+Go short tests and all policy/trace checks. Integration runs were not started.
+
 Windows diagnostics destination binding now uses an owner-window native folder
 chooser and the existing checksum-verified session export. Twelve short unit
 tests cover cancellation, invalid paths, minimal channel payload, request identity,

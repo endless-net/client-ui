@@ -2,6 +2,8 @@
 library;
 
 import 'dart:io';
+import 'dart:ffi';
+import 'package:endlessnet/client_build_target.dart';
 import 'package:endlessnet/main.dart';
 import 'package:endlessnet/windows_elevation.dart';
 import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
@@ -14,6 +16,10 @@ void main() {
     expect(versionText(), contains('endlessnet ${build.version}\n'));
     expect(versionText(), contains('commit: ${build.commit}\n'));
     expect(versionText(), contains('built: ${build.buildDate}\n'));
+    expect(
+      versionText(buildTarget: ''),
+      contains('target: ${nativeClientBuildTarget(Abi.current())}\n'),
+    );
   });
   test(
     'desktop startup uses validated native endpoint and hides on autostart',

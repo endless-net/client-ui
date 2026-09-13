@@ -482,6 +482,10 @@
       "implementation": "partial",
       "testEvidence": [
         {
+          "path": "app/test/client_build_target_test.dart",
+          "scope": "18 short unit tests: 16 native process ABI mappings agree between immutable UI build identity and version text; explicit build target overrides ABI; unmapped ABI fails without fabricating Windows identity. No native host creation, supported-architecture matrix, distribution execution or platform acceptance is claimed"
+        },
+        {
           "path": "app/test/client_profiles_test.dart",
           "scope": "Update reader/panel: distinct source/compatibility states, immutable context, expiry/target/URL checks, observer denial and explicit refresh. Support reader/panel: runtime identity, safe destinations, offline basic help without RPC, observer refresh, fresh unchanged URL before fake launch, changed/unsafe/invalidation/refusal outcomes. Local execution only for new UI; no signature verification, complete localized help, native browser, distribution outcome or platform acceptance"
         },

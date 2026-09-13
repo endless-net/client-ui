@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
@@ -7,6 +8,7 @@ import 'package:win32/win32.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'client_desktop_app.dart';
+import 'client_build_target.dart';
 import 'client_intent_journal.dart';
 import 'client_session.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
@@ -25,10 +27,7 @@ const _appBuildDate = String.fromEnvironment(
   'ENDLESSNET_BUILD_DATE',
   defaultValue: 'unknown',
 );
-const _appTarget = String.fromEnvironment(
-  'ENDLESSNET_TARGET',
-  defaultValue: 'windows/amd64',
-);
+const _appTarget = String.fromEnvironment('ENDLESSNET_TARGET');
 const _defaultDebugLogDir = '~/.endlessnet/logs';
 const _showSignalPath = '~/.endlessnet/endlessnet.show';
 
@@ -90,15 +89,25 @@ Future<void> main(List<String> args) async {
   );
 }
 
-String versionText() {
+String _resolvedBuildTarget({String? buildTarget, Abi? processAbi}) {
+  final configuredTarget = buildTarget ?? _appTarget;
+  return configuredTarget.isEmpty
+      ? nativeClientBuildTarget(processAbi ?? Abi.current())
+      : configuredTarget;
+}
+
+String versionText({String? buildTarget, Abi? processAbi}) {
   return 'endlessnet $_appVersion\n'
       'commit: $_appCommit\n'
       'built: $_appBuildDate\n'
-      'target: $_appTarget\n';
+      'target: ${_resolvedBuildTarget(buildTarget: buildTarget, processAbi: processAbi)}\n';
 }
 
-api.BuildIdentity desktopBuildIdentity() {
-  final target = _appTarget.split('/');
+api.BuildIdentity desktopBuildIdentity({String? buildTarget, Abi? processAbi}) {
+  final target = _resolvedBuildTarget(
+    buildTarget: buildTarget,
+    processAbi: processAbi,
+  ).split('/');
   return api.BuildIdentity(
     version: _appVersion,
     commit: _appCommit,
