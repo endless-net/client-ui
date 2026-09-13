@@ -185,8 +185,17 @@
         "UBR-39",
         "UI-AC-17"
       ],
-      "implementation": "missing",
-      "testEvidence": [],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/client_profiles_test.dart",
+          "scope": "Shared exit-node reader: one catalog/status revision, typed allowed modes, no inferred downgrade, required IPv4/IPv6 states, partial apply preservation, duplicate/cycle/mixed-page rejection; not selection UI or traffic enforcement"
+        },
+        {
+          "path": "app/test/client_session_test.dart",
+          "scope": "Owner-scoped exit-node read rejects repeated exit/profile/peer/network invalidations and stale revisions without mutation or journal write"
+        }
+      ],
       "acceptanceEvidence": []
     },
     {

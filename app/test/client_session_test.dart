@@ -12,6 +12,7 @@ import 'package:endlessnet/client_profiles.dart';
 import 'package:endlessnet/client_networks.dart';
 import 'package:endlessnet/client_preferences.dart';
 import 'package:endlessnet/client_resources.dart';
+import 'package:endlessnet/client_exit_nodes.dart';
 import 'package:endlessnet/client_session.dart';
 import 'package:endlessnet/client_session_panel.dart';
 import 'package:endlessnet/client_state_controller.dart';
@@ -26,6 +27,12 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 class FakeConnection implements ClientConnection {
+  Future<ClientExitNodes> Function(String, void Function())? exits;
+  @override
+  Future<ClientExitNodes> getExitNodes(
+    String profileId,
+    void Function() check,
+  ) => exits!(profileId, check);
   Future<ClientResourceCatalog> Function(
     String,
     String,
@@ -198,6 +205,88 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'US-05: exit reads require owner and reject repeated domain invalidations',
+    () async {
+      await expectLater(session.getExitNodes(), throwsStateError);
+      connection.events.add(
+        snapshot()..snapshot.status.activeProfileId = 'profile-a',
+      );
+      await pumpEventQueue();
+      final status = api.GetExitNodeResponse()
+        ..mergeFromProto3Json({
+          'status': {
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'profileId': 'profile-a',
+            'requestedFamilyMode': 'EXIT_FAMILY_MODE_NONE',
+            'applyState': 'APPLY_STATE_APPLIED',
+            'ipv4': {'applyState': 'APPLY_STATE_APPLIED'},
+            'ipv6': {'applyState': 'APPLY_STATE_APPLIED'},
+          },
+        });
+      final page = api.ListExitNodesResponse()
+        ..mergeFromProto3Json({
+          'page': {
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+          },
+        });
+      Future<ClientExitNodes> read(String id, void Function() check) =>
+          readClientExitNodes(
+            instanceId: 'runtime-a',
+            profileId: id,
+            list: (_) async => page,
+            get: (_) async => status,
+            checkContext: check,
+          );
+      connection.exits = read;
+      expect(
+        (await session.getExitNodes()).status.ipv4.hasRequestedExitNodeId(),
+        isFalse,
+      );
+      final domains = [
+        'DOMAIN_EXIT_NODE',
+        'DOMAIN_EXIT_NODE',
+        'DOMAIN_PEERS',
+        'DOMAIN_NETWORKS',
+        'DOMAIN_PROFILES',
+      ];
+      for (var i = 0; i < domains.length; i++) {
+        final pending = Completer<api.GetExitNodeResponse>();
+        connection.exits = (id, check) => readClientExitNodes(
+          instanceId: 'runtime-a',
+          profileId: id,
+          list: (_) async => page,
+          get: (_) => pending.future,
+          checkContext: check,
+        );
+        final rejected = expectLater(session.getExitNodes(), throwsStateError);
+        await pumpEventQueue();
+        connection.events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '${i + 2}',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'invalidated': {'domain': domains[i], 'profileId': 'profile-a'},
+          }),
+        );
+        await pumpEventQueue();
+        pending.complete(status);
+        await rejected;
+      }
+      connection.exits = read;
+      status.status.metadata.revision -= 1;
+      page.page.metadata.revision -= 1;
+      await expectLater(session.getExitNodes(), throwsStateError);
+      final observer = snapshot()..sequence += 6;
+      observer.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      connection.events.add(observer);
+      await pumpEventQueue();
+      connection.exits = (_, _) =>
+          throw TestFailure('Observer must not call RPC');
+      await expectLater(session.getExitNodes(), throwsStateError);
+      expect(await session.journal.pending(), isEmpty);
+    },
+  );
 
   test(
     'US-11: resource reads bind owner context and reject repeated invalidations',

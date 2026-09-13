@@ -342,6 +342,17 @@ Rename никогда не меняет Account identity/control origin.
 
 ## 5. Сроки, предпочтения и диагностика
 
+US-05 read foundation: `ClientSession.getExitNodes` читает ListExitNodes и
+GetExitNode через typed local binding. Каталог и status должны иметь одну runtime
+revision; IPv4/IPv6 обязательны и не синтезируются из aggregate. Optional IDs,
+typed failures и fail_closed сохраняются независимо по каждой семье. Узел,
+исчезнувший из каталога после policy/path change, не подменяется другим; текущий
+status сохраняется. Allowed modes не расширяются до dual-stack. Reader проверяет
+структуру, а не доказывает согласованность всех aggregate/apply invariants или
+реальную блокировку обходного трафика. Shared tests проверяют partial apply,
+missing families и пагинацию; session tests — owner/context invalidation.
+Exit-node UI, Select/Clear process scenarios и actual traffic acceptance ещё нужны.
+
 US-11 read foundation: `ClientSession.listResources` использует typed local RPC
 и immutable каталог. Search ограничен 256 UTF-8 bytes; фильтры фиксируются перед
 первым await. Страницы по 100 entries принимаются только для одной runtime revision,

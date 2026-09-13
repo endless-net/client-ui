@@ -12,10 +12,12 @@ import 'client_profiles.dart';
 import 'client_networks.dart';
 import 'client_preferences.dart';
 import 'client_resources.dart';
+import 'client_exit_nodes.dart';
 import 'client_state_controller.dart';
 import 'local_client_events.dart';
 
 abstract interface class ClientConnection {
+  Future<ClientExitNodes> getExitNodes(String profileId, void Function() check);
   Future<ClientResourceCatalog> listResources(
     String profileId,
     String search,
@@ -45,6 +47,11 @@ abstract interface class ClientConnection {
 final class _LocalConnection implements ClientConnection {
   _LocalConnection(this.source);
   final LocalClientEvents source;
+  @override
+  Future<ClientExitNodes> getExitNodes(
+    String profileId,
+    void Function() check,
+  ) => source.getExitNodes(profileId, check);
   @override
   Future<ClientResourceCatalog> listResources(
     String profileId,
@@ -217,6 +224,54 @@ final class ClientSession {
     final (exitCode, output) = await launch(request);
     return request.decodeResult(exitCode, output);
   });
+
+  Future<ClientExitNodes> getExitNodes() async {
+    final connection = _connection;
+    final snapshot = state.snapshot;
+    if (_closed ||
+        connection == null ||
+        snapshot == null ||
+        state.link != ClientLinkState.ready ||
+        snapshot.runtime.callerAccess == api.Access.ACCESS_OBSERVER ||
+        snapshot.status.activeProfileId.isEmpty) {
+      throw StateError('Exit nodes require a current owner profile');
+    }
+    final epoch = _epoch;
+    final cache = state.cacheEpoch;
+    final domains = {
+      for (final domain in [
+        api.Domain.DOMAIN_EXIT_NODE,
+        api.Domain.DOMAIN_PROFILES,
+        api.Domain.DOMAIN_NETWORKS,
+        api.Domain.DOMAIN_PEERS,
+      ])
+        domain: state.domainEpoch(domain),
+    };
+    void check() {
+      if (_closed ||
+          epoch != _epoch ||
+          cache != state.cacheEpoch ||
+          state.link != ClientLinkState.ready ||
+          domains.entries.any(
+            (entry) => state.domainEpoch(entry.key) != entry.value,
+          )) {
+        throw StateError('Exit-node context changed during read');
+      }
+    }
+
+    final result = await connection.getExitNodes(
+      snapshot.status.activeProfileId,
+      check,
+    );
+    check();
+    if (result.status.profileId != snapshot.status.activeProfileId ||
+        result.status.metadata.instanceId != snapshot.runtime.instanceId ||
+        result.status.metadata.revision <
+            state.snapshot!.status.metadata.revision) {
+      throw StateError('Stale exit-node status');
+    }
+    return result;
+  }
 
   Future<ClientResourceCatalog> listResources({
     String search = '',

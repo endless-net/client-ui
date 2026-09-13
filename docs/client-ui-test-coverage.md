@@ -125,6 +125,16 @@ successful compilation as simulator execution or extend the timeout as proof.
 
 ## Validation
 
+### Exit-node reader foundation (2026-09-13)
+
+The typed exit reader requires one catalog/status revision and both address-family
+states. Shared tests preserve IPv4 applied / IPv6 failed without inventing dual-stack
+success or aggregate fail-closed, retain an unavailable current selection, and
+reject missing families, invalid modes, duplicate IDs, token loops and mixed pages.
+Session tests guard owner context and repeated exit/profile/peer/network invalidation.
+These are structural consumer checks, not a complete aggregate-state consistency
+validator, selection/clear UI, producer-process evidence or actual routing proof.
+
 ### Resource reader foundation (2026-09-13)
 
 The resource reader and local/session bindings preserve one profile/query/revision

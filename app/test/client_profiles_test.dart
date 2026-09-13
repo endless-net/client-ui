@@ -2,6 +2,7 @@ import 'package:endlessnet/client_profiles.dart';
 import 'package:endlessnet/client_networks.dart';
 import 'package:endlessnet/client_resources.dart';
 import 'package:endlessnet/client_resources_panel.dart';
+import 'package:endlessnet/client_exit_nodes.dart';
 import 'package:endlessnet/client_networks_panel.dart';
 import 'package:endlessnet/client_create_profile_panel.dart';
 import 'dart:async';
@@ -73,7 +74,171 @@ api.ListResourcesResponse _resourcePage(String suffix, {String next = ''}) =>
       ],
     });
 
+api.ListExitNodesResponse _exitPage() =>
+    api.ListExitNodesResponse()..mergeFromProto3Json({
+      'page': {
+        'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+      },
+      'exitNodes': [
+        {
+          'id': 'candidate-a',
+          'displayName': 'Candidate',
+          'peerId': 'peer-a',
+          'allowedFamilyModes': ['EXIT_FAMILY_MODE_IPV4_ONLY'],
+          'allowedLanAccess': ['LAN_ACCESS_BLOCK'],
+        },
+      ],
+    });
+api.GetExitNodeResponse _exitStatus() =>
+    api.GetExitNodeResponse()..mergeFromProto3Json({
+      'status': {
+        'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+        'profileId': 'profile-a',
+        'requestedExitNodeId': 'old-selection',
+        'requestedFamilyMode': 'EXIT_FAMILY_MODE_DUAL_STACK',
+        'applyState': 'APPLY_STATE_FAILED',
+        'failure': {'code': 'ERROR_CODE_UNSUPPORTED'},
+        'ipv4': {
+          'requestedExitNodeId': 'old-selection',
+          'effectiveExitNodeId': 'old-selection',
+          'applyState': 'APPLY_STATE_APPLIED',
+          'failClosed': true,
+        },
+        'ipv6': {
+          'requestedExitNodeId': 'old-selection',
+          'applyState': 'APPLY_STATE_FAILED',
+          'failure': {'code': 'ERROR_CODE_UNSUPPORTED'},
+        },
+      },
+    });
+
 void main() {
+  test(
+    'US-05: exit pagination rejects cycles, duplicates and mixed revisions',
+    () async {
+      for (final variant in ['valid', 'cycle', 'duplicate', 'revision']) {
+        var calls = 0;
+        final reading = readClientExitNodes(
+          instanceId: 'runtime-a',
+          profileId: 'profile-a',
+          list: (request) async {
+            expect(request.page.pageToken, calls == 0 ? '' : 'opaque');
+            final response = _exitPage();
+            if (calls++ == 0) {
+              response.page.nextPageToken = 'opaque';
+            } else {
+              if (variant != 'duplicate') {
+                response.exitNodes.single.id = 'candidate-b';
+              }
+              if (variant == 'cycle') response.page.nextPageToken = 'opaque';
+              if (variant == 'revision') response.page.metadata.revision += 1;
+            }
+            return response;
+          },
+          get: (_) async => _exitStatus(),
+          checkContext: () {},
+        );
+        if (variant == 'valid') {
+          expect((await reading).nodes, hasLength(2));
+        } else {
+          await expectLater(reading, throwsFormatException);
+        }
+        expect(calls, 2);
+      }
+    },
+  );
+  test(
+    'US-05: exit catalog preserves partial family apply and unavailable selection',
+    () async {
+      final status = _exitStatus();
+      final result = await readClientExitNodes(
+        instanceId: 'runtime-a',
+        profileId: 'profile-a',
+        list: (request) async {
+          expect(request.profile.profileId, 'profile-a');
+          expect(request.page.pageSize, 100);
+          return _exitPage();
+        },
+        get: (request) async {
+          expect(request.profile.profileId, 'profile-a');
+          return status;
+        },
+        checkContext: () {},
+      );
+      expect(result.nodes.single.allowedFamilyModes, [
+        api.ExitFamilyMode.EXIT_FAMILY_MODE_IPV4_ONLY,
+      ]);
+      expect(
+        result.status.requestedFamilyMode,
+        api.ExitFamilyMode.EXIT_FAMILY_MODE_DUAL_STACK,
+      );
+      expect(result.status.hasEffectiveExitNodeId(), isFalse);
+      expect(result.status.ipv4.effectiveExitNodeId, 'old-selection');
+      expect(result.status.ipv6.hasEffectiveExitNodeId(), isFalse);
+      expect(result.status.ipv6.applyState, api.ApplyState.APPLY_STATE_FAILED);
+      expect(result.status.ipv6.failClosed, isFalse);
+      expect(result.status.failClosed, isFalse);
+      status.status.ipv4.effectiveExitNodeId = 'changed';
+      expect(result.status.ipv4.effectiveExitNodeId, 'old-selection');
+      expect(result.status.isFrozen, isTrue);
+      expect(result.nodes.single.isFrozen, isTrue);
+    },
+  );
+  test(
+    'US-05: exit reads reject missing families, mixed revision and invalid catalog modes',
+    () async {
+      for (final change in <void Function(api.GetExitNodeResponse)>[
+        (r) => r.clearStatus(),
+        (r) => r.status.clearIpv4(),
+        (r) => r.status.clearIpv6(),
+        (r) => r.status.profileId = 'other-profile',
+        (r) => r.status.metadata.revision += 1,
+        (r) => r.status.requestedFamilyMode =
+            api.ExitFamilyMode.EXIT_FAMILY_MODE_UNSPECIFIED,
+        (r) => r.status.ipv6.clearFailure(),
+        (r) => r.status.ipv4.requestedExitNodeId = '',
+      ]) {
+        final response = _exitStatus();
+        change(response);
+        await expectLater(
+          readClientExitNodes(
+            instanceId: 'runtime-a',
+            profileId: 'profile-a',
+            list: (_) async => _exitPage(),
+            get: (_) async => response,
+            checkContext: () {},
+          ),
+          throwsFormatException,
+        );
+      }
+      for (final change in <void Function(api.ListExitNodesResponse)>[
+        (r) => r.clearPage(),
+        (r) => r.page.metadata.instanceId = 'other-runtime',
+        (r) => r.exitNodes.single.allowedFamilyModes.add(
+          api.ExitFamilyMode.EXIT_FAMILY_MODE_NONE,
+        ),
+        (r) => r.exitNodes.single.allowedLanAccess.add(
+          api.LanAccess.LAN_ACCESS_UNSPECIFIED,
+        ),
+        (r) => r.exitNodes.add(
+          api.ExitNode.fromBuffer(r.exitNodes.single.writeToBuffer()),
+        ),
+      ]) {
+        final response = _exitPage();
+        change(response);
+        await expectLater(
+          readClientExitNodes(
+            instanceId: 'runtime-a',
+            profileId: 'profile-a',
+            list: (_) async => response,
+            get: (_) => throw TestFailure('Invalid catalog must stop'),
+            checkContext: () {},
+          ),
+          throwsFormatException,
+        );
+      }
+    },
+  );
   for (final scenario in [
     'valid',
     'changed',
