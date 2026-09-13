@@ -28,6 +28,18 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+At `8f222f1804fd0b56ff9d60f9323273bec536affb`, the
+[desktop consumer run](https://github.com/endless-net/client-ui/actions/runs/34772689573)
+passed on Windows, Linux and macOS. Each log explicitly passes the RenewSession
+producer-host scenario and independent session/credential state widget test.
+The [iOS job](https://github.com/endless-net/client-ui/actions/runs/34772689579/job/103765166098)
+passed the new shared state assertion, but failed the initial profile-creation
+test because the expected create callback was not observed. The whole iOS suite
+is not qualified by that partial pass. Android failed KVM preflight before tests;
+Windows packaging failed at the reviewed core resolver. No runtime renewal,
+mobile native transport or full SA acceptance is claimed. The added failed-renewal
+process scenario and profile-input settling checks await a new runner result.
+
 Identity confirmation callback hardening (local evidence): queued inspection and
 checkbox callbacks cannot act after the form is disposed. A checkbox retained
 from an earlier identity cannot confirm while a reload is pending or after a

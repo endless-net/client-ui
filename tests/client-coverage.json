@@ -348,7 +348,7 @@
         },
         {
           "path": "app/test/client_session_process_test.dart",
-          "scope": "RenewSession producer-host scenario: exact mutation context, persisted request ID, pending acceptance, GetOperation renewal result, and gated SessionChanged without credential mutation. Desktop CI execution pending; not real renewal or mobile native interoperability"
+          "scope": "RenewSession producer-host scenario: exact mutation context, persisted request ID, pending acceptance, GetOperation renewal result, and gated SessionChanged without credential mutation. Success scenario passed on Windows/Linux/macOS at 8f222f1 (run 34772689573); failed renewal retaining deadlines and journal is pending runner execution. Not real renewal or mobile native interoperability"
         }
       ],
       "acceptanceEvidence": []

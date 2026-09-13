@@ -59,8 +59,35 @@ Map<String, Object> exitFailureOperation(Map<String, Object> accepted) => {
   },
 };
 
+Map<String, Object> renewalFailureOperation(Map<String, Object> accepted) => {
+  ...accepted,
+  'state': 'OPERATION_STATE_FAILED',
+  'continuity': 'CONNECTION_CONTINUITY_UNKNOWN',
+  'failure': {
+    'code': 'ERROR_CODE_UNAVAILABLE',
+    'reasonKey': 'session.renewal_unavailable',
+    'retryable': false,
+  },
+};
+
 void main() {
   final executable = Platform.environment['ENDLESSNET_TESTSERVER'];
+  test('US-09 failed renewal fixture never exposes a successful deadline', () {
+    final result = ClientOperation.fromProto(
+      api.Operation()..mergeFromProto3Json(
+        renewalFailureOperation({
+          'id': 'renewal-a',
+          'requestId': 'c06bd29f-7c77-4b27-943a-620081f313df',
+          'kind': 'OPERATION_KIND_RENEW_SESSION',
+        }),
+      ),
+    );
+    expect(result.terminal, isTrue);
+    expect(result.succeeded, isFalse);
+    expect(result.value.hasRenewal(), isFalse);
+    expect(result.value.failure.code, api.ErrorCode.ERROR_CODE_UNAVAILABLE);
+    expect(result.value.failure.retryable, isFalse);
+  });
   test('US-05: exit failure fixture is not selection success', () {
     final result = ClientOperation.fromProto(
       api.Operation()..mergeFromProto3Json(
@@ -160,6 +187,7 @@ void main() {
   });
   for (final authentication in [
     'renew-session',
+    'failed-renew-session',
     'select-network',
     'connect',
     'browser',
@@ -176,6 +204,7 @@ void main() {
     'failed-exit',
     'ui-quit',
   ]) {
+    final renewingSession = authentication.endsWith('renew-session');
     test(
       'US-01/02/03/04/05/06/07/09/10/11/12: $authentication session submits and recovers while WatchEvents stays open',
       () async {
@@ -186,7 +215,8 @@ void main() {
         final intent = PendingClientIntent(
           'c06bd29f-7c77-4b27-943a-620081f313df',
           switch (authentication) {
-            'renew-session' => api.OperationKind.OPERATION_KIND_RENEW_SESSION,
+            'renew-session' || 'failed-renew-session' =>
+              api.OperationKind.OPERATION_KIND_RENEW_SESSION,
             'select-network' => api.OperationKind.OPERATION_KIND_SELECT_NETWORK,
             'ui-quit' => api.OperationKind.OPERATION_KIND_NOTIFY_LIFECYCLE,
             'select-exit' ||
@@ -226,6 +256,7 @@ void main() {
           'state': 'OPERATION_STATE_PENDING',
         };
         final terminal = switch (authentication) {
+          'failed-renew-session' => renewalFailureOperation(accepted),
           'conflict-resource' => resourceConflictOperation(accepted),
           'failed-exit' => exitFailureOperation(accepted),
           _ => recoveredOperation(accepted),
@@ -255,7 +286,7 @@ void main() {
                   'status': {
                     'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
                     'activeProfileId': 'profile-a',
-                    if (authentication == 'renew-session') ...{
+                    if (renewingSession) ...{
                       'session': {
                         'state': 'SESSION_STATE_EXPIRING',
                         'expiresAt': '2030-01-01T00:00:00Z',
@@ -473,7 +504,7 @@ void main() {
               'disable-resource' ||
               'conflict-resource' => 'SetResourceEnabled',
               'connect' => 'Connect',
-              'renew-session' => 'RenewSession',
+              'renew-session' || 'failed-renew-session' => 'RenewSession',
               'trust' => 'TrustServerIdentity',
               'bundle' => 'CreateDiagnosticsBundle',
               'set-preferences' => 'SetPreferences',
@@ -733,7 +764,7 @@ void main() {
               }
               return commands.enroll(request);
             }
-            if (authentication == 'renew-session') {
+            if (renewingSession) {
               return commands.renewSession(
                 api.RenewSessionRequest(
                   mutation: context,
@@ -768,6 +799,35 @@ void main() {
             expect(session.state.snapshot!.status.network.id, 'network-a');
           }
           final recovered = await session.recoverPending();
+          if (authentication == 'failed-renew-session') {
+            final current = session.state.snapshot!.status;
+            expect(
+              current.session.state,
+              api.SessionState.SESSION_STATE_EXPIRING,
+            );
+            expect(
+              current.session.expiresAt.toProto3Json(),
+              '2030-01-01T00:00:00Z',
+            );
+            expect(
+              current.credential.state,
+              api.CredentialState.CREDENTIAL_STATE_VALID,
+            );
+            expect(
+              current.credential.expiresAt.toProto3Json(),
+              '2032-01-01T00:00:00Z',
+            );
+            expect(
+              recovered.single.value.failure.code,
+              api.ErrorCode.ERROR_CODE_UNAVAILABLE,
+            );
+            expect(recovered.single.value.failure.retryable, isFalse);
+            expect(recovered.single.value.hasRenewal(), isFalse);
+            expect(
+              (await journal.pending()).single.requestId,
+              intent.requestId,
+            );
+          }
           if (authentication == 'renew-session') {
             final before = session.state.snapshot!.status;
             expect(
@@ -852,6 +912,7 @@ void main() {
           expect(
             recovered.single.succeeded,
             authentication != 'conflict-resource' &&
+                authentication != 'failed-renew-session' &&
                 authentication != 'failed-exit',
           );
           if (exits != null) {

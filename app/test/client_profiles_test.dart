@@ -1762,7 +1762,11 @@ void main() {
         find.byKey(const Key('create-profile-origin')),
         'https://example.test',
       );
-      await tester.pump();
+      // Complete editable-text focus/scroll animations before native hit
+      // testing. Keep the real tap: never bypass it by invoking onPressed.
+      await tester.pumpAndSettle();
+      expect(tester.widget<OutlinedButton>(submit).onPressed, isNotNull);
+      expect(submit.hitTestable(), findsOneWidget);
       await tester.tap(submit);
       await tester.pump();
       expect(calls, [('New profile', 'https://example.test')]);
