@@ -9,7 +9,9 @@ The target multiplatform design, BA traceability and acceptance scenarios for
 Client Protobuf v0 are documented in
 [`docs/client-ui-system-analysis.md`](docs/client-ui-system-analysis.md).
 [`docs/architecture-and-future.md`](docs/architecture-and-future.md) preserves the
-dated Windows HTTP v2 implementation description; runtime/UI cutover is pending.
+dated Windows HTTP v2 implementation description. The native entrypoint is now
+active; remaining cutover work is tracked in
+[`docs/native-desktop-cutover.md`](docs/native-desktop-cutover.md).
 
 ## Local checks
 
@@ -21,17 +23,15 @@ flutter test
 Pop-Location
 ```
 
-Run the UI component and IPC end-to-end suite against a hermetic named-pipe
-service emulator:
+Run the native IPC process suite with a reviewed producer scenario host:
 
 ```powershell
-.\scripts\test-ui-with-service-emulator.ps1
+.\scripts\test-ui-with-native-host.ps1 -HostExecutable C:\test-tools\client-testserver.exe
 ```
 
-The emulator implements the checked-in OpenAPI surface, supports deterministic
-state transitions and fault injection, and records a redacted JSONL request
-journal. See [`tools/service-emulator/README.md`](tools/service-emulator/README.md)
-for manual UI testing and custom scenarios.
+The strict producer fixture uses Protobuf v0 over a local pipe/socket. The old
+HTTP emulator is removed. See [`docs/native-scenario-host.md`](docs/native-scenario-host.md)
+for fixture ownership, verification and explicit scenario coverage gaps.
 
 ## Client core v0.4.1 integration
 

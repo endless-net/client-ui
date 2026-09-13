@@ -28,8 +28,8 @@ still includes retired-contract tests and concurrent native exit-node work;
 its aggregate result is not a native-only coverage claim.
 
 Remaining work in client-ui: remove the unreachable old controller, bridge and
-widgets from main.dart and replace their HTTP-based tests; migrate the emulator
-and release pairing; complete native shell actions and destination adapters;
+widgets from main.dart and replace their HTTP-based tests; complete the native
+scenario catalog and release pairing; complete native shell actions and destination adapters;
 validate actual desktop integration and elevation on supported platforms.
 Client owns remaining runtime providers/capabilities. System acceptance against
 pinned artifacts remains separate. This entrypoint change does not establish
@@ -84,3 +84,6 @@ disconnect during connect, duplicate queued clicks, context changes during an
 operation and sanitized errors. Tests use native projections with injected
 actions, not real OS tray clicks. Window/session tests and durable journal tests
 remain separate evidence; OS integration and release acceptance remain pending.
+
+The subsequent emulator removal, pinned native host wiring and unfulfilled
+scenario coverage are recorded in [Native v0 scenario host](native-scenario-host.md).

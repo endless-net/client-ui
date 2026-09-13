@@ -63,17 +63,36 @@ jobs:
       - name: Test Go tools
         run: go test ./...
 
-      - name: Build service emulator
+      - name: Checkout pinned native scenario producer
+        uses: actions/checkout@v7
+        with:
+          repository: endless-net/client
+          ref: ac30bfe0e959f3c93ef1059495f2356fa5476b06
+          path: client-source
+          persist-credentials: false
+
+      - name: Build native scenario host
         shell: pwsh
+        working-directory: client-source/clientipc
         run: >-
           go build
-          -o "$env:RUNNER_TEMP/endlessnet-service-emulator.exe"
-          ./tools/service-emulator/cmd/endlessnet-service-emulator
+          -o "$env:RUNNER_TEMP/client-testserver.exe"
+          ./cmd/client-testserver
+
+      - name: Remove fixture checkout from UI source artifacts
+        shell: pwsh
+        run: |
+          $workspacePath = [System.IO.Path]::GetFullPath($env:GITHUB_WORKSPACE)
+          $fixturePath = [System.IO.Path]::GetFullPath((Join-Path $workspacePath 'client-source'))
+          if ([System.IO.Path]::GetDirectoryName($fixturePath) -ne $workspacePath) {
+            throw 'Fixture checkout must be a direct workspace child'
+          }
+          Remove-Item -LiteralPath $fixturePath -Recurse -Force
 
       - name: Analyze and test Flutter UI
         working-directory: app
         env:
-          ENDLESSNET_SERVICE_EMULATOR: ${{ runner.temp }}\endlessnet-service-emulator.exe
+          ENDLESSNET_TESTSERVER: ${{ runner.temp }}\client-testserver.exe
         run: |
           flutter analyze
           flutter test
