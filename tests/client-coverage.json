@@ -557,6 +557,10 @@
           "scope": "17 short tests: exact five enrollment-mode labels, RU/EN browser/token form messages for accepted/result/unknown with cleared token and no locale replay, four stale input callbacks (hostname/token/mode/login method). Component evidence only, not real registration or full-app UI-AC-13"
         },
         {
+          "path": "app/test/client_support_locale_test.dart",
+          "scope": "14 short RU/EN widget vectors compare entire offline/loaded/error support text, unknown offline-topic guidance and all four links with fresh lookup before mock browser opening. Locale changes cause no repeat reads or opens. Not complete offline corpus, full-app switching or native browser acceptance"
+        },
+        {
           "path": "app/test/client_recovery_locale_test.dart",
           "scope": "22 shared RU/EN recovery widget vectors compare all panel text for lookup, pending, acknowledgement, browser success/failure and export success/cancellation/failure/unavailable adapter. Rebuilding the same state in the other locale updates notices without repeating lookup or external actions. Runner execution pending; not full-app language switching, native dialogs or product acceptance"
         },

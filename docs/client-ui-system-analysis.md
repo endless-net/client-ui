@@ -148,6 +148,14 @@ epochs профилей/сессии, callback отправки связан с 
 очистку токена, отсутствие replay при смене языка и четыре input races.
 Это component evidence, не реальный login/registration или full-app UI-AC-13.
 
+ClientSupportPanel поддерживает RU/EN для встроенной справки, четырёх ссылок,
+неизвестной offline topic и безопасного сообщения ошибки. Справка работает без
+runtime; locale rebuild не повторяет lookup и не открывает браузер заново.
+14 short widget-векторов сравнивают весь текст обеих локалей, offline/error,
+каждую ссылку и повторное чтение перед открытием. Это проверка компонента с
+mock browser; полный offline corpus, full-app language switching и нативное
+открытие браузера ещё не приняты.
+
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
 оставляют открытыми версии ОС, принятые assistive technologies, lifecycle

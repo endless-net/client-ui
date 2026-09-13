@@ -2,6 +2,7 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'client_state_controller.dart';
 import 'client_support_info.dart';
+import 'client_locale.dart';
 
 class ClientSupportPanel extends StatefulWidget {
   const ClientSupportPanel({
@@ -9,8 +10,10 @@ class ClientSupportPanel extends StatefulWidget {
     required this.state,
     required this.load,
     required this.openBrowser,
+    this.locale = ClientLocale.en,
   });
   final ClientStateController state;
+  final ClientLocale locale;
   final Future<api.SupportInfo> Function() load;
   final Future<bool> Function(Uri, void Function()) openBrowser;
   @override
@@ -20,7 +23,15 @@ class ClientSupportPanel extends StatefulWidget {
 class _ClientSupportPanelState extends State<ClientSupportPanel> {
   api.SupportInfo? _info;
   String? _context;
-  String? _notice;
+  bool _failed = false;
+  String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
+  String _linkLabel(String key) => switch (key) {
+    'documentation' => _text('Open documentation', 'Открыть документацию'),
+    'support' => _text('Open support', 'Открыть поддержку'),
+    'privacy' => _text('Open privacy', 'Открыть политику конфиденциальности'),
+    'license' => _text('Open license', 'Открыть лицензию'),
+    _ => throw StateError('Unknown support link'),
+  };
   bool _busy = false;
   bool _help = false;
   String get contextId =>
@@ -33,7 +44,7 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
   void _reset() {
     _info = null;
     _context = null;
-    _notice = null;
+    _failed = false;
   }
 
   void _changed() {
@@ -77,9 +88,13 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
     final original = key == null ? null : link(_info!, key);
     if (original == '') return;
     final context = contextId;
+    final originalState = widget.state;
     final build = widget.state.snapshot!.runtime.build;
     void check() {
-      if (!mounted || !current || context != _context) {
+      if (!mounted ||
+          !identical(widget.state, originalState) ||
+          !current ||
+          context != _context) {
         throw StateError('Support context changed');
       }
     }
@@ -87,7 +102,7 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
     setState(() {
       _context = context;
       _busy = true;
-      _notice = null;
+      _failed = false;
       if (key == null) _info = null;
     });
     try {
@@ -111,11 +126,13 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
       }
       setState(() => _info = info);
     } catch (_) {
-      if (mounted && current && context == _context) {
+      if (mounted &&
+          identical(widget.state, originalState) &&
+          current &&
+          context == _context) {
         setState(() {
           _info = null;
-          _notice =
-              'Support information could not be confirmed. Refresh before opening a link.';
+          _failed = true;
         });
       }
     } finally {
@@ -137,26 +154,49 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
             onPressed: () {
               if (mounted) setState(() => _help = !_help);
             },
-            child: const Text('Offline help'),
+            child: Text(_text('Offline help', 'Справка без интернета')),
           ),
           if (_help)
-            const Text(
-              'Built-in help: Reconnect runtime if its status is unavailable. '
-              'An accepted operation is not a completed result: recover pending operations before retrying. '
-              'Logout and Forget local enrollment are different actions. Never share enrollment tokens or private keys. '
-              'Use explicit diagnostics export when requesting support; inspect the file before sharing.',
+            Text(
+              _text(
+                'Built-in help: Reconnect runtime if its status is unavailable. '
+                    'An accepted operation is not a completed result: recover pending operations before retrying. '
+                    'Logout and Forget local enrollment are different actions. Never share enrollment tokens or private keys. '
+                    'Use explicit diagnostics export when requesting support; inspect the file before sharing.',
+                'Встроенная справка: переподключитесь к службе, если её состояние недоступно. '
+                    'Принятие операции не означает завершения: восстановите незавершённые операции перед повтором. '
+                    'Выход и удаление локальной регистрации — разные действия. Никому не передавайте токены регистрации и закрытые ключи. '
+                    'Для обращения в поддержку явно экспортируйте диагностику; проверьте файл перед отправкой.',
+              ),
             ),
           OutlinedButton(
             key: const Key('client-load-support'),
             onPressed: allowed && !_busy ? () => _run() : null,
-            child: const Text('Refresh support information'),
+            child: Text(
+              _text(
+                'Refresh support information',
+                'Обновить сведения о поддержке',
+              ),
+            ),
           ),
-          if (current && _notice != null) Text(_notice!),
+          if (current && _failed)
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                _text(
+                  'Support information could not be confirmed. Refresh before opening a link.',
+                  'Не удалось подтвердить сведения о поддержке. Обновите их перед открытием ссылки.',
+                ),
+              ),
+            ),
           if (info != null) ...[
-            Text('Product: ${info.productName}'),
+            Text('${_text('Product', 'Продукт')}: ${info.productName}'),
             if (info.offlineHelpKey.isNotEmpty)
-              const Text(
-                'The runtime-requested offline topic is not bundled. Built-in help remains available.',
+              Text(
+                _text(
+                  'The runtime-requested offline topic is not bundled. Built-in help remains available.',
+                  'Запрошенная службой тема отсутствует во встроенной справке. Общая справка остаётся доступной.',
+                ),
               ),
             for (final key in [
               'documentation',
@@ -176,7 +216,7 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
                           }
                         }
                       : null,
-                  child: Text('Open $key'),
+                  child: Text(_linkLabel(key)),
                 ),
           ],
         ],
