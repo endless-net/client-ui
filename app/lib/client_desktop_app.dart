@@ -38,9 +38,13 @@ class ClientDesktopApp extends StatefulWidget {
     this.onExit,
     this.uiBuild,
     this.initialLocale = ClientLocale.en,
+    this.localeReadFailed = false,
+    this.saveLocale,
   });
   final ClientSession session;
   final ClientLocale initialLocale;
+  final bool localeReadFailed;
+  final Future<void> Function(ClientLocale)? saveLocale;
   final api.BuildIdentity? uiBuild;
   final bool desktopIntegration;
   final bool showWindow;
@@ -60,6 +64,38 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   bool _busy = false;
   _DesktopNotice? _notice;
   late ClientLocale _locale;
+  bool _localeStorageFailed = false;
+  int _localeChoice = 0;
+  Future<void>? _localeWrites;
+  void _chooseLocale(ClientLocale value) {
+    if (_busy || value == _locale) return;
+    final choice = ++_localeChoice;
+    setState(() {
+      _locale = value;
+      _localeStorageFailed = false;
+    });
+    _tray.locale = value;
+    final save = widget.saveLocale;
+    if (save == null) return;
+    final previous = _localeWrites;
+    final writing = () async {
+      if (previous != null) await previous;
+      try {
+        await save(value);
+      } catch (_) {
+        if (mounted && choice == _localeChoice) {
+          setState(() => _localeStorageFailed = true);
+        }
+      }
+    }();
+    _localeWrites = writing;
+    unawaited(
+      writing.then((_) {
+        if (identical(_localeWrites, writing)) _localeWrites = null;
+      }),
+    );
+  }
+
   String _text(String en, String ru) => _locale.text(en: en, ru: ru);
   String get _noticeText => switch (_notice!) {
     _DesktopNotice.tray => _text(
@@ -114,6 +150,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   void initState() {
     super.initState();
     _locale = widget.initialLocale;
+    _localeStorageFailed = widget.localeReadFailed;
     _tray = ClientTray(
       locale: _locale,
       state: session.state,
@@ -333,6 +370,8 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     }
     _signals?.cancel();
     _trayReady = false;
+    final savingLocale = _localeWrites;
+    if (savingLocale != null) await savingLocale;
     await session.close();
     await widget.onExit?.call();
     if (widget.desktopIntegration) {
@@ -393,16 +432,27 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
                   child: Text('Русский'),
                 ),
               ],
-              onChanged: (value) {
-                if (value != null && value != _locale) {
-                  setState(() => _locale = value);
-                  _tray.locale = value;
-                }
-              },
+              onChanged: _busy
+                  ? null
+                  : (value) {
+                      if (value != null && value != _locale) {
+                        _chooseLocale(value);
+                      }
+                    },
             ),
           ),
           if (_notice != null)
             Semantics(liveRegion: true, child: Text(_noticeText)),
+          if (_localeStorageFailed)
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                _text(
+                  'The language setting could not be read or saved. Your current choice applies to this session.',
+                  'Не удалось прочитать или сохранить язык. Текущий выбор действует в этом запуске.',
+                ),
+              ),
+            ),
           AnimatedBuilder(
             animation: _tray,
             builder: (context, _) => _tray.notice == null

@@ -605,6 +605,14 @@
           "scope": "Ten short unit tests: all 12 service and four local-link labels, exact RU/EN menu and four command notices, language changes during pending result without replay, expired menu click rejection and same-locale no-op. Native drawing and OS accessibility not verified; not full UI-AC-13 acceptance"
         },
         {
+          "path": "app/test/client_locale_store_test.dart",
+          "scope": "Six short storage tests: missing preference, RU/EN persisted across new store, ordered writes, bounded malformed/oversized reads without implicit repair, non-file preservation, recovery after failed write and absolute path requirement. Not native restart or mobile container acceptance"
+        },
+        {
+          "path": "app/test/client_locale_persistence_test.dart",
+          "scope": "Five short widgets: read/write failure notice, ordered rapid writes with stale failure suppression and no reconnect, observer quit and explicitly confirmed quit after errored IPC stream await save. Not native restart, Material/OS localization or full UI-AC-13 acceptance"
+        },
+        {
           "path": "app/test/client_intent_journal_test.dart",
           "scope": "Journal contains UUID and kind only; not complete privacy/accessibility acceptance"
         },

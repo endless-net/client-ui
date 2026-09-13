@@ -10,6 +10,8 @@ import 'package:window_manager/window_manager.dart';
 import 'client_desktop_app.dart';
 import 'client_build_target.dart';
 import 'client_intent_journal.dart';
+import 'client_locale.dart';
+import 'client_locale_store.dart';
 import 'client_session.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
@@ -74,8 +76,24 @@ Future<void> main(List<String> args) async {
     endpoint: endpoint,
     journal: ClientIntentJournal(clientJournalDirectory(endpoint)),
   );
+  ClientLocaleStore? localeStore;
+  var locale = ClientLocale.en;
+  var localeReadFailed = false;
+  try {
+    localeStore = ClientLocaleStore(clientLocaleDirectory());
+    locale = await localeStore.read() ?? ClientLocale.en;
+  } catch (_) {
+    localeReadFailed = true;
+  }
   runApp(
     ClientDesktopApp(
+      initialLocale: locale,
+      localeReadFailed: localeReadFailed,
+      saveLocale: (value) async {
+        final store = localeStore;
+        if (store == null) throw StateError('UI language storage unavailable');
+        await store.write(value);
+      },
       session: session,
       uiBuild: desktopBuildIdentity(),
       showWindow: config.showWindow,
