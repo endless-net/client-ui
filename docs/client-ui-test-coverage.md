@@ -18,6 +18,20 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+Latest completed inspected snapshot: `02515e07deed10b40da72c4fac17097ae28331b5`.
+[Windows](https://github.com/endless-net/client-ui/actions/runs/34740023685/job/103678075723),
+[Linux](https://github.com/endless-net/client-ui/actions/runs/34740023685/job/103678075876)
+and [macOS](https://github.com/endless-net/client-ui/actions/runs/34740023685/job/103678075814)
+each passed 252 tests. Logs confirm both previously failing process scenarios,
+peer UI and the durable outbox; the desktop workflow completed successfully.
+[iOS](https://github.com/endless-net/client-ui/actions/runs/34740023703/job/103678076431)
+passed 80 simulator tests, explicitly including peer panel query/invalidation
+and the full outbox boundary. The separate peer bounds and time-validation files
+were not imported into that mobile run; they are now included for a future run.
+[Android](https://github.com/endless-net/client-ui/actions/runs/34740023703/job/103678076374)
+failed KVM preflight before tests. The overall mobile workflow failed; no native
+VPN/traffic acceptance or full SA scenario is established by these results.
+
 At `0fec352f2fb6e9391b1ae0fcb956548349f9a782`, inspected
 [macOS](https://github.com/endless-net/client-ui/actions/runs/34739507905/job/103676688251)
 passed 248 tests including the peer panel and full outbox boundary.
