@@ -55,3 +55,23 @@ func TestDesktopEntrypointUsesOnlyNativeSession(t *testing.T) {
 		}
 	}
 }
+
+func TestNativeConsumerCIDiscoversEveryFlutterTest(t *testing.T) {
+	raw, err := os.ReadFile(".github/workflows/contract-consumer.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := strings.ReplaceAll(string(raw), "\r\n", "\n")
+	for _, required := range []string{
+		"os: [ubuntu-latest, windows-latest, macos-latest]",
+		"flutter pub get --enforce-lockfile",
+		"ENDLESSNET_TESTSERVER: ${{ github.workspace }}/client-testserver.exe\n        run: flutter test --no-pub\n",
+	} {
+		if !strings.Contains(workflow, required) {
+			t.Errorf("native consumer CI missing full-suite contract: %s", required)
+		}
+	}
+	if strings.Contains(workflow, "run: flutter test --no-pub test/") {
+		t.Fatal("explicit test file allowlists silently omit new native regression tests")
+	}
+}

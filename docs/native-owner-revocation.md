@@ -17,3 +17,9 @@ installed-service acceptance. The producer-side send/queue revocation behavior
 is owned by [client main](https://github.com/endless-net/client/blob/main/docs/native-event-cutover.md).
 Combined real-host permission-change tests, OS lifecycle and UI presentation
 remain separate acceptance work. No contract, SDK pin or version is changed.
+
+The cross-platform `Client v0 consumer` workflow now runs the whole Flutter test
+suite on Linux, Windows and macOS with the existing pinned native scenario host,
+instead of a manually maintained file list that omitted this regression test.
+A repository Go test guards full-suite discovery and host wiring. This schedules
+coverage; only completed CI results establish whether each platform passes.

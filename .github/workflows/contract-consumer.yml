@@ -51,17 +51,15 @@ jobs:
       - name: Resolve exact consumer dependencies
         working-directory: app
         run: flutter pub get --enforce-lockfile
-      - name: Test generated v0 snapshot consumer
-        # The probe below checks the dependency resolved by the app itself.
+      - name: Test complete native consumer suite
+        # Discover every test, including new regression files. The native host
+        # enables process tests on every OS; the probe below uses this app's SDK.
         working-directory: app
         env:
           ENDLESSNET_TESTSERVER: ${{ github.workspace }}/client-testserver.exe
-        run: flutter test --no-pub test/client_runtime_snapshot_test.dart test/client_event_stream_test.dart test/client_operation_test.dart test/client_mutations_test.dart test/client_state_controller_test.dart test/client_intent_journal_test.dart test/client_session_test.dart test/client_session_process_test.dart test/local_client_events_test.dart test/mobile_contract_widget_test.dart
+        run: flutter test --no-pub
       - name: Reject dependency drift
         run: git diff --exit-code -- app/pubspec.yaml app/pubspec.lock
       - name: Verify app transport after stream cancellation
         working-directory: app
         run: dart --packages=.dart_tool/package_config.json ../packages/local_client_rpc/tool/probe_late_headers.dart
-      - name: Test v0 shared panels and desktop lifecycle
-        working-directory: app
-        run: flutter test --no-pub test/client_profiles_test.dart test/client_desktop_app_test.dart
