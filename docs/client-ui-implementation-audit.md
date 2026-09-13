@@ -65,6 +65,12 @@ Windows/Linux и использует прежние checksum/context/unique-dir
 14 shared short tests и native syntax check прошли; реальный диалог, portal
 permissions и OS captions не квалифицированы. macOS/mobile export ещё отсутствует.
 
+macOS export source дополнена: NSOpenPanel + одноразовый lease, user-selected
+read/write entitlement при сохранённом sandbox, release в finally после записи
+или stale/error. Семь short channel tests проверяют Dart lifetime; AppKit
+compilation, effective sandbox rights и реальный диалог пока не проверены.
+Mobile export и macOS protected-IPC acceptance остаются отдельными пробелами.
+
 | UF | Наблюдаемая реализация | Что ещё нужно для исходного scope |
 | --- | --- | --- |
 | UF-01 | `main.dart`, Windows runner/package pipeline; Linux/macOS scaffold | Product hosts Android/iOS отсутствуют; дистрибуция и compatible pairing всех платформ не квалифицированы |

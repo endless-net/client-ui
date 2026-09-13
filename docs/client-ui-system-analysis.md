@@ -129,6 +129,27 @@ Linux C++ syntax check с GTK/Flutter headers пройден; native dialog inte
 filesystem/portal permission, captions относительно UI locale и полная native
 app build не проверены. OS labels выбирает GTK; полное UI-AC-13 не заявлено.
 
+macOS destination source дополнена в
+[`MainFlutterWindow.swift`](../app/macos/Runner/MainFlutterWindow.swift):
+`NSOpenPanel` выбирает только одну папку без создания каталога. UI получает
+временный UUID lease/path, не bookmark; одновременный chooser или новый grant
+при ещё открытом предыдущем отклоняется. User-selected read/write entitlement
+добавлен в DebugProfile/Release без отключения sandbox. Согласно
+[App Sandbox](https://developer.apple.com/documentation/security/accessing-files-from-the-macos-app-sandbox),
+доступ открывается системой при выборе и освобождается через
+`stopAccessingSecurityScopedResource` после записи/ошибки или закрытия окна.
+Shell выполняет scoped export с `finally` release даже при stale context;
+malformed path с известным lease также освобождается. Ошибка release не
+выдаётся за успешный export и не запускает повтор. Bookmark/path не сохраняется.
+[7 channel tests](../app/test/client_mac_bundle_destination_test.dart) проверяют
+эти Dart boundaries. Нативные AppKit compilation, NSOpenPanel/grant lifetime,
+подпись/entitlement effectiveness и sandbox-protected IPC пока не проверены.
+Mobile export отсутствует; наличие macOS source не означает готовность платформы.
+
+Повторная read-only сверка `client/main` после этого дополнения: remote main и
+локальный origin/main остаются `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`.
+Producer repository, его пользовательские изменения, pin и версии не менялись.
+
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin

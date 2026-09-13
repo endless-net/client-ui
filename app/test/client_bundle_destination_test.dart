@@ -14,7 +14,7 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
-  test('only implemented Windows/Linux destination hosts are enabled', () {
+  test('only implemented desktop destination hosts are enabled', () {
     for (final os in [
       'windows',
       'linux',
@@ -26,7 +26,7 @@ void main() {
     ]) {
       expect(
         supportsClientBundleDestination(os),
-        os == 'windows' || os == 'linux',
+        os == 'windows' || os == 'linux' || os == 'macos',
       );
     }
   });

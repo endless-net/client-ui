@@ -178,6 +178,16 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
       }
     }
 
+    if (Platform.isMacOS) {
+      return exportClientBundleToMacDirectory(
+        requestId: requestId,
+        save: (id, directory) async {
+          check();
+          await originalSession.exportDiagnosticsBundle(id, directory);
+        },
+        checkContext: check,
+      );
+    }
     return exportClientBundleToChosenDirectory(
       requestId: requestId,
       choose: chooseClientBundleDirectory,
