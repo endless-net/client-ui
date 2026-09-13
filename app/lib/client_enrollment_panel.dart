@@ -60,7 +60,7 @@ class _EnrollmentFormState extends State<_EnrollmentForm> {
   bool _useToken = false;
   bool _busy = false;
   String? _notice;
-  bool get _enabled => widget.profileId.isNotEmpty && !_busy;
+  bool get _enabled => mounted && widget.profileId.isNotEmpty && !_busy;
 
   Future<void> _submit() async {
     if (!_enabled ||

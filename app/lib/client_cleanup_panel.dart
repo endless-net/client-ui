@@ -28,7 +28,8 @@ class _ClientCleanupPanelState extends State<ClientCleanupPanel> {
 
   bool _allowed(bool forget) {
     final snapshot = widget.state.snapshot;
-    return !_busy &&
+    return mounted &&
+        !_busy &&
         widget.state.link == ClientLinkState.ready &&
         snapshot != null &&
         snapshot.status.activeProfileId.isNotEmpty &&
@@ -127,7 +128,9 @@ class _ClientCleanupPanelState extends State<ClientCleanupPanel> {
               children: [
                 TextButton(
                   key: const Key('cancel-client-cleanup'),
-                  onPressed: () => setState(() => _forget = null),
+                  onPressed: () {
+                    if (mounted) setState(() => _forget = null);
+                  },
                   child: const Text('Cancel'),
                 ),
                 TextButton(

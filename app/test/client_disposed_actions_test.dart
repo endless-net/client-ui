@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'package:endlessnet/client_cleanup_panel.dart';
+import 'package:endlessnet/client_create_profile_panel.dart';
+import 'package:endlessnet/client_enrollment_panel.dart';
 import 'package:endlessnet/client_diagnostics_panel.dart';
 import 'package:endlessnet/client_exit_panel.dart';
 import 'package:endlessnet/client_networks_panel.dart';
@@ -62,6 +65,23 @@ Widget panel(
     recover: () async => invoked(),
     acknowledge: (_) async => invoked(),
   ),
+  'client-logout' ||
+  'client-local-forget' ||
+  'confirm-client-cleanup' ||
+  'cancel-client-cleanup' => ClientCleanupPanel(
+    state: state,
+    canElevate: true,
+    logout: (_) async => invoked(),
+    forget: (_) async => invoked(),
+  ),
+  'create-profile-submit' => ClientCreateProfilePanel(
+    state: state,
+    create: (_, _) async => invoked(),
+  ),
+  'enroll-submit' => ClientEnrollmentPanel(
+    state: state,
+    enroll: (_, _, _, _) async => invoked(),
+  ),
   _ => throw StateError('Unknown test action'),
 };
 
@@ -76,6 +96,12 @@ void main() {
     'client-load-resources',
     'client-load-exits',
     'client-recover',
+    'client-logout',
+    'client-local-forget',
+    'confirm-client-cleanup',
+    'cancel-client-cleanup',
+    'create-profile-submit',
+    'enroll-submit',
   ]) {
     testWidgets('Disposed panel does not execute queued $action', (
       tester,
@@ -128,6 +154,27 @@ void main() {
           },
         }),
       );
+      await tester.pump();
+      if (action == 'create-profile-submit') {
+        await tester.enterText(
+          find.byKey(const Key('create-profile-name')),
+          'Synthetic',
+        );
+        await tester.enterText(
+          find.byKey(const Key('create-profile-origin')),
+          'https://control.test',
+        );
+      }
+      if (action == 'enroll-submit') {
+        await tester.enterText(
+          find.byKey(const Key('enroll-hostname')),
+          'synthetic-host',
+        );
+      }
+      if (action == 'confirm-client-cleanup' ||
+          action == 'cancel-client-cleanup') {
+        await tester.tap(find.byKey(const Key('client-local-forget')));
+      }
       await tester.pump();
       final callback = tester
           .widget<ButtonStyleButton>(find.byKey(Key(action)))

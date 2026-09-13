@@ -60,7 +60,7 @@ class _CreateProfileFormState extends State<_CreateProfileForm> {
   }
 
   Future<void> _submit() async {
-    if (!widget.enabled || _busy || !_valid) return;
+    if (!mounted || !widget.enabled || _busy || !_valid) return;
     final name = _name.text.trim();
     final origin = _origin.text.trim();
     setState(() {
