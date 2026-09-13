@@ -14,6 +14,18 @@ Status: incomplete. Owner: client-ui. Scope: the complete BA/SA goal, not the
 subset already implemented. The canonical machine-readable trace is
 [`tests/client-coverage.json`](../tests/client-coverage.json).
 
+Windows diagnostics destination binding now uses an owner-window native folder
+chooser and the existing checksum-verified session export. Twelve short unit
+tests cover cancellation, invalid paths, minimal channel payload, request identity,
+context invalidation and no replay after save failure. The chooser follows
+[Microsoft's Common Item Dialog contract](https://learn.microsoft.com/en-us/windows/win32/shell/common-file-dialog).
+Real dialog/OS permission acceptance is not claimed, and the four other platform
+adapters remain missing. This implements part of US-07 without closing it.
+Local verification passed 352 short Flutter tests with 1 skip, Flutter analysis,
+Go short tests and the 11 policy/trace checks. `flutter build windows --debug
+--no-pub` compiled the native chooser with the installed local SDK; this is not
+qualification against the pinned CI SDK or a real chooser-interaction test.
+
 Primary connection localization: shared RU/EN tests exercise 29 typed projections
 per locale and four command outcomes per locale. The latter compare complete
 panel text, preserve the semantic live region, change language without another

@@ -9,6 +9,7 @@ import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'client_session.dart';
+import 'client_bundle_destination.dart';
 import 'client_session_panel.dart';
 import 'client_state_controller.dart';
 import 'client_tray.dart';
@@ -58,6 +59,35 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   bool _trayUpdating = false;
   bool _trayDirty = false;
   ClientSession get session => widget.session;
+
+  Future<bool> _exportBundle(String requestId, void Function() checkContext) {
+    final originalSession = session;
+    final state = originalSession.state;
+    final cacheEpoch = state.cacheEpoch;
+    final profileEpoch = state.domainEpoch(api.Domain.DOMAIN_PROFILES);
+    final sessionEpoch = state.domainEpoch(api.Domain.DOMAIN_SESSION);
+    void check() {
+      checkContext();
+      if (!mounted ||
+          !identical(session, originalSession) ||
+          state.link != ClientLinkState.ready ||
+          state.cacheEpoch != cacheEpoch ||
+          state.domainEpoch(api.Domain.DOMAIN_PROFILES) != profileEpoch ||
+          state.domainEpoch(api.Domain.DOMAIN_SESSION) != sessionEpoch) {
+        throw StateError('Diagnostics export context changed');
+      }
+    }
+
+    return exportClientBundleToChosenDirectory(
+      requestId: requestId,
+      choose: chooseClientBundleDirectory,
+      save: (id, directory) async {
+        check();
+        await originalSession.exportDiagnosticsBundle(id, directory);
+      },
+      checkContext: check,
+    );
+  }
 
   @override
   void initState() {
@@ -340,6 +370,9 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
             child: ClientSessionPanel(
               session: session,
               uiBuild: widget.uiBuild,
+              exportBundle: widget.desktopIntegration && Platform.isWindows
+                  ? _exportBundle
+                  : null,
             ),
           ),
         ],

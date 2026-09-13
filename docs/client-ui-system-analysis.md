@@ -211,20 +211,28 @@ Synthetic bytes [1,2,3] проверяют transport/checksum, не формат
 `diagnostics.bundle` без предположения ZIP, flush и повторная context check.
 При ошибке удаляется только созданная подпапка. Filesystem regression проверяет
 неперезапись, два отдельных экспорта и cleanup после отмены. Native destination
-picker, session/UI binding, OS permissions и формат/redaction остаются отдельными
-незавершёнными acceptance gates; путь никогда не берётся из bundle handle.
+picker, session/UI binding, OS permissions и формат/redaction имеют отдельные
+acceptance gates; путь никогда не берётся из bundle handle.
 `ClientSession.exportDiagnosticsBundle` связывает свежий operation lookup,
 checksum-verified read и файловую запись одним session/context guard. Session
 regression проверяет успешный файл, отсутствие нового output при checksum mismatch
 и смене caller во время загрузки. Intention не acknowledge автоматически.
-Native picker и UI export action ещё не подключены; это не полный US-07 acceptance.
+Это не полный US-07 acceptance; default Windows binding описан ниже.
 Recovery UI теперь предоставляет explicit export action только для succeeded
 bundle outcome и переданного native adapter. Перед callback повторяется recovery;
 adapter получает request ID и context guard, не старый handle/путь. Cancellation
 отличается от saved, intention остаётся для отдельного acknowledgement. Shared
 widget test проверяет explicit invocation, fresh lookup и cancellation. Default
-session panel без native adapter сообщает недоступность; полноценное системное
-сохранение на пяти платформах всё ещё не реализовано и не принято.
+session panel без native adapter сообщает недоступность.
+Windows desktop теперь передаёт adapter: системный IFileOpenDialog выбирает
+существующую filesystem-папку, возвращая только путь или null при отмене через
+UI-owned MethodChannel. Пакет сохраняется через `ClientSession.exportDiagnosticsBundle`
+в новую подпапку; caller/profile/session guards проверяются до/после picker и
+сохранения. URL, handle и bytes не передаются native chooser. Short unit-тесты
+проверяют отмену, неверные пути, ошибки и смену контекста без повтора команды.
+Реальное взаимодействие с диалогом Windows ещё не принято; адаптеры Linux,
+macOS, Android и iOS отсутствуют. Полноценное системное сохранение на пяти
+платформах остаётся незавершённым.
 Helper не пишет файлы, clipboard или сеть вне переданного RPC callback.
 
 Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:

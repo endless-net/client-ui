@@ -1,8 +1,46 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <shobjidl.h>
+#include <wrl/client.h>
+#include <flutter/standard_method_codec.h>
+
+#include "utils.h"
 
 #include "flutter/generated_plugin_registrant.h"
+
+namespace {
+// UI-owned chooser; it neither reads runtime state nor writes bundle contents.
+void ChooseDiagnosticsDirectory(
+    HWND owner,
+    std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
+  HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr,
+                               CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog));
+  FILEOPENDIALOGOPTIONS options = 0;
+  if (SUCCEEDED(hr)) hr = dialog->GetOptions(&options);
+  if (SUCCEEDED(hr)) {
+    hr = dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM |
+                           FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR | FOS_DONTADDTORECENT);
+  }
+  if (SUCCEEDED(hr)) hr = dialog->Show(owner);
+  if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+    result->Success();
+    return;
+  }
+  Microsoft::WRL::ComPtr<IShellItem> selected;
+  if (SUCCEEDED(hr)) hr = dialog->GetResult(&selected);
+  PWSTR path = nullptr;
+  if (SUCCEEDED(hr)) hr = selected->GetDisplayName(SIGDN_FILESYSPATH, &path);
+  const std::string encoded = SUCCEEDED(hr) && path ? Utf8FromUtf16(path) : "";
+  CoTaskMemFree(path);
+  if (FAILED(hr) || encoded.empty()) {
+    result->Error("destination_unavailable", "Cannot select diagnostics destination");
+    return;
+  }
+  result->Success(flutter::EncodableValue(encoded));
+}
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project,
                              bool show_on_first_frame)
@@ -28,6 +66,26 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  destination_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(),
+          "endlessnet/ui-diagnostics-destination",
+          &flutter::StandardMethodCodec::GetInstance());
+  destination_channel_->SetMethodCallHandler(
+      [this](const auto& call, auto result) {
+        if (call.method_name() != "chooseDirectory") {
+          result->NotImplemented();
+          return;
+        }
+        if (destination_picker_open_) {
+          result->Error("destination_busy", "A destination chooser is already open");
+          return;
+        }
+        destination_picker_open_ = true;
+        ChooseDiagnosticsDirectory(GetHandle(), std::move(result));
+        destination_picker_open_ = false;
+      });
+
   if (show_on_first_frame_) {
     flutter_controller_->engine()->SetNextFrameCallback([&]() {
       this->Show();
@@ -43,6 +101,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  destination_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
