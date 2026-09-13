@@ -18,6 +18,13 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+UBR-09 connection context now displays Account, Network name/ID and device
+hostname/node ID from the current Status for owners with an active profile.
+The shared typed-snapshot widget regression checks Unknown for missing values,
+Network replacement and removal of private context for observers. Local tests
+cover this addition; its runner execution and full localization/accessibility
+acceptance remain pending.
+
 The shared application-resource widget test now switches Network from a to b
 while the browser action's fresh-catalog validation is pending. It requires the
 old action to disappear and the late old-network response to open no browser and

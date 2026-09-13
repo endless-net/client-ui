@@ -1590,6 +1590,33 @@ void main() {
       expect(find.text('Profile: synthetic-profile'), findsOneWidget);
       expect(find.text('Session expiry: Unknown'), findsOneWidget);
       expect(find.text('Credential expiry: Unknown'), findsOneWidget);
+      expect(find.text('Account: Unknown'), findsOneWidget);
+      expect(find.text('Network ID: Unknown'), findsOneWidget);
+      expect(find.text('Device: Unknown'), findsOneWidget);
+      snapshot.sequence += 1;
+      snapshot.snapshot.status
+        ..accountId = 'account-a'
+        ..hostname = 'device-a'
+        ..nodeId = 'node-a'
+        ..network = api.Network(id: 'network-a', name: 'Network A');
+      source.add(snapshot);
+      await tester.pump();
+      expect(find.text('Account: account-a'), findsOneWidget);
+      expect(find.text('Network: Network A'), findsOneWidget);
+      expect(find.text('Network ID: network-a'), findsOneWidget);
+      expect(find.text('Device: device-a'), findsOneWidget);
+      expect(find.text('Device ID: node-a'), findsOneWidget);
+      snapshot.sequence += 1;
+      snapshot.snapshot.status.network = api.Network(
+        id: 'network-b',
+        name: 'Network B',
+      );
+      source.add(snapshot);
+      await tester.pump();
+      expect(find.text('Network: Network A'), findsNothing);
+      expect(find.text('Network ID: network-a'), findsNothing);
+      expect(find.text('Network: Network B'), findsOneWidget);
+      expect(find.text('Network ID: network-b'), findsOneWidget);
       expect(
         tester
             .widget<OutlinedButton>(
@@ -1677,6 +1704,10 @@ void main() {
       snapshot.snapshot.status.metadata.revision += 1;
       snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
       snapshot.snapshot.status.clearActiveProfileId();
+      snapshot.snapshot.status.clearAccountId();
+      snapshot.snapshot.status.clearHostname();
+      snapshot.snapshot.status.clearNodeId();
+      snapshot.snapshot.status.clearNetwork();
       snapshot.snapshot.status.clearSession();
       snapshot.snapshot.status.clearCredential();
       source.add(snapshot);
@@ -1684,6 +1715,9 @@ void main() {
       expect(find.text('Profile: synthetic-profile'), findsNothing);
       expect(find.byKey(const Key('client-session-expiry')), findsNothing);
       expect(find.byKey(const Key('client-credential-expiry')), findsNothing);
+      expect(find.byKey(const Key('client-context-account')), findsNothing);
+      expect(find.byKey(const Key('client-context-network')), findsNothing);
+      expect(find.byKey(const Key('client-context-device')), findsNothing);
       expect(
         tester
             .widget<OutlinedButton>(

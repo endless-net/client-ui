@@ -130,6 +130,22 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                 Text('Profile: ${snapshot.status.activeProfileId}'),
               if (owner && profile) ...[
                 Text(
+                  'Account: ${_contextValue(snapshot.status.accountId)}',
+                  key: const Key('client-context-account'),
+                ),
+                Text(
+                  'Network: ${_contextValue(snapshot.status.network.name)}',
+                  key: const Key('client-context-network'),
+                ),
+                Text(
+                  'Network ID: ${_contextValue(snapshot.status.network.id)}',
+                ),
+                Text(
+                  'Device: ${_contextValue(snapshot.status.hostname)}',
+                  key: const Key('client-context-device'),
+                ),
+                Text('Device ID: ${_contextValue(snapshot.status.nodeId)}'),
+                Text(
                   'Session expiry: ${snapshot.status.session.hasExpiresAt() ? _deadline(snapshot.status.session.expiresAt.seconds.toInt(), snapshot.status.session.expiresAt.nanos) : 'Unknown'}',
                   key: const Key('client-session-expiry'),
                 ),
@@ -182,6 +198,8 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
     },
   );
 }
+
+String _contextValue(String value) => value.isEmpty ? 'Unknown' : value;
 
 // Display authoritative UTC deadlines independently. Never infer runtime state
 // from the UI clock or substitute one deadline for the other.

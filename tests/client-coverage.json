@@ -195,6 +195,10 @@
         {
           "path": "app/test/client_session_test.dart",
           "scope": "Network catalog active-profile binding and repeated invalidation rejection in session unit tests; no producer runtime acceptance"
+        },
+        {
+          "path": "app/test/mobile_contract_widget_test.dart",
+          "scope": "UBR-09 shared connection panel test: explicit Account, Network and device identity from Status, Unknown for missing fields, replacement of Network and observer privacy cleanup. Local widget evidence, runner validation pending; not full platform/localization acceptance"
         }
       ],
       "acceptanceEvidence": []

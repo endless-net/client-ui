@@ -254,6 +254,13 @@ scaffold и составная session panel теперь используют S
 проверяет верхний inset 59 и настоящий tap, layout — также нижний inset 34.
 Повторный simulator execution зафиксирован выше; локальные unit tests сами по себе не закрывают iOS acceptance.
 
+UBR-09 context: панель подключения показывает owner с active profile отдельные Account ID, Network name
+и ID, device hostname и node ID из текущего Status. Отсутствующее значение
+отмечается Unknown; каталоги не используются для угадывания этих полей. Shared
+widget regression проверяет обновление Network и очистку private context при
+переходе в observer. Это UBR-09 consumer foundation, не полная локализация или
+платформенная acceptance.
+
 US-04 read foundation: `client_networks.dart` собирает полный immutable каталог
 через ListNetworks с фиксированным ProfileRef и opaque page tokens. Проверяются
 instance/revision, неизменность selected ID, duplicate IDs и pagination cycles;
