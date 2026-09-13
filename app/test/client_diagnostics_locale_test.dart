@@ -227,6 +227,8 @@ void main() {
                     ? 'Это сводка. Восстановите операцию создания архива для проверенной загрузки и отдельного экспорта, если он поддерживается.'
                     : 'This is a summary. Recover the archive operation for verified download and a separate export, when supported.',
                 ru ? 'Создать архив диагностики' : 'Create diagnostics archive',
+                ru ? 'Подробности туннеля: 0' : 'Tunnel details: 0',
+                ru ? 'Подробности DNS: 0' : 'DNS details: 0',
                 ru ? 'Подробности интерфейсов: 0' : 'Interface details: 0',
                 ru ? 'Подробности маршрутов: 0' : 'Route details: 0',
                 ru ? 'Подробности конфликтов: 0' : 'Conflict details: 0',

@@ -19,32 +19,90 @@ class ClientDiagnosticsDetails extends StatelessWidget {
       failure.code == api.ErrorCode.ERROR_CODE_UNSPECIFIED
       ? _text('Not reported', 'Не сообщена')
       : clientFailureLabel(failure.code, locale: locale);
-  Widget _section(String key, String title, List<List<String>> entries) =>
-      ExpansionTile(
-        key: Key(key),
-        title: Text('$title: ${entries.length}'),
-        children: [
-          if (entries.isEmpty)
-            Text(
+  Widget _section(
+    String key,
+    String title,
+    List<List<String>> entries, {
+    String? emptyText,
+  }) => ExpansionTile(
+    key: Key(key),
+    title: Text('$title: ${entries.length}'),
+    children: [
+      if (entries.isEmpty)
+        Text(
+          emptyText ??
               _text(
                 'No entries in this snapshot.',
                 'В этом снимке нет записей.',
               ),
-            ),
-          for (final entry in entries)
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [for (final line in entry) Text(line)],
-              ),
-            ),
-        ],
-      );
+        ),
+      for (final entry in entries)
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [for (final line in entry) Text(line)],
+          ),
+        ),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) => Column(
     children: [
+      _section(
+        'diagnostic-tunnel',
+        _text('Tunnel details', 'Подробности туннеля'),
+        [
+          if (diagnostics.hasTunnel())
+            [
+              '${_text('Inspection OK', 'Проверка успешна')}: ${_bool(diagnostics.tunnel.ok)}',
+              '${_text('Interface', 'Интерфейс')}: ${diagnostics.tunnel.interfaceName}',
+              'MTU: ${diagnostics.tunnel.mtu}',
+              '${_text('Listen port', 'Порт прослушивания')}: ${diagnostics.tunnel.listenPort}',
+              '${_text('Failure', 'Ошибка')}: ${_failure(diagnostics.tunnel.failure)}',
+              '${_text('Tunnel peers', 'Устройства туннеля')}: ${diagnostics.tunnel.peers.length}',
+              for (final peer in diagnostics.tunnel.peers) ...[
+                '${_text('Peer', 'Устройство')}: ${peer.peerId}',
+                '${_text('Public key', 'Публичный ключ')}: ${peer.publicKey}',
+                '${_text('Endpoint', 'Адрес подключения')}: ${peer.endpoint}',
+                '${_text('Allowed IPs', 'Разрешённые IP')}: ${peer.allowedIps.join(', ')}',
+                '${_text('Latest handshake', 'Последнее рукопожатие')}: ${peer.hasLatestHandshake() ? peer.latestHandshake.toProto3Json() : _text('Not reported', 'Не сообщается')}',
+                '${_text('Received bytes', 'Получено байт')}: ${peer.receivedBytes}',
+                '${_text('Transmitted bytes', 'Отправлено байт')}: ${peer.transmittedBytes}',
+                '${_text('Keepalive', 'Поддержание соединения')}: ${peer.hasPersistentKeepalive() ? peer.persistentKeepalive.toProto3Json() : _text('Not reported', 'Не сообщается')}',
+              ],
+            ],
+        ],
+        emptyText: _text(
+          'Tunnel inspection not reported.',
+          'Проверка туннеля не предоставлена.',
+        ),
+      ),
+      _section(
+        'diagnostic-dns',
+        _text('DNS details', 'Подробности DNS'),
+        [
+          if (diagnostics.hasDns())
+            [
+              '${_text('Search domain', 'Поисковый домен')}: ${diagnostics.dns.searchDomain}',
+              'TTL: ${diagnostics.dns.hasTtl() ? diagnostics.dns.ttl.toProto3Json() : _text('Not reported', 'Не сообщается')}',
+              '${_text('Servers', 'Серверы')}: ${diagnostics.dns.servers.join(', ')}',
+              '${_text('Records', 'Записи')}: ${diagnostics.dns.records.length}',
+              for (final record in diagnostics.dns.records) ...[
+                '${_text('Node', 'Узел')}: ${record.nodeId}',
+                '${_text('Hostname', 'Имя хоста')}: ${record.hostname}',
+                '${_text('Label', 'Метка')}: ${record.label}',
+                'FQDN: ${record.fqdn}',
+                '${_text('Addresses', 'Адреса')}: ${record.addresses.join(', ')}',
+              ],
+            ],
+        ],
+        emptyText: _text(
+          'DNS inspection not reported.',
+          'Проверка DNS не предоставлена.',
+        ),
+      ),
       _section(
         'diagnostic-interfaces',
         _text('Interface details', 'Подробности интерфейсов'),

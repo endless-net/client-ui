@@ -313,7 +313,11 @@
         },
         {
           "path": "app/test/client_diagnostics_details_test.dart",
-          "scope": "Four short widget tests: expand interfaces/routes/conflicts/failures, exact RU/EN fields and empty-state text, locale switch and suppression of unprojected browser URL/private failure reason. UI-only inspection; tunnel/DNS details and actual runtime/platform acceptance remain incomplete"
+          "scope": "Four short widget tests: expand interfaces/routes/conflicts/failures, exact RU/EN fields and empty-state text, locale switch and suppression of unprojected browser URL/private failure reason. UI-only inspection; actual runtime/platform acceptance remains incomplete"
+        },
+        {
+          "path": "app/test/client_tunnel_dns_details_test.dart",
+          "scope": "Eight short widgets compare all RU/EN tunnel/DNS fields for absent, empty, populated and missing-timing projections; exact 64-bit counters, explicit zero keepalive and retained expansion on locale changes. No live traffic/DNS probe, capture, upload or platform acceptance"
         },
         {
           "path": "app/test/mobile_contract_widget_test.dart",

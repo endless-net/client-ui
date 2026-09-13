@@ -340,11 +340,6 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
                 ),
               ),
             ),
-            ClientDiagnosticsDetails(
-              key: ValueKey(preview),
-              diagnostics: preview,
-              locale: widget.locale,
-            ),
             if (_confirmBundle) ...[
               Text(
                 _text(
@@ -383,6 +378,11 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
                 ],
               ),
             ],
+            ClientDiagnosticsDetails(
+              key: ValueKey(preview),
+              diagnostics: preview,
+              locale: widget.locale,
+            ),
           ],
           if (_context == contextId && allowed && _notice != null)
             Semantics(liveRegion: true, child: Text(_noticeText(_notice!))),

@@ -85,10 +85,11 @@ void main() {
         }
 
         await render(locale);
-        expect(
-          tester.widgetList<Text>(find.byType(Text)).map((t) => t.data),
-          headers.map((h) => '$h: ${empty ? 0 : 1}'),
-        );
+        expect(tester.widgetList<Text>(find.byType(Text)).map((t) => t.data), [
+          ru ? 'Подробности туннеля: 0' : 'Tunnel details: 0',
+          ru ? 'Подробности DNS: 0' : 'DNS details: 0',
+          ...headers.map((h) => '$h: ${empty ? 0 : 1}'),
+        ]);
         for (final key in [
           'diagnostic-interfaces',
           'diagnostic-routes',
@@ -107,6 +108,8 @@ void main() {
             .map((t) => t.data)
             .toSet();
         final expected = <String>{
+          ru ? 'Подробности туннеля: 0' : 'Tunnel details: 0',
+          ru ? 'Подробности DNS: 0' : 'DNS details: 0',
           for (final h in headers) '$h: ${empty ? 0 : 1}',
         };
         expected.addAll(
@@ -147,12 +150,12 @@ void main() {
                         'Interface: tun0',
                         'Uses interface: No',
                         'Peer: peer-a',
-                    'Failure: Not supported',
+                        'Failure: Not supported',
                         'Overlay CIDR: 10.0.0.0/8',
                         'Local prefix: 10.1.0.0/16',
                         'Interface: eth0',
                         'Reason code: route.overlap',
-                    'Not supported',
+                        'Not supported',
                         'Retryable: Yes',
                       }),
         );

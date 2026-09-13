@@ -183,8 +183,18 @@ addresses/prefixes/flags, target/interface/uses-interface/peer, overlap prefixes
 Четыре short widget-теста сравнивают весь раскрытый RU/EN текст с пустыми и
 непустыми данными, переключение языка и отсутствие private browser/reason
 payload. Разделы не выполняют RPC, copy или upload; новое preview пересоздаёт
-их состояние. Это partial US-07: детали tunnel/DNS ещё отсутствуют, реальная
-platform diagnostics/export acceptance не подтверждена.
+их состояние. Это partial US-07; реальная platform diagnostics/export
+acceptance не подтверждена.
+
+Раскрываемые tunnel/DNS разделы отображают наличие инспекции отдельно от
+пустого результата: tunnel ok/interface/MTU/listen port/typed failure, peers с
+public key/endpoint/allowed IPs/handshake/counters/keepalive; DNS search domain,
+TTL, servers и records с node/hostname/label/FQDN/addresses. Optional timestamp
+и duration не заменяются нулём; большие счётчики сохраняют точность. Восемь
+short widget-тестов сравнивают полный RU/EN текст для отсутствующей/пустой
+инспекции, заполненных данных и отсутствующих timings; изменение языка
+сохраняет раскрытие разделов. Это только просмотр snapshot, без probe,
+capture, upload, clipboard или подтверждения фактической работы tunnel/DNS.
 
 ClientResourcesPanel локализует RU/EN поиск, фильтры, effective/requested,
 availability/mutation, источник/lock, overlap и пять typed notices. Коды причин,
