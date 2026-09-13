@@ -63,7 +63,7 @@ func TestNativeConsumerCIDiscoversEveryFlutterTest(t *testing.T) {
 	}
 	workflow := strings.ReplaceAll(string(raw), "\r\n", "\n")
 	for _, required := range []string{
-		"os: [ubuntu-latest, windows-latest, macos-latest]",
+		"os: [ubuntu-latest, windows-2022, macos-latest]",
 		"flutter pub get --enforce-lockfile",
 		"ENDLESSNET_TESTSERVER: ${{ github.workspace }}/client-testserver.exe\n        run: flutter test --no-pub\n",
 	} {

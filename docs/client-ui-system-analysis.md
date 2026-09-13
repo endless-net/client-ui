@@ -513,6 +513,24 @@ Mobile использует отдельно проверенный native bridg
 
 ## 2. Bootstrap, состояние и права
 
+Последующий [трёхплатформенный native build-only run](native-ui-build-2026-09-14.md#второй-проход-на-8e78e55)
+на `8e78e55` завершился success для Linux, Windows 2022 и macOS. Integration
+steps пропущены. Он подтверждает compile source этого commit, но не последующий
+tray fix и не runtime/OS acceptance; ограничения исходной цели остаются в силе.
+
+Linux tray correction: pinned
+[`tray_manager v0.5.3`](https://github.com/leanflutter/tray_manager/blob/v0.5.3/packages/tray_manager/linux/tray_manager_plugin.cc)
+не реализует setToolTip/popUpContextMenu. Общий shell ранее вызывал tooltip
+перед setContextMenu, поэтому MissingPluginException прерывал установку меню.
+Новый [`client_tray_host.dart`](../app/lib/client_tray_host.dart) на Linux
+использует setContextMenu; AppIndicator открывает его самостоятельно, runtime
+status уже присутствует в menu row. Windows/macOS сохраняют tooltip/popup.
+Неизвестный host не считается Linux; после dispose/late tooltip menu keys
+не переиспользуются. Ошибка popup показывает безопасный UI notice.
+[Десять short tests](../app/test/client_tray_host_test.dart) проверяют platform
+method selection, lifetime и свежие menu keys. Фактическая desktop tray/DE
+интеграция ещё не принята; это не отказ от UF-02/05 и не runtime fallback.
+
 Native build evidence: [первый compile-only run 2026-09-14](native-ui-build-2026-09-14.md)
 на `88947c2` подтвердил настоящую macOS Debug сборку, включая Swift adapters.
 Linux/Windows остановились на prerequisites/CMake; исходный run failed.

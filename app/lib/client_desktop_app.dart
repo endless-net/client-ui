@@ -15,6 +15,7 @@ import 'client_bundle_destination.dart';
 import 'client_session_panel.dart';
 import 'client_state_controller.dart';
 import 'client_tray.dart';
+import 'client_tray_host.dart';
 import 'client_notification_delivery.dart';
 import 'client_notifications_panel.dart';
 import 'client_notification_permission_panel.dart';
@@ -286,9 +287,12 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     try {
       do {
         _trayDirty = false;
-        await trayManager.setToolTip('EndlessNet: ${_tray.status}');
-        if (!mounted || !_trayReady) return;
-        await trayManager.setContextMenu(_tray.menu);
+        await updateClientTrayMenu(
+          platform: Platform.operatingSystem,
+          tooltip: 'EndlessNet: ${_tray.status}',
+          menu: () => _tray.menu,
+          isCurrent: () => mounted && _trayReady,
+        );
       } while (_trayDirty && mounted && _trayReady);
     } catch (_) {
       if (mounted) {
@@ -399,7 +403,18 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
 
   @override
   void onTrayIconRightMouseDown() {
-    unawaited(trayManager.popUpContextMenu());
+    unawaited(_popUpTray());
+  }
+
+  Future<void> _popUpTray() async {
+    try {
+      await popUpClientTrayMenu(
+        platform: Platform.operatingSystem,
+        isCurrent: () => mounted && _trayReady,
+      );
+    } catch (_) {
+      if (mounted) setState(() => _notice = _DesktopNotice.tray);
+    }
   }
 
   @override

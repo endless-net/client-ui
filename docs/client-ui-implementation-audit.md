@@ -137,6 +137,12 @@ requiresApproval/unsupported; 9 channel/widget tests проверяют read/wri
 
 ## Последовательность оставшейся работы
 
+Linux tray correction по pinned plugin source: общий tooltip вызов не был
+поддержан Linux host и мешал setContextMenu. Platform-aware helper теперь
+устанавливает Linux menu без unsupported tooltip/popup; статус остаётся в
+самом меню. Десять short tests проверяют call selection/lifetime; actual DE
+rendering/click и runtime acceptance остаются незавершёнными.
+
 UF-15 дополнение: typed BLOCKED credentials теперь создают отдельное безопасное
 RU/EN уведомление без трактовки как expiry. Восемь новых planner tests и один
 dispatcher test подтверждают dedup, независимость от session/deadline и новую

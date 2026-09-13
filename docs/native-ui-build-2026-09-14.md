@@ -38,3 +38,21 @@ Owning follow-up: `client-ui` — повторить compile-only на испр�
 acceptance. Runtime, инфраструктура runners и другие repositories не менялись.
 
 См. [SA](client-ui-system-analysis.md) и [аудит](client-ui-implementation-audit.md).
+
+## Второй проход на `8e78e55`
+
+[Run 34789841331](https://github.com/endless-net/client-ui/actions/runs/34789841331)
+завершился success: один build-only pass на каждой ОС.
+
+| Host | Native Debug build |
+| --- | --- |
+| [Linux](https://github.com/endless-net/client-ui/actions/runs/34789841331/job/103811917814) | Success, `build/linux/x64/debug/bundle/endlessnet` |
+| [Windows 2022](https://github.com/endless-net/client-ui/actions/runs/34789841331/job/103811917800) | Success |
+| [macOS](https://github.com/endless-net/client-ui/actions/runs/34789841331/job/103811917658) | Success |
+
+Compile и dependency drift steps успешны; producer/testserver, complete suite
+и transport probe пропущены. Это впервые успешный общий трёхплатформенный
+compile-only run, не functional acceptance и не тестирование работающего UI.
+Он не включает последующий Linux tray method-selection fix. Локальный Go
+structural guard всё ещё ожидал windows-latest и исправлен после этого run;
+build-only не выполняет Go tests и не является evidence их успеха.

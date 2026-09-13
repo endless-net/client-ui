@@ -73,6 +73,10 @@
       "implementation": "partial",
       "testEvidence": [
         {
+          "path": "app/test/client_tray_host_test.dart",
+          "scope": "Ten short tests: Linux only installs supported context menu; Windows/macOS preserve tooltip/popup, disposed host makes no call, menu keys read after pending tooltip, unknown platform rejected. Pinned tray_manager 0.5.3 native source confirms Linux lacks tooltip/popup. Actual desktop rendering/click and runtime effects unverified"
+        },
+        {
           "path": "app/test/client_windows_autostart_test.dart",
           "scope": "Eight short tests: fixed Windows Startup apps URI, explicit RU/EN action, safe launch result not startup confirmation, busy/disabled and stale adapter/dispose guards. No registry writes or runtime intent; actual OS settings/policy/login/installer acceptance unverified"
         },
