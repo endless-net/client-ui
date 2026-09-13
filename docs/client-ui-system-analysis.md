@@ -513,6 +513,16 @@ Mobile использует отдельно проверенный native bridg
 
 ## 2. Bootstrap, состояние и права
 
+Windows packaging cutover correction: MSI больше не регистрирует устаревший
+`endlessnet:` handler через `--enroll`, который текущий UI startup parser
+отвергает. [`installer_test.go`](../tools/windows-packaging/installer_test.go)
+запрещает этот handler и старые enrollment flags; существующий
+[`client_startup_test.dart`](../app/test/client_startup_test.dart) сохраняет
+отказ от startup enrollment. Это удаление не заменяет запланированный новый
+deep-link flow и не доказывает cleanup установленного старого package.
+MSI HKCU Run запись UI `EndlessNet` уже существует, не изменена; Windows UI
+autostart control, OS policy и upgrade behavior остаются отдельными задачами.
+
 Локальная [Windows x64 Debug сборка 2026-09-14](windows-ui-build-2026-09-14.md)
 проверила настоящий app на `7f01918` с Flutter 3.38.1 и завершилась успешно.
 Это compile/link evidence, не запуск UI, protected IPC, signed distribution или

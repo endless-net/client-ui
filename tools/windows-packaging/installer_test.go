@@ -79,13 +79,7 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`<Files Include="$(var.AppBundleDir)\native_assets.json" />`,
 		`ComponentGroup Id="EndlessNetAppDataFiles" Directory="EndlessNetAppDataFolder"`,
 		`<Files Include="$(var.AppBundleDir)\data\**" />`,
-		`Component Id="DeepLinkProtocol" Guid="*" Bitness="always64"`,
 		`Software\Microsoft\Windows\CurrentVersion\Run`,
-		`Component Id="DeepLinkProtocol"`,
-		`Software\Classes\endlessnet`,
-		`URL:EndlessNet Enrollment`,
-		`Name="URL Protocol"`,
-		`--enroll &quot;%1&quot;`,
 		`<ServiceInstall`,
 		`Name="endlessnet-client"`,
 		`--windows-service`,
@@ -125,6 +119,12 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		t.Fatalf("state removal condition count = %d, want 2:\n%s", got, artifacts.WixSource)
 	}
 	for _, forbidden := range []string{
+		`DeepLinkProtocol`,
+		`Software\Classes\endlessnet`,
+		`URL:EndlessNet Enrollment`,
+		`Name="URL Protocol"`,
+		`--enroll`,
+		`--elevated-enroll`,
 		`WixUI_Minimal`,
 		`LicenseAgreementDlg`,
 		`WixUILicenseRtf`,

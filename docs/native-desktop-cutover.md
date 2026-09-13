@@ -7,6 +7,13 @@ Opening a channel does not enable commands before a validated snapshot. Native
 connection failures have no HTTP fallback and expose only a fixed UI message.
 Startup enrollment flags are rejected; enrollment belongs to the native panel.
 
+The Windows MSI source no longer registers `endlessnet:` with the retired
+`--enroll` startup flag. Packaging tests reject that protocol registration and
+retired enrollment flags. This removes a broken legacy launcher, not the planned
+replacement deep-link feature: a typed, explicitly confirmed UI enrollment/link
+flow still needs implementation and acceptance. No installed registry entry was
+deleted by this source change; upgrade/uninstall cleanup remains unverified.
+
 The desktop shell provides explicit reconnect, single-instance show signalling,
 close-to-tray and quit. Owner quit with an active profile submits UI_QUIT through
 the normal journal. An accepted operation is not reported as completed. If the

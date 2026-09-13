@@ -274,15 +274,6 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
         <RemoveRegistryValue Id="RemoveLegacyAutostartName" Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet Tray" />
         <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet" Value="&quot;[INSTALLFOLDER]endlessnet.exe&quot; --debug --debug-log-dir %s" Type="string" KeyPath="yes" />
       </Component>
-      <Component Id="DeepLinkProtocol" Guid="*" Bitness="always64">
-        <RegistryKey Root="HKLM" Key="Software\Classes\endlessnet">
-          <RegistryValue Value="URL:EndlessNet Enrollment" Type="string" KeyPath="yes" />
-          <RegistryValue Name="URL Protocol" Value="" Type="string" />
-          <RegistryKey Key="shell\open\command">
-            <RegistryValue Value="&quot;[INSTALLFOLDER]endlessnet.exe&quot; --debug --debug-log-dir %s --enroll &quot;%%1&quot;" Type="string" />
-          </RegistryKey>
-        </RegistryKey>
-      </Component>
       <Component Id="EventLogSource" Guid="*" Bitness="always64">
         <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\EventLog\Application\%s">
           <RegistryValue Name="EventMessageFile" Type="expandable" Value="[System64Folder]EventCreate.exe" KeyPath="yes" />
@@ -342,7 +333,6 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 		xmlAttrEscape(opts.ServiceOptions.Description),
 		xmlAttrEscape(strings.Join(serviceArgs, " ")),
 		xmlAttrEscape(opts.ServiceOptions.ServiceName),
-		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
 		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
 		xmlAttrEscape(opts.ServiceOptions.EventLogSource),
 		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),

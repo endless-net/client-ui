@@ -137,6 +137,16 @@ requiresApproval/unsupported; 9 channel/widget tests проверяют read/wri
 
 ## Последовательность оставшейся работы
 
+Packaging correction: при проверке Windows autostart обнаружена старая MSI
+регистрация `endlessnet:` → `--enroll`, уже отвергаемая новым AppConfig. Она
+удалена из generated WiX source; packaging unit test запрещает эту регистрацию
+и retired enrollment flags. Замена deep-link flow остаётся в UF-02/03/09,
+не считается реализованной удалением legacy. Installed registry/upgrade cleanup
+не проверены. Отдельно подтверждено наличие MSI HKCU Run записи `EndlessNet`
+для UI executable: регистрация уже есть, но управление из UI и фактическая
+Windows startup policy по-прежнему не квалифицированы. Существующая запись
+autostart, installer identity и версии этим изменением не менялись.
+
 UI resume дополнение: hidden/paused → resumed обновляет protected subscription
 со сбросом старого snapshot сразу при callback; focus-only не переподключает,
 hidden сохраняет tray stream, busy shell объединяет refresh, quit/dispose
