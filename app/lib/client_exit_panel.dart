@@ -1,6 +1,10 @@
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'client_exit_nodes.dart';
+import 'client_exit_labels.dart';
+import 'client_locale.dart';
+import 'client_operation_labels.dart';
+import 'client_update_labels.dart';
 import 'client_operation.dart';
 import 'client_state_controller.dart';
 
@@ -11,8 +15,10 @@ class ClientExitPanel extends StatefulWidget {
     required this.load,
     required this.select,
     required this.clear,
+    this.locale = ClientLocale.en,
   });
   final ClientStateController state;
+  final ClientLocale locale;
   final Future<ClientExitNodes> Function() load;
   final Future<ClientOperation> Function(
     String,
@@ -27,6 +33,8 @@ class ClientExitPanel extends StatefulWidget {
   State<ClientExitPanel> createState() => _ClientExitPanelState();
 }
 
+enum _ExitNotice { received, unknown }
+
 class _ClientExitPanelState extends State<ClientExitPanel> {
   ClientExitNodes? _view;
   String? _context;
@@ -37,7 +45,14 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
   bool _confirmClear = false;
   int _draftSerial = 0;
   bool Function()? _contextCurrent;
-  String? _notice;
+  _ExitNotice? _notice;
+  String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
+  String _boolean(bool value) =>
+      value ? _text('Yes', 'Да') : _text('No', 'Нет');
+  String _failure(api.ErrorCode code) =>
+      code == api.ErrorCode.ERROR_CODE_UNSPECIFIED
+      ? _text('Not reported', 'Не сообщена')
+      : clientFailureLabel(code, locale: widget.locale);
   String get contextId =>
       '${widget.state.cacheEpoch}:'
       '${[api.Domain.DOMAIN_EXIT_NODE, api.Domain.DOMAIN_PROFILES, api.Domain.DOMAIN_NETWORKS, api.Domain.DOMAIN_PEERS].map(widget.state.domainEpoch).join(',')}';
@@ -153,8 +168,7 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
           _node = null;
           _mode = null;
           _lan = null;
-          _notice =
-              'Exit operation received. Recover its result and refresh both address families.';
+          _notice = _ExitNotice.received;
         });
       } else {
         setState(() {
@@ -181,8 +195,7 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
         _node = null;
         _mode = null;
         _lan = null;
-        _notice =
-            'Exit request could not be confirmed. Recover pending operations before retrying.';
+        _notice = _ExitNotice.unknown;
       });
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -220,45 +233,64 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                     if (validFrame()) _run();
                   }
                 : null,
-            child: const Text('Refresh exit nodes'),
+            child: Text(_text('Refresh exit nodes', 'Обновить выходные узлы')),
           ),
-          if (current && _notice != null) Text(_notice!),
+          if (current && _notice != null)
+            Semantics(
+              liveRegion: true,
+              child: Text(switch (_notice!) {
+                _ExitNotice.received => _text(
+                  'Exit operation received. Recover its result and refresh both address families.',
+                  'Операция выходного узла получена. Восстановите её результат и обновите состояние обоих семейств адресов.',
+                ),
+                _ExitNotice.unknown => _text(
+                  'Exit request could not be confirmed. Recover pending operations before retrying.',
+                  'Запрос выходного узла не удалось подтвердить. Восстановите незавершённые операции перед повтором.',
+                ),
+              }),
+            ),
           if (current && view != null) ...[
             Text(
-              'Requested exit mode: ${view.status.requestedFamilyMode.name}',
+              _text(
+                'Requested exit mode: ${exitFamilyModeLabel(view.status.requestedFamilyMode, widget.locale)}',
+                'Запрошенный режим: ${exitFamilyModeLabel(view.status.requestedFamilyMode, widget.locale)}',
+              ),
             ),
             Text(
-              'Exit apply: ${view.status.applyState.name}; failure: ${view.status.failure.code.name}',
+              _text(
+                'Exit apply: ${exitApplyStateLabel(view.status.applyState, widget.locale)}; failure: ${_failure(view.status.failure.code)}',
+                'Применение: ${exitApplyStateLabel(view.status.applyState, widget.locale)}; ошибка: ${_failure(view.status.failure.code)}',
+              ),
             ),
             for (final entry in [
               ('IPv4', view.status.ipv4),
               ('IPv6', view.status.ipv6),
             ]) ...[
               Text(
-                '${entry.$1}: requested ${entry.$2.hasRequestedExitNodeId() ? entry.$2.requestedExitNodeId : 'No exit'}; '
-                'effective ${entry.$2.hasEffectiveExitNodeId() ? entry.$2.effectiveExitNodeId : 'No exit'}',
+                '${entry.$1}: ${_text('requested', 'запрошено')} ${entry.$2.hasRequestedExitNodeId() ? entry.$2.requestedExitNodeId : _text('No exit', 'Без выходного узла')}; ${_text('effective', 'фактически')} ${entry.$2.hasEffectiveExitNodeId() ? entry.$2.effectiveExitNodeId : _text('No exit', 'Без выходного узла')}',
               ),
               Text(
-                '${entry.$1}: ${entry.$2.applyState.name}; reported fail-closed: ${entry.$2.failClosed}; '
-                'failure: ${entry.$2.failure.code.name}',
+                '${entry.$1}: ${exitApplyStateLabel(entry.$2.applyState, widget.locale)}; ${_text('reported fail-closed', 'блокировка при отказе по данным службы')}: ${_boolean(entry.$2.failClosed)}; ${_text('failure', 'ошибка')}: ${_failure(entry.$2.failure.code)}',
               ),
               if (!entry.$2.hasRequestedExitNodeId())
                 Text(
-                  'No exit is requested for ${entry.$1}; see effective state for current routing.',
+                  _text(
+                    'No exit is requested for ${entry.$1}; see effective state for current routing.',
+                    'Для ${entry.$1} выходной узел не запрошен; текущая маршрутизация указана в фактическом состоянии.',
+                  ),
                 ),
             ],
             Text(
-              'LAN requested: ${view.status.requestedLanAccess.name}; effective: ${view.status.effectiveLanAccess.name}',
+              '${_text('LAN requested', 'Локальная сеть: запрошено')}: ${exitLanAccessLabel(view.status.requestedLanAccess, widget.locale)}; ${_text('effective', 'фактически')}: ${exitLanAccessLabel(view.status.effectiveLanAccess, widget.locale)}',
             ),
             Text(
-              'Exit control: ${view.status.control.mutation.availability.name}; locked: ${view.status.control.locked}; '
-              'reason: ${view.status.control.mutation.reasonKey}; owner: ${view.status.control.mutation.actionOwner.name}',
+              '${_text('Exit control', 'Управление выходным узлом')}: ${updateAvailabilityLabel(view.status.control.mutation.availability, widget.locale)}; ${_text('locked', 'заблокировано')}: ${_boolean(view.status.control.locked)}; ${_text('reason', 'причина')}: ${view.status.control.mutation.reasonKey}; ${_text('owner', 'исполнитель')}: ${clientActionOwnerLabel(view.status.control.mutation.actionOwner, locale: widget.locale)}',
             ),
             DropdownButton<String>(
               key: const Key('client-exit-node'),
               isExpanded: true,
               value: _node,
-              hint: const Text('Choose exit node'),
+              hint: Text(_text('Choose exit node', 'Выберите выходной узел')),
               items: [
                 for (final candidate in view.nodes)
                   DropdownMenuItem(
@@ -267,7 +299,7 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                         candidate.selection.availability ==
                         api.Availability.AVAILABILITY_AVAILABLE,
                     child: Text(
-                      '${candidate.displayName}: ${candidate.selection.availability.name}',
+                      '${candidate.displayName}: ${updateAvailabilityLabel(candidate.selection.availability, widget.locale)}',
                     ),
                   ),
               ],
@@ -297,10 +329,18 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                 key: const Key('client-exit-mode'),
                 isExpanded: true,
                 value: _mode,
-                hint: const Text('Choose address families'),
+                hint: Text(
+                  _text(
+                    'Choose address families',
+                    'Выберите семейства адресов',
+                  ),
+                ),
                 items: [
                   for (final mode in node.allowedFamilyModes)
-                    DropdownMenuItem(value: mode, child: Text(mode.name)),
+                    DropdownMenuItem(
+                      value: mode,
+                      child: Text(exitFamilyModeLabel(mode, widget.locale)),
+                    ),
                 ],
                 onChanged: editable && !_busy
                     ? (mode) {
@@ -320,10 +360,18 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                 key: const Key('client-exit-lan'),
                 isExpanded: true,
                 value: _lan,
-                hint: const Text('Choose LAN policy'),
+                hint: Text(
+                  _text(
+                    'Choose LAN policy',
+                    'Выберите политику локальной сети',
+                  ),
+                ),
                 items: [
                   for (final lan in node.allowedLanAccess)
-                    DropdownMenuItem(value: lan, child: Text(lan.name)),
+                    DropdownMenuItem(
+                      value: lan,
+                      child: Text(exitLanAccessLabel(lan, widget.locale)),
+                    ),
                 ],
                 onChanged: editable && !_busy
                     ? (lan) {
@@ -341,9 +389,19 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
               ),
             ],
             if (_mode == api.ExitFamilyMode.EXIT_FAMILY_MODE_IPV4_ONLY)
-              const Text('IPv6 will not be protected by this exit selection.'),
+              Text(
+                _text(
+                  'IPv6 will not be protected by this exit selection.',
+                  'Этот выбор выходного узла не защитит IPv6.',
+                ),
+              ),
             if (_mode == api.ExitFamilyMode.EXIT_FAMILY_MODE_IPV6_ONLY)
-              const Text('IPv4 will not be protected by this exit selection.'),
+              Text(
+                _text(
+                  'IPv4 will not be protected by this exit selection.',
+                  'Этот выбор выходного узла не защитит IPv4.',
+                ),
+              ),
             FilledButton(
               key: const Key('client-select-exit'),
               onPressed: canSelect && !_busy
@@ -351,7 +409,7 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                       if (validView()) _run(select: true);
                     }
                   : null,
-              child: const Text('Select exit node'),
+              child: Text(_text('Select exit node', 'Выбрать выходной узел')),
             ),
             OutlinedButton(
               key: const Key('client-clear-exit'),
@@ -365,11 +423,14 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                       }
                     }
                   : null,
-              child: const Text('Clear exit node'),
+              child: Text(_text('Clear exit node', 'Сбросить выходной узел')),
             ),
             if (_confirmClear) ...[
-              const Text(
-                'Clear both exit families and restore ordinary routing policy?',
+              Text(
+                _text(
+                  'Clear both exit families and restore ordinary routing policy?',
+                  'Сбросить выходной узел для обоих семейств адресов и восстановить обычную политику маршрутизации?',
+                ),
               ),
               TextButton(
                 key: const Key('client-cancel-clear-exit'),
@@ -383,7 +444,7 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                         }
                       }
                     : null,
-                child: const Text('Cancel'),
+                child: Text(_text('Cancel', 'Отмена')),
               ),
               FilledButton(
                 key: const Key('client-confirm-clear-exit'),
@@ -392,7 +453,7 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                         if (validView()) _run(clear: true);
                       }
                     : null,
-                child: const Text('Confirm clear'),
+                child: Text(_text('Confirm clear', 'Подтвердить сброс')),
               ),
             ],
           ],

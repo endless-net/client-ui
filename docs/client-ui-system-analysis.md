@@ -14,8 +14,8 @@
 
 ### Актуализация source cutover — 2026-09-13
 
-Повторная read-only сверка producer: remote `client/main` на
-`9d73421d3ba40470c9b8ba49ed276bcf14765e4e`; `proto/client/v0` и
+Повторная read-only сверка producer 2026-09-14: remote `client/main` на
+`c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin
 `cd05fcddb858877b10ecefe7b0b4a3819d2c6f3b`. Pin и версии не менялись.
 Нормативный `docs/client-ipc-protobuf.md` также не изменился относительно
@@ -200,7 +200,17 @@ ClientExitPanel привязывает действия к controller/snapshot, 
 от прежнего контроллера не отображаются в новом контексте. Восемь short widget
 тестов проверяют эти гонки и успешное выполнение свежего явного действия.
 Это component evidence US-05, не traffic/fail-closed или native acceptance;
-локализация exit-панели и общий выбор языка ещё не реализованы.
+общий выбор языка ещё не реализован.
+
+Exit-панель поддерживает RU/EN для режимов IP, LAN policy, apply state,
+requested/effective, ограничений, предупреждений single-family, подтверждения
+очистки и двух typed notices. Fail-closed показывается как сообщение службы,
+не как самостоятельно проверенная защита трафика. Отсутствие кода ошибки
+показывается как «не сообщена», а не как доказательство отсутствия ошибки.
+17 short тестов покрывают все 12 enum-значений и полный текст панели в обеих
+локалях: каталог, IPv4/IPv6, подтверждение, select/clear и read error. Смена
+локали сохраняет черновик и переводит notice без повторного read/mutation.
+Это component evidence, не full-app UI-AC-13 или реальная routing acceptance.
 
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
