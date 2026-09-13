@@ -92,6 +92,15 @@ logout/local forget не снимают ownership. UI не обещает воз
 
 ## 3. Команды и восстановление
 
+На `b2d218420af01e69739447c9b3d802554dd8912b` iOS simulator job успешно
+выполнил **22 tests passed**
+([job](https://github.com/endless-net/client-ui/actions/runs/34729192852/job/103648732270)).
+Это повторная проверка shared widget/profile/network suite после SafeArea fix,
+включая настоящий tap с верхним inset. Предыдущие failures ниже остаются
+историческим evidence; причина intermittent VM Service startup timeout этим
+успехом не установлена. Успех job не означает успех всего mobile run или приёмку
+native VPN bridge, реального runtime, полного product shell и traffic path.
+
 Повторный iOS job на `52eac5c` завершился до тестов: 0 passed, timeout ожидания
 VM Service после успешного build/simctl launch
 ([job](https://github.com/endless-net/client-ui/actions/runs/34728449505/job/103646732566)).
@@ -105,7 +114,7 @@ Native iOS run на `840a6f5` впервые выполнил suite: 16 passed /
 Пять failures сопровождались hit-test miss верхних кнопок на y=24. Shared test
 scaffold и составная session panel теперь используют SafeArea; локальная regression
 проверяет верхний inset 59 и настоящий tap, layout — также нижний inset 34.
-Исправление требует повторного simulator execution; локальные unit tests не закрывают iOS acceptance.
+Повторный simulator execution зафиксирован выше; локальные unit tests сами по себе не закрывают iOS acceptance.
 
 US-04 read foundation: `client_networks.dart` собирает полный immutable каталог
 через ListNetworks с фиксированным ProfileRef и opaque page tokens. Проверяются

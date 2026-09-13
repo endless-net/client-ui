@@ -13,28 +13,29 @@
   "execution": [
     {
       "platforms": [
+        "windows",
         "linux",
         "macos"
       ],
       "workflow": ".github/workflows/contract-consumer.yml",
       "status": "passed",
-      "run": "https://github.com/endless-net/client-ui/actions/runs/34725762762",
-      "scope": "Linux/macOS jobs at d1d2998: 89 consumer tests, 7 profile tests and app cancellation probe passed; overall run cancelled for Windows; mock foundations only, not current HEAD or runtime acceptance"
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34727879150",
+      "scope": "All three desktop jobs at 840a6f5634b23fbda982ace08be988d325cb19d8 passed: 103 consumer tests and 15 profile/network tests per OS, including producer mock interoperability; not current HEAD or runtime/product acceptance"
     },
     {
-      "platforms": ["windows"],
-      "workflow": ".github/workflows/contract-consumer.yml",
-      "status": "pending",
-      "scope": "Corrected transport run at d1d2998 was cancelled; current revision needs verification"
+      "platforms": ["ios"],
+      "workflow": ".github/workflows/mobile-contract.yml",
+      "status": "passed",
+      "run": "https://github.com/endless-net/client-ui/actions/runs/34729192852",
+      "scope": "iOS job 103648732270 at b2d218420af01e69739447c9b3d802554dd8912b passed 22 shared widget/profile/network tests in native simulator; job evidence only, not whole run, native VPN bridge, producer-process interoperability or real traffic acceptance"
     },
     {
       "platforms": [
-        "android",
-        "ios"
+        "android"
       ],
       "workflow": ".github/workflows/mobile-contract.yml",
       "status": "pending",
-      "scope": "Synthetic widget in emulator/simulator; no native VPN bridge or real traffic acceptance"
+      "scope": "Android native execution remains unproven: previous KVM preflight failed before tests; no runner permission changes authorized and no native VPN bridge or real traffic acceptance"
     }
   ],
   "sharedEnvelopeTests": [
@@ -114,7 +115,7 @@
         },
         {
           "path": "app/test/client_session_process_test.dart",
-          "scope": "Defined exact-request browser/token Enroll fixtures, terminal lookup and UUID/kind-only journal assertions; execution of new enrollment fixtures is pending CI"
+          "scope": "Exact-request browser/token Enroll fixtures, terminal lookup and UUID/kind-only journal assertions passed on three desktop runners at 840a6f5; synthetic producer only, not actual enrollment/runtime acceptance"
         }
       ],
       "acceptanceEvidence": []

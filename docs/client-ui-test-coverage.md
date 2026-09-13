@@ -17,6 +17,29 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+Latest inspected evidence (the older diagnostic history below is retained):
+
+- Desktop consumer commit `840a6f5634b23fbda982ace08be988d325cb19d8`:
+  [Linux](https://github.com/endless-net/client-ui/actions/runs/34727879150/job/103645176217),
+  [Windows](https://github.com/endless-net/client-ui/actions/runs/34727879150/job/103645176299)
+  and [macOS](https://github.com/endless-net/client-ui/actions/runs/34727879150/job/103645176387)
+  passed, each with 103 consumer tests and 15 profile/network tests. This includes
+  the exact-request browser/token enrollment producer fixtures and same-channel
+  transport regressions, not real enrollment or installed-daemon acceptance.
+- Consumer commit `b2d218420af01e69739447c9b3d802554dd8912b`:
+  [iOS simulator job](https://github.com/endless-net/client-ui/actions/runs/34729192852/job/103648732270)
+  passed 22 shared widget/profile/network tests after the SafeArea correction.
+  This is individual-job evidence, not a claim that the entire mobile run passed.
+  The harness does not execute the desktop Go fixture process or a native VPN
+  bridge. The earlier intermittent VM Service timeout remains undiagnosed.
+- Android native execution remains unproven; prior KVM preflight failure happened
+  before tests. No host permission change or infrastructure approval is implied.
+
+These are different immutable consumer commits, not same-manifest five-platform
+acceptance. All 14 full product scenarios remain incomplete.
+
+### Earlier transport and simulator diagnosis
+
 For consumer commit `eec22c3c6c28bfcb72e998059fcdd173f81262c6`, the
 [Windows contract job](https://github.com/endless-net/client-ui/actions/runs/34723624375/job/103633802799)
 passed. The same run failed on
@@ -50,7 +73,7 @@ The socket-free
 now reproduces this deterministically with pinned `http2` 2.3.1: cancel stream 1,
 deliver its already-in-flight HEADERS, observe `ProtocolError` and closed shared
 connection. Run `dart run tool/probe_late_headers.dart` from
-`packages/local_client_rpc`. Current exit is **1**, not a passing regression;
+`packages/local_client_rpc`. Before the backport its exit was **1**, not a passing regression;
 the corrected transport must return 0. This isolates the dependency defect but
 does not replace the producer interoperability jobs or prove their fix.
 
@@ -59,7 +82,8 @@ Local correction now uses the explicitly documented
 2.3.1 and upstream license. The same probe returns 0 and completes a subsequent
 response on the same connection. It is required in the local-RPC desktop CI
 workflow. App, transport package and mobile harness select this same source;
-runner results for the corrected source still need inspection.
+the later desktop job evidence above verifies these consumer regressions on all
+three desktop runners, without proving installed-runtime or product acceptance.
 
 The [Android job](https://github.com/endless-net/client-ui/actions/runs/34723624391/job/103633802852)
 for the same consumer commit failed before Flutter tests started: software-only
