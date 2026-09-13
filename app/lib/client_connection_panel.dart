@@ -189,7 +189,12 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                   _noticeEpoch == widget.state.cacheEpoch)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: Text(_notice!),
+                  child: Semantics(
+                    key: const Key('client-command-announcement'),
+                    container: true,
+                    liveRegion: true,
+                    child: Text(_notice!),
+                  ),
                 ),
             ],
           ),

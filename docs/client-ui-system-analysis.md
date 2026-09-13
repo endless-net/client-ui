@@ -299,6 +299,12 @@ native IPC interoperability, локализацию, accessibility или platfo
 refresh через прокрутку. Это локальная layout-проверка, не полная accessibility
 или native mobile product acceptance.
 
+US-14: fixed-text результаты Connect/Disconnect/RenewSession помечены отдельным
+semantic live region. Shared regression проверяет точный текст pending-объявления
+без profile/credential payload и удаление semantic node при переходе в observer.
+Это проверка Flutter semantics tree, а не фактического озвучивания VoiceOver,
+TalkBack или Windows screen reader; полная accessibility и локализация открыты.
+
 `client_cleanup_panel.dart` подключает отдельные journaled Logout и
 ForgetLocalEnrollment(confirmed=true) для active profile. Каждое действие требует
 подтверждения; local forget дополнительно требует ACCESS_ADMINISTRATOR и capability.

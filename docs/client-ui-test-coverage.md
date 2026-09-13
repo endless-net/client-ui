@@ -1,5 +1,14 @@
 # Client v0 test coverage ledger
 
+US-14 command-announcement addition: `ClientConnectionPanel` exposes its fixed
+command-result notice as a separate semantic live region. The shared typed-snapshot
+widget regression checks the pending notice's exact accessible label and live-region
+flag, then verifies removal on observer transition. Local Flutter validation passed
+234 tests with 27 CI-only skips; this checks the semantics tree, not actual
+screen-reader speech, OS notifications or localization acceptance. The extension
+belongs to the existing desktop/mobile shared harness; prior runner results below
+predate it and do not qualify the new assertion.
+
 Status: incomplete. Owner: client-ui. Scope: the complete BA/SA goal, not the
 subset already implemented. The canonical machine-readable trace is
 [`tests/client-coverage.json`](../tests/client-coverage.json).

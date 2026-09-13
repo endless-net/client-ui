@@ -493,7 +493,7 @@
         },
         {
           "path": "app/test/mobile_contract_widget_test.dart",
-          "scope": "Token-field clearing and suppression of browser URLs/raw errors in shared widgets; not comprehensive privacy acceptance"
+          "scope": "Token-field clearing, suppression of browser URLs/raw errors, and fixed-text command live-region semantics with observer cleanup in shared widgets; not actual screen-reader, localization or comprehensive privacy acceptance"
         }
       ],
       "acceptanceEvidence": []
