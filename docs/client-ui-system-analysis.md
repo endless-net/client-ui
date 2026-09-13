@@ -99,8 +99,12 @@ LocalClientEvents предоставляет typed RPC binding. Шесть пр�
 `client_profiles_test.dart` и mobile harness. Session.listNetworks теперь требует
 owner/active profile и отклоняет late result после cache/domain invalidation,
 смены профиля, другого instance/profile или старой revision. Session regression
-проверяет две последовательные invalidations и смену active profile. UI выбора
-сети ещё не подключён; это не доказательство network lifecycle acceptance.
+проверяет две последовательные invalidations и смену active profile.
+ClientNetworksPanel подключает refresh и journaled SelectNetwork с profile/network
+IDs из свежего каталога, разрешая выбор только при AVAILABLE selection restriction.
+Shared widget-тест проверяет restriction, отсутствие optimistic network state,
+invalidation и observer cleanup. Это ещё не доказательство network lifecycle
+acceptance или смены реального туннеля; production entrypoint остаётся отдельной работой.
 
 Составная ClientSessionPanel имеет общий scroll container, enrollment mode dropdown
 ограничен доступной шириной. US-14 widget regression проверяет всю session panel

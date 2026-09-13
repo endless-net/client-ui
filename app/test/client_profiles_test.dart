@@ -1,5 +1,6 @@
 import 'package:endlessnet/client_profiles.dart';
 import 'package:endlessnet/client_networks.dart';
+import 'package:endlessnet/client_networks_panel.dart';
 import 'package:endlessnet/client_create_profile_panel.dart';
 import 'dart:async';
 import 'package:endlessnet/client_profiles_panel.dart';
@@ -26,6 +27,119 @@ api.ListProfilesResponse page(
   });
 
 void main() {
+  testWidgets(
+    'US-04: network selection uses fresh profile-bound IDs without optimistic state',
+    (tester) async {
+      final state = ClientStateController();
+      final events = StreamController<api.WatchEventsResponse>();
+      await state.attach(events.stream);
+      final calls = <(String, String)>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ClientNetworksPanel(
+              state: state,
+              load: () => readClientNetworks(
+                (_) async => api.ListNetworksResponse()
+                  ..mergeFromProto3Json({
+                    'networks': [
+                      {'id': 'network-a', 'name': 'A'},
+                      {
+                        'id': 'network-b',
+                        'name': 'B',
+                        'selection': {'availability': 'AVAILABILITY_AVAILABLE'},
+                      },
+                      {'id': 'network-c', 'name': 'C'},
+                    ],
+                    'selectedNetworkId': 'network-a',
+                    'page': {
+                      'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+                    },
+                  }),
+                instanceId: 'runtime-a',
+                profileId: 'profile-a',
+              ),
+              select: (profile, network) async {
+                calls.add((profile, network));
+                return ClientOperation.fromProto(
+                  api.Operation(
+                    id: 'network-selection',
+                    kind: api.OperationKind.OPERATION_KIND_SELECT_NETWORK,
+                    state: api.OperationState.OPERATION_STATE_PENDING,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      final snapshot = api.WatchEventsResponse()
+        ..mergeFromProto3Json({
+          'sequence': '1',
+          'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'runtime-a',
+              'callerAccess': 'ACCESS_OWNER',
+            },
+            'status': {
+              'activeProfileId': 'profile-a',
+              'network': {'id': 'network-a'},
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            },
+          },
+        });
+      events.add(snapshot);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('client-load-networks')));
+      await tester.pump();
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const Key('select-network-network-c')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const Key('select-network-network-b')));
+      await tester.pump();
+      expect(calls, [('profile-a', 'network-b')]);
+      expect(state.snapshot!.status.network.id, 'network-a');
+      await tester.tap(find.byKey(const Key('client-load-networks')));
+      await tester.pump();
+      events.add(
+        api.WatchEventsResponse()..mergeFromProto3Json({
+          'sequence': '2',
+          'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+          'invalidated': {
+            'domain': 'DOMAIN_NETWORKS',
+            'profileId': 'profile-a',
+          },
+        }),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('select-network-network-b')), findsNothing);
+      snapshot.sequence += 2;
+      snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      snapshot.snapshot.status.clearActiveProfileId();
+      snapshot.snapshot.status.clearNetwork();
+      events.add(snapshot);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.byKey(const Key('client-load-networks')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await events.close();
+      await tester.pumpWidget(const SizedBox());
+      state.dispose();
+    },
+  );
   for (final fault in [
     '',
     'revision',
