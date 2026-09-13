@@ -74,6 +74,143 @@ api.ListResourcesResponse _resourcePage(String suffix, {String next = ''}) =>
     });
 
 void main() {
+  for (final scenario in [
+    'valid',
+    'changed',
+    'denied',
+    'invalidated',
+    'http',
+    'credentials',
+  ]) {
+    testWidgets('US-11: application browser action $scenario', (tester) async {
+      final state = ClientStateController();
+      final events = StreamController<api.WatchEventsResponse>();
+      await state.attach(events.stream);
+      addTearDown(() async {
+        await state.detach();
+        await events.close();
+        state.dispose();
+      });
+      var reads = 0;
+      var opens = 0;
+      final pending = Completer<void>();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ContractTestScaffold(
+            body: SingleChildScrollView(
+              child: ClientResourcesPanel(
+                state: state,
+                setEnabled: (_, _, _, _) =>
+                    throw TestFailure('Opening is not a mutation'),
+                openBrowser: (uri, check) async {
+                  check();
+                  opens++;
+                  expect(uri.toString(), 'https://application.example/');
+                  return true;
+                },
+                load: (search, kinds) async {
+                  reads++;
+                  if (scenario == 'invalidated' && reads == 2) {
+                    await pending.future;
+                  }
+                  final response = _resourcePage('a');
+                  response.resources.removeWhere(
+                    (r) => r.kind != api.ResourceKind.RESOURCE_KIND_APPLICATION,
+                  );
+                  final resource = response.resources.single;
+                  resource.ensureAvailability().availability =
+                      api.Availability.AVAILABILITY_AVAILABLE;
+                  if (scenario == 'http') {
+                    resource.application.browserUrl =
+                        'http://application.example/';
+                  }
+                  if (scenario == 'credentials') {
+                    resource.application.browserUrl =
+                        'https://user:secret@application.example/';
+                  }
+                  if (scenario == 'changed' && reads == 2) {
+                    resource.application.browserUrl =
+                        'https://changed.example/';
+                  }
+                  if (scenario == 'denied' && reads == 2) {
+                    resource.availability.availability =
+                        api.Availability.AVAILABILITY_UNSPECIFIED;
+                  }
+                  return readClientResources(
+                    (_) async => response,
+                    instanceId: 'runtime-a',
+                    profileId: 'profile-a',
+                    search: search,
+                    kinds: kinds,
+                    checkContext: () {},
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      events.add(
+        api.WatchEventsResponse()..mergeFromProto3Json({
+          'sequence': '1',
+          'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+          'snapshot': {
+            'runtime': {
+              'protocol': api.ClientContract.protocol,
+              'contractSha256': api.ClientContract.sha256,
+              'instanceId': 'runtime-a',
+              'callerAccess': 'ACCESS_OWNER',
+              'capabilities': [
+                {
+                  'capability': 'CAPABILITY_RESOURCES',
+                  'restriction': {'availability': 'AVAILABILITY_AVAILABLE'},
+                },
+              ],
+            },
+            'status': {
+              'activeProfileId': 'profile-a',
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            },
+          },
+        }),
+      );
+      await tester.pump();
+      await tester.ensureVisible(
+        find.byKey(const Key('client-load-resources')),
+      );
+      await tester.tap(find.byKey(const Key('client-load-resources')));
+      await tester.pump();
+      expect(opens, 0);
+      expect(reads, 1);
+      final button = find.byKey(const Key('open-resource-application-a'));
+      if (scenario == 'http' || scenario == 'credentials') {
+        expect(button, findsNothing);
+      } else {
+        await tester.ensureVisible(button);
+        await tester.tap(button);
+        await tester.pump();
+        if (scenario == 'invalidated') {
+          events.add(
+            api.WatchEventsResponse()..mergeFromProto3Json({
+              'sequence': '2',
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+              'invalidated': {
+                'domain': 'DOMAIN_RESOURCES',
+                'profileId': 'profile-a',
+              },
+            }),
+          );
+          await tester.pump();
+          pending.complete();
+          await tester.pump();
+        }
+        expect(reads, 2);
+        expect(opens, scenario == 'valid' ? 1 : 0);
+        if (scenario != 'valid') expect(button, findsNothing);
+      }
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
   for (final lateRead in [false, true]) {
     testWidgets(
       'US-11: resource UI ${lateRead ? 'rejects late queries and stale callbacks' : 'submits an explicit disable and respects policy locks'}',

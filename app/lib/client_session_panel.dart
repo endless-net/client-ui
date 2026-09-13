@@ -45,6 +45,10 @@ class ClientSessionPanel extends StatelessWidget {
         children: [
           ClientResourcesPanel(
             state: session.state,
+            openBrowser: (uri, check) {
+              check();
+              return launchUrl(uri, mode: LaunchMode.externalApplication);
+            },
             load: (search, kinds) =>
                 session.listResources(search: search, kinds: kinds),
             setEnabled: (profile, resource, enabled, check) => session.submit(

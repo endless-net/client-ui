@@ -136,7 +136,10 @@ valid, and UI must not probe hidden resources. Session tests additionally guard
 owner context and repeated resource/profile/network invalidations. Resource UI
 widget tests additionally cover explicit disable, policy locks, requested/effective,
 late-query rejection and stale callbacks. The session panel binds changes to the
-intention journal without optimistic apply. Browser actions, producer-process
+intention journal without optimistic apply. Application browser tests use a fake
+launcher and require explicit click, a fresh same-query/profile result and an
+unchanged available HTTPS URL without credentials. Changed destinations, denial
+and invalidation never launch. Native browser acceptance, producer-process
 resource scenarios, mutation effects and platform acceptance remain open.
 
 Resource producer-host fixtures now include exact ListResources query parameters,

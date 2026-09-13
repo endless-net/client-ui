@@ -357,8 +357,13 @@ requested/effective, availability/lock/reason/action-owner и disclosed overlap 
 Profile/domain invalidation удаляет также поисковый текст и фильтры. Enable/Disable
 отправляет SetResourceEnabled через session journal с context check перед RPC;
 acceptance не означает effective apply. Shared widget tests проверяют explicit
-disable, policy lock, late query и stale callback. Browser action, producer-process
-mutation evidence, локализация и actual runtime acceptance остаются незавершёнными.
+disable, policy lock, late query и stale callback. Application browser action
+требует явного click и повторного чтения того же query/profile. HTTPS URI без
+credentials должен остаться неизменным и AVAILABLE; смена URL, denial или
+invalidation запрещают launch. Session panel вызывает внешний OS browser только
+после context check. Shared tests используют browser callback, не настоящий OS
+browser. Producer-process mutation evidence, локализация и actual runtime
+acceptance остаются незавершёнными.
 
 Producer-host suite дополнен US-11 fixtures: ListResources с точными profile,
 search/kinds/page, Enable/Disable через SetResourceEnabled и отдельный terminal

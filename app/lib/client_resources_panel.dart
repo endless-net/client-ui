@@ -11,12 +11,14 @@ class ClientResourcesPanel extends StatefulWidget {
     required this.state,
     required this.load,
     required this.setEnabled,
+    this.openBrowser,
   });
   final ClientStateController state;
   final Future<ClientResourceCatalog> Function(String, List<api.ResourceKind>)
   load;
   final Future<ClientOperation> Function(String, String, bool, void Function())
   setEnabled;
+  final Future<bool> Function(Uri, void Function())? openBrowser;
   @override
   State<ClientResourcesPanel> createState() => _ClientResourcesPanelState();
 }
@@ -92,6 +94,90 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
       !resource.enabled.control.locked &&
       resource.enabled.control.mutation.availability ==
           api.Availability.AVAILABILITY_AVAILABLE;
+
+  Uri? browserUri(api.Resource resource) {
+    if (resource.kind != api.ResourceKind.RESOURCE_KIND_APPLICATION ||
+        !resource.hasApplication() ||
+        resource.availability.availability !=
+            api.Availability.AVAILABILITY_AVAILABLE) {
+      return null;
+    }
+    final uri = Uri.tryParse(resource.application.browserUrl);
+    return uri != null &&
+            uri.scheme == 'https' &&
+            uri.hasAuthority &&
+            uri.host.isNotEmpty &&
+            uri.userInfo.isEmpty
+        ? uri
+        : null;
+  }
+
+  Future<void> _open(api.Resource resource) async {
+    final catalog = _catalog;
+    final launch = widget.openBrowser;
+    final uri = browserUri(resource);
+    if (_busy ||
+        !current ||
+        catalog == null ||
+        launch == null ||
+        uri == null ||
+        !catalog.resources.any((r) => identical(r, resource))) {
+      return;
+    }
+    final context = _context;
+    final query = _query;
+    void check() {
+      if (!mounted || !current || context != _context || query != _query) {
+        throw StateError('Resource context changed before browser launch');
+      }
+    }
+
+    setState(() {
+      _busy = true;
+      _notice = null;
+    });
+    try {
+      final fresh = await widget.load(catalog.search, catalog.kinds);
+      check();
+      if (fresh.profileId != catalog.profileId ||
+          fresh.search != catalog.search ||
+          fresh.kinds.length != catalog.kinds.length ||
+          !fresh.kinds.toSet().containsAll(catalog.kinds) ||
+          fresh.metadata.instanceId !=
+              widget.state.snapshot!.runtime.instanceId ||
+          fresh.metadata.revision <
+              widget.state.snapshot!.status.metadata.revision) {
+        throw const FormatException('Stale resource browser query');
+      }
+      final matches = fresh.resources.where((r) => r.id == resource.id);
+      if (matches.length != 1 ||
+          browserUri(matches.single) == null ||
+          matches.single.application.browserUrl !=
+              resource.application.browserUrl) {
+        throw StateError('Resource destination or availability changed');
+      }
+      check();
+      final opened = await launch(uri, check);
+      check();
+      setState(() {
+        _catalog = fresh;
+        _notice = opened
+            ? 'Resource opened in the browser.'
+            : 'Browser could not open the resource.';
+      });
+    } catch (_) {
+      if (!mounted || !current || context != _context || query != _query) {
+        return;
+      }
+      setState(() {
+        _catalog = null;
+        _notice =
+            'Resource access or destination could not be confirmed. Refresh before opening.';
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   Future<void> _run({api.Resource? resource, bool? enabled}) async {
     if (_busy || !allowed || utf8.encode(_search.text).length > 256) return;
@@ -220,6 +306,17 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(resource.displayName),
+                  if (widget.openBrowser != null &&
+                      browserUri(resource) != null)
+                    TextButton(
+                      key: ValueKey('open-resource-${resource.id}'),
+                      onPressed: !_busy
+                          ? () {
+                              if (validView()) _open(resource);
+                            }
+                          : null,
+                      child: const Text('Open resource in browser'),
+                    ),
                   Text('${resource.kind.name}: ${_target(resource)}'),
                   Text(
                     'Effective: ${resource.enabled.effective}; requested: '
