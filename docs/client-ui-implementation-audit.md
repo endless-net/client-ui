@@ -137,6 +137,13 @@ requiresApproval/unsupported; 9 channel/widget tests проверяют read/wri
 
 ## Последовательность оставшейся работы
 
+Windows UI-autostart дополнение: отдельная RU/EN панель открывает системную
+Startup apps страницу по явному нажатию (fixed URI, без runtime inputs).
+Восемь short unit/widget tests проверяют guards и безопасные outcomes;
+UI не утверждает enabled/disabled без OS evidence. Actual settings launch,
+registration/policy и login/upgrade acceptance остаются открытыми; прямого
+изменения registry или installer policy эта функция не выполняет.
+
 Packaging correction: при проверке Windows autostart обнаружена старая MSI
 регистрация `endlessnet:` → `--enroll`, уже отвергаемая новым AppConfig. Она
 удалена из generated WiX source; packaging unit test запрещает эту регистрацию

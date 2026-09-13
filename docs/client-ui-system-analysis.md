@@ -513,6 +513,21 @@ Mobile использует отдельно проверенный native bridg
 
 ## 2. Bootstrap, состояние и права
 
+Windows UI autostart control: entrypoint подключает отдельную RU/EN панель,
+которая по явному нажатию открывает фиксированный
+[`ms-settings:startupapps`](https://learn.microsoft.com/en-us/windows/apps/develop/launch/launch-settings)
+через external application launcher. Пользователь управляет зарегистрированным
+EndlessNet в Windows Settings; UI не читает/перезаписывает StartupApproved или
+Run и не меняет runtime intent. Текущее разрешение явно обозначено как
+непроверенное; successful launch не считается enable/disable acceptance.
+False/exception дают безопасное сообщение и путь к ручному открытию настроек.
+[`client_windows_autostart_test.dart`](../app/test/client_windows_autostart_test.dart)
+содержит восемь short tests: fixed URI, RU/EN success/failure, explicit action,
+busy/disabled guards, adapter replacement/disposal и error sanitization.
+Реальное открытие страницы, наличие установленного entry, policy/permission,
+login/upgrade/repair/uninstall ещё не проверены. MSI identity и registration
+этой UI-функцией не меняются; UF-02/21 целиком не закрыты.
+
 Windows packaging cutover correction: MSI больше не регистрирует устаревший
 `endlessnet:` handler через `--enroll`, который текущий UI startup parser
 отвергает. [`installer_test.go`](../tools/windows-packaging/installer_test.go)

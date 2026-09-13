@@ -21,6 +21,7 @@ import 'client_notification_permission_panel.dart';
 import 'client_native_notifications.dart';
 import 'client_autostart_panel.dart';
 import 'client_autostart_setting.dart';
+import 'client_windows_autostart.dart';
 
 Directory clientJournalDirectory(String endpoint) {
   final home =
@@ -54,10 +55,12 @@ class ClientDesktopApp extends StatefulWidget {
     this.requestNotificationPermission,
     this.readAutostart,
     this.writeAutostart,
+    this.openWindowsAutostartSettings,
   });
   final ClientSession session;
   final Future<ClientAutostartSetting> Function()? readAutostart;
   final Future<ClientAutostartSetting> Function(bool)? writeAutostart;
+  final Future<bool> Function()? openWindowsAutostartSettings;
   final DeliverClientNotification? deliverNotification;
   final bool initialNotifications;
   final bool notificationReadFailed;
@@ -609,6 +612,12 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
               notifications: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (widget.openWindowsAutostartSettings != null)
+                    ClientWindowsAutostartPanel(
+                      openSettings: widget.openWindowsAutostartSettings!,
+                      locale: _locale,
+                      enabled: !_busy,
+                    ),
                   if (widget.readAutostart != null &&
                       widget.writeAutostart != null)
                     ClientAutostartPanel(
