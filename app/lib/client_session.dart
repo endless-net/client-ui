@@ -4,10 +4,12 @@ import 'client_intent_journal.dart';
 import 'client_mutations.dart';
 import 'client_operation.dart';
 import 'client_profiles.dart';
+import 'client_networks.dart';
 import 'client_state_controller.dart';
 import 'local_client_events.dart';
 
 abstract interface class ClientConnection {
+  Future<ClientNetworkCatalog> listNetworks(String profileId);
   Future<ClientProfileCatalog> listProfiles();
   ClientMutations get mutations;
   Stream<api.WatchEventsResponse> watch();
@@ -17,6 +19,9 @@ abstract interface class ClientConnection {
 final class _LocalConnection implements ClientConnection {
   _LocalConnection(this.source);
   final LocalClientEvents source;
+  @override
+  Future<ClientNetworkCatalog> listNetworks(String profileId) =>
+      source.listNetworks(profileId);
   @override
   Future<ClientProfileCatalog> listProfiles() => source.listProfiles();
   @override
@@ -161,6 +166,37 @@ final class ClientSession {
         catalog.metadata.instanceId != snapshot.runtime.instanceId ||
         catalog.metadata.revision < state.snapshot!.status.metadata.revision) {
       throw StateError('Client context changed during profile lookup');
+    }
+    return catalog;
+  }
+
+  Future<ClientNetworkCatalog> listNetworks() async {
+    final connection = _connection;
+    final snapshot = state.snapshot;
+    if (_closed ||
+        connection == null ||
+        snapshot == null ||
+        state.link != ClientLinkState.ready ||
+        snapshot.runtime.callerAccess == api.Access.ACCESS_OBSERVER ||
+        snapshot.status.activeProfileId.isEmpty) {
+      throw StateError('Network catalog requires a current owner profile');
+    }
+    final epoch = _epoch;
+    final cacheEpoch = state.cacheEpoch;
+    final domainEpoch = state.domainEpoch(api.Domain.DOMAIN_NETWORKS);
+    final profileId = snapshot.status.activeProfileId;
+    final catalog = await connection.listNetworks(profileId);
+    if (_closed ||
+        epoch != _epoch ||
+        cacheEpoch != state.cacheEpoch ||
+        domainEpoch != state.domainEpoch(api.Domain.DOMAIN_NETWORKS) ||
+        state.link != ClientLinkState.ready ||
+        state.snapshot == null ||
+        catalog.profileId != profileId ||
+        state.snapshot!.status.activeProfileId != profileId ||
+        catalog.metadata.instanceId != snapshot.runtime.instanceId ||
+        catalog.metadata.revision < state.snapshot!.status.metadata.revision) {
+      throw StateError('Client context changed during network lookup');
     }
     return catalog;
   }

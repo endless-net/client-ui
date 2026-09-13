@@ -96,8 +96,11 @@ US-04 read foundation: `client_networks.dart` собирает полный immu
 через ListNetworks с фиксированным ProfileRef и opaque page tokens. Проверяются
 instance/revision, неизменность selected ID, duplicate IDs и pagination cycles;
 LocalClientEvents предоставляет typed RPC binding. Шесть проверок входят в общий
-`client_profiles_test.dart` и mobile harness. Session context/domain guards и UI
-выбора сети ещё не подключены; это не доказательство network lifecycle acceptance.
+`client_profiles_test.dart` и mobile harness. Session.listNetworks теперь требует
+owner/active profile и отклоняет late result после cache/domain invalidation,
+смены профиля, другого instance/profile или старой revision. Session regression
+проверяет две последовательные invalidations и смену active profile. UI выбора
+сети ещё не подключён; это не доказательство network lifecycle acceptance.
 
 Составная ClientSessionPanel имеет общий scroll container, enrollment mode dropdown
 ограничен доступной шириной. US-14 widget regression проверяет всю session panel

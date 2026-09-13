@@ -5,6 +5,7 @@ import 'package:endlessnet/client_intent_journal.dart';
 import 'package:endlessnet/client_mutations.dart';
 import 'package:endlessnet/client_operation.dart';
 import 'package:endlessnet/client_profiles.dart';
+import 'package:endlessnet/client_networks.dart';
 import 'package:endlessnet/client_session.dart';
 import 'package:endlessnet/client_session_panel.dart';
 import 'package:endlessnet/client_state_controller.dart';
@@ -19,6 +20,10 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 class FakeConnection implements ClientConnection {
+  Future<ClientNetworkCatalog> Function(String profileId)? networks;
+  @override
+  Future<ClientNetworkCatalog> listNetworks(String profileId) =>
+      networks!(profileId);
   Future<ClientProfileCatalog> Function()? profiles;
   @override
   Future<ClientProfileCatalog> listProfiles() => profiles!();
@@ -93,6 +98,60 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'US-04: networks bind active profile and reject repeated invalidations',
+    () async {
+      await expectLater(session.listNetworks(), throwsStateError);
+      final initial = snapshot()..snapshot.status.activeProfileId = 'profile-a';
+      connection.events.add(initial);
+      await pumpEventQueue();
+      final catalog = await readClientNetworks(
+        (_) async => api.ListNetworksResponse()
+          ..mergeFromProto3Json({
+            'page': {
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            },
+          }),
+        instanceId: 'runtime-a',
+        profileId: 'profile-a',
+      );
+      for (var repeat = 0; repeat < 2; repeat++) {
+        final response = Completer<ClientNetworkCatalog>();
+        connection.networks = (id) {
+          expect(id, 'profile-a');
+          return response.future;
+        };
+        final rejected = expectLater(session.listNetworks(), throwsStateError);
+        connection.events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '${repeat + 2}',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'invalidated': {
+              'domain': 'DOMAIN_NETWORKS',
+              'profileId': 'profile-a',
+            },
+          }),
+        );
+        await pumpEventQueue();
+        response.complete(catalog);
+        await rejected;
+        connection.networks = (_) async => catalog;
+        expect(await session.listNetworks(), same(catalog));
+      }
+      final response = Completer<ClientNetworkCatalog>();
+      connection.networks = (_) => response.future;
+      final rejected = expectLater(session.listNetworks(), throwsStateError);
+      final changed = snapshot()..sequence += 3;
+      changed.snapshot.status.activeProfileId = 'profile-b';
+      connection.events.add(changed);
+      await pumpEventQueue();
+      response.complete(catalog);
+      await rejected;
+      connection.networks = (_) async => catalog;
+      await expectLater(session.listNetworks(), throwsStateError);
+    },
+  );
 
   testWidgets(
     'US-14: composed session panel remains scrollable with large text',
