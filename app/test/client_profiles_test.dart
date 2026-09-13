@@ -4,6 +4,7 @@ import 'package:endlessnet/client_resources.dart';
 import 'package:endlessnet/client_resources_panel.dart';
 import 'package:endlessnet/client_exit_nodes.dart';
 import 'package:endlessnet/client_exit_panel.dart';
+import 'package:endlessnet/client_update_info.dart';
 import 'package:endlessnet/client_networks_panel.dart';
 import 'package:endlessnet/client_create_profile_panel.dart';
 import 'dart:async';
@@ -114,6 +115,133 @@ api.GetExitNodeResponse _exitStatus() =>
     });
 
 void main() {
+  test(
+    'US-13: update source states stay distinct and results are immutable',
+    () async {
+      final build = api.BuildIdentity(
+        version: 'dev',
+        platform: api.Platform.PLATFORM_WINDOWS,
+        architecture: 'amd64',
+      );
+      for (final state in api.UpdateState.values.where(
+        (s) =>
+            s != api.UpdateState.UPDATE_STATE_UNSPECIFIED &&
+            s != api.UpdateState.UPDATE_STATE_AVAILABLE,
+      )) {
+        final response = api.GetUpdateInfoResponse()
+          ..mergeFromProto3Json({
+            'info': {
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+              'installedRuntime': build.toProto3Json(),
+              'reportedUi': build.toProto3Json(),
+              'installedPair': {'state': 'COMPATIBILITY_STATE_UNKNOWN'},
+              'state': state.name,
+            },
+          });
+        var checks = 0;
+        final result = await readClientUpdateInfo(
+          instanceId: 'runtime-a',
+          installedRuntime: build,
+          reportedUi: build,
+          get: (request) async {
+            expect(request.isFrozen, isTrue);
+            expect(request.reportedUi, build);
+            return response;
+          },
+          checkContext: () {
+            checks++;
+          },
+          now: () => DateTime.utc(2026, 9, 13),
+        );
+        expect(result.state, state);
+        expect(result.isFrozen, isTrue);
+        expect(checks, 2);
+        response.info.state = api.UpdateState.UPDATE_STATE_UP_TO_DATE;
+        expect(result.state, state);
+      }
+    },
+  );
+  test(
+    'US-13: verified update rejects stale, mismatched and unsafe projections',
+    () async {
+      final build = api.BuildIdentity(
+        version: 'dev',
+        platform: api.Platform.PLATFORM_WINDOWS,
+        architecture: 'amd64',
+      );
+      api.GetUpdateInfoResponse response() =>
+          api.GetUpdateInfoResponse()..mergeFromProto3Json({
+            'info': {
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+              'installedRuntime': build.toProto3Json(),
+              'reportedUi': build.toProto3Json(),
+              'installedPair': {'state': 'COMPATIBILITY_STATE_COMPATIBLE'},
+              'state': 'UPDATE_STATE_AVAILABLE',
+              'available': {
+                'releaseId': 'release-a',
+                'manifestSha256': 'a' * 64,
+                'signingKeyId': 'key-a',
+                'verifiedAt': '2026-09-12T00:00:00Z',
+                'expiresAt': '2026-09-14T00:00:00Z',
+                'runtime': build.toProto3Json(),
+                'pairedUiVersion': 'dev',
+                'compatibility': {
+                  'state': 'COMPATIBILITY_STATE_COMPATIBLE',
+                  'acceptedContractSha256': [api.ClientContract.sha256],
+                },
+                'classification': 'UPDATE_CLASSIFICATION_MANDATORY',
+                'channel': 'DISTRIBUTION_CHANNEL_VENDOR_PACKAGE',
+                'actionUrl': 'https://distribution.example/',
+              },
+            },
+          });
+      Future<api.UpdateInfo> read(
+        api.GetUpdateInfoResponse value, {
+        bool invalidate = false,
+      }) {
+        var checks = 0;
+        return readClientUpdateInfo(
+          instanceId: 'runtime-a',
+          installedRuntime: build,
+          reportedUi: build,
+          get: (_) async => value,
+          now: () => DateTime.utc(2026, 9, 13),
+          checkContext: () {
+            if (++checks == 2 && invalidate) {
+              throw StateError('Changed context');
+            }
+          },
+        );
+      }
+
+      final valid = await read(response());
+      expect(
+        valid.available.classification,
+        api.UpdateClassification.UPDATE_CLASSIFICATION_MANDATORY,
+      );
+      expect(valid.isFrozen, isTrue);
+      for (final mutate in <void Function(api.UpdateInfo)>[
+        (i) => i.clearAvailable(),
+        (i) => i.state = api.UpdateState.UPDATE_STATE_VERIFICATION_FAILED,
+        (i) => i.metadata.instanceId = 'runtime-b',
+        (i) => i.reportedUi.version = 'another-ui',
+        (i) => i.installedRuntime.version = 'another-runtime',
+        (i) => i.available.expiresAt = i.available.verifiedAt,
+        (i) => i.available.verifiedAt = i.available.expiresAt,
+        (i) => i.available.expiresAt.nanos = -1,
+        (i) => i.available.runtime.platform = api.Platform.PLATFORM_LINUX,
+        (i) => i.available.runtime.architecture = 'arm64',
+        (i) => i.available.manifestSha256 = 'invalid',
+        (i) => i.available.actionUrl = 'https://user:secret@example.test/',
+        (i) => i.available.releaseNotesUrl = 'http://example.test/',
+      ]) {
+        final value = response();
+        mutate(value.info);
+        await expectLater(read(value), throwsFormatException);
+      }
+      await expectLater(read(response(), invalidate: true), throwsStateError);
+    },
+  );
   for (final scenario in ['select', 'clear', 'invalidated', 'locked']) {
     testWidgets('US-05: explicit exit UI $scenario', (tester) async {
       final state = ClientStateController();

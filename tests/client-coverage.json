@@ -418,8 +418,13 @@
         "UI-AC-11",
         "UI-AC-25"
       ],
-      "implementation": "missing",
-      "testEvidence": [],
+      "implementation": "partial",
+      "testEvidence": [
+        {
+          "path": "app/test/client_profiles_test.dart",
+          "scope": "Unwired update reader foundation: distinct source states, immutable identity/context-bound projection, expiry/target/URL checks and invalidation. Local tests only; no manifest signature verification, session/UI integration, installer outcome or platform acceptance"
+        }
+      ],
       "acceptanceEvidence": []
     },
     {

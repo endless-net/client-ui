@@ -362,6 +362,16 @@ Rename никогда не меняет Account identity/control origin.
 
 ## 5. Сроки, предпочтения и диагностика
 
+US-13 reader foundation: `readClientUpdateInfo` сохраняет различия UNKNOWN,
+SOURCE_UNAVAILABLE, VERIFICATION_FAILED и UP_TO_DATE. Проверяет instance/revision,
+installed runtime и caller-reported UI identity, immutable copy, verified metadata,
+expiry/verification time, target platform/architecture, classification/channel и
+HTTPS URLs без userinfo. Это проверка согласованности producer projection, не
+криптографическая проверка manifest. Никаких installer/browser действий reader
+не выполняет. Shared tests покрывают valid/invalid projections и invalidation.
+Local/session binding, UI, trusted source configuration, external installer outcome
+и platform acceptance ещё не реализованы/не подтверждены этим слоем.
+
 US-12 foundation: desktop shell отправляет journaled NotifyLifecycle(UI_QUIT)
 при явном Quit owner с активным профилем; observer не отправляет мутацию.
 Открытие UI не означает runtime start. Pending acceptance разрешает закрыть UI,
