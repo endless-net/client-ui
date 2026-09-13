@@ -384,6 +384,18 @@ widget tests проверяют эти границы, включая expiry п�
 configuration, About/Help, external distribution action/outcome и platform
 acceptance ещё не реализованы/не подтверждены этим слоем.
 
+US-13 support foundation: `ClientSession.getSupportInfo` вызывает generated RPC,
+разрешённый observer без active profile. Reader сверяет BuildIdentity с текущим
+snapshot, сохраняет immutable SupportInfo, отклоняет HTTP/file URLs, userinfo,
+whitespace/control characters. Пустые destinations остаются пустыми; URL не
+открываются автоматически. Runtime отвечает за trusted configured sources;
+одна проверка HTTPS не устанавливает доверие к owning domain. В SupportInfo v0
+нет metadata/revision: consumer не синтезирует их, а отклоняет ответ при смене
+cache/context или повторной SUPPORT invalidation. Offline key остаётся opaque,
+не является путём к файлу. Shared reader/session tests локально проверяют эти
+границы; Help UI, shipped offline content, explicit links и platform evidence
+ещё нужны.
+
 US-12 foundation: desktop shell отправляет journaled NotifyLifecycle(UI_QUIT)
 при явном Quit owner с активным профилем; observer не отправляет мутацию.
 Открытие UI не означает runtime start. Pending acceptance разрешает закрыть UI,

@@ -6,6 +6,7 @@ import 'package:endlessnet/client_exit_nodes.dart';
 import 'package:endlessnet/client_exit_panel.dart';
 import 'package:endlessnet/client_update_info.dart';
 import 'package:endlessnet/client_update_panel.dart';
+import 'package:endlessnet/client_support_info.dart';
 import 'package:endlessnet/client_networks_panel.dart';
 import 'package:endlessnet/client_create_profile_panel.dart';
 import 'dart:async';
@@ -116,6 +117,68 @@ api.GetExitNodeResponse _exitStatus() =>
     });
 
 void main() {
+  test(
+    'US-13: support projection preserves identity and rejects unsafe destinations',
+    () async {
+      final build = api.BuildIdentity(version: 'dev');
+      api.GetSupportInfoResponse response() =>
+          api.GetSupportInfoResponse()..mergeFromProto3Json({
+            'info': {
+              'runtime': build.toProto3Json(),
+              'productName': 'EndlessNet',
+              'documentationUrl': 'https://docs.example/',
+              'supportUrl': 'https://support.example/',
+              'privacyUrl': 'https://privacy.example/',
+              'licenseUrl': 'https://license.example/',
+              'offlineHelpKey': 'opaque-help-key',
+            },
+          });
+      Future<api.SupportInfo> read(api.GetSupportInfoResponse value) =>
+          readClientSupportInfo(
+            installedRuntime: build,
+            get: (request) async {
+              expect(request.isFrozen, isTrue);
+              return value;
+            },
+            checkContext: () {},
+          );
+      final source = response();
+      final info = await read(source);
+      expect(info.isFrozen, isTrue);
+      expect(info.offlineHelpKey, 'opaque-help-key');
+      source.info.productName = 'Changed';
+      expect(info.productName, 'EndlessNet');
+      for (final set in <void Function(api.SupportInfo, String)>[
+        (i, v) => i.documentationUrl = v,
+        (i, v) => i.supportUrl = v,
+        (i, v) => i.privacyUrl = v,
+        (i, v) => i.licenseUrl = v,
+      ]) {
+        for (final url in [
+          'http://example.test/',
+          'https://user:secret@example.test/',
+          'file:///tmp/help',
+          ' https://example.test/',
+          'https://example.test/\n',
+        ]) {
+          final bad = response();
+          set(bad.info, url);
+          await expectLater(read(bad), throwsFormatException);
+        }
+        final absent = response();
+        set(absent.info, '');
+        await read(absent);
+      }
+      await expectLater(
+        read(response()..info.runtime.version = 'other'),
+        throwsFormatException,
+      );
+      await expectLater(
+        read(api.GetSupportInfoResponse()),
+        throwsFormatException,
+      );
+    },
+  );
   for (final scenario in [
     'source-unavailable',
     'expires-later',

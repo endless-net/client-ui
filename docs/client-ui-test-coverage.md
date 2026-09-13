@@ -163,6 +163,17 @@ Mandatory notices do not install, launch URLs or disconnect. UI identity comes
 from the executable's compile-time version fields (tested against versionText),
 not from runtime attestation. About/Help and distribution actions remain open.
 
+### Support read foundation (2026-09-13)
+
+Shared reader tests bind support runtime identity, retain immutable results and
+the opaque offline-help key, permit absent links and reject HTTP/file URLs,
+credentials and whitespace/control characters in all four destinations. This
+does not establish ownership of a domain; trusted source configuration remains
+producer-owned. The session test allows observer access with no active profile,
+rejects repeated SUPPORT invalidation and confirms no intention journal writes.
+SupportInfo has no revision field in v0; none is fabricated. Help UI, bundled
+offline content, explicit link launching and platform evidence remain open.
+
 ### Desktop lifecycle foundation (2026-09-13)
 
 Desktop shell widget tests invoke the explicit Quit callback with native

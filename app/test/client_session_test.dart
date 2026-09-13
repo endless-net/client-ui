@@ -27,6 +27,12 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 class FakeConnection implements ClientConnection {
+  Future<api.GetSupportInfoResponse> Function(api.GetSupportInfoRequest)?
+  support;
+  @override
+  Future<api.GetSupportInfoResponse> getSupportInfo(
+    api.GetSupportInfoRequest request,
+  ) => support!(request);
   Future<api.GetUpdateInfoResponse> Function(api.GetUpdateInfoRequest)? updates;
   @override
   Future<api.GetUpdateInfoResponse> getUpdateInfo(
@@ -210,6 +216,47 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'US-13: support permits observer and rejects repeated invalidation',
+    () async {
+      await expectLater(session.getSupportInfo(), throwsStateError);
+      final observer = snapshot();
+      observer.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      connection.events.add(observer);
+      await pumpEventQueue();
+      final response = api.GetSupportInfoResponse()
+        ..mergeFromProto3Json({
+          'info': {
+            'runtime': {},
+            'productName': 'EndlessNet',
+            'offlineHelpKey': 'offline-a',
+          },
+        });
+      connection.support = (_) async => response;
+      expect((await session.getSupportInfo()).productName, 'EndlessNet');
+      for (var i = 0; i < 2; i++) {
+        final pending = Completer<api.GetSupportInfoResponse>();
+        connection.support = (_) => pending.future;
+        final rejected = expectLater(
+          session.getSupportInfo(),
+          throwsStateError,
+        );
+        await pumpEventQueue();
+        connection.events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '${i + 2}',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'invalidated': {'domain': 'DOMAIN_SUPPORT'},
+          }),
+        );
+        await pumpEventQueue();
+        pending.complete(response);
+        await rejected;
+      }
+      expect(await session.journal.pending(), isEmpty);
+    },
+  );
 
   test(
     'US-13: update reads bind owner and reject repeated invalidation or stale revision',
