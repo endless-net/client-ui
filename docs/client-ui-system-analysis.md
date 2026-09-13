@@ -403,6 +403,15 @@ Shared widget tests используют fake launcher и проверяют ope
 URL, invalidation и launcher отказ. Это не native browser acceptance; полный
 локализованный offline corpus и platform evidence ещё нужны.
 
+US-13 process foundation: `client_information_process_test.dart` содержит семь
+сценариев producer-host — observer support и шесть owner update states. Runtime
+build и UI claim намеренно synthetic (не OS attestation); GetUpdateInfo ожидает
+точный reported_ui. WatchEvents остаётся открыт, active profile отсутствует,
+journal пуст и HostVerify отвергает лишние RPC. Observer role задаётся только
+тестовому процессу, не production UI; update запрещается consumer до запроса.
+Это не проверка server-side отказа, настоящих подписей или installer effects.
+Локально валидируются fixture projections; process execution ожидается в desktop CI.
+
 US-12 foundation: desktop shell отправляет journaled NotifyLifecycle(UI_QUIT)
 при явном Quit owner с активным профилем; observer не отправляет мутацию.
 Открытие UI не означает runtime start. Pending acceptance разрешает закрыть UI,

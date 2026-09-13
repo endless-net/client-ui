@@ -34,7 +34,11 @@ final class ScenarioHost {
     String executable,
     List<Object> steps, {
     bool administrator = false,
+    bool observer = false,
   }) async {
+    if (administrator && observer) {
+      throw ArgumentError('Scenario role must be unambiguous');
+    }
     // Short Unix path is required by sockaddr_un on macOS runners.
     final directory =
         await (Platform.isWindows ? Directory.systemTemp : Directory('/tmp'))
@@ -55,7 +59,11 @@ final class ScenarioHost {
           '--endpoint',
           endpoint,
           '--access',
-          administrator ? 'administrator' : 'owner',
+          administrator
+              ? 'administrator'
+              : observer
+              ? 'observer'
+              : 'owner',
         ],
         environment: {
           // This child runs synthetic scripts only. Capture transport termination

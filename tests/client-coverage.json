@@ -426,7 +426,11 @@
         },
         {
           "path": "app/test/client_session_test.dart",
-          "scope": "Installation-level owner update read without active profile; observer rejected before update RPC, repeated UPDATES invalidation and stale revision rejected without journal changes. Support read permits observer, rejects repeated SUPPORT invalidations without synthesizing revision. Native bindings present; no producer-process or platform execution claim for these changes"
+          "scope": "Installation-level owner update read without active profile; observer rejected before update RPC, repeated UPDATES invalidation and stale revision rejected without journal changes. Support read permits observer, rejects repeated SUPPORT invalidations without synthesizing revision. Native bindings present; no platform execution claim for these changes"
+        },
+        {
+          "path": "app/test/client_information_process_test.dart",
+          "scope": "Seven producer-host read scenarios: observer support and six owner update states, exact UI claim, immutable projection, held-open WatchEvents and empty journal with no extra RPC. Synthetic platform identity; offline fixture validation locally, process execution pending desktop CI. No actual signatures, installer or traffic acceptance"
         }
       ],
       "acceptanceEvidence": []

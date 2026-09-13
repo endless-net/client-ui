@@ -165,6 +165,16 @@ not from runtime attestation. About/Help and distribution actions remain open.
 
 ### Support read foundation (2026-09-13)
 
+The information process suite adds seven pinned-producer scenarios: observer
+support and UNKNOWN/UP_TO_DATE/AVAILABLE/EXTERNAL_MANAGER_REQUIRED/
+SOURCE_UNAVAILABLE/VERIFICATION_FAILED owner update reads. It expects an exact
+UI build claim, keeps WatchEvents open and verifies the journal remains empty
+without extra RPCs. Available security metadata is synthetic; no signature or
+installer is executed. The fixed fixture platform identity does not attest the
+host OS. Local tests validate the typed fixtures; actual process cases require
+desktop CI and are skipped locally. Observer update denial is tested before RPC,
+not as a producer-side authorization rejection.
+
 Shared reader tests bind support runtime identity, retain immutable results and
 the opaque offline-help key, permit absent links and reject HTTP/file URLs,
 credentials and whitespace/control characters in all four destinations. This
