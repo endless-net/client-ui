@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'client_connection_panel.dart';
+import 'client_locale.dart';
 import 'client_session.dart';
 import 'client_recovery_panel.dart';
 import 'client_runtime_operations_panel.dart';
@@ -33,8 +34,10 @@ class ClientSessionPanel extends StatelessWidget {
     this.exportBundle,
     this.elevate,
     this.uiBuild,
+    this.locale = ClientLocale.en,
   });
   final ClientSession session;
+  final ClientLocale locale;
   final api.BuildIdentity? uiBuild;
   final Future<ClientElevationOutcome> Function(ClientPrivilegedRecovery)?
   elevate;
@@ -51,6 +54,7 @@ class ClientSessionPanel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           ClientSupportPanel(
+            locale: locale,
             state: session.state,
             load: session.getSupportInfo,
             openBrowser: (uri, check) {
@@ -60,11 +64,13 @@ class ClientSessionPanel extends StatelessWidget {
           ),
           if (uiBuild != null)
             ClientUpdatePanel(
+              locale: locale,
               state: session.state,
               uiBuild: uiBuild!,
               load: session.getUpdateInfo,
             ),
           ClientExitPanel(
+            locale: locale,
             state: session.state,
             load: session.getExitNodes,
             select: (profile, node, mode, lan, check) => session.submit(
@@ -96,6 +102,7 @@ class ClientSessionPanel extends StatelessWidget {
             ),
           ),
           ClientResourcesPanel(
+            locale: locale,
             state: session.state,
             openBrowser: (uri, check) {
               check();
@@ -119,6 +126,7 @@ class ClientSessionPanel extends StatelessWidget {
             ),
           ),
           ClientPreferencesPanel(
+            locale: locale,
             state: session.state,
             load: session.getPreferences,
             apply: (id, patch, check) => session.submit(
@@ -149,6 +157,7 @@ class ClientSessionPanel extends StatelessWidget {
             ),
           ),
           ClientDiagnosticsPanel(
+            locale: locale,
             state: session.state,
             load: session.getDiagnostics,
             loadLogs: session.getRecentLogs,
@@ -163,6 +172,7 @@ class ClientSessionPanel extends StatelessWidget {
             ),
           ),
           ClientIdentityPanel(
+            locale: locale,
             state: session.state,
             canElevate: _elevate != null,
             load: session.getServerIdentity,
@@ -231,6 +241,7 @@ class ClientSessionPanel extends StatelessWidget {
             },
           ),
           ClientNetworksPanel(
+            locale: locale,
             state: session.state,
             load: session.listNetworks,
             select: (profileId, networkId) => session.submit(
@@ -245,10 +256,12 @@ class ClientSessionPanel extends StatelessWidget {
             ),
           ),
           ClientPeersPanel(
+            locale: locale,
             state: session.state,
             load: (search) => session.listPeers(search: search),
           ),
           ClientCleanupPanel(
+            locale: locale,
             state: session.state,
             canElevate: _elevate != null,
             logout: (id) => session.submit(
@@ -289,6 +302,7 @@ class ClientSessionPanel extends StatelessWidget {
             },
           ),
           ClientEnrollmentPanel(
+            locale: locale,
             state: session.state,
             enroll: (id, mode, hostname, token) => session.submit(
               api.OperationKind.OPERATION_KIND_ENROLL,
@@ -309,6 +323,7 @@ class ClientSessionPanel extends StatelessWidget {
             ),
           ),
           ClientCreateProfilePanel(
+            locale: locale,
             state: session.state,
             create: (name, origin) => session.submit(
               api.OperationKind.OPERATION_KIND_CREATE_PROFILE,
@@ -322,6 +337,7 @@ class ClientSessionPanel extends StatelessWidget {
             ),
           ),
           ClientConnectionPanel(
+            locale: locale,
             state: session.state,
             renewSession: () => session.submit(
               api.OperationKind.OPERATION_KIND_RENEW_SESSION,
@@ -361,8 +377,9 @@ class ClientSessionPanel extends StatelessWidget {
               },
             ),
           ),
-          ClientRuntimeOperationsPanel(state: session.state),
+          ClientRuntimeOperationsPanel(locale: locale, state: session.state),
           ClientRecoveryPanel(
+            locale: locale,
             // Local-journal recovery stays separate from stream observations.
             exportBundle: exportBundle,
             state: session.state,
@@ -372,6 +389,7 @@ class ClientSessionPanel extends StatelessWidget {
                 launchUrl(uri, mode: LaunchMode.externalApplication),
           ),
           ClientProfilesPanel(
+            locale: locale,
             state: session.state,
             load: session.listProfiles,
             remove: (id) => session.submit(

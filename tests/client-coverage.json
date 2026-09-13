@@ -594,7 +594,11 @@
         },
         {
           "path": "app/test/client_operation_labels_test.dart",
-          "scope": "Closed operation state, continuity, action owner, required action and failure enums have RU/EN catalog entries; exact Russian enum mappings and existing English mappings are tested in the shared desktop/mobile harness. Application locale switching and complete localized flows remain unimplemented. Runner execution pending; not full localization or accessibility acceptance"
+          "scope": "Closed operation state, continuity, action owner, required action and failure enums have RU/EN catalog entries; exact Russian enum mappings and existing English mappings are tested in the shared desktop/mobile harness. Complete localized flows remain incomplete. Runner execution pending; not full localization or accessibility acceptance"
+        },
+        {
+          "path": "app/test/client_app_locale_test.dart",
+          "scope": "Six short composed-app tests: real dropdown selection in RU/EN reaches all 16 session panels; controller/snapshot/form identity and draft survive without reconnect or journal mutation; shell failure and quit/stay texts translate. Locale is in-memory only. Not persistence, native tray, Material/OS localization or full UI-AC-13 acceptance"
         },
         {
           "path": "app/test/client_intent_journal_test.dart",

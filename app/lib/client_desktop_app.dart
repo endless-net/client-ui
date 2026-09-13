@@ -9,6 +9,7 @@ import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'client_session.dart';
+import 'client_locale.dart';
 import 'client_bundle_destination.dart';
 import 'client_session_panel.dart';
 import 'client_state_controller.dart';
@@ -36,8 +37,10 @@ class ClientDesktopApp extends StatefulWidget {
     this.showSignal,
     this.onExit,
     this.uiBuild,
+    this.initialLocale = ClientLocale.en,
   });
   final ClientSession session;
+  final ClientLocale initialLocale;
   final api.BuildIdentity? uiBuild;
   final bool desktopIntegration;
   final bool showWindow;
@@ -47,13 +50,31 @@ class ClientDesktopApp extends StatefulWidget {
   State<ClientDesktopApp> createState() => _ClientDesktopAppState();
 }
 
+enum _DesktopNotice { tray, integration, runtime }
+
 class _ClientDesktopAppState extends State<ClientDesktopApp>
     with WindowListener, TrayListener {
   final _navigator = GlobalKey<NavigatorState>();
   Timer? _signals;
   DateTime? _lastSignal;
   bool _busy = false;
-  String? _notice;
+  _DesktopNotice? _notice;
+  late ClientLocale _locale;
+  String _text(String en, String ru) => _locale.text(en: en, ru: ru);
+  String get _noticeText => switch (_notice!) {
+    _DesktopNotice.tray => _text(
+      'Tray update unavailable. Use the application window.',
+      'Обновление значка в трее недоступно. Используйте окно приложения.',
+    ),
+    _DesktopNotice.integration => _text(
+      'Desktop integration is unavailable. Runtime access remains separate.',
+      'Интеграция с рабочим столом недоступна. Доступ к службе не зависит от неё.',
+    ),
+    _DesktopNotice.runtime => _text(
+      'Native runtime is unavailable or incompatible. No fallback was used.',
+      'Локальная служба недоступна или несовместима. Альтернативное подключение не использовалось.',
+    ),
+  };
   late final ClientTray _tray;
   bool _trayReady = false;
   bool _trayUpdating = false;
@@ -92,6 +113,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   @override
   void initState() {
     super.initState();
+    _locale = widget.initialLocale;
     _tray = ClientTray(
       state: session.state,
       connect: () => session.submit(
@@ -137,10 +159,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
       } while (_trayDirty && mounted && _trayReady);
     } catch (_) {
       if (mounted) {
-        setState(
-          () =>
-              _notice = 'Tray update unavailable. Use the application window.',
-        );
+        setState(() => _notice = _DesktopNotice.tray);
       }
     } finally {
       _trayUpdating = false;
@@ -187,10 +206,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
         );
       } catch (_) {
         if (mounted) {
-          setState(
-            () => _notice =
-                'Desktop integration is unavailable. Runtime access remains separate.',
-          );
+          setState(() => _notice = _DesktopNotice.integration);
         }
       }
     }
@@ -242,10 +258,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
       await session.connect();
     } catch (_) {
       if (mounted) {
-        setState(
-          () => _notice =
-              'Native runtime is unavailable or incompatible. No fallback was used.',
-        );
+        setState(() => _notice = _DesktopNotice.runtime);
       }
     } finally {
       if (mounted) _setBusy(false);
@@ -288,18 +301,26 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
       final exit = await showDialog<bool>(
         context: _navigator.currentContext!,
         builder: (context) => AlertDialog(
-          title: const Text('Exit without confirmed runtime notification?'),
-          content: const Text(
-            'The agent may retain its current connection intent. The operation will not be replayed.',
+          title: Text(
+            _text(
+              'Exit without confirmed runtime notification?',
+              'Закрыть интерфейс без подтверждения уведомления службы?',
+            ),
+          ),
+          content: Text(
+            _text(
+              'The agent may retain its current connection intent. The operation will not be replayed.',
+              'Агент может сохранить текущее намерение подключения. Операция не будет отправлена повторно.',
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Stay'),
+              child: Text(_text('Stay', 'Остаться')),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Exit UI'),
+              child: Text(_text('Exit UI', 'Закрыть интерфейс')),
             ),
           ],
         ),
@@ -344,17 +365,42 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
         actions: [
           TextButton(
             onPressed: _busy ? null : _connect,
-            child: const Text('Reconnect runtime'),
+            child: Text(
+              _text('Reconnect runtime', 'Переподключиться к службе'),
+            ),
           ),
           TextButton(
             onPressed: _busy ? null : _quit,
-            child: const Text('Quit'),
+            child: Text(_text('Quit', 'Выход')),
           ),
         ],
       ),
       body: Column(
         children: [
-          if (_notice != null) Text(_notice!),
+          Semantics(
+            label: _text('Interface language', 'Язык интерфейса'),
+            child: DropdownButton<ClientLocale>(
+              key: const Key('client-ui-language'),
+              value: _locale,
+              items: const [
+                DropdownMenuItem(
+                  value: ClientLocale.en,
+                  child: Text('English'),
+                ),
+                DropdownMenuItem(
+                  value: ClientLocale.ru,
+                  child: Text('Русский'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null && value != _locale) {
+                  setState(() => _locale = value);
+                }
+              },
+            ),
+          ),
+          if (_notice != null)
+            Semantics(liveRegion: true, child: Text(_noticeText)),
           AnimatedBuilder(
             animation: _tray,
             builder: (context, _) => _tray.notice == null
@@ -363,11 +409,21 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
           ),
           AnimatedBuilder(
             animation: session.state,
-            builder: (context, _) =>
-                Text('Runtime: ${session.state.link.name}'),
+            builder: (context, _) => Text(
+              _text(
+                'Runtime: ${session.state.link.name}',
+                'Служба: ${switch (session.state.link) {
+                  ClientLinkState.disconnected => 'отключена',
+                  ClientLinkState.awaitingSnapshot => 'ожидание состояния',
+                  ClientLinkState.ready => 'готова',
+                  ClientLinkState.unavailable => 'недоступна',
+                }}',
+              ),
+            ),
           ),
           Expanded(
             child: ClientSessionPanel(
+              locale: _locale,
               session: session,
               uiBuild: widget.uiBuild,
               exportBundle: widget.desktopIntegration && Platform.isWindows

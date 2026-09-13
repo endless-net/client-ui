@@ -200,7 +200,7 @@ ClientExitPanel привязывает действия к controller/snapshot, 
 от прежнего контроллера не отображаются в новом контексте. Восемь short widget
 тестов проверяют эти гонки и успешное выполнение свежего явного действия.
 Это component evidence US-05, не traffic/fail-closed или native acceptance;
-общий выбор языка ещё не реализован.
+полнота локализации приложения этим набором не подтверждается.
 
 Exit-панель поддерживает RU/EN для режимов IP, LAN policy, apply state,
 requested/effective, ограничений, предупреждений single-family, подтверждения
@@ -211,6 +211,17 @@ requested/effective, ограничений, предупреждений single
 локалях: каталог, IPv4/IPv6, подтверждение, select/clear и read error. Смена
 локали сохраняет черновик и переводит notice без повторного read/mutation.
 Это component evidence, не full-app UI-AC-13 или реальная routing acceptance.
+
+Оболочка предоставляет явный выбор English/Русский и передаёт ClientLocale во
+все 16 панелей ClientSessionPanel. Переводятся команды оболочки, её typed
+notices, состояние local connection и подтверждение выхода. Выбор действует
+в пределах запуска; сохранение UI-настройки между запусками, локализация
+native tray и стандартных Material/OS подписей ещё не реализованы.
+Шесть short widget-тестов проверяют выбор через раскрывающееся меню в обеих
+локалях, передачу locale всем панелям, сохранение controller/snapshot/form state
+и введённого имени профиля, перевод ошибки без reconnect или записи mutation
+в journal, а также тексты quit/stay. Это проверка композиции, не завершённая
+UI-AC-13 или native accessibility acceptance.
 
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
