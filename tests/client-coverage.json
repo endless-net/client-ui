@@ -533,6 +533,10 @@
           "scope": "18 short RU/EN profile widget vectors: exact catalog and seven command-notice texts, removal security warning, active/empty catalog, locale changes without command replay or optimistic active state. Local component evidence only; full-app language selection and UI-AC-13 remain incomplete"
         },
         {
+          "path": "app/test/client_create_profile_activation_test.dart",
+          "scope": "12 short create-profile widget vectors: stale displayed input/snapshot/controller rejection, late response/error suppression, exact RU/EN form and typed notices with locale changes without replay. Component evidence only, not producer ownership enforcement, full-app switching or OS acceptance"
+        },
+        {
           "path": "app/test/client_recovery_locale_test.dart",
           "scope": "22 shared RU/EN recovery widget vectors compare all panel text for lookup, pending, acknowledgement, browser success/failure and export success/cancellation/failure/unavailable adapter. Rebuilding the same state in the other locale updates notices without repeating lookup or external actions. Runner execution pending; not full-app language switching, native dialogs or product acceptance"
         },

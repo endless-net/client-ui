@@ -97,6 +97,14 @@ ClientProfilesPanel локализован на RU/EN, включая поля, 
 результат операции за новый runtime snapshot. Это component unit evidence;
 full-app language selection и UI-AC-13 остаются незавершёнными.
 
+Создание профиля также принимает RU/EN: пояснение назначения владельца,
+поля и accepted/result/unknown notices. Форма привязана к controller и cache
+epoch; отправка проверяет показанные поля, snapshot и profiles domain epoch.
+Поздние ответы старого контекста не очищают новую форму и не показывают notices.
+12 short widget-векторов проверяют смену имени/origin/snapshot/controller,
+поздние успех/ошибку и полные RU/EN тексты без повторной команды при смене языка.
+Это локальные проверки компонента, не atomic ownership/OS acceptance.
+
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
 оставляют открытыми версии ОС, принятые assistive technologies, lifecycle
