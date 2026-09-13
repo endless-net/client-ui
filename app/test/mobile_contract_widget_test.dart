@@ -117,11 +117,24 @@ void main() {
       final events = StreamController<api.WatchEventsResponse>();
       await state.attach(events.stream);
       var reads = 0;
+      final creates = <String>[];
       await tester.pumpWidget(
         MaterialApp(
           home: ContractTestScaffold(
             body: ClientDiagnosticsPanel(
               state: state,
+              createBundle: (id) async {
+                creates.add(id);
+                return ClientOperation.fromProto(
+                  api.Operation(
+                    id: 'bundle-op',
+                    kind: api
+                        .OperationKind
+                        .OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE,
+                    state: api.OperationState.OPERATION_STATE_PENDING,
+                  ),
+                );
+              },
               load: () async {
                 reads++;
                 return api.Diagnostics()..mergeFromProto3Json({
@@ -176,6 +189,25 @@ void main() {
       expect(find.textContaining('synthetic-os'), findsOneWidget);
       expect(find.textContaining('not a complete report'), findsOneWidget);
       expect(find.textContaining('private.example'), findsNothing);
+      final create = find.byKey(const Key('create-client-bundle'));
+      final confirmBundle = find.byKey(const Key('confirm-client-bundle'));
+      expect(creates, isEmpty);
+      await tester.tap(create);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('cancel-client-bundle')));
+      await tester.pump();
+      expect(creates, isEmpty);
+      await tester.tap(create);
+      await tester.pump();
+      await tester.tap(confirmBundle);
+      await tester.pump();
+      expect(creates, ['profile-a']);
+      expect(
+        find.textContaining('archive readiness is not confirmed'),
+        findsOneWidget,
+      );
+      await tester.tap(create);
+      await tester.pump();
       events.add(
         api.WatchEventsResponse()..mergeFromProto3Json({
           'sequence': '2',
@@ -185,6 +217,8 @@ void main() {
       );
       await tester.pump();
       expect(find.textContaining('synthetic-os'), findsNothing);
+      expect(confirmBundle, findsNothing);
+      expect(creates, ['profile-a']);
       expect(reads, 1);
       await events.close();
       await tester.pump();

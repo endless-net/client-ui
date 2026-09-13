@@ -28,6 +28,15 @@ class ClientSessionPanel extends StatelessWidget {
           ClientDiagnosticsPanel(
             state: session.state,
             load: session.getDiagnostics,
+            createBundle: (id) => session.submit(
+              api.OperationKind.OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE,
+              (commands, mutation) => commands.createDiagnosticsBundle(
+                api.CreateDiagnosticsBundleRequest(
+                  mutation: mutation,
+                  profile: api.ProfileRef(profileId: id),
+                ),
+              ),
+            ),
           ),
           ClientIdentityPanel(
             state: session.state,

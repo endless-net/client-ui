@@ -123,6 +123,12 @@ GetOperation с expected CREATE_DIAGNOSTICS_BUNDLE kind, требует succeede
 проверяет свежий lookup, pending rejection и caller change во время чтения.
 Чтение не acknowledge intention и не сохраняет файл; UI/export binding и producer
 process/native execution этого пути ещё требуются.
+После явного diagnostics preview UI предлагает отдельное подтверждение создания
+локального redacted bundle. Session panel отправляет journaled
+CreateDiagnosticsBundle с текущим ProfileRef; cancellation/invalidation не
+отправляют команду, acceptance не означает archive readiness. Shared widget test
+проверяет эти границы. Download/export UI, полноценный preview и native execution
+нового create flow остаются открытыми; production main ещё не переключён.
 Helper не пишет файлы, clipboard или сеть вне переданного RPC callback.
 
 Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:
