@@ -175,6 +175,21 @@ lifecycle event до RPC, что покрыто тремя short negative tests.
 
 ## Внешние границы и CI
 
+Последующее compile evidence: [Windows x64 Debug UI](windows-ui-build-2026-09-14.md)
+успешно собран локально на `7f01918`. Исполняемый файл не запускался; это не
+installer, runtime IPC или platform acceptance. Полные 14 US остаются открытыми.
+
+Повторная проверка mobile boundary: producer
+[SDK README, client/main](https://github.com/endless-net/client/blob/main/packages/client_api/README.md)
+прямо исключает mobile bridge; UI `validateLocalEndpoint` в
+[`local_channel.dart`](../packages/local_client_rpc/lib/src/local_channel.dart)
+отклоняет mobile platform без авторизованного bridge. `app` не содержит product
+Android/iOS hosts, а `tests/mobile_contract` документирован как test harness.
+Необходимый внешний результат от owning `client`: утверждённый transport/ABI,
+caller app identity и VPN permission/lifecycle boundary с native runtime.
+Создание UI host само по себе не закрывает эту зависимость и не разрешает
+заменить bridge desktop socket/TCP или перенести VPN core в UI repository.
+
 - `client`: только read-only contract/SDK; mobile bridge/native authorization
   и недостающие гарантии owning runtime фиксируются как внешние зависимости.
 - `architecture`: product/security решения по OS/architecture/accessibility

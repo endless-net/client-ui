@@ -513,6 +513,12 @@ Mobile использует отдельно проверенный native bridg
 
 ## 2. Bootstrap, состояние и права
 
+Локальная [Windows x64 Debug сборка 2026-09-14](windows-ui-build-2026-09-14.md)
+проверила настоящий app на `7f01918` с Flutter 3.38.1 и завершилась успешно.
+Это compile/link evidence, не запуск UI, protected IPC, signed distribution или
+platform acceptance. Общий implementation gate и mobile bridge dependency
+остаются открытыми; integration runs в этой проверке не выполнялись.
+
 UI сначала различает отсутствие installation, отсутствие доступного runtime и
 ошибку authorization локального канала. При доступном runtime GetRuntimeInfo
 подтверждает protocol, v0, exact descriptor digest, instance ID, build, caller
