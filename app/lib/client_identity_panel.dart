@@ -10,10 +10,12 @@ class ClientIdentityPanel extends StatelessWidget {
     required this.state,
     required this.load,
     required this.trust,
+    this.canElevate = false,
   });
   final ClientStateController state;
   final Future<api.GetServerIdentityResponse> Function() load;
   final Future<ClientOperation> Function(api.ServerIdentity identity) trust;
+  final bool canElevate;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -63,7 +65,10 @@ class _IdentityFormState extends State<_IdentityForm> {
       state.snapshot!.status.activeProfileId.isNotEmpty;
   bool get _trustAllowed =>
       _readAllowed &&
-      state.snapshot!.runtime.callerAccess == api.Access.ACCESS_ADMINISTRATOR &&
+      (state.snapshot!.runtime.callerAccess ==
+              api.Access.ACCESS_ADMINISTRATOR ||
+          (state.snapshot!.runtime.callerAccess == api.Access.ACCESS_OWNER &&
+              widget.panel.canElevate)) &&
       state.snapshot!.supports(api.Capability.CAPABILITY_IDENTITY_RECOVERY);
 
   api.ServerIdentity _validate(api.GetServerIdentityResponse response) {
@@ -170,6 +175,11 @@ class _IdentityFormState extends State<_IdentityForm> {
         Text('Trusted key: ${identity.trustedKeyId}'),
         Text('Announced key: ${identity.announcedKeyId}'),
         Text('Announcement: ${identity.announcementId}'),
+        if (_trustAllowed &&
+            state.snapshot!.runtime.callerAccess == api.Access.ACCESS_OWNER)
+          const Text(
+            'Confirmation will open the system administrator approval prompt.',
+          ),
         if (!_trustAllowed)
           const Text(
             'Trust requires administrator access and available identity recovery.',

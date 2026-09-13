@@ -1,5 +1,6 @@
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/widgets.dart';
+import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'client_connection_panel.dart';
@@ -13,6 +14,9 @@ import 'client_networks_panel.dart';
 import 'client_identity_panel.dart';
 import 'client_diagnostics_panel.dart';
 import 'client_preferences_panel.dart';
+import 'client_privileged_recovery.dart';
+import 'client_privileged_session.dart';
+import 'client_windows_recovery.dart';
 import 'client_resources_panel.dart';
 
 /// Desktop application binding. A mobile runtime adapter can supply the same
@@ -22,8 +26,14 @@ class ClientSessionPanel extends StatelessWidget {
     super.key,
     required this.session,
     this.exportBundle,
+    this.elevate,
   });
   final ClientSession session;
+  final Future<ClientElevationOutcome> Function(ClientPrivilegedRecovery)?
+  elevate;
+  Future<ClientElevationOutcome> Function(ClientPrivilegedRecovery)?
+  get _elevate =>
+      elevate ?? (Platform.isWindows ? launchClientWindowsRecovery : null);
   final Future<bool> Function(String requestId, void Function() checkContext)?
   exportBundle;
 
@@ -97,6 +107,7 @@ class ClientSessionPanel extends StatelessWidget {
           ),
           ClientIdentityPanel(
             state: session.state,
+            canElevate: _elevate != null,
             load: session.getServerIdentity,
             trust: (identity) {
               final identityEpoch = session.state.domainEpoch(
@@ -105,6 +116,35 @@ class ClientSessionPanel extends StatelessWidget {
               final profileEpoch = session.state.domainEpoch(
                 api.Domain.DOMAIN_PROFILES,
               );
+              if (session.state.snapshot!.runtime.callerAccess ==
+                      api.Access.ACCESS_OWNER &&
+                  _elevate != null) {
+                return session.submitPrivilegedViaLookup(
+                  api.OperationKind.OPERATION_KIND_TRUST_SERVER_IDENTITY,
+                  (mutation) {
+                    if (identityEpoch !=
+                            session.state.domainEpoch(
+                              api.Domain.DOMAIN_SERVER_IDENTITY,
+                            ) ||
+                        profileEpoch !=
+                            session.state.domainEpoch(
+                              api.Domain.DOMAIN_PROFILES,
+                            )) {
+                      throw StateError('Identity changed before elevation');
+                    }
+                    return ClientPrivilegedRecovery.trust(
+                      api.TrustServerIdentityRequest(
+                        mutation: mutation,
+                        profile: api.ProfileRef(profileId: identity.profileId),
+                        confirmedControlOrigin: identity.controlOrigin,
+                        confirmedKeyId: identity.announcedKeyId,
+                        confirmedAnnouncementId: identity.announcementId,
+                      ),
+                    );
+                  },
+                  _elevate!,
+                );
+              }
               return session.submit(
                 api.OperationKind.OPERATION_KIND_TRUST_SERVER_IDENTITY,
                 (commands, mutation) {
@@ -149,6 +189,7 @@ class ClientSessionPanel extends StatelessWidget {
           ),
           ClientCleanupPanel(
             state: session.state,
+            canElevate: _elevate != null,
             logout: (id) => session.submit(
               api.OperationKind.OPERATION_KIND_LOGOUT,
               (commands, mutation) => commands.logout(
@@ -158,16 +199,33 @@ class ClientSessionPanel extends StatelessWidget {
                 ),
               ),
             ),
-            forget: (id) => session.submit(
-              api.OperationKind.OPERATION_KIND_FORGET_LOCAL_ENROLLMENT,
-              (commands, mutation) => commands.forgetLocalEnrollment(
-                api.ForgetLocalEnrollmentRequest(
-                  mutation: mutation,
-                  profile: api.ProfileRef(profileId: id),
-                  confirmed: true,
+            forget: (id) {
+              if (session.state.snapshot!.runtime.callerAccess ==
+                      api.Access.ACCESS_OWNER &&
+                  _elevate != null) {
+                return session.submitPrivilegedViaLookup(
+                  api.OperationKind.OPERATION_KIND_FORGET_LOCAL_ENROLLMENT,
+                  (mutation) => ClientPrivilegedRecovery.forget(
+                    api.ForgetLocalEnrollmentRequest(
+                      mutation: mutation,
+                      profile: api.ProfileRef(profileId: id),
+                      confirmed: true,
+                    ),
+                  ),
+                  _elevate!,
+                );
+              }
+              return session.submit(
+                api.OperationKind.OPERATION_KIND_FORGET_LOCAL_ENROLLMENT,
+                (commands, mutation) => commands.forgetLocalEnrollment(
+                  api.ForgetLocalEnrollmentRequest(
+                    mutation: mutation,
+                    profile: api.ProfileRef(profileId: id),
+                    confirmed: true,
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
           ClientEnrollmentPanel(
             state: session.state,

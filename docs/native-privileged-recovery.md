@@ -28,3 +28,20 @@ operation lookup in Windows CI, and implement/verify the Linux/macOS elevation
 adapters. Elevation under a different OS identity is not assumed to grant the
 original user access to another caller's operation. No cross-platform or release
 acceptance is claimed from unit tests.
+
+## Native panel binding — 2026-09-13
+
+`ClientSessionPanel` now supplies the fixed Windows adapter by default, or an
+explicitly injected platform launcher. Owner trust/local-forget confirmations use
+the journaled elevation-and-lookup path; administrators use direct typed RPC.
+Shared panels require both runtime capability availability and either current
+administrator access or an owner context with an available elevation adapter.
+They disclose the system approval prompt before confirmation. Observer access
+does not gain these actions. Logout failures never trigger privileged cleanup.
+
+Widget tests in `client_elevation_panel_test.dart` prove explicit confirmation,
+fresh identity inspection before trust and observer rejection for local forget. Existing identity/context and
+no-logout-fallback tests remain green. Go tests and Flutter analysis pass; the
+current full suite passes 195 tests, 13 skipped (same local SDK limitation above).
+This binds the native panel, not the still-retired-contract application shell in
+`main.dart`; full entrypoint removal/migration and actual UAC acceptance remain.

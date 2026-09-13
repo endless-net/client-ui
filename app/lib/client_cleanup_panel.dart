@@ -10,10 +10,12 @@ class ClientCleanupPanel extends StatefulWidget {
     required this.state,
     required this.logout,
     required this.forget,
+    this.canElevate = false,
   });
   final ClientStateController state;
   final Future<ClientOperation> Function(String profileId) logout;
   final Future<ClientOperation> Function(String profileId) forget;
+  final bool canElevate;
   @override
   State<ClientCleanupPanel> createState() => _ClientCleanupPanelState();
 }
@@ -31,7 +33,10 @@ class _ClientCleanupPanelState extends State<ClientCleanupPanel> {
         snapshot != null &&
         snapshot.status.activeProfileId.isNotEmpty &&
         (forget
-            ? snapshot.runtime.callerAccess == api.Access.ACCESS_ADMINISTRATOR
+            ? (snapshot.runtime.callerAccess ==
+                      api.Access.ACCESS_ADMINISTRATOR ||
+                  (snapshot.runtime.callerAccess == api.Access.ACCESS_OWNER &&
+                      widget.canElevate))
             : snapshot.runtime.callerAccess != api.Access.ACCESS_OBSERVER) &&
         snapshot.supports(
           forget
@@ -106,6 +111,13 @@ class _ClientCleanupPanelState extends State<ClientCleanupPanel> {
             ],
           ),
           if (current && _forget != null) ...[
+            if (_forget! &&
+                widget.canElevate &&
+                widget.state.snapshot!.runtime.callerAccess ==
+                    api.Access.ACCESS_OWNER)
+              const Text(
+                'Confirmation will open the system administrator approval prompt.',
+              ),
             Text(
               _forget!
                   ? 'Remove local registration without confirmed remote cleanup? Remote registration may remain. Installation ownership is retained.'
