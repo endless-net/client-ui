@@ -55,6 +55,10 @@ acknowledgement. This is local consumer evidence pending CI; it does not prove
 the producer's 31 ordinary plus one Disconnect nonterminal admission policy or
 its 24-hour terminal retention. The session's existing same-kind recovery guard
 still prevents treating a fresh Disconnect UUID as a retry of unresolved work.
+The Android/iOS integration host now imports the same journal suite in a scoped
+test group. Its temporary files are native sandbox files, not host-side mocks;
+this schedules the boundary checks but does not establish mobile execution,
+crash durability, filesystem permission enforcement or actual runtime behavior.
 
 Earlier inspected desktop evidence: consumer `3b5ad34ead11173c32c22e537cd06e74468968f9`.
 The [desktop run](https://github.com/endless-net/client-ui/actions/runs/34733301626)
