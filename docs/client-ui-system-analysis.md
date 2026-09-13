@@ -351,8 +351,14 @@ Resources/profile/network invalidation отменяет незавершённо
 вне текущего search/filter не равнозначен скрытому resource. Авторизация, поиск
 и RESOURCE_CONFLICT остаются обязанностью producer, UI не выбирает route сам.
 Shared reader tests включены в mobile harness; их runner execution ещё не
-подтверждено. Каталог UI, SetResourceEnabled flow и actual runtime acceptance
-остаются незавершёнными.
+подтверждено. `ClientResourcesPanel` добавляет explicit search/kind filters,
+requested/effective, availability/lock/reason/action-owner и disclosed overlap IDs.
+Изменение запроса удаляет старый каталог, late response не возвращает старые данные.
+Profile/domain invalidation удаляет также поисковый текст и фильтры. Enable/Disable
+отправляет SetResourceEnabled через session journal с context check перед RPC;
+acceptance не означает effective apply. Shared widget tests проверяют explicit
+disable, policy lock, late query и stale callback. Browser action, producer-process
+mutation evidence, локализация и actual runtime acceptance остаются незавершёнными.
 
 Реализован read foundation US-10: `ClientSession.getPreferences` через прямой
 typed local binding читает `GetPreferences` и `ListManagedSettings`. Consumer

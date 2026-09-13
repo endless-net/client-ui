@@ -13,6 +13,7 @@ import 'client_networks_panel.dart';
 import 'client_identity_panel.dart';
 import 'client_diagnostics_panel.dart';
 import 'client_preferences_panel.dart';
+import 'client_resources_panel.dart';
 
 /// Desktop application binding. A mobile runtime adapter can supply the same
 /// shared connection panel without using a desktop local channel.
@@ -32,6 +33,25 @@ class ClientSessionPanel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          ClientResourcesPanel(
+            state: session.state,
+            load: (search, kinds) =>
+                session.listResources(search: search, kinds: kinds),
+            setEnabled: (profile, resource, enabled, check) => session.submit(
+              api.OperationKind.OPERATION_KIND_SET_RESOURCE_ENABLED,
+              (commands, mutation) {
+                check();
+                return commands.setResourceEnabled(
+                  api.SetResourceEnabledRequest(
+                    mutation: mutation,
+                    profile: api.ProfileRef(profileId: profile),
+                    resourceId: resource,
+                    enabled: enabled,
+                  ),
+                );
+              },
+            ),
+          ),
           ClientPreferencesPanel(
             state: session.state,
             load: session.getPreferences,

@@ -351,7 +351,7 @@
       "testEvidence": [
         {
           "path": "app/test/client_profiles_test.dart",
-          "scope": "Resource reader tests shared with native mobile host: four typed targets, fixed search/filter pagination, bounds, duplicate IDs, mixed revisions and stale tokens; no resource UI, browser launch or backend policy acceptance"
+          "scope": "Shared resource reader and UI tests: four typed targets, fixed search/filter pagination, bounds, duplicates and stale pages; explicit disable, policy locks, requested/effective distinction, late-query and stale-callback rejection. No browser launch, producer mutation or backend policy acceptance"
         },
         {
           "path": "app/test/client_session_test.dart",

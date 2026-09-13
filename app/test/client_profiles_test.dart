@@ -1,6 +1,7 @@
 import 'package:endlessnet/client_profiles.dart';
 import 'package:endlessnet/client_networks.dart';
 import 'package:endlessnet/client_resources.dart';
+import 'package:endlessnet/client_resources_panel.dart';
 import 'package:endlessnet/client_networks_panel.dart';
 import 'package:endlessnet/client_create_profile_panel.dart';
 import 'dart:async';
@@ -73,6 +74,190 @@ api.ListResourcesResponse _resourcePage(String suffix, {String next = ''}) =>
     });
 
 void main() {
+  for (final lateRead in [false, true]) {
+    testWidgets(
+      'US-11: resource UI ${lateRead ? 'rejects late queries and stale callbacks' : 'submits an explicit disable and respects policy locks'}',
+      (tester) async {
+        final state = ClientStateController();
+        final events = StreamController<api.WatchEventsResponse>();
+        await state.attach(events.stream);
+        addTearDown(() async {
+          await state.detach();
+          await events.close();
+          state.dispose();
+        });
+        var reads = 0;
+        var writes = 0;
+        final pending = Completer<void>();
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ContractTestScaffold(
+              body: SingleChildScrollView(
+                child: ClientResourcesPanel(
+                  state: state,
+                  load: (search, kinds) async {
+                    reads++;
+                    if (lateRead && reads == 1) await pending.future;
+                    return readClientResources(
+                      (_) async {
+                        final response = _resourcePage('a');
+                        for (final resource in response.resources) {
+                          resource.ensureAvailability().availability =
+                              api.Availability.AVAILABILITY_AVAILABLE;
+                          resource
+                                  .ensureEnabled()
+                                  .ensureControl()
+                                  .ensureMutation()
+                                  .availability =
+                              api.Availability.AVAILABILITY_AVAILABLE;
+                          resource.enabled.control.locked =
+                              resource.kind ==
+                              api.ResourceKind.RESOURCE_KIND_SERVICE;
+                        }
+                        response.resources.first.enabled.requested = true;
+                        response.resources.first.enabled.effective = false;
+                        return response;
+                      },
+                      instanceId: 'runtime-a',
+                      profileId: 'profile-a',
+                      search: search,
+                      kinds: kinds,
+                      checkContext: () {},
+                    );
+                  },
+                  setEnabled: (profile, resource, enabled, check) async {
+                    check();
+                    writes++;
+                    expect(profile, 'profile-a');
+                    expect(resource, 'host-a');
+                    expect(enabled, isFalse);
+                    return ClientOperation.fromProto(
+                      api.Operation(
+                        id: 'resource-op',
+                        requestId: 'resource-request',
+                        kind: api
+                            .OperationKind
+                            .OPERATION_KIND_SET_RESOURCE_ENABLED,
+                        state: api.OperationState.OPERATION_STATE_PENDING,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+        events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '1',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'snapshot': {
+              'runtime': {
+                'protocol': api.ClientContract.protocol,
+                'contractSha256': api.ClientContract.sha256,
+                'instanceId': 'runtime-a',
+                'callerAccess': 'ACCESS_OWNER',
+                'capabilities': [
+                  {
+                    'capability': 'CAPABILITY_RESOURCES',
+                    'restriction': {'availability': 'AVAILABILITY_AVAILABLE'},
+                  },
+                ],
+              },
+              'status': {
+                'activeProfileId': 'profile-a',
+                'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+              },
+            },
+          }),
+        );
+        await tester.pump();
+        expect(reads, 0);
+        expect(writes, 0);
+        await tester.enterText(
+          find.byKey(const Key('client-resource-search')),
+          'first',
+        );
+        await tester.ensureVisible(
+          find.byKey(const Key('client-load-resources')),
+        );
+        await tester.tap(find.byKey(const Key('client-load-resources')));
+        await tester.pump();
+        if (lateRead) {
+          await tester.enterText(
+            find.byKey(const Key('client-resource-search')),
+            'second',
+          );
+          pending.complete();
+          await tester.pump();
+          expect(find.text('Host a'), findsNothing);
+          await tester.tap(find.byKey(const Key('client-load-resources')));
+          await tester.pump();
+        }
+        expect(find.text('Host a'), findsOneWidget);
+        expect(find.text('Effective: false; requested: true'), findsOneWidget);
+        expect(
+          tester
+              .widget<TextButton>(
+                find.byKey(const Key('resource-service-a-true')),
+              )
+              .onPressed,
+          isNull,
+        );
+        expect(
+          tester
+              .widget<TextButton>(find.byKey(const Key('resource-host-a-true')))
+              .onPressed,
+          isNull,
+        );
+        expect(writes, 0);
+        final stale = tester
+            .widget<TextButton>(find.byKey(const Key('resource-host-a-false')))
+            .onPressed!;
+        if (lateRead) {
+          events.add(
+            api.WatchEventsResponse()..mergeFromProto3Json({
+              'sequence': '2',
+              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+              'invalidated': {
+                'domain': 'DOMAIN_RESOURCES',
+                'profileId': 'profile-a',
+              },
+            }),
+          );
+          await tester.pump();
+          stale();
+          await tester.pump();
+          expect(writes, 0);
+          expect(find.text('Host a'), findsNothing);
+          expect(
+            tester
+                .widget<TextField>(
+                  find.byKey(const Key('client-resource-search')),
+                )
+                .controller!
+                .text,
+            isEmpty,
+          );
+        } else {
+          await tester.ensureVisible(
+            find.byKey(const Key('resource-host-a-false')),
+          );
+          await tester.tap(find.byKey(const Key('resource-host-a-false')));
+          await tester.pump();
+          expect(writes, 1);
+          expect(find.text('Host a'), findsNothing);
+          expect(
+            find.text(
+              'Resource operation received. Recover its result and refresh effective values.',
+            ),
+            findsOneWidget,
+          );
+        }
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  }
   test(
     'US-11: resource pagination preserves typed targets and a fixed query',
     () async {

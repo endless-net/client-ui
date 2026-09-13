@@ -133,8 +133,11 @@ results, UTF-8 query/ID/name bounds, duplicates, type mismatches, mixed revision
 token cycles and context invalidation without retries or partial publication.
 Overlap IDs are not resolved: visible resources outside a filtered result are
 valid, and UI must not probe hidden resources. Session tests additionally guard
-owner context and repeated resource/profile/network invalidations. Resource UI,
-producer-process scenarios, mutation effects and platform acceptance remain open.
+owner context and repeated resource/profile/network invalidations. Resource UI
+widget tests additionally cover explicit disable, policy locks, requested/effective,
+late-query rejection and stale callbacks. The session panel binds changes to the
+intention journal without optimistic apply. Browser actions, producer-process
+resource scenarios, mutation effects and platform acceptance remain open.
 
 ### Preferences/policy read foundation (2026-09-13)
 
