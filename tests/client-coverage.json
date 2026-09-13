@@ -356,6 +356,10 @@
         {
           "path": "app/test/client_session_test.dart",
           "scope": "Owner-scoped resource reads reject stale metadata and repeated resource/profile/network invalidations; no mutation or journal write"
+        },
+        {
+          "path": "app/test/client_session_process_test.dart",
+          "scope": "Producer-host resource fixtures: exact profile/search/kind/page read, Enable/Disable and typed RESOURCE_CONFLICT recovery, original UUID and unchanged cached effective state. New runner execution pending; no actual policy/route enforcement"
         }
       ],
       "acceptanceEvidence": []

@@ -360,6 +360,14 @@ acceptance не означает effective apply. Shared widget tests прове
 disable, policy lock, late query и stale callback. Browser action, producer-process
 mutation evidence, локализация и actual runtime acceptance остаются незавершёнными.
 
+Producer-host suite дополнен US-11 fixtures: ListResources с точными profile,
+search/kinds/page, Enable/Disable через SetResourceEnabled и отдельный terminal
+ERROR_CODE_RESOURCE_CONFLICT. Recovery использует исходный UUID, control request
+correlation сохраняется отдельно. Успех/конфликт не меняют cached effective state;
+до явного acknowledge намерение остаётся в journal. Execution этих новых fixtures
+на runners пока не подтверждено. Script не доказывает actual conflict detection,
+route enforcement или отсутствие утечки скрытых backend ресурсов.
+
 Реализован read foundation US-10: `ClientSession.getPreferences` через прямой
 typed local binding читает `GetPreferences` и `ListManagedSettings`. Consumer
 публикует immutable projection только при совпадении instance/revision обоих

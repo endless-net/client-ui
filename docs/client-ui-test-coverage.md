@@ -139,6 +139,14 @@ late-query rejection and stale callbacks. The session panel binds changes to the
 intention journal without optimistic apply. Browser actions, producer-process
 resource scenarios, mutation effects and platform acceptance remain open.
 
+Resource producer-host fixtures now include exact ListResources query parameters,
+Enable/Disable and terminal RESOURCE_CONFLICT with separate control correlation.
+They recover the original UUID, retain the intention until explicit acknowledgement
+and leave cached effective state unchanged. Local envelope validation passes;
+the new process cases are skipped without the CI producer-host. The local full
+suite passed 196 tests with 16 skips, analyze and Go tests passed. Actual conflict
+detection, hidden-resource authorization and OS route effects remain unproven.
+
 ### Preferences/policy read foundation (2026-09-13)
 
 `client_preferences.dart` combines typed GetPreferences/ListManagedSettings only

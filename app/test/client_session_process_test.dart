@@ -29,8 +29,40 @@ Map<String, Object> recoveredOperation(Map<String, Object> accepted) => {
     'change': {'changed': true},
 };
 
+Map<String, Object> resourceConflictOperation(Map<String, Object> accepted) => {
+  ...accepted,
+  'state': 'OPERATION_STATE_FAILED',
+  'continuity': 'CONNECTION_CONTINUITY_UNKNOWN',
+  'failure': {
+    'code': 'ERROR_CODE_RESOURCE_CONFLICT',
+    'reasonKey': 'resource.overlap',
+    'controlRequestId': 'control-resource-a',
+  },
+};
+
 void main() {
   final executable = Platform.environment['ENDLESSNET_TESTSERVER'];
+  test(
+    'US-11: resource conflict fixture preserves typed failure and correlation',
+    () {
+      final result = ClientOperation.fromProto(
+        api.Operation()..mergeFromProto3Json(
+          resourceConflictOperation({
+            'id': 'resource-op',
+            'requestId': 'c06bd29f-7c77-4b27-943a-620081f313df',
+            'kind': 'OPERATION_KIND_SET_RESOURCE_ENABLED',
+          }),
+        ),
+      );
+      expect(result.terminal, isTrue);
+      expect(result.succeeded, isFalse);
+      expect(
+        result.value.failure.code,
+        api.ErrorCode.ERROR_CODE_RESOURCE_CONFLICT,
+      );
+      expect(result.value.failure.controlRequestId, 'control-resource-a');
+    },
+  );
   test('Synthetic host diagnostics retain only exact lifecycle errors', () {
     expect(
       scenarioLifecycleDiagnostic('script has in-flight calls'),
@@ -58,6 +90,7 @@ void main() {
       'CREATE_DIAGNOSTICS_BUNDLE',
       'SET_PREFERENCES',
       'RESET_PREFERENCES',
+      'SET_RESOURCE_ENABLED',
     ]) {
       final operation = ClientOperation.fromProto(
         api.Operation()..mergeFromProto3Json(
@@ -89,9 +122,12 @@ void main() {
     'bundle',
     'set-preferences',
     'reset-preferences',
+    'enable-resource',
+    'disable-resource',
+    'conflict-resource',
   ]) {
     test(
-      'US-01/02/03/06/07/10: $authentication session submits and recovers while WatchEvents stays open',
+      'US-01/02/03/06/07/10/11: $authentication session submits and recovers while WatchEvents stays open',
       () async {
         final directory = await Directory.systemTemp.createTemp(
           'en-session-rpc-',
@@ -100,6 +136,8 @@ void main() {
         final intent = PendingClientIntent(
           'c06bd29f-7c77-4b27-943a-620081f313df',
           switch (authentication) {
+            'enable-resource' || 'disable-resource' || 'conflict-resource' =>
+              api.OperationKind.OPERATION_KIND_SET_RESOURCE_ENABLED,
             'connect' => api.OperationKind.OPERATION_KIND_CONNECT,
             'trust' => api.OperationKind.OPERATION_KIND_TRUST_SERVER_IDENTITY,
             'bundle' =>
@@ -131,6 +169,9 @@ void main() {
           'kind': intent.kind.name,
           'state': 'OPERATION_STATE_PENDING',
         };
+        final terminal = authentication == 'conflict-resource'
+            ? resourceConflictOperation(accepted)
+            : recoveredOperation(accepted);
         final host = await ScenarioHost.start(executable!, [
           {
             'method': 'GetRuntimeInfo',
@@ -159,6 +200,37 @@ void main() {
               },
             ],
           },
+          if (authentication.endsWith('-resource'))
+            {
+              'method': 'ListResources',
+              'request': {
+                'profile': {'profileId': 'profile-a'},
+                'page': {'pageSize': 100},
+                'search': 'synthetic',
+                'kinds': ['RESOURCE_KIND_HOST'],
+              },
+              'responses': [
+                {
+                  'page': {
+                    'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+                  },
+                  'resources': [
+                    {
+                      'id': 'resource-a',
+                      'displayName': 'Synthetic host',
+                      'networkId': 'network-a',
+                      'kind': 'RESOURCE_KIND_HOST',
+                      'host': {'hostname': 'synthetic.example'},
+                      'enabled': {
+                        'requested': authentication == 'disable-resource',
+                        'effective': authentication == 'disable-resource',
+                      },
+                      'overlappingResourceIds': ['visible-outside-query'],
+                    },
+                  ],
+                },
+              ],
+            },
           if (authentication.endsWith('-preferences')) ...[
             {
               'method': 'GetPreferences',
@@ -220,6 +292,9 @@ void main() {
             },
           {
             'method': switch (authentication) {
+              'enable-resource' ||
+              'disable-resource' ||
+              'conflict-resource' => 'SetResourceEnabled',
               'connect' => 'Connect',
               'trust' => 'TrustServerIdentity',
               'bundle' => 'CreateDiagnosticsBundle',
@@ -234,6 +309,10 @@ void main() {
                 'expectedRevision': '7',
               },
               'profile': {'profileId': 'profile-a'},
+              if (authentication.endsWith('-resource')) ...{
+                'resourceId': 'resource-a',
+                'enabled': authentication != 'disable-resource',
+              },
               if (authentication == 'set-preferences')
                 'patch': {
                   'allowInbound': false,
@@ -271,7 +350,7 @@ void main() {
             'method': 'GetOperation',
             'request': {'requestId': intent.requestId},
             'responses': [
-              {'operation': recoveredOperation(accepted)},
+              {'operation': terminal},
             ],
           },
           if (authentication == 'bundle') ...[
@@ -322,6 +401,18 @@ void main() {
           final preferences = authentication.endsWith('-preferences')
               ? await session.getPreferences()
               : null;
+          final resources = authentication.endsWith('-resource')
+              ? await session.listResources(
+                  search: 'synthetic',
+                  kinds: [api.ResourceKind.RESOURCE_KIND_HOST],
+                )
+              : null;
+          if (resources != null) {
+            expect(resources.resources.single.id, 'resource-a');
+            expect(resources.resources.single.overlappingResourceIds, [
+              'visible-outside-query',
+            ]);
+          }
           if (preferences != null) {
             expect(preferences.preferences.allowInbound.hasRequested(), isTrue);
             expect(preferences.preferences.allowInbound.requested, isFalse);
@@ -329,6 +420,16 @@ void main() {
             expect(preferences.managed.single.hasBooleanValue(), isTrue);
           }
           final result = await session.submit(intent.kind, (commands, context) {
+            if (resources != null) {
+              return commands.setResourceEnabled(
+                api.SetResourceEnabledRequest(
+                  mutation: context,
+                  profile: api.ProfileRef(profileId: resources.profileId),
+                  resourceId: resources.resources.single.id,
+                  enabled: authentication != 'disable-resource',
+                ),
+              );
+            }
             if (authentication == 'set-preferences') {
               return commands.setPreferences(
                 api.SetPreferencesRequest(
@@ -419,7 +520,35 @@ void main() {
             api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED,
           );
           final recovered = await session.recoverPending();
-          expect(recovered.single.succeeded, isTrue);
+          expect(
+            recovered.single.succeeded,
+            authentication != 'conflict-resource',
+          );
+          if (authentication == 'conflict-resource') {
+            expect(
+              recovered.single.value.state,
+              api.OperationState.OPERATION_STATE_FAILED,
+            );
+            expect(
+              recovered.single.value.failure.code,
+              api.ErrorCode.ERROR_CODE_RESOURCE_CONFLICT,
+            );
+            expect(recovered.single.value.requestId, intent.requestId);
+            expect(
+              recovered.single.value.failure.controlRequestId,
+              'control-resource-a',
+            );
+          }
+          if (resources != null) {
+            expect(
+              resources.resources.single.enabled.effective,
+              authentication == 'disable-resource',
+            );
+            expect(
+              (await journal.pending()).single.requestId,
+              intent.requestId,
+            );
+          }
           expect(recovered.single.value.id, result.value.id);
           if (preferences != null) {
             // A scripted success is not a fresh effective-settings projection.
