@@ -334,6 +334,10 @@
       "implementation": "partial",
       "testEvidence": [
         {
+          "path": "app/test/client_profile_activation_test.dart",
+          "scope": "Seven short widget regressions: old selection after reload/snapshot, rename after changed input, removal confirmation after cancel/retarget/reopen/snapshot, and late catalog lookup after controller replacement. Old callbacks make no mutations; fresh explicit actions work. Mock-only, not native input or runtime effects"
+        },
+        {
           "path": "app/test/client_state_controller_test.dart",
           "scope": "Profile context replacement only"
         },

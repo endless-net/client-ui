@@ -14,6 +14,17 @@ Status: incomplete. Owner: client-ui. Scope: the complete BA/SA goal, not the
 subset already implemented. The canonical machine-readable trace is
 [`tests/client-coverage.json`](../tests/client-coverage.json).
 
+Profile action admission now binds queued callbacks to the displayed controller,
+snapshot, catalog and rename text. Removal confirmation is invalidated by cancel,
+retargeting or reopening, including reopening the same profile. Late lookup from
+a replaced controller is hidden. Seven short widget regressions exercise these
+cases and verify that a fresh explicit action still works; no integration or
+product acceptance is claimed.
+
+Profile-admission validation passed 377 short Flutter tests with 1 skip,
+Flutter analysis, Go short and all 11 policy/trace checks. Integration runs were
+not started for this change.
+
 Build-target regression: the UI no longer defaults to Windows/amd64 on every
 process. Eighteen short tests cover 16 ABI-to-platform/architecture mappings,
 explicit build override and unsupported ABI rejection; each mapped target agrees

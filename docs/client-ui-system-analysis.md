@@ -46,7 +46,18 @@ Build identity UI без `ENDLESSNET_TARGET` теперь определяетс
 в `--version`; явный build target имеет приоритет. Unit-тесты проверяют 16 ABI,
 override и отказ для неподдержанного ABI. Это не утверждённая support matrix:
 в product `app` пока есть только Windows native-host. Остальные native-hosts и
-постоянные application/bundle IDs ещё не созданы/не выбраны.
+постоянные application/bundle IDs ещё не применены к новым hosts.
+
+Решение пользователя: основной application/bundle ID новых Android, iOS и macOS
+hosts — `endlessnet.app`, отображаемое имя — `EndlessNet`. ID не привязывается к
+домену endlessnet.ru. Dev-ID отдельно не утверждён. Выбор имени не подтверждает
+регистрацию/доступность в developer accounts и не меняет существующий Windows ID.
+
+Защита управления профилями: callbacks привязаны к controller, snapshot, каталогу,
+domain epoch и показанному имени. Подтверждение удаления имеет отдельный token
+поколения: отмена, повторное открытие и смена профиля отменяют старые callbacks.
+Поздний lookup старого controller не отображается в новом. Семь short widget
+тестов проверяют эти условия без RPC/network/native execution.
 
 Решение пользователя от 2026-09-13: приняты локали `ru` и `en`. UI-AC-13
 должен проверять весь ключевой сценарий в каждой локали без смешения языков и

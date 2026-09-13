@@ -39,14 +39,18 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
   }
 
   ClientProfileCatalog? _catalog;
+  ClientStateController? _catalogState;
   int? _epoch;
   int? _domainEpoch;
   bool get _catalogCurrent =>
+      identical(_catalogState, widget.state) &&
       _epoch == widget.state.cacheEpoch &&
       _domainEpoch == widget.state.domainEpoch(api.Domain.DOMAIN_PROFILES);
   bool _busy = false;
   String? _notice;
   String? _pendingRemoval;
+  Object? _pendingRemovalSnapshot;
+  int _confirmationEpoch = 0;
   bool get _owner =>
       mounted &&
       widget.state.link == ClientLinkState.ready &&
@@ -60,6 +64,29 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
   }) async {
     if (_busy || !_owner) return;
     if (profileId != null && !_catalogCurrent) return;
+    if (profileId != null) {
+      final profiles = _catalog?.profiles.where((p) => p.id == profileId);
+      if (profiles == null || profiles.length != 1) return;
+      final profile = profiles.single;
+      if (!remove &&
+          name == null &&
+          (profile.active ||
+              profile.selection.availability !=
+                  api.Availability.AVAILABILITY_AVAILABLE)) {
+        return;
+      }
+      if (name != null &&
+          (name.trim().isEmpty ||
+              utf8.encode(name).length > 128 ||
+              RegExp(r'[\x00-\x1f\x7f-\x9f]').hasMatch(name))) {
+        return;
+      }
+      if (remove &&
+          (_pendingRemoval != profileId ||
+              !identical(_pendingRemovalSnapshot, widget.state.snapshot))) {
+        return;
+      }
+    }
     if (remove &&
         !(_catalog?.profiles.any(
               (p) =>
@@ -76,9 +103,12 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
       _busy = true;
       _notice = null;
       _pendingRemoval = null;
+      _pendingRemovalSnapshot = null;
+      _confirmationEpoch++;
       _name.clear();
       if (profileId == null || _epoch != epoch) _catalog = null;
       _epoch = epoch;
+      _catalogState = widget.state;
       _domainEpoch = domainEpoch;
     });
     try {
@@ -123,12 +153,37 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
     animation: widget.state,
     builder: (context, _) {
       final visible = _owner && _catalogCurrent;
+      final renderedState = widget.state;
+      final renderedSnapshot = widget.state.snapshot;
+      final renderedCatalog = _catalog;
+      final renderedEpoch = widget.state.cacheEpoch;
+      final renderedDomain = widget.state.domainEpoch(
+        api.Domain.DOMAIN_PROFILES,
+      );
+      final renderedName = _name.text.trim();
+      final removal = identical(_pendingRemovalSnapshot, renderedSnapshot)
+          ? _pendingRemoval
+          : null;
+      final confirmationEpoch = _confirmationEpoch;
+      bool current() =>
+          mounted &&
+          identical(widget.state, renderedState) &&
+          identical(widget.state.snapshot, renderedSnapshot) &&
+          identical(_catalog, renderedCatalog) &&
+          _confirmationEpoch == confirmationEpoch &&
+          widget.state.cacheEpoch == renderedEpoch &&
+          widget.state.domainEpoch(api.Domain.DOMAIN_PROFILES) ==
+              renderedDomain;
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           OutlinedButton(
             key: const Key('client-load-profiles'),
-            onPressed: _owner && !_busy ? () => _run() : null,
+            onPressed: _owner && !_busy
+                ? () {
+                    if (current()) _run();
+                  }
+                : null,
             child: const Text('Refresh profiles'),
           ),
           if (visible && _notice != null) Text(_notice!),
@@ -156,10 +211,17 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                         TextButton(
                           key: ValueKey('rename-profile-${profile.id}'),
                           onPressed: !_busy && _validName
-                              ? () => _run(
-                                  profileId: profile.id,
-                                  name: _name.text.trim(),
-                                )
+                              ? () {
+                                  if (!current() ||
+                                      !_validName ||
+                                      _name.text.trim() != renderedName) {
+                                    return;
+                                  }
+                                  _run(
+                                    profileId: profile.id,
+                                    name: renderedName,
+                                  );
+                                }
                               : null,
                           child: const Text('Rename'),
                         ),
@@ -173,7 +235,11 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                                             api
                                                 .Availability
                                                 .AVAILABILITY_AVAILABLE
-                                    ? () => _run(profileId: profile.id)
+                                    ? () {
+                                        if (current()) {
+                                          _run(profileId: profile.id);
+                                        }
+                                      }
                                     : null,
                                 child: const Text('Select'),
                               ),
@@ -184,8 +250,16 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                                   !profile.active &&
                                   profile.state ==
                                       api.ProfileState.PROFILE_STATE_EMPTY
-                              ? () =>
-                                    setState(() => _pendingRemoval = profile.id)
+                              ? () {
+                                  if (current()) {
+                                    setState(() {
+                                      _pendingRemoval = profile.id;
+                                      _pendingRemovalSnapshot =
+                                          widget.state.snapshot;
+                                      _confirmationEpoch++;
+                                    });
+                                  }
+                                }
                               : null,
                           child: const Text('Remove'),
                         ),
@@ -194,23 +268,34 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                   ],
                 ),
               ),
-            if (_pendingRemoval != null) ...[
+            if (removal != null) ...[
               Text(
-                'Remove profile $_pendingRemoval? This does not log out or clean up a remote registration.',
+                'Remove profile $removal? This does not log out or clean up a remote registration.',
               ),
               Wrap(
                 children: [
                   TextButton(
                     key: const Key('cancel-profile-removal'),
                     onPressed: !_busy
-                        ? () => setState(() => _pendingRemoval = null)
+                        ? () {
+                            if (current() && _pendingRemoval == removal) {
+                              setState(() {
+                                _pendingRemoval = null;
+                                _confirmationEpoch++;
+                              });
+                            }
+                          }
                         : null,
                     child: const Text('Cancel'),
                   ),
                   TextButton(
                     key: const Key('confirm-profile-removal'),
                     onPressed: !_busy
-                        ? () => _run(profileId: _pendingRemoval, remove: true)
+                        ? () {
+                            if (current() && _pendingRemoval == removal) {
+                              _run(profileId: removal, remove: true);
+                            }
+                          }
                         : null,
                     child: const Text('Confirm removal'),
                   ),
