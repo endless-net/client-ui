@@ -84,7 +84,11 @@ void main() {
         expect(loads, 1);
         expect(tester.takeException(), isNull);
       } else {
-        load();
+        tester
+            .widget<OutlinedButton>(
+              find.byKey(const Key('load-client-identity')),
+            )
+            .onPressed!();
         checkbox(true); // A pending reload cannot be confirmed by an old frame.
         await tester.pump();
         checkbox(
