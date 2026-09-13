@@ -124,6 +124,9 @@ void main() {
     'unsafe',
     'invalidated',
     'cancelled',
+    'disposed-refresh',
+    'disposed-help',
+    'disposed-link',
   ]) {
     testWidgets('US-13: support UI $scenario', (tester) async {
       final state = ClientStateController();
@@ -208,6 +211,21 @@ void main() {
         findsNothing,
       );
       final button = find.byKey(const Key('client-support-support'));
+      if (scenario.startsWith('disposed-')) {
+        final target = scenario == 'disposed-refresh'
+            ? refresh
+            : scenario == 'disposed-help'
+            ? find.byKey(const Key('client-offline-help'))
+            : button;
+        final callback = tester.widget<ButtonStyleButton>(target).onPressed!;
+        await tester.pumpWidget(const SizedBox());
+        callback();
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+        expect(reads, 1);
+        expect(opens, 0);
+        return;
+      }
       await tester.ensureVisible(button);
       await tester.tap(button);
       await tester.pump();

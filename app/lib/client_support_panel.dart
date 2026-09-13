@@ -26,6 +26,7 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
   String get contextId =>
       '${widget.state.cacheEpoch}:${widget.state.domainEpoch(api.Domain.DOMAIN_SUPPORT)}';
   bool get allowed =>
+      mounted &&
       widget.state.link == ClientLinkState.ready &&
       widget.state.snapshot != null;
   bool get current => allowed && _context == contextId;
@@ -133,7 +134,9 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
         children: [
           TextButton(
             key: const Key('client-offline-help'),
-            onPressed: () => setState(() => _help = !_help),
+            onPressed: () {
+              if (mounted) setState(() => _help = !_help);
+            },
             child: const Text('Offline help'),
           ),
           if (_help)
