@@ -18,6 +18,13 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+Shared peer widget scenarios `network-visible` and `network-pending` cover
+StatusChanged replacing Network: clear the old visible catalog and search,
+require explicit refresh, and discard an old in-flight result even after a new
+query has completed. Both passed locally and are imported by the existing mobile
+harness. Runner execution is pending; these synthetic stream checks do not close
+the producer-process event sequence or native Network-switch acceptance.
+
 At `e4a06abac6d2f4a39dc9a091140410c2c8120210`, the
 [Linux consumer job](https://github.com/endless-net/client-ui/actions/runs/34741391970/job/103681568115)
 passed 256 tests, including all three newly added producer-host peer scenarios.

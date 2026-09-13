@@ -277,6 +277,12 @@ invalidations между страницами. Экран показывает s
 map revisions, stable peer ID, overlay addresses, selected path/endpoint и
 переданные producer причины, health, RTT и timestamps кандидатов. Он не запускает
 сетевые probes и не считает PREVIOUS snapshot доказательством текущей связности.
+Shared widget regression подаёт typed StatusChanged со сменой Network и новой
+revision: уже показанные peers и поисковая строка очищаются, автоматического
+запроса нет. Отдельный сценарий задерживает старый ответ до завершения явного
+запроса в новом контексте и проверяет, что старый результат не возвращается.
+Эти два теста включены в общий mobile harness; это проверка consumer на
+синтетическом event stream, не выполнение SelectNetwork в native runtime.
 Shared tests входят в desktop/mobile harness; локальные результаты не закрывают
 native IPC interoperability, локализацию, accessibility или platform acceptance.
 

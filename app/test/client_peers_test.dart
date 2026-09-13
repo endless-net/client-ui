@@ -12,7 +12,14 @@ import 'client_session_test.dart' as fixtures;
 import 'support/contract_test_scaffold.dart';
 
 void main() {
-  for (final scenario in ['display', 'query-race', 'invalidated', 'observer']) {
+  for (final scenario in [
+    'display',
+    'query-race',
+    'invalidated',
+    'observer',
+    'network-visible',
+    'network-pending',
+  ]) {
     testWidgets('US-04: peer panel $scenario', (tester) async {
       final state = ClientStateController();
       final events = StreamController<api.WatchEventsResponse>();
@@ -26,7 +33,11 @@ void main() {
         (_) async => api.ListPeersResponse()
           ..mergeFromProto3Json({
             'page': {
-              'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+              'metadata': {
+                'instanceId': 'runtime-a',
+                'revision':
+                    state.snapshot?.status.metadata.revision.toString() ?? '7',
+              },
             },
             'snapshotState': 'AGENT_SNAPSHOT_STATE_PREVIOUS',
             'mapRevision': '11',
@@ -65,7 +76,11 @@ void main() {
                 load: (query) {
                   reads++;
                   if (reads == 1 &&
-                      ['query-race', 'invalidated'].contains(scenario)) {
+                      [
+                        'query-race',
+                        'invalidated',
+                        'network-pending',
+                      ].contains(scenario)) {
                     return pending.future;
                   }
                   return catalog(query);
@@ -76,7 +91,8 @@ void main() {
         ),
       );
       final snapshot = fixtures.snapshot()
-        ..snapshot.status.activeProfileId = 'profile-a';
+        ..snapshot.status.activeProfileId = 'profile-a'
+        ..snapshot.status.network = api.Network(id: 'network-a');
       if (scenario == 'observer') {
         snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
       }
@@ -103,6 +119,41 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Host second'), findsOneWidget);
         expect(find.text('Host first'), findsNothing);
+        expect(reads, 2);
+      } else if (scenario.startsWith('network-')) {
+        final oldCatalog = await catalog('first');
+        if (scenario == 'network-visible') {
+          await tester.pumpAndSettle();
+          expect(find.text('Host first'), findsOneWidget);
+        }
+        final changed =
+            api.Status.fromBuffer(snapshot.snapshot.status.writeToBuffer())
+              ..network = api.Network(id: 'network-b')
+              ..metadata.revision += 1;
+        events.add(
+          api.WatchEventsResponse(
+            sequence: snapshot.sequence + 1,
+            metadata: changed.metadata,
+            statusChanged: changed,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(state.link, ClientLinkState.ready);
+        expect(state.snapshot!.status.network.id, 'network-b');
+        expect(find.text('Host first'), findsNothing);
+        expect(tester.widget<TextField>(search).controller!.text, isEmpty);
+        expect(reads, 1); // Context changes do not silently issue a query.
+        await tester.enterText(search, 'second');
+        await tester.pump();
+        tester.widget<OutlinedButton>(refresh).onPressed!();
+        await tester.pumpAndSettle();
+        expect(find.text('Host second'), findsOneWidget);
+        if (scenario == 'network-pending') {
+          pending.complete(oldCatalog);
+          await tester.pumpAndSettle();
+        }
+        expect(find.text('Host first'), findsNothing);
+        expect(find.text('Host second'), findsOneWidget);
         expect(reads, 2);
       } else if (scenario == 'invalidated') {
         events.add(
