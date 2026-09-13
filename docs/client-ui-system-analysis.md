@@ -519,6 +519,14 @@ invalidation preferences/managed settings/profiles отменяют незаве
 сохраняется отдельно от отсутствующего override; requested/effective, source и
 lock не вычисляются UI. Некорректные и повторяющиеся managed keys/value kinds
 отвергаются. Read не пишет intention journal и не повторяется автоматически.
+Lifecycle effective, присутствующий requested и каждый allowed value должны
+быть определёнными значениями enum; дубли allowed values отклоняют всю проекцию
+до второго RPC. Managed lifecycle value проверяется так же. Отсутствующий
+requested и пустой allowed values допустимы и не превращаются в default override
+или разрешение изменения. `client_preferences_validation_test.dart` покрывает
+эти отрицательные исходы для всех пяти lifecycle-полей. Локальные Go tests,
+Flutter analysis и Flutter tests прошли (256 passed, 27 skipped); пропуски и
+reader tests не являются доказательством platform/runtime acceptance.
 Shared tests входят в desktop и mobile harness, session checks — в desktop suite;
 runner execution этого изменения ещё не подтверждено.
 

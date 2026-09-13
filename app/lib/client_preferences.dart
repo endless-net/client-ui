@@ -40,6 +40,26 @@ Future<ClientPreferences> readClientPreferences({
   final preferences = api.Preferences.fromBuffer(
     response.preferences.writeToBuffer(),
   )..freeze();
+  final lifecycle = preferences.lifecycle;
+  for (final setting in [
+    if (lifecycle.hasRuntimeStart()) lifecycle.runtimeStart,
+    if (lifecycle.hasUiQuit()) lifecycle.uiQuit,
+    if (lifecycle.hasUserLogoff()) lifecycle.userLogoff,
+    if (lifecycle.hasSuspend()) lifecycle.suspend,
+    if (lifecycle.hasResume()) lifecycle.resume,
+  ]) {
+    _validateLifecycleValue(setting.effective);
+    if (setting.hasRequested()) {
+      _validateLifecycleValue(setting.requested);
+    }
+    final allowed = <api.LifecycleBehavior>{};
+    for (final value in setting.allowedValues) {
+      _validateLifecycleValue(value);
+      if (!allowed.add(value)) {
+        throw const FormatException('Duplicate lifecycle choice');
+      }
+    }
+  }
   final policies = await listManaged(
     api.ListManagedSettingsRequest(
       profile: api.ProfileRef(profileId: profileId),
@@ -65,6 +85,7 @@ Future<ClientPreferences> readClientPreferences({
     if (boolean ? !setting.hasBooleanValue() : !setting.hasLifecycleValue()) {
       throw const FormatException('Invalid managed preference value kind');
     }
+    if (!boolean) _validateLifecycleValue(setting.lifecycleValue);
   }
   return ClientPreferences._(
     preferences,
@@ -73,4 +94,11 @@ Future<ClientPreferences> readClientPreferences({
         api.ManagedSetting.fromBuffer(setting.writeToBuffer())..freeze(),
     ]),
   );
+}
+
+void _validateLifecycleValue(api.LifecycleBehavior value) {
+  if (value == api.LifecycleBehavior.LIFECYCLE_BEHAVIOR_UNSPECIFIED ||
+      !api.LifecycleBehavior.values.contains(value)) {
+    throw const FormatException('Invalid lifecycle preference value');
+  }
 }
