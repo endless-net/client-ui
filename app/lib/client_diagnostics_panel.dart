@@ -25,6 +25,44 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
   String? _notice;
   bool _busy = false;
   bool _confirmBundle = false;
+  @override
+  void initState() {
+    super.initState();
+    widget.state.addListener(_clearInvalidatedPreview);
+  }
+
+  @override
+  void didUpdateWidget(covariant ClientDiagnosticsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.state != widget.state) {
+      oldWidget.state.removeListener(_clearInvalidatedPreview);
+      widget.state.addListener(_clearInvalidatedPreview);
+      _clearPreview();
+    }
+  }
+
+  void _clearPreview() {
+    _preview = null;
+    _notice = null;
+    _confirmBundle = false;
+    _context = null;
+  }
+
+  void _clearInvalidatedPreview() {
+    if (_context != null && (_context != contextId || !allowed)) {
+      // Drop the message itself, not just its rendered summary. It can contain
+      // log entries or browser actions belonging to the former caller/profile.
+      setState(_clearPreview);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.state.removeListener(_clearInvalidatedPreview);
+    _clearPreview();
+    super.dispose();
+  }
+
   String get contextId =>
       '${widget.state.cacheEpoch}:${api.Domain.values.map(widget.state.domainEpoch).join(',')}';
   bool get allowed =>
@@ -47,7 +85,9 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
     });
     try {
       final preview = await widget.load();
-      if (!mounted || context != contextId || !allowed) return;
+      if (!mounted || context != _context || context != contextId || !allowed) {
+        return;
+      }
       final snapshot = widget.state.snapshot!;
       if (!preview.hasMetadata() ||
           preview.metadata.instanceId != snapshot.runtime.instanceId ||
@@ -60,7 +100,7 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
               ..freeze(),
       );
     } catch (_) {
-      if (mounted && context == contextId) {
+      if (mounted && context == _context && context == contextId) {
         setState(() => _notice = 'Diagnostics could not be read.');
       }
     } finally {
@@ -85,14 +125,16 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
     });
     try {
       final operation = await widget.createBundle(profileId);
-      if (!mounted || context != contextId || !allowed) return;
+      if (!mounted || context != _context || context != contextId || !allowed) {
+        return;
+      }
       setState(
         () => _notice = operation.succeeded
             ? 'Bundle operation succeeded. Recover its handle before verified download; nothing was exported.'
             : 'Bundle operation received. Recover its result; archive readiness is not confirmed.',
       );
     } catch (_) {
-      if (mounted && context == contextId) {
+      if (mounted && context == _context && context == contextId) {
         setState(
           () => _notice =
               'Bundle creation could not be confirmed. Recover the intention before another attempt.',

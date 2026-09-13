@@ -129,6 +129,11 @@ CreateDiagnosticsBundle с текущим ProfileRef; cancellation/invalidation 
 отправляют команду, acceptance не означает archive readiness. Shared widget test
 проверяет эти границы. Download/export UI, полноценный preview и native execution
 нового create flow остаются открытыми; production main ещё не переключён.
+Diagnostics panel при invalidation/caller change теперь удаляет сам protobuf из
+widget state, notice и confirmation, а не только скрывает summary. Listener
+переподключается при замене controller и снимается при dispose; очищенный context
+не допускает возврата late response. Это очистка ссылок, не обещание secure memory
+erasure managed Dart heap.
 Producer process suite содержит bundle fixture: journaled create, terminal lookup,
 повторный GetOperation перед download, два точных ReadDiagnosticsBundle запроса,
 SHA-256 и сохранение intention до явного acknowledgement. Test envelope проверен
