@@ -175,6 +175,10 @@
         {
           "path": "app/test/client_state_controller_test.dart",
           "scope": "Context cache invalidation only; no peer/network catalog UI"
+        },
+        {
+          "path": "app/test/client_peers_test.dart",
+          "scope": "Immutable paginated peer reader preserves exact profile/search, snapshot state and applied/target map revisions; inconsistent pages, duplicate IDs, oversized query/page and token cycles fail closed. Included in desktop/mobile suites, local fixtures only; no session binding, peer screen, native IPC or actual path reachability acceptance"
         }
       ],
       "acceptanceEvidence": []
