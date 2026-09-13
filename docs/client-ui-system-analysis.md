@@ -651,6 +651,12 @@ production код его не импортирует, native Go-host/OS IPC те
 OS identity, защищённого bridge, VPN или producer runtime. Остальные RPC пока
 не реализованы этим fixture и отклоняются; полнота контракта не заявляется.
 
+Второй wire vector моделирует UNAVAILABLE после synthetic acceptance: старая
+ClientSession закрывается, новая открывает тот же journal и получает свежий
+snapshot с pending operation. Новый UUID/повтор Connect запрещены, GetOperation
+читает исходный request ID. Это restart consumer session в одном тестовом
+процессе, не crash/power-loss или producer durability acceptance.
+
 [Coverage ledger](client-ui-test-coverage.md) и
 [`tests/client-coverage.json`](../tests/client-coverage.json) трассируют весь
 scope из 104 UF/UBR/UI-AC/US identifiers. Проверка структуры и отдельный

@@ -143,7 +143,7 @@
       "testEvidence": [
         {
           "path": "app/test/client_loopback_contract_test.dart",
-          "scope": "UI-owned generated gRPC loopback server: exact pairing metadata/context, durable UUID before Connect, separate GetOperation and authoritative StatusChanged, explicit acknowledgement and no extra RPC. Registered in all desktop/mobile harnesses, local pass only pending runners. Synthetic protobuf wire evidence, NOT OS-authenticated IPC/mobile bridge, policy, VPN or real runtime acceptance"
+          "scope": "UI-owned generated gRPC loopback server: exact pairing/context, UUID on disk before Connect, separate GetOperation/StatusChanged and explicit acknowledgement. Ambiguous UNAVAILABLE-after-acceptance case recreates ClientSession with reopened journal and fresh snapshot, forbids a new UUID/second Connect and recovers the original result. Both shared desktop/mobile scenarios pass locally, runner execution pending. Synthetic session restart, NOT OS-authenticated IPC/mobile bridge, process/runtime durability, policy or VPN acceptance"
         },
         {
           "path": "app/test/client_rebootstrap_test.dart",

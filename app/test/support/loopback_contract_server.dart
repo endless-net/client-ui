@@ -5,12 +5,19 @@ import 'package:grpc/grpc.dart';
 /// UI-owned synthetic wire fixture, never imported by production code.
 /// It does not implement OS authentication, VPN, policy or runtime persistence.
 class LoopbackContractServer extends api.ClientServiceBase {
-  LoopbackContractServer({required this.requestId, required this.beforeAccept});
+  LoopbackContractServer({
+    required this.requestId,
+    required this.beforeAccept,
+    this.ambiguousConnect = false,
+  });
+  final bool ambiguousConnect;
+  bool accepted = false;
+  bool completed = false;
   final String requestId;
   final Future<void> Function() beforeAccept;
   final calls = <String>[];
   final violations = <String>[];
-  final events = StreamController<api.WatchEventsResponse>();
+  final events = StreamController<api.WatchEventsResponse>.broadcast();
 
   api.RuntimeInfo get runtime => api.RuntimeInfo(
     protocol: api.ClientContract.protocol,
@@ -24,6 +31,9 @@ class LoopbackContractServer extends api.ClientServiceBase {
         'metadata': {'instanceId': 'mock-runtime', 'revision': '$revision'},
         'activeProfileId': 'profile-a',
         'connectionPhase': phase.name,
+        'currentOperations': [
+          if (accepted && !completed) operation(terminal: false).toProto3Json(),
+        ],
       });
 
   void _check(bool condition, String message) {
@@ -68,7 +78,9 @@ class LoopbackContractServer extends api.ClientServiceBase {
         'runtime': runtime.toProto3Json(),
         'status': status(
           7,
-          api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED,
+          accepted
+              ? api.ConnectionPhase.CONNECTION_PHASE_CONNECTING
+              : api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED,
         ).toProto3Json(),
       },
     });
@@ -103,6 +115,12 @@ class LoopbackContractServer extends api.ClientServiceBase {
       'Mutation context mismatch',
     );
     await beforeAccept();
+    accepted = true;
+    if (ambiguousConnect) {
+      throw const GrpcError.unavailable(
+        'Synthetic ambiguous response after acceptance',
+      );
+    }
     return api.ConnectResponse(operation: operation(terminal: false));
   }
 
@@ -112,10 +130,12 @@ class LoopbackContractServer extends api.ClientServiceBase {
     api.GetOperationRequest request,
   ) async {
     _record(call, 'GetOperation');
+    _check(accepted, 'Lookup before acceptance');
     _check(
       request.requestId == requestId && request.operationId.isEmpty,
       'Recovery identity mismatch',
     );
+    completed = true;
     return api.GetOperationResponse(operation: operation(terminal: true));
   }
 
