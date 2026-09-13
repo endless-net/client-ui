@@ -142,6 +142,10 @@
       "implementation": "partial",
       "testEvidence": [
         {
+          "path": "app/test/mobile_contract_widget_test.dart",
+          "scope": "Recovery acknowledgement is admitted only for a currently displayed result and bound caller context; duplicate callbacks and owner-observer-owner stale callbacks (even after fresh lookup of the same object) do not acknowledge. Shared desktop/mobile harness; local regression passed, runner execution pending; not durable runtime acceptance"
+        },
+        {
           "path": "app/test/client_session_test.dart",
           "scope": "Snapshot-gated submission and retained request ID"
         },

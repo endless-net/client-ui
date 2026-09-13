@@ -1493,14 +1493,41 @@ void main() {
       expect(lookups, 1);
       expect(find.text('Still pending'), findsOneWidget);
       expect(find.byKey(const Key('ack-request-pending')), findsNothing);
+      final acknowledgedCallback = tester
+          .widget<TextButton>(find.byKey(const Key('ack-request-done')))
+          .onPressed!;
       await tester.tap(find.byKey(const Key('ack-request-done')));
       await tester.pump();
       expect(acknowledgements, ['request-done']);
       expect(find.byKey(const Key('ack-request-done')), findsNothing);
+      acknowledgedCallback();
+      await tester.pump();
+      expect(acknowledgements, ['request-done']);
+
+      await tester.tap(find.byKey(const Key('client-recover')));
+      await tester.pump();
+      final staleAcknowledgement = tester
+          .widget<TextButton>(find.byKey(const Key('ack-request-done')))
+          .onPressed!;
+      snapshot.sequence += 1;
+      snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      source.add(snapshot);
+      await tester.pump();
+      snapshot.sequence += 1;
+      snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OWNER;
+      source.add(snapshot);
+      await tester.pump();
+      // Even a fresh lookup returning the same object cannot authorize an old
+      // callback captured before the caller context changed.
+      await tester.tap(find.byKey(const Key('client-recover')));
+      await tester.pump();
+      staleAcknowledgement();
+      await tester.pump();
+      expect(acknowledgements, ['request-done']);
       delayedLookup = Completer<List<ClientOperation>>();
       await tester.tap(find.byKey(const Key('client-recover')));
       await tester.pump();
-      expect(lookups, 2);
+      expect(lookups, 4);
       snapshot.sequence += 1;
       snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
       source.add(snapshot);

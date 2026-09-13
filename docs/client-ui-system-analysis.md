@@ -30,6 +30,15 @@ outcomes требуют отдельного evidence.
 
 ## 1. Границы решения
 
+Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
+и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
+оставляют открытыми версии ОС, принятые локали/assistive technologies, lifecycle
+defaults, platform variants и distribution ownership. Цель этой задачи сохраняет
+пять платформ; эти открытые решения нельзя выдавать за accepted exceptions.
+UI-AC-01/11/17 требуют реального ресурса/transport/traffic, UI-AC-10 — distribution,
+UI-AC-12/13 — принятых accessibility mechanisms/локалей. Mock-прохождение не
+закрывает эти критерии. Эта сверка не меняет BA и не утверждает product решения.
+
 Общая Flutter presentation использует application layer с типизированными моделями
 и командами. Транспорт скрыт за platform adapter. Runtime единолично управляет
 identity, trust, tunnel intent, credential, policy application и операциями.

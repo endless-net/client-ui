@@ -162,6 +162,11 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
 
   Future<void> _run(ClientOperation? acknowledgement) async {
     if (_busy || !_owner) return;
+    if (acknowledgement != null &&
+        (_epoch != widget.state.cacheEpoch ||
+            !_results.contains(acknowledgement))) {
+      return;
+    }
     final epoch = widget.state.cacheEpoch;
     setState(() {
       _busy = true;
@@ -206,13 +211,23 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
     animation: widget.state,
     builder: (context, _) {
       final visible = _owner && _epoch == widget.state.cacheEpoch;
+      final renderedState = widget.state;
+      final renderedEpoch = widget.state.cacheEpoch;
+      bool current() =>
+          mounted &&
+          identical(widget.state, renderedState) &&
+          widget.state.cacheEpoch == renderedEpoch;
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           OutlinedButton(
             key: const Key('client-recover'),
-            onPressed: _owner && !_busy ? () => _run(null) : null,
+            onPressed: _owner && !_busy
+                ? () {
+                    if (current()) _run(null);
+                  }
+                : null,
             child: const Text('Recover pending operations'),
           ),
           if (visible && _notice != null) Text(_notice!),
@@ -238,7 +253,12 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
                                 'export-${operation.value.requestId}',
                               ),
                               onPressed: !_busy
-                                  ? () => _export(operation)
+                                  ? () {
+                                      if (current() &&
+                                          _results.contains(operation)) {
+                                        _export(operation);
+                                      }
+                                    }
                                   : null,
                               child: const Text('Export verified bundle'),
                             ),
@@ -247,7 +267,11 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
                 trailing: operation.terminal
                     ? TextButton(
                         key: ValueKey('ack-${operation.value.requestId}'),
-                        onPressed: !_busy ? () => _run(operation) : null,
+                        onPressed: !_busy
+                            ? () {
+                                if (current()) _run(operation);
+                              }
+                            : null,
                         child: const Text('Acknowledge result'),
                       )
                     : operation.value.userAction.kind ==
@@ -256,7 +280,11 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
                     ? TextButton(
                         key: ValueKey('browser-${operation.value.requestId}'),
                         onPressed: !_busy
-                            ? () => _openBrowser(operation)
+                            ? () {
+                                if (current() && _results.contains(operation)) {
+                                  _openBrowser(operation);
+                                }
+                              }
                             : null,
                         child: const Text('Open browser'),
                       )
