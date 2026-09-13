@@ -2,6 +2,7 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 
 import 'client_operation.dart';
+import 'client_operation_labels.dart';
 
 /// Render only typed result fields. Never serialize a whole operation: browser
 /// URLs and future sensitive fields must not leak into diagnostic output.
@@ -12,15 +13,19 @@ class ClientOperationDetails extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final value = operation.value;
-    final lines = <String>[value.state.name];
+    final lines = <String>[clientOperationStateLabel(value.state)];
     if (value.continuity !=
         api.ConnectionContinuity.CONNECTION_CONTINUITY_UNSPECIFIED) {
-      lines.add('Connection continuity: ${value.continuity.name}');
+      lines.add(
+        'Connection continuity: ${clientContinuityLabel(value.continuity)}',
+      );
     }
     switch (value.whichOutcome()) {
       case api.Operation_Outcome.failure:
-        lines.add('Failure: ${value.failure.code.name}');
-        lines.add('Action owner: ${value.failure.actionOwner.name}');
+        lines.add('Failure: ${clientFailureLabel(value.failure.code)}');
+        lines.add(
+          'Action owner: ${clientActionOwnerLabel(value.failure.actionOwner)}',
+        );
         lines.add(
           value.failure.retryable
               ? 'Retry may be possible; no command has been replayed.'
@@ -70,7 +75,9 @@ class ClientOperationDetails extends StatelessWidget {
         lines.add('Download requires the caller-bound bundle RPC.');
       case api.Operation_Outcome.notSet:
         if (value.hasUserAction()) {
-          lines.add('Required action: ${value.userAction.kind.name}');
+          lines.add(
+            'Required action: ${clientRequiredActionLabel(value.userAction.kind)}',
+          );
         }
     }
     return Column(

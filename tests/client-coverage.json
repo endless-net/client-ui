@@ -492,6 +492,10 @@
       "implementation": "partial",
       "testEvidence": [
         {
+          "path": "app/test/client_operation_labels_test.dart",
+          "scope": "Closed operation state, continuity, action owner, required action and failure enums have readable English labels; registered in desktop/mobile harness. Runner execution pending; not full localization or accessibility acceptance"
+        },
+        {
           "path": "app/test/client_intent_journal_test.dart",
           "scope": "Journal contains UUID and kind only; not complete privacy/accessibility acceptance"
         },

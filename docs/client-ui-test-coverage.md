@@ -28,6 +28,14 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+The operation-presentation extension maps closed producer enums to readable
+English labels for state, continuity, failure, action owner and required action.
+`client_operation_labels_test.dart` checks the current enum set; the shared
+widget regression checks the browser-action label while suppressing the browser
+URL and raw reason key. Local validation passed 307 Flutter tests with 30 skips,
+Flutter analysis and Go tests. Runner execution for this extension is pending;
+English labels do not establish full localization or accessibility acceptance.
+
 At `77e1aa8fdc55c948067e247bc151014433322c3a`, the
 [desktop consumer run](https://github.com/endless-net/client-ui/actions/runs/34773440729)
 passed on Windows, Linux and macOS, including the failed RenewSession producer-host

@@ -1393,7 +1393,7 @@ void main() {
         ),
       );
       expect(
-        find.text('Failure: ERROR_CODE_REMOTE_CLEANUP_REQUIRED'),
+        find.text('Failure: Remote cleanup still required'),
         findsOneWidget,
       );
       expect(find.text('Control request: failure-correlation'), findsOneWidget);
@@ -1417,7 +1417,12 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Required action: KIND_OPEN_BROWSER'), findsOneWidget);
+      expect(
+        find.text('Required action: Continue in your browser'),
+        findsOneWidget,
+      );
+      expect(find.text('Waiting for required action'), findsOneWidget);
+      expect(find.textContaining('KIND_OPEN_BROWSER'), findsNothing);
       expect(find.textContaining('sensitive-token'), findsNothing);
     },
   );

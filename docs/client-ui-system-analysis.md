@@ -305,6 +305,11 @@ semantic live region. Shared regression проверяет точный текс
 Это проверка Flutter semantics tree, а не фактического озвучивания VoiceOver,
 TalkBack или Windows screen reader; полная accessibility и локализация открыты.
 
+ClientOperationDetails отображает закрытые enum состояния операции, continuity,
+ошибки, владельца действия и required action через английские подписи, а не wire
+names. Raw reason key и browser URL не отображаются. Shared regression проверяет
+подписи и скрытие чувствительных полей; это не полная локализация US-14.
+
 US-03/09: Connect, Disconnect и RenewSession привязаны к immutable snapshot,
 который разрешил кнопку. Отложенный callback после замены profile/caller,
 capabilities, status или session, отключения подписки либо dispose не вызывает
