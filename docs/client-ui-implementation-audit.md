@@ -29,6 +29,14 @@ outcomes, явный retry после ошибки, stale completion guards, acc
 [11 unit-тестов](../app/test/client_notification_delivery_test.dart) используют
 управляемый adapter; shell/settings/native delivery по-прежнему отсутствуют.
 
+Последующее shell дополнение: dispatcher подключён к `ClientDesktopApp`, а
+scrollable RU/EN panel содержит toggle текущего запуска, пять delivery outcomes
+и явный retry. Без adapter отображается unsupported; production native adapter
+пока отсутствует. [Panel tests](../app/test/client_notifications_panel_test.dart)
+и [shell test](../app/test/client_app_notifications_test.dart) — widget evidence,
+не OS delivery. Persisted preference, permissions и native adapters остаются
+незавершёнными; первое включение off пока не окончательная policy.
+
 | UF | Наблюдаемая реализация | Что ещё нужно для исходного scope |
 | --- | --- | --- |
 | UF-01 | `main.dart`, Windows runner/package pipeline; Linux/macOS scaffold | Product hosts Android/iOS отсутствуют; дистрибуция и compatible pairing всех платформ не квалифицированы |

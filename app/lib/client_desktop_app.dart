@@ -15,6 +15,8 @@ import 'client_bundle_destination.dart';
 import 'client_session_panel.dart';
 import 'client_state_controller.dart';
 import 'client_tray.dart';
+import 'client_notification_delivery.dart';
+import 'client_notifications_panel.dart';
 
 Directory clientJournalDirectory(String endpoint) {
   final home =
@@ -41,8 +43,10 @@ class ClientDesktopApp extends StatefulWidget {
     this.initialLocale = ClientLocale.en,
     this.localeReadFailed = false,
     this.saveLocale,
+    this.deliverNotification,
   });
   final ClientSession session;
+  final DeliverClientNotification? deliverNotification;
   final ClientLocale initialLocale;
   final bool localeReadFailed;
   final Future<void> Function(ClientLocale)? saveLocale;
@@ -76,6 +80,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
       _localeStorageFailed = false;
     });
     _tray.locale = value;
+    _notifications.locale = value;
     final save = widget.saveLocale;
     if (save == null) return;
     final previous = _localeWrites;
@@ -113,6 +118,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     ),
   };
   late final ClientTray _tray;
+  late final ClientNotificationDelivery _notifications;
   bool _trayReady = false;
   bool _trayUpdating = false;
   bool _trayDirty = false;
@@ -152,6 +158,14 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     super.initState();
     _locale = widget.initialLocale;
     _localeStorageFailed = widget.localeReadFailed;
+    _notifications = ClientNotificationDelivery(
+      state: session.state,
+      locale: _locale,
+      enabled: false,
+      deliver:
+          widget.deliverNotification ??
+          (_, _) async => ClientNotificationDeliveryResult.unsupported,
+    );
     _tray = ClientTray(
       locale: _locale,
       state: session.state,
@@ -372,6 +386,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     _signals?.cancel();
     _trayReady = false;
     final savingLocale = _localeWrites;
+    _notifications.enabled = false;
     if (savingLocale != null) await savingLocale;
     await session.close();
     await widget.onExit?.call();
@@ -387,6 +402,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     _trayReady = false;
     _tray.removeListener(_trayChanged);
     _tray.dispose();
+    _notifications.dispose();
     if (widget.desktopIntegration) {
       windowManager.removeListener(this);
       trayManager.removeListener(this);
@@ -482,6 +498,12 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
               locale: _locale,
               session: session,
               uiBuild: widget.uiBuild,
+              notifications: ClientNotificationsPanel(
+                delivery: _notifications,
+                supported: widget.deliverNotification != null,
+                locale: _locale,
+                busy: _busy,
+              ),
               exportBundle: widget.desktopIntegration && Platform.isWindows
                   ? _exportBundle
                   : null,

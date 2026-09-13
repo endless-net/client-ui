@@ -4,6 +4,7 @@ library;
 import 'dart:io';
 import 'package:endlessnet/client_desktop_app.dart';
 import 'package:endlessnet/client_locale.dart';
+import 'package:endlessnet/client_notifications_panel.dart';
 import 'package:endlessnet/client_session.dart';
 import 'package:endlessnet/client_session_panel.dart';
 import 'package:endlessnet/client_intent_journal.dart';
@@ -88,6 +89,12 @@ void main() {
             find.byType(ClientSessionPanel),
           );
           expect(Localizations.localeOf(localizedContext), Locale(locale.name));
+          final notifications = tester.widget<ClientNotificationsPanel>(
+            find.byType(ClientNotificationsPanel),
+          );
+          expect(notifications.locale, locale);
+          expect(notifications.supported, isFalse);
+          expect(notifications.delivery.enabled, isFalse);
           final material = MaterialLocalizations.of(localizedContext);
           expect(
             [

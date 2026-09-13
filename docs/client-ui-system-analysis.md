@@ -46,7 +46,21 @@ Disable, потеря stream, смена profile/account и dispose отбрас
 должен завершать каждый вызов, иначе очередь ждёт его завершения.
 [11 short tests](../app/test/client_notification_delivery_test.dart) проверяют
 state subscription и управляемые async completions, не ОС. Shell wiring,
-persisted settings, permissions и native adapters всё ещё не реализованы.
+persisted settings, permissions и native adapters этим слоем не реализованы.
+
+Shell wiring дополнен: `ClientDesktopApp` владеет dispatcher, передаёт локаль,
+отключает отправку при завершении UI и освобождает подписку при dispose.
+[`ClientNotificationsPanel`](../app/lib/client_notifications_panel.dart) внутри
+прокручиваемой session panel позволяет включить deadline notices на текущий
+запуск, выключить их и явно повторить неуспешную доставку. Все пять outcomes
+имеют отдельные RU/EN тексты; delivered означает передачу системе, не доказанный
+показ. Без adapter переключатель недоступен и показано unsupported.
+В production entrypoint adapter пока отсутствует; persisted preference,
+OS permission/click handling и native delivery ещё нужны. Начальное off —
+временное безопасное поведение этой незавершённой функции, не утверждение
+окончательной продуктовой политики. [10 widget vectors](../app/test/client_notifications_panel_test.dart)
+и [shell regression](../app/test/client_app_notifications_test.dart) проверяют
+явный toggle/retry, смену языка без replay и отсутствие runtime mutation.
 
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и

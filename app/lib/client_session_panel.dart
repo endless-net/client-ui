@@ -35,8 +35,10 @@ class ClientSessionPanel extends StatelessWidget {
     this.elevate,
     this.uiBuild,
     this.locale = ClientLocale.en,
+    this.notifications,
   });
   final ClientSession session;
+  final Widget? notifications;
   final ClientLocale locale;
   final api.BuildIdentity? uiBuild;
   final Future<ClientElevationOutcome> Function(ClientPrivilegedRecovery)?
@@ -53,6 +55,7 @@ class ClientSessionPanel extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          ?notifications,
           ClientSupportPanel(
             locale: locale,
             state: session.state,

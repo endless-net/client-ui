@@ -633,12 +633,20 @@
           "scope": "Journal contains UUID and kind only; not complete privacy/accessibility acceptance"
         },
         {
+          "path": "app/test/client_notifications_panel_test.dart",
+          "scope": "10 RU/EN widget vectors: explicit per-run toggle, five distinct delivery outcomes, retry after failure, locale rebuild without replay, disable cleanup and unavailable toggle without adapter. No persisted setting or native permission/display acceptance"
+        },
+        {
+          "path": "app/test/client_app_notifications_test.dart",
+          "scope": "Composed desktop shell binds explicit enable/retry/disable to injected notification delivery from validated session snapshot, with one runtime connection and no journal mutation. Production native adapter and persistent preference remain absent; not OS delivery acceptance"
+        },
+        {
           "path": "app/test/client_notification_delivery_test.dart",
-          "scope": "11 short tests: validated state subscription, serial asynchronous deliveries, latest locale without replay, distinct permission/unsupported/unavailable/failure results, explicit retry without snapshot-driven storm, exception privacy, disable/reconnect/profile ABA/account switch/dispose stale completion guards. Controlled adapter only; shell/settings/native delivery still absent, not platform notification acceptance"
+          "scope": "11 short tests: validated state subscription, serial asynchronous deliveries, latest locale without replay, distinct permission/unsupported/unavailable/failure results, explicit retry without snapshot-driven storm, exception privacy, disable/reconnect/profile ABA/account switch/dispose stale completion guards. Controlled adapter only; shell wiring tested separately, native delivery and persisted settings still absent, not platform notification acceptance"
         },
         {
           "path": "app/test/client_deadline_notifications_test.dart",
-          "scope": "11 short unit tests: independent typed session/credential expiry events, fixed RU/EN private-context-free payload, acknowledgement before dedup, reconnect and disabled delivery, deadline changes, profile/runtime changes and stale receipt rejection. Planner only, not wired to shell/settings/native notifications; in-memory dedup in one context, not OS delivery, persistent policy or full UF-15/US-14 acceptance"
+          "scope": "11 short unit tests: independent typed session/credential expiry events, fixed RU/EN private-context-free payload, acknowledgement before dedup, reconnect and disabled delivery, deadline changes, profile/runtime changes and stale receipt rejection. Planner-only tests; shell wiring tested separately; in-memory dedup in one context, not OS delivery, persistent policy or full UF-15/US-14 acceptance"
         },
         {
           "path": "app/test/client_session_test.dart",
