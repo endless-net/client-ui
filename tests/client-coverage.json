@@ -549,6 +549,10 @@
           "scope": "Ten short RU/EN identity vectors compare complete displayed identity and four notices, reject trust after changed announcement and stale callback after reconfirmation, and switch locale without repeat reads/commands. Unit/component evidence only, not native elevation, established trust or full UI-AC-13"
         },
         {
+          "path": "app/test/client_cleanup_locale_test.dart",
+          "scope": "16 short vectors: exact RU/EN logout/local-forget warnings and accepted/result/unknown notices without replay on locale change; stale confirm/cancel cannot retarget, reuse renewed consent or cross snapshot/controller replacement. Component evidence, not actual remote cleanup or full UI-AC-13"
+        },
+        {
           "path": "app/test/client_recovery_locale_test.dart",
           "scope": "22 shared RU/EN recovery widget vectors compare all panel text for lookup, pending, acknowledgement, browser success/failure and export success/cancellation/failure/unavailable adapter. Rebuilding the same state in the other locale updates notices without repeating lookup or external actions. Runner execution pending; not full-app language switching, native dialogs or product acceptance"
         },
