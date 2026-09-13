@@ -204,6 +204,13 @@ lifecycle event до RPC, что покрыто тремя short negative tests.
 
 ## Внешние границы и CI
 
+Native compile дополнение: три существующих desktop consumer jobs получают
+настоящую Debug host build. Отдельный manual `native_build_only=true` не
+запускает producer/testserver/probe или integration suite. Это compile gate
+первой стадии, не обход требования завершить функционал перед интеграционными
+проверками. Jobs не добавлены, branch push остаётся short. Наличие этого режима
+само по себе не подтверждает сборку или platform acceptance.
+
 Последующее compile evidence: [Windows x64 Debug UI](windows-ui-build-2026-09-14.md)
 успешно собран локально на `7f01918`. Исполняемый файл не запускался; это не
 installer, runtime IPC или platform acceptance. Полные 14 US остаются открытыми.

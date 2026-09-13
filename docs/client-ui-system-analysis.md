@@ -513,6 +513,18 @@ Mobile использует отдельно проверенный native bridg
 
 ## 2. Bootstrap, состояние и права
 
+Native compilation gate: существующий `contract-consumer.yml` теперь собирает
+настоящие Windows/Linux/macOS Debug hosts в тех же трёх OS jobs, без отдельной
+матрицы jobs. Ручной input `native_build_only=true` исключает producer checkout,
+Go testserver build, complete consumer suite и transport probe; остаются locked
+dependencies, analyzer и native compile. Этот режим позволяет проверять исходники
+платформ на стадии реализации, не начиная integration/testserver acceptance.
+По умолчанию PR/manual сохраняют полную suite; pass=1, три повтора opt-in,
+superseded cancellation и short-only branch push не изменены. Структурный
+[workflow test](../scripts/check-contract-workflows.test.mjs) проверяет guard
+каждого integration шага; успешное исполнение native jobs требует собственного
+evidence и не выводится из наличия YAML.
+
 Credential notification дополнение: authoritative
 `CREDENTIAL_STATE_BLOCKED` теперь даёт отдельный fixed RU/EN notice, не expiry
 и не предположение о причине. Account/profile/URL/recovery reason не передаются

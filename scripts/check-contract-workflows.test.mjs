@@ -11,7 +11,8 @@ for (const [file, jobs] of [
 ]) {
   test(`${file}: repetitions are opt-in and superseded runs cancel`, () => {
     const source = readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8');
-    assert.match(source, /workflow_dispatch:\s+inputs:\s+repetitions:/);
+    assert.match(source, /workflow_dispatch:\s+inputs:/);
+    assert.match(source, /^      repetitions:/m);
     assert.doesNotMatch(source, /^  push:/m);
     assert.match(source, /^  pull_request:/m);
     assert.match(source, /type: choice\s+options: \['1', '3'\]\s+default: '1'/);
@@ -40,6 +41,23 @@ test('branch pushes run only the short workflow', () => {
   assert.match(source, /flutter test --no-pub --tags short/);
   assert.doesNotMatch(source, /matrix:|repository: endless-net\/client|ENDLESSNET_TESTSERVER|flutter build|emulator|simulator/);
   assert.match(source, /cancel-in-progress: true/);
+});
+
+test('native build-only mode compiles real hosts without producer or integration execution', () => {
+  const source = readFileSync(new URL('../.github/workflows/contract-consumer.yml', import.meta.url), 'utf8');
+  assert.match(source, /native_build_only:\s+description: '[^']+'\s+type: boolean\s+default: false/);
+  for (const [os, target] of [['ubuntu-latest', 'linux'], ['windows-latest', 'windows'], ['macos-latest', 'macos']]) {
+    assert.ok(source.includes(`- os: ${os}\n            target: ${target}`));
+  }
+  assert.match(source, /run: flutter build \$\{\{ matrix.target \}\} --debug --no-pub/);
+  assert.match(source, /run: flutter pub get --enforce-lockfile/);
+  const steps = source.split(/^      - /m).slice(1);
+  for (const marker of ['repository: endless-net/client', 'actions/setup-go@', 'Build pinned producer scenario host', 'Test complete native consumer suite', 'Verify app transport after stream cancellation']) {
+    const step = steps.find((value) => value.includes(marker));
+    assert.ok(step, marker);
+    assert.ok(step.includes('if: ${{ !inputs.native_build_only }}'), marker);
+  }
+  assert.doesNotMatch(source, /workflow_run:|secrets\.|signing|publish|upload-artifact/);
 });
 
 test('every Flutter suite explicitly chooses short or integration', () => {

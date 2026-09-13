@@ -3,6 +3,10 @@ name: Client v0 consumer
 on:
   workflow_dispatch:
     inputs:
+      native_build_only:
+        description: 'Compile real desktop hosts only; do not run testserver or integration tests'
+        type: boolean
+        default: false
       repetitions:
         description: 'Passes per OS (3 for release preparation or flake diagnosis)'
         type: choice
@@ -25,6 +29,13 @@ jobs:
       matrix:
         pass: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.repetitions == '3' && '[1,2,3]' || '[1]') }}
         os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            target: linux
+          - os: windows-latest
+            target: windows
+          - os: macos-latest
+            target: macos
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -42,23 +53,38 @@ jobs:
           flutter-version: 3.38.1
           cache: false
       - uses: actions/checkout@v7
+        if: ${{ !inputs.native_build_only }}
         with:
           repository: endless-net/client
           ref: 80d9cdc16241ca03200381b6b1b04fa5acca1987
           path: client-source
           persist-credentials: false
       - uses: actions/setup-go@v7
+        if: ${{ !inputs.native_build_only }}
         with:
           go-version-file: client-source/clientipc/go.mod
           cache: false
       - name: Build pinned producer scenario host
+        if: ${{ !inputs.native_build_only }}
         shell: bash
         working-directory: client-source/clientipc
         run: go build -o "$GITHUB_WORKSPACE/client-testserver.exe" ./cmd/client-testserver
       - name: Resolve exact consumer dependencies
         working-directory: app
         run: flutter pub get --enforce-lockfile
+      - name: Install Linux UI build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+      - name: Analyze real UI application
+        working-directory: app
+        run: flutter analyze --no-pub
+      - name: Compile real native UI host
+        working-directory: app
+        run: flutter build ${{ matrix.target }} --debug --no-pub
       - name: Test complete native consumer suite
+        if: ${{ !inputs.native_build_only }}
         # Discover every test, including new regression files. The native host
         # enables process tests on every OS; the probe below uses this app's SDK.
         working-directory: app
@@ -68,5 +94,6 @@ jobs:
       - name: Reject dependency drift
         run: git diff --exit-code -- app/pubspec.yaml app/pubspec.lock
       - name: Verify app transport after stream cancellation
+        if: ${{ !inputs.native_build_only }}
         working-directory: app
         run: dart --packages=.dart_tool/package_config.json ../packages/local_client_rpc/tool/probe_late_headers.dart
