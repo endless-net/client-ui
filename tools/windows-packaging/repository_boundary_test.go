@@ -34,7 +34,7 @@ func TestReleaseConsumesStandalonePublicClientCore(t *testing.T) {
 		"app\\pubspec.yaml",
 		"github.token",
 		"endless-net/client/releases/download",
-		"client-ipc-v2.openapi.yaml",
+		"client-v0.binpb",
 		"client = [ordered]@{",
 		"schema_version = 3",
 	} {

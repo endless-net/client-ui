@@ -31,7 +31,7 @@ func TestResolveClientCoreAcceptsReviewedLock(t *testing.T) {
 		"client-core-manifest.json",
 		"endlessnet-client_windows_amd64.exe",
 		"endlessnet-client-recovery-helper_windows_amd64.exe",
-		"client-ipc-v2.openapi.yaml",
+		"client-v0.binpb",
 		"LICENSE",
 		"NOTICE",
 		"THIRD_PARTY_NOTICES",
@@ -84,10 +84,42 @@ func TestResolveClientCoreRejectsMissingRecoveryHelperAttestation(t *testing.T) 
 
 func TestResolveClientCoreRejectsIPCMismatch(t *testing.T) {
 	fixture := newCoreLockFixture(t)
-	if err := os.WriteFile(fixture.expectedContract, []byte("different IPC"), 0o600); err != nil {
+	writeJSONFixture(t, fixture.expectedContract, map[string]any{
+		"protocol": "endlessnet-client-ipc", "version": 0, "sha256": strings.Repeat("e", 64),
+	})
+	fixture.expectFailure(t, "checked-in IPC contract does not match")
+}
+
+func TestResolveClientCoreRejectsRetiredManifest(t *testing.T) {
+	fixture := newCoreLockFixture(t)
+	manifestPath := filepath.Join(fixture.assetsDir, "endlessnet-client_windows_amd64.manifest.json")
+	manifest := readJSONMap(t, manifestPath)
+	manifest["ipc_version"] = "v2"
+	writeJSONFixture(t, manifestPath, manifest)
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
 		t.Fatal(err)
 	}
-	fixture.expectFailure(t, "checked-in IPC contract does not match")
+	lock := readJSONMap(t, fixture.lockPath)
+	lock["manifest"].(map[string]any)["sha256"] = testSHA256(raw)
+	writeJSONFixture(t, fixture.lockPath, lock)
+	fixture.expectFailure(t, "client core manifest target or IPC version mismatch")
+}
+
+func TestResolveClientCoreRejectsRetiredExpectedIdentity(t *testing.T) {
+	fixture := newCoreLockFixture(t)
+	identity := readJSONMap(t, fixture.expectedContract)
+	identity["version"] = 2
+	writeJSONFixture(t, fixture.expectedContract, identity)
+	fixture.expectFailure(t, "expected contract must identify native client v0")
+}
+
+func TestResolveClientCoreRejectsTamperedDescriptor(t *testing.T) {
+	fixture := newCoreLockFixture(t)
+	if err := os.WriteFile(filepath.Join(fixture.assetsDir, "client-v0.binpb"), []byte{0x0a}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fixture.expectFailure(t, "client core asset digest mismatch")
 }
 
 func newCoreLockFixture(t *testing.T) coreLockFixture {
@@ -103,11 +135,11 @@ func newCoreLockFixture(t *testing.T) coreLockFixture {
 	assetContents := map[string][]byte{
 		"endlessnet-client_windows_amd64.exe":                 []byte("test client executable"),
 		"endlessnet-client-recovery-helper_windows_amd64.exe": []byte("test recovery helper executable"),
-		"client-ipc-v2.openapi.yaml":                          []byte("openapi: 3.1.0\ninfo:\n  title: fixture\n"),
-		"LICENSE":                                             []byte("Apache License\nVersion 2.0, January 2004\n"),
-		"NOTICE":                                              []byte("EndlessNet fixture notice\n"),
-		"THIRD_PARTY_NOTICES":                                 []byte("Fixture dependency notices\n"),
-		"source-sbom.spdx.json":                               []byte(`{"spdxVersion":"SPDX-2.3"}`),
+		"client-v0.binpb":       []byte{0x0a, 0x02, 0x0d, 0x0a, 0xff, 0x00},
+		"LICENSE":               []byte("Apache License\nVersion 2.0, January 2004\n"),
+		"NOTICE":                []byte("EndlessNet fixture notice\n"),
+		"THIRD_PARTY_NOTICES":   []byte("Fixture dependency notices\n"),
+		"source-sbom.spdx.json": []byte(`{"spdxVersion":"SPDX-2.3"}`),
 	}
 	for name, content := range assetContents {
 		if err := os.WriteFile(filepath.Join(assetsDir, name), content, 0o600); err != nil {
@@ -121,7 +153,7 @@ func newCoreLockFixture(t *testing.T) coreLockFixture {
 		"version":        "0.3.1",
 		"commit":         commit,
 		"target":         "windows/amd64",
-		"ipc_version":    "v2",
+		"ipc_version":    "v0",
 		"artifacts": map[string]any{
 			"client": map[string]any{
 				"name":   "endlessnet-client_windows_amd64.exe",
@@ -129,9 +161,9 @@ func newCoreLockFixture(t *testing.T) coreLockFixture {
 				"sha256": testSHA256(assetContents["endlessnet-client_windows_amd64.exe"]),
 			},
 			"ipc_contract": map[string]any{
-				"name":   "client-ipc-v2.openapi.yaml",
-				"url":    releaseBase + "/client-ipc-v2.openapi.yaml",
-				"sha256": testSHA256(assetContents["client-ipc-v2.openapi.yaml"]),
+				"name":   "client-v0.binpb",
+				"url":    releaseBase + "/client-v0.binpb",
+				"sha256": testSHA256(assetContents["client-v0.binpb"]),
 			},
 			"recovery_helper": map[string]any{
 				"name":           "endlessnet-client-recovery-helper_windows_amd64.exe",
@@ -179,10 +211,10 @@ func newCoreLockFixture(t *testing.T) coreLockFixture {
 	}
 	lockPath := filepath.Join(root, "client-core.lock.json")
 	writeJSONFixture(t, lockPath, lock)
-	expectedContract := filepath.Join(root, "client-ipc-v2.openapi.yaml")
-	if err := os.WriteFile(expectedContract, assetContents["client-ipc-v2.openapi.yaml"], 0o600); err != nil {
-		t.Fatal(err)
-	}
+	expectedContract := filepath.Join(root, "client-v0.json")
+	writeJSONFixture(t, expectedContract, map[string]any{
+		"protocol": "endlessnet-client-ipc", "version": 0, "sha256": testSHA256(assetContents["client-v0.binpb"]),
+	})
 	fakeGH := filepath.Join(root, "fake-gh.ps1")
 	fakeGHBody := `$endpoint = $args[1]
 if ($args[0] -eq "attestation" -and $args[1] -eq "verify") {

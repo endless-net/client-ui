@@ -111,3 +111,17 @@ Local validation: Go tests, Flutter analysis and 180 Flutter tests passed;
 14 process/platform cases were skipped without the native host. The same local
 SDK versus pinned-CI limitation applies. Full 104-ID trace scope remains intact,
 with zero of 14 scenarios claimed complete. CI was queued at inspection time.
+
+## Native Windows release pairing — 2026-09-13
+
+The resolver now requires IPC v0 and raw `client-v0.binpb` SHA-256 equal to the
+consumer identity in `contracts/client-v0.json`. A Dart test compares that record
+with the resolved generated SDK. Old v2 manifests and tampered/mismatched
+descriptors fail closed. Executable attestations and immutable release/tag/commit
+checks remain. The vendored OpenAPI file is removed, recoverable only in Git.
+
+Producer publication is updated in client main; no new release/tag or version
+was created. `client-core.lock.json` still pins v0.4.1 and must fail native
+packaging until a reviewed compatible release is explicitly selected. Completing
+that pairing and real platform acceptance remains required; this is not a
+successful distribution build. Linux/other consumers need their own review.

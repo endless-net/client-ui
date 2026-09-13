@@ -79,7 +79,7 @@ func TestReleaseProvenanceKeepsUIAndCoreVersionsIndependent(t *testing.T) {
 		"schema_version": 2,
 		"version":        "0.3.1",
 		"target":         "windows/amd64",
-		"ipc_version":    "v2",
+		"ipc_version":    "v0",
 		"repository":     "endless-net/client",
 		"commit":         strings.Repeat("a", 40),
 		"artifacts": map[string]any{

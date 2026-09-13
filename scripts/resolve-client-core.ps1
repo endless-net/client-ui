@@ -3,7 +3,7 @@ param(
     [string]$LockFile = (Join-Path $PSScriptRoot "..\client-core.lock.json"),
     [Parameter(Mandatory = $true)]
     [string]$OutputDir,
-    [string]$ExpectedContract = (Join-Path $PSScriptRoot "..\contracts\upstream\client-ipc-v2.openapi.yaml"),
+    [string]$ExpectedContract = (Join-Path $PSScriptRoot "..\contracts\client-v0.json"),
     [string]$GitHubEnv = $env:GITHUB_ENV,
     [string]$GitHubOutput = $env:GITHUB_OUTPUT,
     [string]$GitHubCLI = "gh",
@@ -92,6 +92,12 @@ if (-not [string]::IsNullOrWhiteSpace($AssetSourceDir)) {
     $AssetSourceDir = [System.IO.Path]::GetFullPath($AssetSourceDir)
 }
 
+$expectedIdentity = Get-Content -LiteralPath $ExpectedContract -Raw | ConvertFrom-Json
+if ($expectedIdentity.protocol -cne "endlessnet-client-ipc" -or $expectedIdentity.version -cne 0) {
+    throw "expected contract must identify native client v0"
+}
+Assert-SHA256 ([string]$expectedIdentity.sha256) "expected descriptor sha256"
+
 $lock = Get-Content -LiteralPath $LockFile -Raw | ConvertFrom-Json
 if ($lock.schema_version -ne 1) {
     throw "unsupported client core lock schema"
@@ -163,7 +169,7 @@ if ($manifest.schema_version -ne 2 -or $manifest.repository -cne $lock.repositor
 if ($manifest.version -cne $lock.version -or $manifest.commit -cne $lock.commit) {
     throw "client core manifest does not match the reviewed lock"
 }
-if ($manifest.target -cne "windows/amd64" -or $manifest.ipc_version -cne "v2") {
+if ($manifest.target -cne "windows/amd64" -or $manifest.ipc_version -cne "v0") {
     throw "client core manifest target or IPC version mismatch"
 }
 
@@ -173,8 +179,8 @@ $clientAsset = [pscustomobject]@{
     sha256 = [string]$manifest.artifacts.client.sha256
 }
 $contractAsset = [pscustomobject]@{
-    name = "client-ipc-v2.openapi.yaml"
-    url = "$releaseBase/client-ipc-v2.openapi.yaml"
+    name = "client-v0.binpb"
+    url = "$releaseBase/client-v0.binpb"
     sha256 = [string]$manifest.artifacts.ipc_contract.sha256
 }
 
@@ -221,9 +227,8 @@ Copy-VerifiedAsset $recoveryHelperAsset $recoveryHelperPath $lock.repository $lo
 Assert-BuildAttestation $clientPath $lock.repository $lock.tag $lock.commit
 Assert-BuildAttestation $recoveryHelperPath $lock.repository $lock.tag $lock.commit
 
-$checkedInContract = [System.IO.File]::ReadAllText($ExpectedContract).Replace("`r`n", "`n")
-$releasedContract = [System.IO.File]::ReadAllText($contractPath).Replace("`r`n", "`n")
-if ($checkedInContract -cne $releasedContract) {
+$releasedDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $contractPath).Hash.ToLowerInvariant()
+if ($expectedIdentity.sha256 -cne $releasedDigest) {
     throw "checked-in IPC contract does not match the reviewed client core release"
 }
 

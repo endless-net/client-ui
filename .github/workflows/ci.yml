@@ -43,13 +43,6 @@ jobs:
           wix extension add --global WixToolset.Util.wixext/5.0.0
           wix extension add --global WixToolset.UI.wixext/5.0.0
 
-      - name: Resolve reviewed public client core
-        id: core
-        shell: pwsh
-        run: >-
-          ./scripts/resolve-client-core.ps1
-          -OutputDir "$env:RUNNER_TEMP/client-core"
-
       - name: Prepare Flutter dependencies
         working-directory: app
         run: flutter pub get
@@ -96,6 +89,13 @@ jobs:
         run: |
           flutter analyze
           flutter test
+
+      - name: Resolve reviewed public client core
+        id: core
+        shell: pwsh
+        run: >-
+          ./scripts/resolve-client-core.ps1
+          -OutputDir "$env:RUNNER_TEMP/client-core"
 
       - name: Build Windows release
         working-directory: app

@@ -99,18 +99,16 @@ func TestCoreResolverConsumesOnlyReviewedLock(t *testing.T) {
 	}
 }
 
-func TestVendoredIPCContractTracksPublishedProducerRevision(t *testing.T) {
-	provenance := readRepositoryFile(t, "contracts/upstream/README.md")
+func TestNativePairingKeepsReviewedReleaseUnmodified(t *testing.T) {
+	provenance := readRepositoryFile(t, "contracts/client-v0.json")
 	lock := readRepositoryFile(t, "client-core.lock.json")
 	for _, required := range []string{
-		"v0.4.1",
-		"517780f5d748a241ca9975fe75d02de2cd074182",
-		"client-ipc-v2.openapi.yaml",
-		"996103b8bfc8ed60ec9cd5ea9407662388e48bf35e75d70f96cef3c159971eca",
-		"6c9013ed51810ec65606358f81f5eb6750aeb638",
+		`"protocol": "endlessnet-client-ipc"`,
+		`"version": 0`,
+		"ffc4b4a2edf94e18fec83a66aa441a7a80c69647a4d453ee48c191d015251cfe",
 	} {
 		if !strings.Contains(provenance, required) {
-			t.Errorf("vendored IPC provenance is missing %q", required)
+			t.Errorf("native IPC identity is missing %q", required)
 		}
 	}
 	for _, required := range []string{
