@@ -18,8 +18,9 @@ final class ScenarioHost {
 
   static Future<ScenarioHost> start(
     String executable,
-    List<Object> steps,
-  ) async {
+    List<Object> steps, {
+    bool administrator = false,
+  }) async {
     // Short Unix path is required by sockaddr_un on macOS runners.
     final directory =
         await (Platform.isWindows ? Directory.systemTemp : Directory('/tmp'))
@@ -34,13 +35,20 @@ final class ScenarioHost {
       await script.writeAsString(jsonEncode({'steps': steps}));
       process = await Process.start(
         executable,
-        ['--script', script.path, '--endpoint', endpoint, '--access', 'owner'],
+        [
+          '--script',
+          script.path,
+          '--endpoint',
+          endpoint,
+          '--access',
+          administrator ? 'administrator' : 'owner',
+        ],
         environment: {
           // This child runs synthetic scripts only. Capture transport termination
           // reasons because grpc-dart's public error omits GOAWAY debug data.
           'GRPC_GO_LOG_SEVERITY_LEVEL': 'info',
-        'GRPC_GO_LOG_VERBOSITY_LEVEL': '2',
-        'GODEBUG': 'http2debug=2',
+          'GRPC_GO_LOG_VERBOSITY_LEVEL': '2',
+          'GODEBUG': 'http2debug=2',
         },
       );
       host = ScenarioHost._(

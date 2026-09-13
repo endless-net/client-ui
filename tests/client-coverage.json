@@ -213,6 +213,10 @@
         {
           "path": "app/test/mobile_contract_widget_test.dart",
           "scope": "Identity comparison UI, administrator gating, explicit confirmation with fresh announcement comparison and invalidation reset; native execution of this new test pending, no privileged helper or actual runtime acceptance"
+        },
+        {
+          "path": "app/test/client_session_process_test.dart",
+          "scope": "Administrator producer fixture defines exact GetServerIdentity and TrustServerIdentity origin/key/announcement requests, UUID/kind-only journal and terminal recovery on held-open channel; new process execution pending CI, not actual trust/runtime acceptance"
         }
       ],
       "acceptanceEvidence": []

@@ -110,6 +110,13 @@ announcement, точные подтверждённые поля и сброс i
 доставляет late read и вызывает captured callback без перерисовки; без этой
 проверки тест падает, с ней проходит. Это локальная consumer race verification,
 не native/runtime acceptance.
+Desktop process suite теперь содержит отдельный synthetic administrator scenario:
+GetServerIdentity → TrustServerIdentity с точными origin/key/announcement →
+GetOperation, при открытом WatchEvents. Journal проверяется на точные UUID/kind
+без identity payload; acceptance не меняет snapshot оптимистично. Testserver
+моделирует роль только для этой fixture, не даёт UI способ задавать свою роль.
+Новый process scenario ожидает GitHub execution; локально standalone Go testserver
+не запускался. Проверка operation envelope локально включает trust outcome.
 Privileged helper, production shell cutover и actual runtime acceptance ещё
 требуются; этот partial consumer flow не закрывает US-06.
 

@@ -24,7 +24,7 @@ Map<String, Object> recoveredOperation(Map<String, Object> accepted) => {
 void main() {
   final executable = Platform.environment['ENDLESSNET_TESTSERVER'];
   test('US-03: process recovery fixture satisfies operation contract', () {
-    for (final kind in ['CONNECT', 'ENROLL']) {
+    for (final kind in ['CONNECT', 'ENROLL', 'TRUST_SERVER_IDENTITY']) {
       final operation = ClientOperation.fromProto(
         api.Operation()..mergeFromProto3Json(
           recoveredOperation({
@@ -48,9 +48,9 @@ void main() {
       );
     }
   });
-  for (final authentication in ['connect', 'browser', 'token']) {
+  for (final authentication in ['connect', 'browser', 'token', 'trust']) {
     test(
-      'US-01/02/03: $authentication session submits and recovers while WatchEvents stays open',
+      'US-01/02/03/06: $authentication session submits and recovers while WatchEvents stays open',
       () async {
         final directory = await Directory.systemTemp.createTemp(
           'en-session-rpc-',
@@ -58,9 +58,11 @@ void main() {
         addTearDown(() => directory.delete(recursive: true));
         final intent = PendingClientIntent(
           'c06bd29f-7c77-4b27-943a-620081f313df',
-          authentication == 'connect'
-              ? api.OperationKind.OPERATION_KIND_CONNECT
-              : api.OperationKind.OPERATION_KIND_ENROLL,
+          switch (authentication) {
+            'connect' => api.OperationKind.OPERATION_KIND_CONNECT,
+            'trust' => api.OperationKind.OPERATION_KIND_TRUST_SERVER_IDENTITY,
+            _ => api.OperationKind.OPERATION_KIND_ENROLL,
+          },
         );
         // Only UUID generation is deterministic. Preparation, persistence and
         // submission ordering are production code, not a pre-seeded outbox.
@@ -72,7 +74,9 @@ void main() {
           'protocol': api.ClientContract.protocol,
           'contractSha256': api.ClientContract.sha256,
           'instanceId': 'runtime-a',
-          'callerAccess': 'ACCESS_OWNER',
+          'callerAccess': authentication == 'trust'
+              ? 'ACCESS_ADMINISTRATOR'
+              : 'ACCESS_OWNER',
         };
         final accepted = {
           'id': 'operation-a',
@@ -108,8 +112,32 @@ void main() {
               },
             ],
           },
+          if (authentication == 'trust')
+            {
+              'method': 'GetServerIdentity',
+              'request': {
+                'profile': {'profileId': 'profile-a'},
+              },
+              'responses': [
+                {
+                  'identity': {
+                    'profileId': 'profile-a',
+                    'controlOrigin': 'https://control.example',
+                    'trustedKeyId': 'old-key',
+                    'announcedKeyId': 'new-key',
+                    'announcementId': 'announcement-a',
+                    'changed': true,
+                  },
+                  'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+                },
+              ],
+            },
           {
-            'method': authentication == 'connect' ? 'Connect' : 'Enroll',
+            'method': switch (authentication) {
+              'connect' => 'Connect',
+              'trust' => 'TrustServerIdentity',
+              _ => 'Enroll',
+            },
             'request': {
               'mutation': {
                 'requestId': intent.requestId,
@@ -117,7 +145,12 @@ void main() {
                 'expectedRevision': '7',
               },
               'profile': {'profileId': 'profile-a'},
-              if (authentication != 'connect') ...{
+              if (authentication == 'trust') ...{
+                'confirmedControlOrigin': 'https://control.example',
+                'confirmedKeyId': 'new-key',
+                'confirmedAnnouncementId': 'announcement-a',
+              },
+              if (authentication == 'browser' || authentication == 'token') ...{
                 'mode': 'ENROLLMENT_MODE_WORKSTATION',
                 'hostname': 'device-a',
                 if (authentication == 'browser') 'browserLogin': true,
@@ -136,7 +169,7 @@ void main() {
               {'operation': recoveredOperation(accepted)},
             ],
           },
-        ]);
+        ], administrator: authentication == 'trust');
         final session = ClientSession(
           journal: journal,
           endpoint: host.endpoint,
@@ -151,8 +184,22 @@ void main() {
           });
           await session.connect();
           await ready.future.timeout(const Duration(seconds: 10));
+          final identity = authentication == 'trust'
+              ? (await session.getServerIdentity()).identity
+              : null;
           final result = await session.submit(intent.kind, (commands, context) {
-            if (authentication != 'connect') {
+            if (identity != null) {
+              return commands.trustServerIdentity(
+                api.TrustServerIdentityRequest(
+                  mutation: context,
+                  profile: api.ProfileRef(profileId: identity.profileId),
+                  confirmedControlOrigin: identity.controlOrigin,
+                  confirmedKeyId: identity.announcedKeyId,
+                  confirmedAnnouncementId: identity.announcementId,
+                ),
+              );
+            }
+            if (authentication == 'browser' || authentication == 'token') {
               final request = api.EnrollRequest(
                 mutation: context,
                 profile: api.ProfileRef(profileId: 'profile-a'),
