@@ -45,6 +45,13 @@ choices, сохраняет ошибки как безопасный UI notice �
 evidence. Native delivery/permissions, мобильный settings container и итоговая
 default policy остаются незавершёнными; это не полное закрытие UF-15.
 
+Linux delivery source дополнена native Flutter channel → session D-Bus Notify.
+Локально пройдены C++ syntax check с реальными GTK/Flutter headers и две GLib
+unit-проверки (без desktop bus). Dart channel проверен 11 short tests.
+Полная native app build, фактический показ/нажатие, desktop packaging/portal
+и адаптеры Windows/macOS/Android/iOS не квалифицированы. См. актуальное
+дополнение в [SA](client-ui-system-analysis.md), не считать UF-15 закрытым.
+
 | UF | Наблюдаемая реализация | Что ещё нужно для исходного scope |
 | --- | --- | --- |
 | UF-01 | `main.dart`, Windows runner/package pipeline; Linux/macOS scaffold | Product hosts Android/iOS отсутствуют; дистрибуция и compatible pairing всех платформ не квалифицированы |

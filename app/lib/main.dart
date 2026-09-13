@@ -13,6 +13,7 @@ import 'client_intent_journal.dart';
 import 'client_locale.dart';
 import 'client_locale_store.dart';
 import 'client_notification_store.dart';
+import 'client_native_notifications.dart';
 import 'client_session.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
@@ -99,6 +100,9 @@ Future<void> main(List<String> args) async {
     ClientDesktopApp(
       initialLocale: locale,
       initialNotifications: notifications,
+      deliverNotification: Platform.isLinux
+          ? deliverNativeClientNotification
+          : null,
       notificationReadFailed: notificationReadFailed,
       saveNotifications: (value) async {
         final store = notificationStore;

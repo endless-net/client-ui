@@ -641,6 +641,14 @@
           "scope": "Five composed-shell tests: explicit enable/retry/disable without runtime mutation, restored setting without implicit save, read/write failure privacy, ordered rapid writes with stale failure suppression, observer quit awaits pending save and rejects stale toggle. Production native adapter remains absent; not OS delivery or native restart acceptance"
         },
         {
+          "path": "app/test/client_native_notifications_test.dart",
+          "scope": "11 short MethodChannel tests: exact title/body-only payload, all outcomes, missing host, private platform error suppression, malformed responses and pre-channel UTF8/NUL/size checks. Linux native source connected in main; channel mocks do not prove desktop service delivery or native app build"
+        },
+        {
+          "path": "app/linux/runner/notification_protocol_test.cc",
+          "scope": "Two local Ubuntu GLib unit tests compiled with C++14/Wall/Werror: actual GVariant Notify signature, fixed app/title, no actions/private hints, escaped RU markup, server-selected expiry, sound suppression and typed DBus/GIO error mapping. No bus connection or desktop delivery; not native platform acceptance"
+        },
+        {
           "path": "app/test/client_notification_store_test.dart",
           "scope": "Four short storage tests: missing preference, persisted true/false across store recreation, serialized writes/reads, bounded malformed/oversized reads without repair, non-file preservation and recovery after failure, absolute directory requirement. Boolean only, no notification payload; not native restart or mobile secure-container acceptance"
         },

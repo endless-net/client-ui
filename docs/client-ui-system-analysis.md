@@ -77,6 +77,26 @@ Explicit UI choice сохраняется по порядку; поздняя о
 restart/mobile secure container или notification permission acceptance.
 Production native delivery и окончательная default policy остаются открытыми.
 
+Linux source delivery добавлена через
+[`notifications.cc`](../app/linux/runner/notifications.cc) и
+[`native channel`](../app/lib/client_native_notifications.dart); entrypoint
+подключает adapter только на Linux. GTK session bus вызывает стандартный
+[Notify](https://specifications.freedesktop.org/notification/latest/protocol.html)
+асинхронно с 5-second timeout: запрос несёт fixed title/body, без profile/URL,
+actions и произвольных hints; markup экранируется, звук подавлен, срок показа
+выбирает desktop server. Положительный notification ID означает принятие
+сервером, не показ. D-Bus access/auth denial, unknown method и недоступность
+различаются без raw error. Missing Flutter plugin остаётся unsupported.
+Native syntax check выполнен локально в Ubuntu с Flutter 3.38.1 headers и
+GTK 3.24.41/GIO 2.80.0 (`-std=c++14 -Wall -Werror -fsyntax-only`);
+[две GLib unit-проверки](../app/linux/runner/notification_protocol_test.cc)
+проверяют реальную GVariant-сериализацию/экранирование и error mapping без bus.
+[11 Dart channel tests](../app/test/client_native_notifications_test.dart)
+проверяют payload, outcomes, malformed response, missing plugin и UTF8 bound.
+Полная Linux app build/desktop delivery не выполнялась. Click activation,
+desktop-entry packaging, Wayland focus, sandbox/portal, OS notification policy
+и остальные четыре платформенных адаптера остаются незавершёнными.
+
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin

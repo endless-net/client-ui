@@ -36,6 +36,15 @@ jobs:
           node scripts/check-client-coverage.mjs
       - name: Short Go tests
         run: go test -short ./...
+      - name: Short Linux notification protocol unit tests
+        run: |
+          if ! pkg-config --exists gio-2.0; then
+            sudo apt-get update
+            sudo apt-get install --no-install-recommends -y libglib2.0-dev
+          fi
+          mkdir -p app/.dart_tool
+          c++ -std=c++14 -Wall -Werror app/linux/runner/notification_protocol_test.cc $(pkg-config --cflags --libs gio-2.0) -o app/.dart_tool/notification_protocol_test
+          app/.dart_tool/notification_protocol_test
       - name: Resolve locked Flutter dependencies
         working-directory: app
         run: flutter pub get --enforce-lockfile
