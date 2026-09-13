@@ -7,9 +7,26 @@
   UF-01–UF-23, UBR-01–UBR-40, UI-AC-01–UI-AC-27.
 - Producer: [Client v0, main](https://github.com/endless-net/client/tree/main/proto/client/v0)
   и [нормативные правила](https://github.com/endless-net/client/blob/main/docs/client-ipc-protobuf.md).
-- Статус реализации: контракт и SDK существуют; UI/runtime cutover и platform
-  acceptance не заявлены. [Windows HTTP v2 as-is](architecture-and-future.md)
+- Статус реализации: контракт и SDK существуют; desktop UI source переведён на
+  native v0, полный runtime/functionality cutover и platform acceptance не заявлены.
+  [Windows HTTP v2 as-is](architecture-and-future.md)
   сохраняет дату своей проверки и не является целевым дизайном.
+
+### Актуализация source cutover — 2026-09-13
+
+Проверено на `036541aead97074bf741f2827126b7144043f5bf`: production
+`app/lib/main.dart` создаёт `ClientSession`/`ClientDesktopApp`; старые HTTP DTO,
+transport, controller/widgets и service emulator удалены коммитами `2d50c16` и
+`63b1d83`. Release pairing переведён на exact native descriptor в `78f909e`.
+Текущие границы и ограничения описаны в
+[native desktop cutover](native-desktop-cutover.md) и
+[producer scenario host](native-scenario-host.md).
+Это проверка исходников и wiring, не runtime revalidation или доказательство
+полного переноса UF/UBR/UI-AC. Ни отсутствие HTTP symbols, ни удаление старых
+тестов не подтверждают функциональную полноту. Исторические job results ниже
+относятся только к указанным immutable revisions; общий scope остаётся 104 IDs,
+0/14 сценариев с полным acceptance. Mobile bridge, OS effects и distribution
+outcomes требуют отдельного evidence.
 
 ## 1. Границы решения
 
@@ -99,8 +116,9 @@ truncated. Любая domain invalidation во время aggregate read отк�
 включая повторную invalidation peers. Чтение не создаёт bundle, не пишет clipboard,
 не выполняет upload и не добавляет intention. Локальная session regression
 проверяет эти границы; UI preview, redaction/export policy, chunks, native execution
-и actual runtime acceptance ещё требуются. Production main пока использует старую
-диагностику; этот слой не означает её cutover.
+и actual runtime acceptance на этапе этой foundation ещё требовались.
+Production main теперь использует native session panel; это source wiring,
+а не доказательство полноты diagnostics acceptance.
 Составная session panel теперь содержит явный local diagnostics summary:
 OS/Go, counts interfaces/routes/peers/conflicts/failures, connection phase и
 truncation warning. Capability/caller/context ограничивают просмотр; domain
@@ -128,7 +146,7 @@ process/native execution этого пути ещё требуются.
 CreateDiagnosticsBundle с текущим ProfileRef; cancellation/invalidation не
 отправляют команду, acceptance не означает archive readiness. Shared widget test
 проверяет эти границы. Download/export UI, полноценный preview и native execution
-нового create flow остаются открытыми; production main ещё не переключён.
+нового create flow остаются открытыми; source wiring production main описан выше.
 Diagnostics panel при invalidation/caller change теперь удаляет сам protobuf из
 widget state, notice и confirmation, а не только скрывает summary. Listener
 переподключается при замене controller и снимается при dispose; очищенный context
@@ -208,8 +226,9 @@ Process scenario проверен desktop run выше; локально standal
 гипотеза, не установленная причина. Harness теперь сохраняет только точные
 фиксированные lifecycle errors и exit code; payload/headers не добавляются.
 Это диагностика следующего запуска, не исправление или Windows acceptance.
-Privileged helper, production shell cutover и actual runtime acceptance ещё
-требуются; этот partial consumer flow не закрывает US-06.
+Этот process flow сам по себе не проверяет privileged helper или production shell.
+Их последующий source cutover описан в native desktop cutover; actual runtime
+acceptance ещё требуется, и этот partial consumer flow не закрывает US-06.
 
 На `b2d218420af01e69739447c9b3d802554dd8912b` iOS simulator job успешно
 выполнил **22 tests passed**
@@ -247,7 +266,8 @@ ClientNetworksPanel подключает refresh и journaled SelectNetwork с p
 IDs из свежего каталога, разрешая выбор только при AVAILABLE selection restriction.
 Shared widget-тест проверяет restriction, отсутствие optimistic network state,
 invalidation и observer cleanup. Это ещё не доказательство network lifecycle
-acceptance или смены реального туннеля; production entrypoint остаётся отдельной работой.
+acceptance или смены реального туннеля; подключение production entrypoint
+проверено отдельно в source cutover, не этим reader test.
 
 Составная ClientSessionPanel имеет общий scroll container, enrollment mode dropdown
 ограничен доступной шириной. US-14 widget regression проверяет всю session panel
@@ -434,8 +454,8 @@ journal с повторной context check перед RPC. Acceptance не по
 projection: после команды нужен recovery и refresh. Shared widget tests проверяют
 patch всех восьми полей, отдельный reset, policy denial и stale draft callbacks.
 Локализация, producer-process Set/Reset evidence, atomic producer validation/apply
-и platform lifecycle acceptance остаются незавершёнными; production shell ещё
-использует старый consumer.
+и platform lifecycle acceptance остаются отдельными требованиями. Production
+shell использует native session panel; Set/Reset process evidence описан ниже.
 
 Для Set/Reset добавлены producer-host process fixtures: owner-scoped typed reads,
 Set всех восьми полей с явными false и отдельный Reset двух keys, journaled
@@ -662,12 +682,13 @@ synthetic snapshot → typed controller → widget и очистку после 
 2. client/client-ui проверяют local transport binding; Windows сохраняет прямой
    named pipe. Для mobile назначается owner и проверяется native boundary.
 3. client-ui закрепляет generated package, реализует state/application layer,
-   US-01–14, emulator и UI-only функции, заменяя HTTP v2 consumer при cutover.
+   US-01–14 и UI-only функции; использует producer-owned scenario host вместо
+   удалённого HTTP emulator. Source cutover не закрывает весь functional scope.
 4. Distribution owners публикуют совместимые artifacts и authoritative update
    outcome; UI не запускает updater через daemon.
 5. system-tests подтверждает UI-AC по принятому platform/release scope.
 
-Не закрыты реализацией: transport adapter, mobile ownership, реальные defaults
+Не закрыты реализацией/приёмкой: mobile transport adapter и ownership, реальные defaults
 managed/lifecycle, signed update source и platform release order. Принятые
 контрактом semantics (один active context, fail-closed, operation replay,
 deadline separation и observer redaction) не являются открытыми вопросами.
