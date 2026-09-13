@@ -3,7 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'package:tray_manager/tray_manager.dart';
 
 import 'client_operation.dart';
+import 'client_locale.dart';
+import 'client_tray_labels.dart';
 import 'client_state_controller.dart';
+
+enum _TrayNotice { completed, failed, accepted, unknown }
 
 /// Native snapshot projection. Menu keys expire on every state change so a
 /// click queued by the OS cannot act on a newly selected profile or caller.
@@ -12,7 +16,8 @@ class ClientTray extends ChangeNotifier {
     required this.state,
     required this.connect,
     required this.disconnect,
-  }) {
+    ClientLocale locale = ClientLocale.en,
+  }) : _locale = locale {
     state.addListener(_stateChanged);
   }
   final ClientStateController state;
@@ -23,10 +28,38 @@ class ClientTray extends ChangeNotifier {
   bool _disconnecting = false;
   bool _enabled = true;
   bool _disposed = false;
-  String? notice;
+  ClientLocale _locale;
+  ClientLocale get locale => _locale;
+  set locale(ClientLocale value) {
+    if (_disposed || value == _locale) return;
+    _locale = value;
+    _changed();
+  }
+
+  String _text(String en, String ru) => _locale.text(en: en, ru: ru);
+  _TrayNotice? _notice;
+  String? get notice => switch (_notice) {
+    null => null,
+    _TrayNotice.completed => _text(
+      'Command completed. Check runtime status.',
+      'Команда выполнена. Проверьте состояние службы.',
+    ),
+    _TrayNotice.failed => _text(
+      'Command failed. Check the operation result.',
+      'Команда завершилась ошибкой. Проверьте результат операции.',
+    ),
+    _TrayNotice.accepted => _text(
+      'Command accepted. Completion is not yet confirmed.',
+      'Команда принята. Завершение ещё не подтверждено.',
+    ),
+    _TrayNotice.unknown => _text(
+      'Command result is unknown. Recover the original intention before retrying.',
+      'Результат команды неизвестен. Восстановите исходное намерение перед повтором.',
+    ),
+  };
 
   void _stateChanged() {
-    notice = null;
+    _notice = null;
     _changed();
   }
 
@@ -79,27 +112,30 @@ class ClientTray extends ChangeNotifier {
 
   String get status =>
       state.link == ClientLinkState.ready && state.snapshot != null
-      ? state.snapshot!.status.serviceState.name.replaceFirst(
-          'SERVICE_STATE_',
-          '',
-        )
-      : state.link.name;
+      ? clientTrayServiceLabel(state.snapshot!.status.serviceState, _locale)
+      : clientLinkLabel(state.link, _locale);
 
   Menu get menu => Menu(
     items: [
-      MenuItem(key: 'open', label: 'Open EndlessNet'),
-      MenuItem(label: 'Runtime: $status', disabled: true),
+      MenuItem(
+        key: 'open',
+        label: _text('Open EndlessNet', 'Открыть EndlessNet'),
+      ),
+      MenuItem(
+        label: _text('Runtime: $status', 'Служба: $status'),
+        disabled: true,
+      ),
       MenuItem(
         key: 'connect:$_generation',
-        label: 'Connect',
+        label: _text('Connect', 'Подключить'),
         disabled: !canConnect,
       ),
       MenuItem(
         key: 'disconnect:$_generation',
-        label: 'Disconnect',
+        label: _text('Disconnect', 'Отключить'),
         disabled: !canDisconnect,
       ),
-      MenuItem(key: 'exit', label: 'Quit', disabled: !_enabled),
+      MenuItem(key: 'exit', label: _text('Quit', 'Выход'), disabled: !_enabled),
     ],
   );
 
@@ -117,20 +153,19 @@ class ClientTray extends ChangeNotifier {
     } else {
       _disconnecting = true;
     }
-    notice = null;
+    _notice = null;
     _changed();
     try {
       final operation = await (isConnect ? connect() : disconnect());
       if (_disposed || state.contextEpoch != epoch) return;
-      notice = operation.succeeded
-          ? 'Command completed. Check runtime status.'
+      _notice = operation.succeeded
+          ? _TrayNotice.completed
           : operation.terminal
-          ? 'Command failed. Check the operation result.'
-          : 'Command accepted. Completion is not yet confirmed.';
+          ? _TrayNotice.failed
+          : _TrayNotice.accepted;
     } catch (_) {
       if (_disposed || state.contextEpoch != epoch) return;
-      notice =
-          'Command result is unknown. Recover the original intention before retrying.';
+      _notice = _TrayNotice.unknown;
     } finally {
       if (isConnect) {
         _connecting = false;

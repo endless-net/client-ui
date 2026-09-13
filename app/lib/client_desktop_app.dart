@@ -115,6 +115,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     super.initState();
     _locale = widget.initialLocale;
     _tray = ClientTray(
+      locale: _locale,
       state: session.state,
       connect: () => session.submit(
         api.OperationKind.OPERATION_KIND_CONNECT,
@@ -395,6 +396,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
               onChanged: (value) {
                 if (value != null && value != _locale) {
                   setState(() => _locale = value);
+                  _tray.locale = value;
                 }
               },
             ),

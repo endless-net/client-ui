@@ -601,6 +601,10 @@
           "scope": "Six short composed-app tests: real dropdown selection in RU/EN reaches all 16 session panels; controller/snapshot/form identity and draft survive without reconnect or journal mutation; shell failure and quit/stay texts translate. Locale is in-memory only. Not persistence, native tray, Material/OS localization or full UI-AC-13 acceptance"
         },
         {
+          "path": "app/test/client_tray_locale_test.dart",
+          "scope": "Ten short unit tests: all 12 service and four local-link labels, exact RU/EN menu and four command notices, language changes during pending result without replay, expired menu click rejection and same-locale no-op. Native drawing and OS accessibility not verified; not full UI-AC-13 acceptance"
+        },
+        {
           "path": "app/test/client_intent_journal_test.dart",
           "scope": "Journal contains UUID and kind only; not complete privacy/accessibility acceptance"
         },
