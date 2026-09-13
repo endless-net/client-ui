@@ -137,6 +137,13 @@ requiresApproval/unsupported; 9 channel/widget tests проверяют read/wri
 
 ## Последовательность оставшейся работы
 
+UI resume дополнение: hidden/paused → resumed обновляет protected subscription
+со сбросом старого snapshot сразу при callback; focus-only не переподключает,
+hidden сохраняет tray stream, busy shell объединяет refresh, quit/dispose
+прекращают восстановление. Четыре short widget tests проверяют общую логику.
+Это не native desktop sleep/wake и не mobile product acceptance; полное
+восстановление interrupted flows и US-12 остаются незавершёнными.
+
 Ownership correction после исторического snapshot: `client/main`
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1` разрешает NotifyLifecycle только для
 UI_QUIT; logoff/suspend/resume принадлежат runtime adapters (см. ссылки и

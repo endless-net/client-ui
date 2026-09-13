@@ -489,6 +489,10 @@
       "implementation": "partial",
       "testEvidence": [
         {
+          "path": "app/test/client_app_resume_test.dart",
+          "scope": "Four short widget tests: hidden/paused-to-resumed invalidates snapshot synchronously and bootstraps fresh account; focus-only no-op, busy bootstrap refresh coalescing, failure without retry/private error, observer disposal. No runtime mutation RPC. Simulated Flutter events only; native sleep/wake, mobile product hosts and complete interrupted-operation acceptance unverified"
+        },
+        {
           "path": "app/test/client_mutations_test.dart",
           "scope": "Three short negatives reject missing/UNSPECIFIED/unknown-wire lifecycle event with valid mutation context before RPC. Producer v0 permits only UI_QUIT; OS logoff/suspend/resume are runtime-owned, not UI-generated RPC. No native policy/OS acceptance claim"
         },

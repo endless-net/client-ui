@@ -79,11 +79,14 @@ class ClientDesktopApp extends StatefulWidget {
 enum _DesktopNotice { tray, integration, runtime }
 
 class _ClientDesktopAppState extends State<ClientDesktopApp>
-    with WindowListener, TrayListener {
+    with WindowListener, TrayListener, WidgetsBindingObserver {
   final _navigator = GlobalKey<NavigatorState>();
   Timer? _signals;
   DateTime? _lastSignal;
   bool _busy = false;
+  bool _wasHidden = false;
+  bool _resumePending = false;
+  bool _exiting = false;
   _DesktopNotice? _notice;
   late ClientLocale _locale;
   bool _localeStorageFailed = false;
@@ -225,6 +228,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _locale = widget.initialLocale;
     _localeStorageFailed = widget.localeReadFailed;
     _notificationStorageFailed = widget.notificationReadFailed;
@@ -293,6 +297,34 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   void _setBusy(bool busy) {
     setState(() => _busy = busy);
     _tray.enabled = !busy;
+    if (!busy && _resumePending && !_exiting) {
+      _resumePending = false;
+      unawaited(_connect());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted || _exiting) return;
+    if (state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused) {
+      _wasHidden = true;
+    } else if (state == AppLifecycleState.resumed && _wasHidden) {
+      _wasHidden = false;
+      _resumePending = true;
+      // Invalidate displayed data and outstanding reads immediately, even when
+      // a UI action must finish before reconnect. This sends no runtime intent.
+      unawaited(
+        session.state.detach().catchError((Object _) {
+          // State was already invalidated synchronously. Reconnect owns the
+          // next visible outcome; do not expose subscription teardown details.
+        }),
+      );
+      if (!_busy) {
+        _resumePending = false;
+        unawaited(_connect());
+      }
+    }
   }
 
   Future<void> _initialize() async {
@@ -376,7 +408,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   }
 
   Future<void> _connect() async {
-    if (_busy) return;
+    if (_busy || _exiting) return;
     _setBusy(true);
     try {
       await session.connect();
@@ -454,6 +486,8 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
         return;
       }
     }
+    _exiting = true;
+    _resumePending = false;
     _signals?.cancel();
     _trayReady = false;
     final savingLocale = _localeWrites;
@@ -471,6 +505,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _signals?.cancel();
     _trayReady = false;
     _tray.removeListener(_trayChanged);

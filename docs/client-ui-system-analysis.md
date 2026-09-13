@@ -955,6 +955,23 @@ Consumer теперь отвергает event, отличный от UI_QUIT, �
 настройки, явный quit, восстановление свежего состояния после interruption и
 platform acceptance; это уточнение не закрывает US-12 и не меняет BA.
 
+UI resume дополнение: shell слушает
+[Flutter AppLifecycleState](https://api.flutter.dev/flutter/dart-ui/AppLifecycleState.html).
+После hidden/paused → resumed немедленно очищается snapshot/cache epoch,
+затем выполняется новый protected connection bootstrap/WatchEvents. До свежего
+snapshot прежняя identity не показывается. Пока окно скрыто, подписка сохраняется
+для tray; inactive/resumed без hidden/paused не вызывает reconnect. Если shell
+занят, один pending refresh выполняется после завершения текущего действия;
+ошибка показывает безопасный runtime notice без automatic retry. После принятого
+quit refresh запрещён, observer снимается при dispose. Ни NotifyLifecycle,
+ни Connect/Disconnect runtime intention при resume не отправляются.
+[Четыре short widget tests](../app/test/client_app_resume_test.dart) проверяют
+hidden/paused flows, synchronous invalidation, свежий account, focus-only no-op,
+coalescing во время bootstrap, failure/no retry и disposal. Это simulation
+framework events: Flutter paused относится к Android/iOS, не означает desktop
+OS sleep; native sleep/wake delivery, mobile product hosts, OS acceptance и
+восстановление всех interrupted операций ещё требуют отдельного evidence.
+
 US-05 read foundation: `ClientSession.getExitNodes` читает ListExitNodes и
 GetExitNode через typed local binding. Каталог и status должны иметь одну runtime
 revision; IPv4/IPv6 обязательны и не синтезируются из aggregate. Optional IDs,
