@@ -14,6 +14,15 @@
 
 ### Актуализация source cutover — 2026-09-13
 
+Повторная read-only сверка producer: remote `client/main` на
+`25f58dc468be4fbcf9abafb4793de7eca5f08c27`; `proto/client/v0` и
+`packages/client_api` не отличаются от consumer pin
+`cd05fcddb858877b10ecefe7b0b4a3819d2c6f3b`. Pin и версии не менялись.
+Актуальные нормативные пояснения readiness требуют rebootstrap после typed
+STALE_STATE. Shared session regression проверяет очистку старой проекции,
+новый snapshot без прежней identity capability и сохранение UUID без replay;
+это не переоценка producer/runtime acceptance.
+
 Проверено на `036541aead97074bf741f2827126b7144043f5bf`: production
 `app/lib/main.dart` создаёт `ClientSession`/`ClientDesktopApp`; старые HTTP DTO,
 transport, controller/widgets и service emulator удалены коммитами `2d50c16` и

@@ -142,6 +142,10 @@
       "implementation": "partial",
       "testEvidence": [
         {
+          "path": "app/test/client_rebootstrap_test.dart",
+          "scope": "Typed STALE_STATE readiness failure clears snapshot, requires explicit fresh connection/opening snapshot, revokes an old identity capability and preserves original journal UUID without replay. Shared desktop/mobile session fixture, locally passed; runner execution pending, not native producer readiness acceptance"
+        },
+        {
           "path": "app/test/client_runtime_operations_panel_test.dart",
           "scope": "RU/EN read-only runtime operations panel shows first-snapshot inactive-profile operation without a local journal, applies terminal stream event without synthesizing Connected, and clears on observer/replacement/detach. Wired into session panel and shared desktop/mobile harness. Local widget evidence only pending runners; not full restart/installed-runtime acceptance"
         },
