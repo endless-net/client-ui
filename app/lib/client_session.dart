@@ -14,11 +14,15 @@ import 'client_preferences.dart';
 import 'client_resources.dart';
 import 'client_exit_nodes.dart';
 import 'client_update_info.dart';
+import 'client_recent_logs.dart';
 import 'client_support_info.dart';
 import 'client_state_controller.dart';
 import 'local_client_events.dart';
 
 abstract interface class ClientConnection {
+  Future<api.ListRecentLogsResponse> listRecentLogs(
+    api.ListRecentLogsRequest request,
+  );
   Future<api.GetSupportInfoResponse> getSupportInfo(
     api.GetSupportInfoRequest request,
   );
@@ -55,6 +59,10 @@ abstract interface class ClientConnection {
 final class _LocalConnection implements ClientConnection {
   _LocalConnection(this.source);
   final LocalClientEvents source;
+  @override
+  Future<api.ListRecentLogsResponse> listRecentLogs(
+    api.ListRecentLogsRequest request,
+  ) => source.listRecentLogs(request);
   @override
   Future<api.GetSupportInfoResponse> getSupportInfo(
     api.GetSupportInfoRequest request,
@@ -161,6 +169,37 @@ final class ClientSession {
       }
       rethrow;
     }
+  }
+
+  Future<List<api.LogEntry>> getRecentLogs() async {
+    final connection = _connection;
+    final snapshot = state.snapshot;
+    if (_closed ||
+        connection == null ||
+        snapshot == null ||
+        state.link != ClientLinkState.ready ||
+        snapshot.runtime.callerAccess == api.Access.ACCESS_OBSERVER ||
+        snapshot.status.activeProfileId.isEmpty) {
+      throw StateError('Logs require a current owner profile');
+    }
+    final epoch = _epoch;
+    final cacheEpoch = state.cacheEpoch;
+    final profileEpoch = state.domainEpoch(api.Domain.DOMAIN_PROFILES);
+    return readClientRecentLogs(
+      connection.listRecentLogs,
+      instanceId: snapshot.runtime.instanceId,
+      profileId: snapshot.status.activeProfileId,
+      minimumRevision: snapshot.status.metadata.revision.toInt(),
+      checkContext: () {
+        if (_closed ||
+            epoch != _epoch ||
+            cacheEpoch != state.cacheEpoch ||
+            profileEpoch != state.domainEpoch(api.Domain.DOMAIN_PROFILES) ||
+            state.link != ClientLinkState.ready) {
+          throw StateError('Log context changed during read');
+        }
+      },
+    );
   }
 
   Future<api.SupportInfo> getSupportInfo() async {

@@ -27,6 +27,11 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 class FakeConnection implements ClientConnection {
+  Future<api.ListRecentLogsResponse> Function(api.ListRecentLogsRequest)? logs;
+  @override
+  Future<api.ListRecentLogsResponse> listRecentLogs(
+    api.ListRecentLogsRequest request,
+  ) => logs!(request);
   Future<api.GetSupportInfoResponse> Function(api.GetSupportInfoRequest)?
   support;
   @override
@@ -149,6 +154,38 @@ ClientOperation accepted(api.MutationContext context) =>
     );
 
 void main() {
+  test('US-07: log pages cannot survive profile change', () async {
+    final directory = await Directory.systemTemp.createTemp('en-log-context-');
+    final connection = FakeConnection();
+    final session = ClientSession(
+      journal: ClientIntentJournal(directory),
+      open: () async => connection,
+    );
+    try {
+      await session.connect();
+      connection.events.add(
+        snapshot()..snapshot.status.activeProfileId = 'profile-a',
+      );
+      await pumpEventQueue();
+      var calls = 0;
+      connection.logs = (request) async {
+        calls++;
+        expect(request.profile.profileId, 'profile-a');
+        connection.events.add(
+          snapshot()
+            ..sequence += 1
+            ..snapshot.status.activeProfileId = 'profile-b',
+        );
+        await pumpEventQueue();
+        return api.ListRecentLogsResponse();
+      };
+      await expectLater(session.getRecentLogs(), throwsStateError);
+      expect(calls, 1);
+    } finally {
+      await session.close();
+      await directory.delete(recursive: true);
+    }
+  });
   test(
     'US-07: explicit bundle export never overwrites and cleans cancelled output',
     () async {

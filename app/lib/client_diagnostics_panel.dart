@@ -11,16 +11,19 @@ class ClientDiagnosticsPanel extends StatefulWidget {
     required this.state,
     required this.load,
     required this.createBundle,
+    this.loadLogs,
   });
   final ClientStateController state;
   final Future<api.Diagnostics> Function() load;
   final Future<ClientOperation> Function(String profileId) createBundle;
+  final Future<List<api.LogEntry>> Function()? loadLogs;
   @override
   State<ClientDiagnosticsPanel> createState() => _ClientDiagnosticsPanelState();
 }
 
 class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
   api.Diagnostics? _preview;
+  List<api.LogEntry>? _logs;
   String? _context;
   String? _notice;
   bool _busy = false;
@@ -43,6 +46,7 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
 
   void _clearPreview() {
     _preview = null;
+    _logs = null;
     _notice = null;
     _confirmBundle = false;
     _context = null;
@@ -72,6 +76,33 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
           api.Access.ACCESS_OBSERVER &&
       widget.state.snapshot!.status.activeProfileId.isNotEmpty &&
       widget.state.snapshot!.supports(api.Capability.CAPABILITY_DIAGNOSTICS);
+
+  Future<void> _loadLogs() async {
+    if (!allowed || _busy || widget.loadLogs == null) return;
+    final context = contextId;
+    setState(() {
+      _context = context;
+      _logs = null;
+      _notice = null;
+      _busy = true;
+    });
+    try {
+      final logs = await widget.loadLogs!();
+      if (!mounted || _context != context || contextId != context || !allowed) {
+        return;
+      }
+      setState(() => _logs = logs);
+    } catch (_) {
+      if (mounted && _context == context && contextId == context && allowed) {
+        setState(
+          () => _notice =
+              'Logs could not be read. Refresh to start a new snapshot.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   Future<void> _load() async {
     if (!allowed || _busy) return;
@@ -153,6 +184,30 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (widget.loadLogs != null)
+            OutlinedButton(
+              key: const Key('load-client-logs'),
+              onPressed: allowed && !_busy ? _loadLogs : null,
+              child: const Text('Read recent logs'),
+            ),
+          if (allowed && _context == contextId && _logs != null) ...[
+            const Text(
+              'Recent local log window — not a complete history. Nothing uploaded.',
+            ),
+            if (_logs!.isEmpty) const Text('No recent log entries.'),
+            SizedBox(
+              height: 180,
+              child: ListView.builder(
+                itemCount: _logs!.length,
+                itemBuilder: (context, index) {
+                  final entry = _logs![index];
+                  return Text(
+                    '${entry.timestamp.toDateTime().toUtc().toIso8601String()} ${entry.message}',
+                  );
+                },
+              ),
+            ),
+          ],
           OutlinedButton(
             key: const Key('load-client-diagnostics'),
             onPressed: allowed && !_busy ? _load : null,
