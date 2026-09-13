@@ -129,6 +129,11 @@ CreateDiagnosticsBundle с текущим ProfileRef; cancellation/invalidation 
 отправляют команду, acceptance не означает archive readiness. Shared widget test
 проверяет эти границы. Download/export UI, полноценный preview и native execution
 нового create flow остаются открытыми; production main ещё не переключён.
+Producer process suite содержит bundle fixture: journaled create, terminal lookup,
+повторный GetOperation перед download, два точных ReadDiagnosticsBundle запроса,
+SHA-256 и сохранение intention до явного acknowledgement. Test envelope проверен
+локально; execution этого нового process scenario ожидает desktop GitHub runners.
+Synthetic bytes [1,2,3] проверяют transport/checksum, не формат/redaction архива.
 Helper не пишет файлы, clipboard или сеть вне переданного RPC callback.
 
 Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:

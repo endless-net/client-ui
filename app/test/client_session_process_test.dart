@@ -17,6 +17,14 @@ Map<String, Object> recoveredOperation(Map<String, Object> accepted) => {
   'continuity': 'CONNECTION_CONTINUITY_UNKNOWN',
   if (accepted['kind'] == 'OPERATION_KIND_ENROLL')
     'enrollment': {'profileId': 'profile-a', 'nodeId': 'node-a'}
+  else if (accepted['kind'] == 'OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE')
+    'bundle': {
+      'bundleId': 'bundle-a',
+      'sizeBytes': '3',
+      'expiresAt': '2099-01-01T00:00:00Z',
+      'sha256':
+          '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81',
+    }
   else
     'change': {'changed': true},
 };
@@ -43,7 +51,12 @@ void main() {
     }
   });
   test('US-03: process recovery fixture satisfies operation contract', () {
-    for (final kind in ['CONNECT', 'ENROLL', 'TRUST_SERVER_IDENTITY']) {
+    for (final kind in [
+      'CONNECT',
+      'ENROLL',
+      'TRUST_SERVER_IDENTITY',
+      'CREATE_DIAGNOSTICS_BUNDLE',
+    ]) {
       final operation = ClientOperation.fromProto(
         api.Operation()..mergeFromProto3Json(
           recoveredOperation({
@@ -59,17 +72,22 @@ void main() {
         operation.value.continuity,
         api.ConnectionContinuity.CONNECTION_CONTINUITY_UNKNOWN,
       );
-      expect(
-        operation.value.whichOutcome(),
-        kind == 'ENROLL'
-            ? api.Operation_Outcome.enrollment
-            : api.Operation_Outcome.change,
-      );
+      expect(operation.value.whichOutcome(), switch (kind) {
+        'ENROLL' => api.Operation_Outcome.enrollment,
+        'CREATE_DIAGNOSTICS_BUNDLE' => api.Operation_Outcome.bundle,
+        _ => api.Operation_Outcome.change,
+      });
     }
   });
-  for (final authentication in ['connect', 'browser', 'token', 'trust']) {
+  for (final authentication in [
+    'connect',
+    'browser',
+    'token',
+    'trust',
+    'bundle',
+  ]) {
     test(
-      'US-01/02/03/06: $authentication session submits and recovers while WatchEvents stays open',
+      'US-01/02/03/06/07: $authentication session submits and recovers while WatchEvents stays open',
       () async {
         final directory = await Directory.systemTemp.createTemp(
           'en-session-rpc-',
@@ -80,6 +98,8 @@ void main() {
           switch (authentication) {
             'connect' => api.OperationKind.OPERATION_KIND_CONNECT,
             'trust' => api.OperationKind.OPERATION_KIND_TRUST_SERVER_IDENTITY,
+            'bundle' =>
+              api.OperationKind.OPERATION_KIND_CREATE_DIAGNOSTICS_BUNDLE,
             _ => api.OperationKind.OPERATION_KIND_ENROLL,
           },
         );
@@ -155,6 +175,7 @@ void main() {
             'method': switch (authentication) {
               'connect' => 'Connect',
               'trust' => 'TrustServerIdentity',
+              'bundle' => 'CreateDiagnosticsBundle',
               _ => 'Enroll',
             },
             'request': {
@@ -188,6 +209,33 @@ void main() {
               {'operation': recoveredOperation(accepted)},
             ],
           },
+          if (authentication == 'bundle') ...[
+            {
+              'method': 'GetOperation',
+              'request': {'requestId': intent.requestId},
+              'responses': [
+                {'operation': recoveredOperation(accepted)},
+              ],
+            },
+            {
+              'method': 'ReadDiagnosticsBundle',
+              'request': {'bundleId': 'bundle-a', 'maxBytes': 65536},
+              'responses': [
+                {'data': 'AQI=', 'nextOffset': '2'},
+              ],
+            },
+            {
+              'method': 'ReadDiagnosticsBundle',
+              'request': {
+                'bundleId': 'bundle-a',
+                'offset': '2',
+                'maxBytes': 65536,
+              },
+              'responses': [
+                {'data': 'Aw==', 'nextOffset': '3', 'eof': true},
+              ],
+            },
+          ],
         ], administrator: authentication == 'trust');
         final session = ClientSession(
           journal: journal,
@@ -207,6 +255,14 @@ void main() {
               ? (await session.getServerIdentity()).identity
               : null;
           final result = await session.submit(intent.kind, (commands, context) {
+            if (authentication == 'bundle') {
+              return commands.createDiagnosticsBundle(
+                api.CreateDiagnosticsBundleRequest(
+                  mutation: context,
+                  profile: api.ProfileRef(profileId: 'profile-a'),
+                ),
+              );
+            }
             if (identity != null) {
               return commands.trustServerIdentity(
                 api.TrustServerIdentityRequest(
@@ -258,6 +314,17 @@ void main() {
           final recovered = await session.recoverPending();
           expect(recovered.single.succeeded, isTrue);
           expect(recovered.single.value.id, result.value.id);
+          if (authentication == 'bundle') {
+            expect(await session.readDiagnosticsBundle(intent.requestId), [
+              1,
+              2,
+              3,
+            ]);
+            expect(
+              (await journal.pending()).single.requestId,
+              intent.requestId,
+            );
+          }
           await journal.acknowledge(recovered.single);
           expect(await journal.pending(), isEmpty);
           await session.close();

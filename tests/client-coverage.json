@@ -240,6 +240,14 @@
         {
           "path": "app/test/client_session_test.dart",
           "scope": "Typed diagnostics preview read: owner/profile guard, metadata and nested status consistency, immutable copy, truncation preserved and repeated domain invalidation rejection; no bundle/export, native execution or actual runtime acceptance"
+        },
+        {
+          "path": "app/test/mobile_contract_widget_test.dart",
+          "scope": "Explicit diagnostics preview/create confirmation, invalidation cleanup, bundle chunk offset/EOF/expiry/caller checks and checksum corruption rejection; no complete export or actual runtime acceptance"
+        },
+        {
+          "path": "app/test/client_session_process_test.dart",
+          "scope": "Defined producer bundle-create, repeated operation lookup, exact two-chunk requests and checksum read while preserving intention until acknowledgement; new process scenario execution pending CI"
         }
       ],
       "acceptanceEvidence": []
