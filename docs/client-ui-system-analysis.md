@@ -513,6 +513,21 @@ Mobile использует отдельно проверенный native bridg
 
 ## 2. Bootstrap, состояние и права
 
+Credential notification дополнение: authoritative
+`CREDENTIAL_STATE_BLOCKED` теперь даёт отдельный fixed RU/EN notice, не expiry
+и не предположение о причине. Account/profile/URL/recovery reason не передаются
+OS adapter. Он использует тот же explicit notification toggle и dispatcher;
+подпись настройки явно включает blocked credentials. Fingerprint блокировки
+не зависит от deadline: reconnect/renewing/unknown и изменение expiresAt не
+создают повтор. Только наблюдаемый VALID завершает episode в текущем scope,
+включая наблюдение при выключенной доставке; новая блокировка допускает новое
+уведомление. История по-прежнему bounded/in-memory, не переживает UI restart.
+[Восемь planner tests](../app/test/client_blocked_notifications_test.dart) и
+дополнительный [dispatcher test](../app/test/client_notification_delivery_test.dart)
+проверяют новые semantics; существующая exhaustive enum matrix обновлена.
+Это unit evidence, не новый OS delivery/platform acceptance. Другие значимые
+события UF-15 и недостающие native adapters остаются открытыми.
+
 macOS approval navigation дополнение: при requiresApproval отдельная explicit
 RU/EN кнопка вызывает
 [`SMAppService.openSystemSettingsLoginItems()`](https://developer.apple.com/documentation/servicemanagement/smappservice/opensystemsettingsloginitems())

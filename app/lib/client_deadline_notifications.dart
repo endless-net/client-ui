@@ -9,6 +9,7 @@ enum ClientDeadlineNoticeKind {
   sessionExpired,
   credentialExpiring,
   credentialExpired,
+  credentialBlocked,
 }
 
 /// Safe delivery payload: no profile/account IDs, deadlines, URLs or reasons.
@@ -35,10 +36,14 @@ final class ClientDeadlineNotice {
       en: 'Device credentials have expired. Open EndlessNet to review recovery options.',
       ru: 'Срок учётных данных устройства истёк. Откройте EndlessNet, чтобы проверить варианты восстановления.',
     ),
+    ClientDeadlineNoticeKind.credentialBlocked => locale.text(
+      en: 'Device credentials are blocked. Open EndlessNet to review the required action.',
+      ru: 'Учётные данные устройства заблокированы. Откройте EndlessNet, чтобы проверить требуемое действие.',
+    ),
   };
 }
 
-/// In-memory delivery planning for one active caller/profile context.
+/// In-memory session/credential delivery planning for one caller/profile context.
 /// An OS adapter must confirm successful delivery before acknowledgement.
 /// Reconnect preserves delivered fingerprints, never a private snapshot.
 final class ClientDeadlineNotifications {
@@ -73,6 +78,12 @@ final class ClientDeadlineNotifications {
       clear();
       _scope = scope;
     }
+    // Only authoritative recovery ends a blocked episode. Unknown/renewing
+    // states and transport loss must not manufacture a new blocked notice.
+    if (snapshot.status.credential.state ==
+        api.CredentialState.CREDENTIAL_STATE_VALID) {
+      _delivered.remove(ClientDeadlineNoticeKind.credentialBlocked);
+    }
     if (!enabled) {
       _current.clear();
       return const [];
@@ -98,6 +109,8 @@ final class ClientDeadlineNotifications {
         ClientDeadlineNoticeKind.credentialExpiring,
       api.CredentialState.CREDENTIAL_STATE_EXPIRED =>
         ClientDeadlineNoticeKind.credentialExpired,
+      api.CredentialState.CREDENTIAL_STATE_BLOCKED =>
+        ClientDeadlineNoticeKind.credentialBlocked,
       _ => null,
     };
     if (sessionKind != null) {
@@ -109,7 +122,11 @@ final class ClientDeadlineNotifications {
     if (credentialKind != null) {
       add(
         credentialKind,
-        credential.hasExpiresAt() ? credential.expiresAt.toProto3Json() : null,
+        credentialKind == ClientDeadlineNoticeKind.credentialBlocked
+            ? null // Blocking is not a deadline; deadline refresh is not an episode.
+            : credential.hasExpiresAt()
+            ? credential.expiresAt.toProto3Json()
+            : null,
       );
     }
     _current.removeWhere((kind, value) => desired[kind] != value._fingerprint);

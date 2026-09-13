@@ -56,15 +56,20 @@ class ClientNotificationsPanel extends StatelessWidget {
       children: [
         SwitchListTile(
           key: const Key('client-ui-notifications'),
-          title: Text(text('Deadline notifications', 'Уведомления о сроках')),
+          title: Text(
+            text(
+              'Session and credential notifications',
+              'Уведомления о сессии и учётных данных',
+            ),
+          ),
           subtitle: Text(
             text(
               persistent
-                  ? 'Session and device credential warnings. The choice is saved on this device; system permission is separate.'
-                  : 'Session and device credential warnings. This choice applies to this run only.',
+                  ? 'Warnings about expiry and blocked device credentials. The choice is saved on this device; system permission is separate.'
+                  : 'Warnings about expiry and blocked device credentials. This choice applies to this run only.',
               persistent
-                  ? 'Предупреждения о сроках сессии и учётных данных устройства. Выбор сохраняется на этом устройстве; разрешение системы запрашивается отдельно.'
-                  : 'Предупреждения о сроках сессии и учётных данных устройства. Выбор действует только в этом запуске.',
+                  ? 'Предупреждения об истечении сроков и блокировке учётных данных устройства. Выбор сохраняется на этом устройстве; разрешение системы запрашивается отдельно.'
+                  : 'Предупреждения об истечении сроков и блокировке учётных данных устройства. Выбор действует только в этом запуске.',
             ),
           ),
           value: delivery.enabled,

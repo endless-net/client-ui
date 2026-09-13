@@ -74,6 +74,34 @@ void main() {
   }
 
   test(
+    'blocked credentials deliver once and valid recovery permits next episode',
+    () async {
+      Future<void> credential(int revision, String value) async {
+        final event = snapshot(revision);
+        event.snapshot.status.mergeFromProto3Json({
+          'session': {'state': 'SESSION_STATE_ACTIVE'},
+          'credential': {'state': value},
+        });
+        stream.add(event);
+        await pumpEventQueue();
+      }
+
+      await credential(1, 'CREDENTIAL_STATE_BLOCKED');
+      expect(
+        calls.single.$2,
+        'Device credentials are blocked. Open EndlessNet to review the required action.',
+      );
+      await complete(0, ClientNotificationDeliveryResult.delivered);
+      await credential(2, 'CREDENTIAL_STATE_BLOCKED');
+      expect(calls.length, 1);
+      await credential(3, 'CREDENTIAL_STATE_VALID');
+      await credential(4, 'CREDENTIAL_STATE_BLOCKED');
+      expect(calls.length, 2);
+      expect(calls.last, calls.first);
+    },
+  );
+
+  test(
     'one delivery in flight; latest locale used for next notice, no replay',
     () async {
       expect(calls, isEmpty);

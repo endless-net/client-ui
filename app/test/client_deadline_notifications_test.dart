@@ -65,6 +65,8 @@ void main() {
               ClientDeadlineNoticeKind.credentialExpiring,
             if (credential == api.CredentialState.CREDENTIAL_STATE_EXPIRED)
               ClientDeadlineNoticeKind.credentialExpired,
+            if (credential == api.CredentialState.CREDENTIAL_STATE_BLOCKED)
+              ClientDeadlineNoticeKind.credentialBlocked,
           ]);
         }
       }

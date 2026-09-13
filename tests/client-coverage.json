@@ -693,6 +693,10 @@
           "scope": "11 short tests: validated state subscription, serial asynchronous deliveries, latest locale without replay, distinct permission/unsupported/unavailable/failure results, explicit retry without snapshot-driven storm, exception privacy, disable/reconnect/profile ABA/account switch/dispose stale completion guards. Controlled adapter only; shell wiring and persistence tested separately, native delivery still absent, not platform notification acceptance"
         },
         {
+          "path": "app/test/client_blocked_notifications_test.dart",
+          "scope": "Eight short planner tests: independent typed BLOCKED credential notice, observer/disabled privacy, reconnect/deadline-independent dedup, only authoritative VALID starts a later episode, stale receipt rejection and fixed RU/EN body. Additional dispatcher case in client_notification_delivery_test.dart; no real OS delivery acceptance"
+        },
+        {
           "path": "app/test/client_deadline_notifications_test.dart",
           "scope": "11 short unit tests: independent typed session/credential expiry events, fixed RU/EN private-context-free payload, acknowledgement before dedup, reconnect and disabled delivery, deadline changes, profile/runtime changes and stale receipt rejection. Planner-only tests; shell wiring tested separately; in-memory dedup in one context, not OS delivery, persistent policy or full UF-15/US-14 acceptance"
         },

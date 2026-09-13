@@ -137,6 +137,12 @@ requiresApproval/unsupported; 9 channel/widget tests проверяют read/wri
 
 ## Последовательность оставшейся работы
 
+UF-15 дополнение: typed BLOCKED credentials теперь создают отдельное безопасное
+RU/EN уведомление без трактовки как expiry. Восемь новых planner tests и один
+dispatcher test подтверждают dedup, независимость от session/deadline и новую
+блокировку после authoritative VALID. UI toggle описывает этот scope явно.
+Полный набор значимых событий и OS/platform acceptance ещё не завершён.
+
 macOS autostart approval navigation: UI теперь по явной кнопке открывает
 Login Items системным SMAppService API; не изменяет approval/registration и
 оставляет requiresApproval до явного Refresh. Восемь channel/widget tests
