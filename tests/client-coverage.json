@@ -348,7 +348,7 @@
         },
         {
           "path": "app/test/client_session_process_test.dart",
-          "scope": "RenewSession producer-host scenario: exact mutation context, persisted request ID, pending acceptance, GetOperation renewal result, and gated SessionChanged without credential mutation. Success scenario passed on Windows/Linux/macOS at 8f222f1 (run 34772689573); failed renewal retaining deadlines and journal is pending runner execution. Not real renewal or mobile native interoperability"
+          "scope": "RenewSession producer-host scenarios: exact mutation context, persisted request ID, pending acceptance, GetOperation renewal result, and gated SessionChanged without credential mutation; failed renewal retains deadlines and journal. Passed on Windows/Linux/macOS at 77e1aa8 (run 34773440729). Not real renewal or mobile native interoperability"
         }
       ],
       "acceptanceEvidence": []
@@ -498,6 +498,10 @@
         {
           "path": "app/test/client_session_test.dart",
           "scope": "Whole session panel at 360x640 with text scale 2: no overflow and scroll reachability; not full accessibility or native mobile product acceptance"
+        },
+        {
+          "path": "app/test/client_session_layout_test.dart",
+          "scope": "Active profile in the composed session panel with 360x640 bounds, text scale 2 and retained platform insets: scroll/hit-test reachability of session/credential warnings and profile controls, with no native connection opened. Included in desktop/mobile harness; runner execution pending, not full assistive-technology or native mobile acceptance"
         },
         {
           "path": "app/test/mobile_contract_widget_test.dart",

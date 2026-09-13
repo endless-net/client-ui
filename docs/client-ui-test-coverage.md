@@ -28,6 +28,18 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+At `77e1aa8fdc55c948067e247bc151014433322c3a`, the
+[desktop consumer run](https://github.com/endless-net/client-ui/actions/runs/34773440729)
+passed on Windows, Linux and macOS, including the failed RenewSession producer-host
+scenario: rejection preserves deadlines and the journal without another mutation.
+The [iOS simulator job](https://github.com/endless-net/client-ui/actions/runs/34773440799/job/103767105339)
+passed 155 shared tests. Its log explicitly passes initial profile creation after
+input settling and independent session/credential states. The desktop process
+scenario is not part of the mobile harness. Android remains blocked before tests
+by KVM access. This does not close full US-08/09 or native platform acceptance.
+The active-profile large-text layout extension is locally checked and included
+in the desktop/mobile harness; execution of that new extension is pending.
+
 At `8f222f1804fd0b56ff9d60f9323273bec536affb`, the
 [desktop consumer run](https://github.com/endless-net/client-ui/actions/runs/34772689573)
 passed on Windows, Linux and macOS. Each log explicitly passes the RenewSession
