@@ -77,6 +77,13 @@ default click только для текущего окна. 10 short permission
 общую UI/channel-логику; AppKit/UserNotifications build и фактическая работа ОС
 не проверены. Windows/Android/iOS adapters остаются незавершёнными.
 
+Linux UI-autostart source дополнена: XDG user entry текущего UI executable,
+explicit enable/Hidden=true disable, no runtime connection flags, строгий отказ
+от перезаписи чужой записи. RU/EN panel различает отсутствие user entry и off,
+показывает ошибку и explicit refresh; shell write блокирует quit. 6 storage и
+5 widget tests — local component evidence. Реальный login, system policy,
+перенос executable/upgrade и остальные платформы остаются открытыми.
+
 | UF | Наблюдаемая реализация | Что ещё нужно для исходного scope |
 | --- | --- | --- |
 | UF-01 | `main.dart`, Windows runner/package pipeline; Linux/macOS scaffold | Product hosts Android/iOS отсутствуют; дистрибуция и compatible pairing всех платформ не квалифицированы |

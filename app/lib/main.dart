@@ -14,6 +14,7 @@ import 'client_locale.dart';
 import 'client_locale_store.dart';
 import 'client_notification_store.dart';
 import 'client_native_notifications.dart';
+import 'client_linux_autostart.dart';
 import 'client_session.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
@@ -96,9 +97,34 @@ Future<void> main(List<String> args) async {
   } catch (_) {
     notificationReadFailed = true;
   }
+  ClientLinuxAutostart? autostart;
+  if (Platform.isLinux) {
+    try {
+      autostart = ClientLinuxAutostart(
+        clientLinuxAutostartDirectory(Platform.environment),
+        Platform.resolvedExecutable,
+      );
+    } catch (_) {
+      /* Surface invalid configuration through the UI read action. */
+    }
+  }
   runApp(
     ClientDesktopApp(
       initialLocale: locale,
+      readAutostart: Platform.isLinux
+          ? () async {
+              final store = autostart;
+              if (store == null) throw StateError('Autostart unavailable');
+              return store.read();
+            }
+          : null,
+      writeAutostart: Platform.isLinux
+          ? (enabled) async {
+              final store = autostart;
+              if (store == null) throw StateError('Autostart unavailable');
+              return store.setEnabled(enabled);
+            }
+          : null,
       initialNotifications: notifications,
       deliverNotification: Platform.isLinux || Platform.isMacOS
           ? deliverNativeClientNotification

@@ -19,6 +19,8 @@ import 'client_notification_delivery.dart';
 import 'client_notifications_panel.dart';
 import 'client_notification_permission_panel.dart';
 import 'client_native_notifications.dart';
+import 'client_autostart_panel.dart';
+import 'client_linux_autostart.dart';
 
 Directory clientJournalDirectory(String endpoint) {
   final home =
@@ -50,8 +52,12 @@ class ClientDesktopApp extends StatefulWidget {
     this.notificationReadFailed = false,
     this.saveNotifications,
     this.requestNotificationPermission,
+    this.readAutostart,
+    this.writeAutostart,
   });
   final ClientSession session;
+  final Future<ClientAutostartSetting> Function()? readAutostart;
+  final Future<ClientAutostartSetting> Function(bool)? writeAutostart;
   final DeliverClientNotification? deliverNotification;
   final bool initialNotifications;
   final bool notificationReadFailed;
@@ -83,6 +89,18 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   bool _localeStorageFailed = false;
   int _localeChoice = 0;
   Future<void>? _localeWrites;
+  Future<ClientAutostartSetting> _writeAutostart(bool enabled) async {
+    if (_busy || !mounted || widget.writeAutostart == null) {
+      throw StateError('UI busy');
+    }
+    _setBusy(true);
+    try {
+      return await widget.writeAutostart!(enabled);
+    } finally {
+      if (mounted) _setBusy(false);
+    }
+  }
+
   Future<void>? _notificationWrites;
   bool _notificationStorageFailed = false;
   int _notificationChoice = 0;
@@ -556,6 +574,14 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
               notifications: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (widget.readAutostart != null &&
+                      widget.writeAutostart != null)
+                    ClientAutostartPanel(
+                      read: widget.readAutostart!,
+                      write: _writeAutostart,
+                      locale: _locale,
+                      enabled: !_busy,
+                    ),
                   if (widget.requestNotificationPermission != null)
                     ClientNotificationPermissionPanel(
                       request: widget.requestNotificationPermission!,

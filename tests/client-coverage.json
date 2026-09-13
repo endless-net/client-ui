@@ -73,6 +73,14 @@
       "implementation": "partial",
       "testEvidence": [
         {
+          "path": "app/test/client_linux_autostart_test.dart",
+          "scope": "Six short tests: XDG user config resolution, Exec two-layer escaping/control rejection, explicit enable/Hidden disable, store recreation and serialized writes, foreign/non-file preservation. UI executable only; no login execution, system-wide policy, moved executable migration or install/upgrade/uninstall acceptance"
+        },
+        {
+          "path": "app/test/client_autostart_panel_test.dart",
+          "scope": "Five RU/EN widget tests: initial read without write, missing user entry distinct from disabled, explicit single-flight enable, failed write privacy, locale rebuild without replay, stale disabled click and explicit refresh after read failure. Linux source wired in shell; native sign-in behavior and other platforms unverified"
+        },
+        {
           "path": "app/test/client_runtime_snapshot_test.dart",
           "scope": "Bootstrap identity, first snapshot and capability gating only"
         },

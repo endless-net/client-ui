@@ -170,6 +170,26 @@ channel tests сохраняются. Native Swift/AppKit compilation, OS prompt
 и реальный click/foreground behavior не проверены; Windows/mobile notification
 adapters ещё отсутствуют. Deployment target и версии не менялись.
 
+Linux UI-autostart source дополнена:
+[`ClientLinuxAutostart`](../app/lib/client_linux_autostart.dart) управляет только
+`$XDG_CONFIG_HOME/autostart/endlessnet.app.desktop` (при отсутствии XDG setting —
+`$HOME/.config/autostart`). [XDG autostart](https://specifications.freedesktop.org/autostart/latest/)
+включается explicit записью текущего UI executable без runtime flags; выключение
+пишет `Hidden=true`, а не удаляет override. Exec учитывает оба слоя escaping и
+проценты; control characters, `=` и относительный executable отклоняются.
+Записи строго распознаются по текущему формату/executable; неизвестный файл,
+symlink/non-file или entry от другого пути не перезаписывается. После переноса
+бинарника такая запись требует отдельного исправления — миграция не реализована.
+Чтение ограничено, записи сериализованы через unique temp/rename.
+Отсутствие user entry не называется выключенным системным автозапуском: system
+policy не читается. [RU/EN panel](../app/lib/client_autostart_panel.dart) делает
+read при построении и explicit enable/disable/refresh; ошибка не превращается
+в успех или автоматический retry. Shell блокирует quit на время записи.
+[6 store tests](../app/test/client_linux_autostart_test.dart) и
+[5 widget tests](../app/test/client_autostart_panel_test.dart) проверяют эти
+компоненты; фактический login launch, desktop policy, install/upgrade/uninstall
+и другие платформенные autostart adapters не квалифицированы.
+
 Повторная read-only сверка producer 2026-09-14: remote `client/main` на
 `c3f1c855cc4dd788dbbbc091a4f6f3e82cba65b1`; `proto/client/v0` и
 `packages/client_api` не отличаются от consumer pin
