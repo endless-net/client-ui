@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:endlessnet/client_intent_journal.dart';
@@ -29,6 +30,67 @@ void main() {
           : api.OperationState.OPERATION_STATE_PENDING,
       change: terminal ? api.ChangeResult(changed: true) : null,
     ),
+  );
+
+  test(
+    'US-03: full outbox reserves a durable Disconnect without evicting work',
+    () async {
+      // Seed the real admission boundary without O(n squared) prepare reads.
+      for (var offset = 0; offset < 4096; offset += 64) {
+        await Future.wait([
+          for (var index = offset; index < offset + 64; index++)
+            File.fromUri(
+              directory.uri.resolve(
+                '12345678-1234-4234-8234-${index.toRadixString(16).padLeft(12, '0')}.json',
+              ),
+            ).writeAsString(
+              jsonEncode({
+                'request_id':
+                    '12345678-1234-4234-8234-${index.toRadixString(16).padLeft(12, '0')}',
+                'kind': api.OperationKind.OPERATION_KIND_CONNECT.value,
+              }),
+            ),
+        ]);
+      }
+      await expectLater(
+        journal.prepare(api.OperationKind.OPERATION_KIND_CONNECT),
+        throwsStateError,
+      );
+      PendingClientIntent? disconnect;
+      await expectLater(
+        journal.submit(api.OperationKind.OPERATION_KIND_DISCONNECT, (
+          intent,
+        ) async {
+          disconnect = intent;
+          throw TimeoutException('synthetic uncertain disconnect');
+        }),
+        throwsA(isA<TimeoutException>()),
+      );
+      final reopened = ClientIntentJournal(directory);
+      final retained = await reopened.pending();
+      expect(retained, hasLength(4097));
+      expect(
+        retained
+            .where(
+              (intent) =>
+                  intent.kind == api.OperationKind.OPERATION_KIND_DISCONNECT,
+            )
+            .single
+            .requestId,
+        disconnect!.requestId,
+      );
+      await expectLater(
+        reopened.prepare(api.OperationKind.OPERATION_KIND_DISCONNECT),
+        throwsStateError,
+      );
+      await reopened.acknowledge(operation(disconnect!, terminal: true));
+      expect(await reopened.pending(), hasLength(4096));
+      final next = await reopened.prepare(
+        api.OperationKind.OPERATION_KIND_DISCONNECT,
+      );
+      expect(next.requestId, isNot(disconnect!.requestId));
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
   );
 
   test(

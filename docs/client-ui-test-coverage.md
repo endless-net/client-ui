@@ -18,7 +18,16 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
-Latest inspected evidence: consumer `e2e6f6cca085125592aca899f5d7ede9acabf082`.
+Consumer `5d5c979f0ac539e23c4e2b6e102201f3b4cb9bce` has verified individual
+[Windows](https://github.com/endless-net/client-ui/actions/runs/34737934018/job/103672549796)
+and [Linux](https://github.com/endless-net/client-ui/actions/runs/34737934018/job/103672549878)
+passes: 237 tests each. Both logs explicitly include observer support and all six
+owner update-state producer-host cases. macOS and both mobile jobs were still
+queued at inspection; this is not a whole-run or five-platform pass. Synthetic
+build identities in these scenarios do not attest the runner platform, actual
+update signature verification, browser launch or installer outcomes.
+
+Earlier inspected evidence: consumer `e2e6f6cca085125592aca899f5d7ede9acabf082`.
 The [desktop run](https://github.com/endless-net/client-ui/actions/runs/34736166400)
 passed with 136 consumer and 39 shared panel/desktop lifecycle tests per OS:
 [Windows](https://github.com/endless-net/client-ui/actions/runs/34736166400/job/103667880332),
@@ -34,6 +43,18 @@ requires runner-owner approval for permission changes; no such change was made.
 This does not validate the subsequently added update reader, native OS lifecycle,
 mobile VPN bridges, actual routing or installer outcomes. The mobile run as a
 whole did not pass; all 14 full scenarios remain incomplete.
+
+### Disconnect outbox admission correction
+
+The UI outbox now reserves one additional durable Disconnect record when its
+normal 4096-record admission bound is reached. No retained work is evicted and
+an uncertain send preserves its original UUID across reopening. The filesystem
+test fills the real bound, rejects ordinary admission, recovers the Disconnect
+record, rejects overflow and releases the reserve only after explicit terminal
+acknowledgement. This is local consumer evidence pending CI; it does not prove
+the producer's 31 ordinary plus one Disconnect nonterminal admission policy or
+its 24-hour terminal retention. The session's existing same-kind recovery guard
+still prevents treating a fresh Disconnect UUID as a retry of unresolved work.
 
 Earlier inspected desktop evidence: consumer `3b5ad34ead11173c32c22e537cd06e74468968f9`.
 The [desktop run](https://github.com/endless-net/client-ui/actions/runs/34733301626)

@@ -45,7 +45,12 @@ base class ClientIntentJournal {
     }
     await directory.create(recursive: true);
     // Fail closed on old incomplete/corrupt records, rather than replacing them.
-    if ((await pending()).length >= 4096) {
+    final retained = await pending();
+    // Keep one emergency outbox slot for Disconnect. This is a UI storage
+    // bound, not the runtime's nonterminal-operation admission policy.
+    if (retained.length >= 4097 ||
+        (retained.length >= 4096 &&
+            kind != api.OperationKind.OPERATION_KIND_DISCONNECT)) {
       throw StateError('Recover pending intentions before creating more');
     }
     final id = _requestIdFactory();
@@ -80,7 +85,7 @@ base class ClientIntentJournal {
     await for (final entity in directory.list(followLinks: false)) {
       if (!entity.path.endsWith('.json')) continue;
       if (entity is! File ||
-          result.length >= 4096 ||
+          result.length >= 4097 ||
           await entity.length() > 1024) {
         throw const FormatException('Invalid or oversized intention journal');
       }
@@ -104,6 +109,13 @@ base class ClientIntentJournal {
         // JSON exceptions may echo input; do not disclose corrupted contents.
         throw const FormatException('Invalid intention journal record');
       }
+    }
+    if (result.length > 4096 &&
+        !result.any(
+          (intent) =>
+              intent.kind == api.OperationKind.OPERATION_KIND_DISCONNECT,
+        )) {
+      throw const FormatException('Invalid or oversized intention journal');
     }
     return List.unmodifiable(result);
   }

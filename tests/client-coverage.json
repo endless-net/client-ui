@@ -146,6 +146,10 @@
           "scope": "Snapshot-gated submission and retained request ID"
         },
         {
+          "path": "app/test/client_intent_journal_test.dart",
+          "scope": "Real local 4096-record outbox boundary: ordinary admission denied, extra durable Disconnect survives uncertain send and reopen, overflow denied, original UUID acknowledged explicitly without evicting work. Local test only pending CI; not producer nonterminal admission or 24-hour retention acceptance"
+        },
+        {
           "path": "app/test/client_session_process_test.dart",
           "scope": "Pinned synthetic host; live stream, Connect and operation lookup; separate browser/token enrollment fixtures do not prove actual runtime behavior"
         }
