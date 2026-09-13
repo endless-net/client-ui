@@ -236,6 +236,8 @@ void main() {
             'method': 'WatchEvents',
             'request': {},
             'hold_open': true,
+            if (authentication == 'select-network')
+              'response_gates': ['', 'network-changed'],
             'responses': [
               {
                 'sequence': '1',
@@ -252,6 +254,18 @@ void main() {
                   },
                 },
               },
+              if (authentication == 'select-network')
+                {
+                  'sequence': '2',
+                  'metadata': {'instanceId': 'runtime-a', 'revision': '8'},
+                  'statusChanged': {
+                    'metadata': {'instanceId': 'runtime-a', 'revision': '8'},
+                    'activeProfileId': 'profile-a',
+                    'network': {'id': 'network-b'},
+                    'serviceState': 'SERVICE_STATE_DISCONNECTED',
+                    'connectionPhase': 'CONNECTION_PHASE_DISCONNECTED',
+                  },
+                },
             ],
           },
           if (authentication.endsWith('-resource'))
@@ -726,6 +740,29 @@ void main() {
             );
             // Neither acceptance nor operation success is a new status snapshot.
             expect(session.state.snapshot!.status.network.id, 'network-a');
+            expect(networks.selectedNetworkId, 'network-a');
+            final cacheEpoch = session.state.cacheEpoch;
+            final changed = Completer<void>();
+            void observeNetwork() {
+              if (session.state.snapshot?.status.network.id == 'network-b' &&
+                  !changed.isCompleted) {
+                changed.complete();
+              }
+            }
+
+            session.state.addListener(observeNetwork);
+            try {
+              await host.release('network-changed');
+              await changed.future.timeout(const Duration(seconds: 10));
+            } finally {
+              session.state.removeListener(observeNetwork);
+            }
+            expect(session.state.link, ClientLinkState.ready);
+            expect(
+              session.state.snapshot!.status.metadata.revision.toString(),
+              '8',
+            );
+            expect(session.state.cacheEpoch, greaterThan(cacheEpoch));
             expect(networks.selectedNetworkId, 'network-a');
             expect(
               (await journal.pending()).single.requestId,

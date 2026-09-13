@@ -127,6 +127,20 @@ final class ScenarioHost {
     return jsonDecode(_output.current) as Map<String, dynamic>;
   }
 
+  /// Parent-only scenario control. Await consumer state separately: the host's
+  /// acknowledgement means the gate opened, not that the event was observed.
+  Future<void> release(String name) async {
+    if (!RegExp(r'^[a-z0-9_-]{1,64}$').hasMatch(name)) {
+      throw ArgumentError('Invalid scenario gate name');
+    }
+    _process.stdin.writeln('release $name');
+    await _process.stdin.flush();
+    final event = await _event();
+    if (event.length != 1 || event['event'] != 'released') {
+      throw StateError('Testserver gate release failed');
+    }
+  }
+
   Future<void> verify() async {
     _process.stdin.writeln('verify');
     await _process.stdin.flush();

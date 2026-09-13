@@ -186,7 +186,7 @@
         },
         {
           "path": "app/test/client_session_process_test.dart",
-          "scope": "Producer-host ListNetworks then exact profile/network-bound SelectNetwork, durable UUID and GetOperation recovery. Pending acceptance and terminal selection outcome do not replace the authoritative network snapshot or claim continuity. New desktop process scenario pending runner execution; does not yet cover streamed new-network snapshot, runtime tunnel switch or mobile bridge"
+          "scope": "Producer-host ListNetworks then exact profile/network-bound SelectNetwork, durable UUID and GetOperation recovery. Acceptance and terminal outcome leave the old network unchanged; an explicitly released StatusChanged must then replace Network/revision and invalidate the context cache. Continuity stays UNKNOWN. Desktop process scenario pending runner execution; not actual runtime tunnel switch or mobile bridge"
         },
         {
           "path": "app/test/client_profiles_test.dart",

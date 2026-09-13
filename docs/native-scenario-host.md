@@ -9,7 +9,15 @@ The sole UI process fixture is producer-owned
 [`clientipc/testserver` on client main](https://github.com/endless-net/client/tree/main/clientipc/testserver).
 CI builds `clientipc/cmd/client-testserver` from the same immutable source pin
 already used by `contract-consumer.yml`:
-`c7a92e61558531147b9e12f18ad2cbe3549a5f3b`. No contract or dependency version changes.
+`80d9cdc16241ca03200381b6b1b04fa5acca1987`. No contract or dependency version changes.
+
+The pin also supports per-response JSON gates and parent stdin `release` commands.
+The Network selection scenario sends its new StatusChanged only after the UI has
+asserted durable operation recovery without an optimistic context change. The
+parent awaits release acknowledgement and then separately waits for the consumer
+to observe network-b/revision 8 and invalidate its old cache. This is synthetic
+native IPC sequencing, not actual tunnel or platform acceptance; CI execution of
+this addition is pending.
 
 This pin waits for producer handler completion (at most five seconds) after the
 parent closes its channels and explicitly requests verification. Parent channel

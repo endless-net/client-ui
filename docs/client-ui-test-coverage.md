@@ -18,6 +18,20 @@ required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
 
+At `f2cc6d738699cebd474895b18a027dabaaad96fd`, the
+[iOS job](https://github.com/endless-net/client-ui/actions/runs/34741635033/job/103682207409)
+passed 86 simulator tests, including `peer panel network-visible` and
+`peer panel network-pending`. This confirms those shared widget regressions on
+the simulator, not producer-process interoperability or actual VPN switching.
+
+The Network process scenario now uses producer `80d9cdc` response gates: only
+after operation recovery and old-context assertions does the parent release the
+new StatusChanged. The test separately waits for the consumer to observe the new
+Network/revision and checks cache invalidation; release acknowledgement alone is
+not event-delivery evidence. Runner execution is pending. This adds the synthetic
+IPC sequence that earlier snapshots below explicitly lacked; it does not prove
+native tunnel switching or mobile bridge acceptance.
+
 Shared peer widget scenarios `network-visible` and `network-pending` cover
 StatusChanged replacing Network: clear the old visible catalog and search,
 require explicit refresh, and discard an old in-flight result even after a new
