@@ -6,8 +6,9 @@ widget regression checks the pending notice's exact accessible label and live-re
 flag, then verifies removal on observer transition. Local Flutter validation passed
 234 tests with 27 CI-only skips; this checks the semantics tree, not actual
 screen-reader speech, OS notifications or localization acceptance. The extension
-belongs to the existing desktop/mobile shared harness; prior runner results below
-predate it and do not qualify the new assertion.
+belongs to the existing desktop/mobile shared harness. The `c1899a3` runner
+snapshot below qualifies this new assertion on desktop and the iOS simulator;
+older snapshots predate it.
 
 Status: incomplete. Owner: client-ui. Scope: the complete BA/SA goal, not the
 subset already implemented. The canonical machine-readable trace is
@@ -26,6 +27,28 @@ business scenarios, native mobile bridges and product/platform acceptance remain
 required; deferred work does not count as completion.
 
 ## Inspected runner evidence (2026-09-13)
+
+At `c1899a3f5925806b699e52b835f44e8c59f72723`, the native consumer suite passed
+261 tests on each of
+[Linux](https://github.com/endless-net/client-ui/actions/runs/34745141995/job/103691570908),
+[Windows](https://github.com/endless-net/client-ui/actions/runs/34745141995/job/103691571017),
+and [macOS](https://github.com/endless-net/client-ui/actions/runs/34745141995/job/103691571030).
+The [iOS simulator job](https://github.com/endless-net/client-ui/actions/runs/34745141999/job/103691570867)
+passed 87 tests. All four logs explicitly pass the shared typed-snapshot scenario
+containing the command-announcement live-region flag, exact accessible label,
+and observer-transition removal assertions. This is semantics-tree evidence,
+not VoiceOver/TalkBack speech, localization, installed service or VPN acceptance.
+
+The same-source [Android job](https://github.com/endless-net/client-ui/actions/runs/34745141999/job/103691570759)
+failed before tests because `/dev/kvm` was not readable/writable. No Android test
+pass is claimed and runner permissions were not modified. The
+[Windows packaging job](https://github.com/endless-net/client-ui/actions/runs/34745141996/job/103691570760)
+passed 261 tests, then failed the core manifest target/IPC pairing check at
+resolver line 173. Neither blocker is resolved by green consumer fixtures.
+Zero full SA scenarios are accepted; producer runtime, native mobile bridges,
+compatible core packaging and remaining product behavior still require evidence.
+
+Earlier snapshots (preserved with their original scope and limits):
 
 At `c228aeebade053e2b799a68302c192c8f291cc3d`, all
 [three desktop jobs](https://github.com/endless-net/client-ui/actions/runs/34743127619)
