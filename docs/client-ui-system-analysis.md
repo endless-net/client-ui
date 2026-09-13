@@ -100,6 +100,11 @@ session journal: hostname, typed mode и ровно одна authentication alte
 widget-тест проверяет capability gating, обе auth alternatives на callback boundary,
 очистку token и observer transition. End-to-end enrollment и initial Enroll claim
 без выбранного профиля пока не доказаны; initial ownership UI начинается с CreateProfile.
+Process suite `client_session_process_test.dart` теперь задаёт отдельные browser/token
+Enroll сценарии для pinned producer testserver: exact authentication oneof, mutation
+context, terminal enrollment result через GetOperation и UUID/kind-only journal.
+Они выполняются только при ENDLESSNET_TESTSERVER в desktop CI; добавление сценариев
+не является доказательством их прохождения или реальной backend enrollment.
 
 `client_operation_details.dart` отображает typed outcome в recovery panel:
 remote cleanup confirmation отдельно от local registration removal, failure code,
