@@ -169,7 +169,7 @@ void main() {
         expect(reads, 1);
         expect(sent, isNull);
         expect(reset, isNull);
-        expect(find.text('Effective: true; requested: false'), findsOneWidget);
+        expect(find.text('Effective: Yes; requested: No'), findsOneWidget);
         final dns = tester.widget<DropdownButton<Object>>(
           find.byKey(const Key('preference-2')),
         );
@@ -242,7 +242,7 @@ void main() {
           }
           expect(sent, isNull);
           expect(
-            find.text('Effective: true; requested: false'),
+            find.text('Effective: Yes; requested: No'),
             findsOneWidget,
           );
           expect(

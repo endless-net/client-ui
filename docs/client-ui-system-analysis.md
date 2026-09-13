@@ -184,6 +184,15 @@ availability/mutation, источник/lock, overlap и пять typed notices.
 заменяется запрошенным после принятия команды. Это component evidence, не
 реальный доступ к ресурсам или full-app UI-AC-13.
 
+ClientPreferencesPanel поддерживает RU/EN для всех preference keys, lifecycle,
+effective/requested, policy/source/lock, черновика, сброса и notices. Значение
+«без переопределения» не смешивается с false. Apply/discard проверяют поколение
+черновика, поэтому старый callback не применяет и не удаляет более новые правки.
+12 short тестов покрывают каталоги подписей, optional/boolean/lifecycle значения,
+RU/EN просмотр/lock/apply/reset/error и stale draft actions. Locale rebuild
+не повторяет команды. Это component evidence, не OS lifecycle/policy acceptance
+и не full-app UI-AC-13.
+
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
 оставляют открытыми версии ОС, принятые assistive technologies, lifecycle

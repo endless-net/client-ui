@@ -4,6 +4,13 @@ import 'package:flutter/material.dart';
 import 'client_operation.dart';
 import 'client_preferences.dart';
 import 'client_state_controller.dart';
+import 'client_locale.dart';
+import 'client_preference_labels.dart';
+import 'client_resource_labels.dart';
+import 'client_update_labels.dart';
+import 'client_operation_labels.dart';
+
+enum _PreferenceNotice { received, unknown }
 
 class ClientPreferencesPanel extends StatefulWidget {
   const ClientPreferencesPanel({
@@ -12,8 +19,10 @@ class ClientPreferencesPanel extends StatefulWidget {
     required this.load,
     required this.apply,
     required this.reset,
+    this.locale = ClientLocale.en,
   });
   final ClientStateController state;
+  final ClientLocale locale;
   final Future<ClientPreferences> Function() load;
   final Future<ClientOperation> Function(
     String,
@@ -35,7 +44,10 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
   ClientPreferences? _projection;
   final _draft = <api.PreferenceKey, Object>{};
   String? _context;
-  String? _notice;
+  _PreferenceNotice? _notice;
+  int _draftSerial = 0;
+  String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
+  String _value(Object? value) => preferenceValueLabel(value, widget.locale);
   bool _busy = false;
   String get contextId =>
       '${widget.state.cacheEpoch}:'
@@ -55,6 +67,7 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
   void _clear() {
     _projection = null;
     _draft.clear();
+    _draftSerial++;
     _context = null;
     _notice = null;
   }
@@ -164,13 +177,14 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
         setState(() {
           _projection = null;
           _draft.clear();
-          _notice =
-              'Preference operation received. Recover its result and refresh effective values.';
+          _draftSerial++;
+          _notice = _PreferenceNotice.received;
         });
       } else {
         setState(() {
           _projection = null;
           _draft.clear();
+          _draftSerial++;
         });
         final loaded = await widget.load();
         checkContext();
@@ -188,8 +202,8 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
       setState(() {
         _projection = null;
         _draft.clear();
-        _notice =
-            'Preferences could not be confirmed. Recover pending operations before retrying.';
+        _draftSerial++;
+        _notice = _PreferenceNotice.unknown;
       });
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -202,8 +216,10 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
     builder: (context, _) {
       final view = _projection;
       final viewContext = _context;
+      final serial = _draftSerial;
       bool validView() =>
           current &&
+          serial == _draftSerial &&
           !_busy &&
           identical(view, _projection) &&
           viewContext == _context;
@@ -213,29 +229,45 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
           OutlinedButton(
             key: const Key('client-load-preferences'),
             onPressed: allowed && !_busy ? () => _run() : null,
-            child: const Text('Refresh preferences'),
+            child: Text(_text('Refresh preferences', 'Обновить настройки')),
           ),
-          if (current && _notice != null) Text(_notice!),
+          if (current && _notice != null)
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                _notice == _PreferenceNotice.received
+                    ? _text(
+                        'Preference operation received. Recover its result and refresh effective values.',
+                        'Операция настройки получена. Восстановите её результат и обновите фактические значения.',
+                      )
+                    : _text(
+                        'Preferences could not be confirmed. Recover pending operations before retrying.',
+                        'Не удалось подтвердить настройки. Восстановите незавершённые операции перед повторной попыткой.',
+                      ),
+              ),
+            ),
           if (current && _projection != null) ...[
             for (final entry in _entries(_projection!))
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(entry.label),
+                  Text(preferenceKeyLabel(entry.key, widget.locale)),
                   Text(
-                    'Effective: ${_value(entry.effective)}; requested: ${_value(entry.requested)}',
+                    '${_text('Effective', 'Фактически')}: ${_value(entry.effective)}; ${_text('requested', 'Запрошено')}: ${_value(entry.requested)}',
                   ),
                   for (final control in entry.controls)
                     Text(
-                      'Source: ${control.source.name}; locked: ${control.locked}; '
-                      'availability: ${control.mutation.availability.name}; '
-                      'reason: ${control.mutation.reasonKey}; owner: ${control.mutation.actionOwner.name}',
+                      '${_text('Source', 'Источник')}: ${settingSourceLabel(control.source, widget.locale)}; ${_text('locked', 'Заблокировано')}: ${_value(control.locked)}; '
+                      '${_text('availability', 'Доступность')}: ${updateAvailabilityLabel(control.mutation.availability, widget.locale)}; '
+                      '${_text('reason', 'Код причины')}: ${control.mutation.reasonKey}; ${_text('owner', 'Ответственный')}: ${clientActionOwnerLabel(control.mutation.actionOwner, locale: widget.locale)}',
                     ),
                   DropdownButton<Object>(
                     key: ValueKey('preference-${entry.key.value}'),
                     isExpanded: true,
                     value: _draft[entry.key],
-                    hint: const Text('Leave unchanged'),
+                    hint: Text(
+                      _text('Leave unchanged', 'Оставить без изменений'),
+                    ),
                     items: [
                       for (final value in entry.values)
                         DropdownMenuItem(
@@ -248,7 +280,10 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
                             if (value != null &&
                                 validView() &&
                                 entry.values.contains(value)) {
-                              setState(() => _draft[entry.key] = value);
+                              setState(() {
+                                _draft[entry.key] = value;
+                                _draftSerial++;
+                              });
                             }
                           }
                         : null,
@@ -264,7 +299,9 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
                             if (validView()) _run(reset: entry.key);
                           }
                         : null,
-                    child: const Text('Reset override'),
+                    child: Text(
+                      _text('Reset override', 'Сбросить переопределение'),
+                    ),
                   ),
                 ],
               ),
@@ -272,10 +309,15 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
               key: const Key('client-discard-preferences'),
               onPressed: !_busy && _draft.isNotEmpty
                   ? () {
-                      if (validView()) setState(_draft.clear);
+                      if (validView()) {
+                        setState(() {
+                          _draft.clear();
+                          _draftSerial++;
+                        });
+                      }
                     }
                   : null,
-              child: const Text('Discard draft'),
+              child: Text(_text('Discard draft', 'Отменить правки')),
             ),
             FilledButton(
               key: const Key('client-apply-preferences'),
@@ -284,7 +326,9 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
                       if (validView()) _run(apply: true);
                     }
                   : null,
-              child: const Text('Apply preference patch'),
+              child: Text(
+                _text('Apply preference patch', 'Применить изменения настроек'),
+              ),
             ),
           ],
         ],
@@ -293,23 +337,9 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
   );
 }
 
-String _value(Object? value) => value == null
-    ? 'No override'
-    : value is api.LifecycleBehavior
-    ? value.name
-    : value.toString();
-
 class _Entry {
-  _Entry(
-    this.key,
-    this.label,
-    this.effective,
-    this.requested,
-    this.values,
-    this.controls,
-  );
+  _Entry(this.key, this.effective, this.requested, this.values, this.controls);
   final api.PreferenceKey key;
-  final String label;
   final Object effective;
   final Object? requested;
   final List<Object> values;
@@ -335,15 +365,10 @@ List<_Entry> _entries(ClientPreferences projection) {
     for (final managed in projection.managed)
       if (managed.key == key) managed.control,
   ];
-  void boolean(
-    api.PreferenceKey key,
-    String label,
-    api.BooleanSetting setting,
-  ) {
+  void boolean(api.PreferenceKey key, api.BooleanSetting setting) {
     result.add(
       _Entry(
         key,
-        label,
         setting.effective,
         setting.hasRequested() ? setting.requested : null,
         [false, true],
@@ -352,15 +377,10 @@ List<_Entry> _entries(ClientPreferences projection) {
     );
   }
 
-  void lifecycle(
-    api.PreferenceKey key,
-    String label,
-    api.LifecycleSetting setting,
-  ) {
+  void lifecycle(api.PreferenceKey key, api.LifecycleSetting setting) {
     result.add(
       _Entry(
         key,
-        label,
         setting.effective,
         setting.hasRequested() ? setting.requested : null,
         setting.allowedValues
@@ -375,53 +395,29 @@ List<_Entry> _entries(ClientPreferences projection) {
   }
 
   if (p.hasAllowInbound()) {
-    boolean(
-      api.PreferenceKey.PREFERENCE_KEY_ALLOW_INBOUND,
-      'Allow inbound',
-      p.allowInbound,
-    );
+    boolean(api.PreferenceKey.PREFERENCE_KEY_ALLOW_INBOUND, p.allowInbound);
   }
   if (p.hasAcceptDns()) {
-    boolean(
-      api.PreferenceKey.PREFERENCE_KEY_ACCEPT_DNS,
-      'Accept DNS',
-      p.acceptDns,
-    );
+    boolean(api.PreferenceKey.PREFERENCE_KEY_ACCEPT_DNS, p.acceptDns);
   }
   if (p.hasAcceptRoutes()) {
-    boolean(
-      api.PreferenceKey.PREFERENCE_KEY_ACCEPT_ROUTES,
-      'Accept routes',
-      p.acceptRoutes,
-    );
+    boolean(api.PreferenceKey.PREFERENCE_KEY_ACCEPT_ROUTES, p.acceptRoutes);
   }
   final l = p.lifecycle;
   if (l.hasRuntimeStart()) {
-    lifecycle(
-      api.PreferenceKey.PREFERENCE_KEY_RUNTIME_START,
-      'Runtime start',
-      l.runtimeStart,
-    );
+    lifecycle(api.PreferenceKey.PREFERENCE_KEY_RUNTIME_START, l.runtimeStart);
   }
   if (l.hasUiQuit()) {
-    lifecycle(
-      api.PreferenceKey.PREFERENCE_KEY_UI_QUIT,
-      'Graceful UI quit',
-      l.uiQuit,
-    );
+    lifecycle(api.PreferenceKey.PREFERENCE_KEY_UI_QUIT, l.uiQuit);
   }
   if (l.hasUserLogoff()) {
-    lifecycle(
-      api.PreferenceKey.PREFERENCE_KEY_USER_LOGOFF,
-      'User logoff',
-      l.userLogoff,
-    );
+    lifecycle(api.PreferenceKey.PREFERENCE_KEY_USER_LOGOFF, l.userLogoff);
   }
   if (l.hasSuspend()) {
-    lifecycle(api.PreferenceKey.PREFERENCE_KEY_SUSPEND, 'Suspend', l.suspend);
+    lifecycle(api.PreferenceKey.PREFERENCE_KEY_SUSPEND, l.suspend);
   }
   if (l.hasResume()) {
-    lifecycle(api.PreferenceKey.PREFERENCE_KEY_RESUME, 'Resume', l.resume);
+    lifecycle(api.PreferenceKey.PREFERENCE_KEY_RESUME, l.resume);
   }
   return result;
 }
