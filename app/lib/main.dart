@@ -64,7 +64,7 @@ Future<void> main(List<String> args) async {
     exit(0);
   }
 
-  if (config.elevatedEnrollment || config.enrollText.trim().isNotEmpty) {
+  if (config.enrollText.trim().isNotEmpty) {
     stderr.writeln(
       'Startup enrollment arguments are retired. Open the native profile enrollment panel.',
     );
@@ -122,7 +122,6 @@ class AppConfig {
     required this.server,
     required this.mode,
     required this.enrollText,
-    required this.elevatedEnrollment,
     required this.showWindow,
     required this.debug,
     required this.debugLogDir,
@@ -135,7 +134,6 @@ class AppConfig {
   final String server;
   final String mode;
   final String enrollText;
-  final bool elevatedEnrollment;
   final bool showWindow;
   final bool debug;
   final String debugLogDir;
@@ -148,7 +146,6 @@ class AppConfig {
     var server = '';
     var mode = 'workstation';
     var enrollText = '';
-    var elevatedEnrollment = false;
     var showWindow = false;
     var debug = false;
     var debugLogDir = _defaultDebugLogDir;
@@ -175,7 +172,7 @@ class AppConfig {
       } else if (arg == '--enroll') {
         enrollText = nextValue();
       } else if (arg == '--elevated-enroll') {
-        elevatedEnrollment = true;
+        throw const FormatException('Elevated startup enrollment is retired');
       } else if (arg == '--show-window') {
         showWindow = true;
       } else if (arg == '--debug') {
@@ -195,7 +192,6 @@ class AppConfig {
       server: server.trim(),
       mode: mode.trim().isEmpty ? 'workstation' : mode.trim(),
       enrollText: enrollText.trim(),
-      elevatedEnrollment: elevatedEnrollment,
       showWindow: showWindow,
       debug: debug,
       debugLogDir: debugLogDir.trim().isEmpty
@@ -421,8 +417,6 @@ EnrollmentRequest parseEnrollment(
   );
 }
 
-typedef ElevatedEnrollmentLauncher =
-    Future<bool> Function(EnrollmentRequest request);
 typedef PrivilegedRecoveryLauncher =
     Future<PrivilegedHelperResult> Function(PrivilegedRecoveryRequest request);
 typedef LocalForgetConfirmationPresenter =
@@ -455,14 +449,6 @@ class PrivilegedRecoveryRequest {
   final String confirmedKeyID;
 }
 
-bool requiresAdministratorElevation(Object error) {
-  if (error is! ServiceIPCException) {
-    return false;
-  }
-  return error.errorCode == ServiceIPCErrorCode.ownerRequired ||
-      error.errorCode == ServiceIPCErrorCode.administratorRequired;
-}
-
 bool requiresAdministratorTrustElevation(Object error) {
   return error is ServiceIPCException &&
       error.errorCode == ServiceIPCErrorCode.administratorRequired;
@@ -471,44 +457,6 @@ bool requiresAdministratorTrustElevation(Object error) {
 bool requiresLocalForget(Object error) {
   return error is ServiceIPCException &&
       error.errorCode == ServiceIPCErrorCode.remoteCleanupRequired;
-}
-
-Future<bool> launchElevatedEnrollment(
-  AppConfig config,
-  EnrollmentRequest request,
-) async {
-  if (!Platform.isWindows) {
-    throw UnsupportedError(
-      'Administrative enrollment is only supported on Windows.',
-    );
-  }
-  return launchWindowsProcessElevated(
-    Platform.resolvedExecutable,
-    elevatedEnrollmentArguments(config, request),
-  );
-}
-
-List<String> elevatedEnrollmentArguments(
-  AppConfig config,
-  EnrollmentRequest request,
-) {
-  final arguments = <String>[
-    '--elevated-enroll',
-    '--pipe',
-    config.pipe,
-    '--mode',
-    request.mode,
-  ];
-  if (request.server.trim().isNotEmpty) {
-    arguments.addAll(['--server', request.server.trim()]);
-  }
-  if (request.token.trim().isNotEmpty) {
-    arguments.addAll(['--enroll', request.token.trim()]);
-  }
-  if (config.debug) {
-    arguments.addAll(['--debug', '--debug-log-dir', config.debugLogDir]);
-  }
-  return arguments;
 }
 
 Future<PrivilegedHelperResult> launchPrivilegedRecoveryHelper(
@@ -670,8 +618,6 @@ class EndlessNetController extends ChangeNotifier
     this.desktopIntegrationEnabled = true,
     Future<bool> Function(Uri uri)? externalURLLauncher,
     Future<void> Function(String title, String message)? messagePresenter,
-    ElevatedEnrollmentLauncher? elevatedEnrollmentLauncher,
-    bool? enrollmentElevationSupported,
     PrivilegedRecoveryLauncher? privilegedRecoveryLauncher,
     bool? privilegedRecoverySupported,
     LocalForgetConfirmationPresenter? localForgetConfirmationPresenter,
@@ -683,11 +629,6 @@ class EndlessNetController extends ChangeNotifier
     this.recoveryPollTimeout = _defaultRecoveryPollTimeout,
   }) : externalURLLauncher = externalURLLauncher ?? launchExternalURL,
        messagePresenter = messagePresenter ?? showMessageBox,
-       elevatedEnrollmentLauncher =
-           elevatedEnrollmentLauncher ??
-           ((request) => launchElevatedEnrollment(config, request)),
-       enrollmentElevationSupported =
-           enrollmentElevationSupported ?? Platform.isWindows,
        privilegedRecoveryLauncher =
            privilegedRecoveryLauncher ?? launchPrivilegedRecoveryHelper,
        privilegedRecoverySupported =
@@ -701,8 +642,6 @@ class EndlessNetController extends ChangeNotifier
   final bool desktopIntegrationEnabled;
   final Future<bool> Function(Uri uri) externalURLLauncher;
   final Future<void> Function(String title, String message) messagePresenter;
-  final ElevatedEnrollmentLauncher elevatedEnrollmentLauncher;
-  final bool enrollmentElevationSupported;
   final PrivilegedRecoveryLauncher privilegedRecoveryLauncher;
   final bool privilegedRecoverySupported;
   final LocalForgetConfirmationPresenter localForgetConfirmationPresenter;
@@ -1168,28 +1107,6 @@ class EndlessNetController extends ChangeNotifier
           statusErr,
           statusStack,
         );
-      }
-      if (enrollmentElevationSupported && requiresAdministratorElevation(err)) {
-        try {
-          final launched = await elevatedEnrollmentLauncher(request);
-          if (!launched) {
-            throw StateError(
-              'Administrator approval is required to connect this device.',
-            );
-          }
-          _startEnrollmentPolling();
-          logger.info('elevated device enrollment launched after owner denial');
-          return;
-        } catch (elevatedErr, elevatedStack) {
-          errorText = safeErrorText(elevatedErr);
-          logger.error(
-            'elevated device enrollment failed',
-            elevatedErr,
-            elevatedStack,
-          );
-          await messagePresenter('EndlessNet', errorText!);
-          return;
-        }
       }
       errorText = safeErrorText(err);
       logger.error('device enrollment failed', err, stack);

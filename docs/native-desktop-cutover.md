@@ -34,3 +34,17 @@ validate actual desktop integration and elevation on supported platforms.
 Client owns remaining runtime providers/capabilities. System acceptance against
 pinned artifacts remains separate. This entrypoint change does not establish
 full UF-01–UF-23 coverage or complete the hard cutover goal.
+
+## Retired enrollment elevation removed — 2026-09-13
+
+Removed the old automatic owner-denial-to-UAC enrollment launcher, its token
+command-line argument builder and controller injection points. Parsing the
+retired `--elevated-enroll` flag now fails. Privileged identity recovery/local
+forget are separate explicitly confirmed native operations, not enrollment
+fallbacks. Their remaining old controller code is still pending removal.
+
+Old tests expecting automatic elevated enrollment were removed. Native widget
+tests in `client_enrollment_denial_test.dart` instead check owner denial without
+automatic resubmission, token clearing before dispatch, sanitized failure text,
+and observer gating. They do not claim end-to-end OS/process or runtime admission
+coverage. The rest of the retired HTTP controller/test suite still needs cutover.

@@ -380,7 +380,6 @@ void main() {
 
     final launchRequests = <Uri>[];
     final messages = <String>[];
-    final elevatedRequests = <EnrollmentRequest>[];
     final bridge = ContractFakeBridge();
     bridge.statusPayload = {'state': ServiceState.needsEnrollment};
     bridge.enrollmentPayloads.add({
@@ -405,11 +404,6 @@ void main() {
       messagePresenter: (title, message) async {
         messages.add('$title: $message');
       },
-      elevatedEnrollmentLauncher: (request) async {
-        elevatedRequests.add(request);
-        return true;
-      },
-      enrollmentElevationSupported: true,
       enrollmentPollInterval: const Duration(milliseconds: 10),
     );
     addTearDown(controller.exitApp);
@@ -428,7 +422,6 @@ void main() {
       ),
     ]);
     expect(messages, isEmpty);
-    expect(elevatedRequests, isEmpty);
     expect(bridge.enrollmentRequests, hasLength(1));
     expect(bridge.enrollmentRequests.single.token, isEmpty);
     expect(bridge.enrollmentRequests.single.server, isEmpty);
@@ -448,39 +441,6 @@ void main() {
     expect(find.text(ServiceState.connected), findsOneWidget);
     expect(find.text('Disconnect'), findsOneWidget);
   });
-
-  test(
-    'cancelled UAC leaves the device unenrolled with a clear error',
-    () async {
-      final messages = <String>[];
-      final bridge = ContractFakeBridge();
-      bridge.statusPayload = {'state': ServiceState.needsEnrollment};
-      bridge.enrollmentError = const ServiceIPCException(
-        statusCode: 403,
-        errorCode: 'owner_required',
-        message: 'local owner or administrator is required',
-      );
-      final controller = EndlessNetController(
-        config: AppConfig.parse(const []),
-        bridge: bridge,
-        logger: AppLogger('', enabled: false),
-        desktopIntegrationEnabled: false,
-        elevatedEnrollmentLauncher: (_) async => false,
-        enrollmentElevationSupported: true,
-        messagePresenter: (title, message) async {
-          messages.add('$title: $message');
-        },
-      );
-      addTearDown(controller.exitApp);
-      controller.statusPayload = bridge.statusPayload;
-
-      await controller.connectDevice();
-
-      expect(controller.errorText, contains('Administrator approval'));
-      expect(messages.single, contains('Administrator approval'));
-      expect(bridge.enrollmentRequests, hasLength(1));
-    },
-  );
 
   test(
     'degraded connected intent is refreshed until service is ready',
