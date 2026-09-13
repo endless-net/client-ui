@@ -2,6 +2,7 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 
 import 'client_operation.dart';
+import 'client_operation_labels.dart';
 import 'client_runtime_snapshot.dart';
 import 'client_state_controller.dart';
 
@@ -143,6 +144,20 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
               if (owner && profile)
                 Text('Profile: ${snapshot.status.activeProfileId}'),
               if (owner && profile) ...[
+                if (snapshot.status.hasPendingAction())
+                  Text(
+                    'Required action: ${clientRequiredActionLabel(snapshot.status.pendingAction.kind)}',
+                    key: const Key('client-status-required-action'),
+                  ),
+                if (snapshot.status.recovery.hasFailure())
+                  Text(
+                    'Recovery: ${clientFailureLabel(snapshot.status.recovery.failure.code)}. Action owner: ${clientActionOwnerLabel(snapshot.status.recovery.failure.actionOwner)}.',
+                    key: const Key('client-status-recovery-failure'),
+                  ),
+                for (final failure in snapshot.status.failures)
+                  Text(
+                    'Runtime issue: ${clientFailureLabel(failure.code)}. Action owner: ${clientActionOwnerLabel(failure.actionOwner)}.',
+                  ),
                 Text(
                   'Account: ${_contextValue(snapshot.status.accountId)}',
                   key: const Key('client-context-account'),

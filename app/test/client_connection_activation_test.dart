@@ -10,6 +10,99 @@ import 'package:flutter_test/flutter_test.dart';
 // Deliberately retain a callback to simulate queued activation from an older
 // frame. This does not replace platform keyboard/hit-test acceptance.
 void main() {
+  testWidgets('US-03 displays typed status guidance without sensitive payload', (
+    tester,
+  ) async {
+    final state = ClientStateController();
+    final source = StreamController<api.WatchEventsResponse>();
+    await state.attach(source.stream);
+    var calls = 0;
+    Future<ClientOperation> unexpected() async {
+      calls++;
+      throw StateError('Presentation must not submit');
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ClientConnectionPanel(
+              state: state,
+              connect: unexpected,
+              disconnect: unexpected,
+              renewSession: unexpected,
+            ),
+          ),
+        ),
+      ),
+    );
+    final event = _snapshot();
+    event.snapshot.status.mergeFromProto3Json({
+      'serviceState': 'SERVICE_STATE_RECOVERY_BLOCKED',
+      'pendingAction': {
+        'kind': 'KIND_OPEN_BROWSER',
+        'browserUrl': 'https://example.test/private-token',
+      },
+      'recovery': {
+        'failure': {
+          'code': 'ERROR_CODE_PERMISSION_REQUIRED',
+          'actionOwner': 'ACTION_OWNER_DEVICE_ADMINISTRATOR',
+          'reasonKey': 'private-recovery-reason',
+        },
+      },
+      'failures': [
+        {
+          'code': 'ERROR_CODE_POLICY_BLOCKED',
+          'actionOwner': 'ACTION_OWNER_ACCESS_ADMINISTRATOR',
+          'reasonKey': 'private-policy-reason',
+        },
+      ],
+    });
+    source.add(event);
+    await tester.pump();
+    expect(
+      find.text('Required action: Continue in your browser'),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Recovery: Permission required. Action owner: Device administrator.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Runtime issue: Blocked by policy. Action owner: Access administrator.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('private-'), findsNothing);
+    expect(find.textContaining('https://'), findsNothing);
+    expect(calls, 0);
+    final replacement = _snapshot();
+    replacement.sequence *= 2;
+    replacement.metadata.revision = replacement.sequence;
+    replacement.snapshot.status.metadata.revision = replacement.sequence;
+    source.add(replacement);
+    await tester.pump();
+    expect(
+      find.byKey(const Key('client-status-required-action')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('client-status-recovery-failure')),
+      findsNothing,
+    );
+    expect(find.textContaining('Runtime issue:'), findsNothing);
+    expect(calls, 0);
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(() async {
+      await state.detach();
+      await source.close();
+      state.dispose();
+    });
+  });
+
   testWidgets('US-09 displays independent authoritative renewal states', (
     tester,
   ) async {

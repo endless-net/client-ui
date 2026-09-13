@@ -319,6 +319,12 @@ ClientOperationDetails отображает закрытые enum состоян
 names. Raw reason key и browser URL не отображаются. Shared regression проверяет
 подписи и скрытие чувствительных полей; это не полная локализация US-14.
 
+UBR-04/05: основная connection panel для owner с активным профилем показывает
+typed pending_action, recovery.failure и status.failures с action owner. Raw
+reason_key и browser URL не отображаются, action не запускается при render.
+Замена snapshot удаляет прежние подсказки. Shared widget regression проверяет
+эту проекцию; это не полный набор next steps и не usability acceptance UI-AC-02.
+
 US-03/09: Connect, Disconnect и RenewSession привязаны к immutable snapshot,
 который разрешил кнопку. Отложенный callback после замены profile/caller,
 capabilities, status или session, отключения подписки либо dispose не вызывает
