@@ -228,17 +228,36 @@ void main() {
         });
       };
       expect(await session.readDiagnosticsBundle(requestId), [1, 2, 3]);
+      final destination = await Directory.systemTemp.createTemp(
+        'en-session-export-',
+      );
+      addTearDown(() => destination.delete(recursive: true));
+      final exported = await session.exportDiagnosticsBundle(
+        requestId,
+        destination,
+      );
+      expect(await exported.readAsBytes(), [1, 2, 3]);
+      expect(exported.parent.parent.path, destination.path);
+      final successfulRead = connection.chunks;
+      connection.chunks = (_) async => api.ReadDiagnosticsBundleResponse()
+        ..mergeFromProto3Json({'data': 'AQIE', 'nextOffset': '3', 'eof': true});
+      await expectLater(
+        session.exportDiagnosticsBundle(requestId, destination),
+        throwsFormatException,
+      );
+      expect(await destination.list().length, 1);
+      connection.chunks = successfulRead;
       succeeded = false;
       await expectLater(
         session.readDiagnosticsBundle(requestId),
         throwsStateError,
       );
-      expect(lookups, 2);
+      expect(lookups, 4);
       succeeded = true;
       final pending = Completer<api.ReadDiagnosticsBundleResponse>();
       connection.chunks = (_) => pending.future;
       final rejected = expectLater(
-        session.readDiagnosticsBundle(requestId),
+        session.exportDiagnosticsBundle(requestId, destination),
         throwsStateError,
       );
       await pumpEventQueue();
@@ -258,7 +277,8 @@ void main() {
         session.readDiagnosticsBundle(requestId),
         throwsStateError,
       );
-      expect(lookups, 3);
+      expect(lookups, 5);
+      expect(await destination.list().length, 1);
     },
   );
 

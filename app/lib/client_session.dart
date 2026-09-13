@@ -1,5 +1,7 @@
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'dart:typed_data';
+import 'dart:io';
+import 'client_bundle_export.dart';
 import 'client_bundle_chunks.dart';
 
 import 'client_intent_journal.dart';
@@ -258,7 +260,32 @@ final class ClientSession {
   }
 
   /// Re-resolve a caller-authorized operation; never accept an old UI handle.
-  /// Reading does not acknowledge the intention or export the returned bytes.
+  /// Explicit destination export does not acknowledge the intention.
+  Future<File> exportDiagnosticsBundle(
+    String requestId,
+    Directory destination,
+  ) async {
+    final epoch = _epoch;
+    final cacheEpoch = state.cacheEpoch;
+    final profileEpoch = state.domainEpoch(api.Domain.DOMAIN_PROFILES);
+    final sessionEpoch = state.domainEpoch(api.Domain.DOMAIN_SESSION);
+    void check() {
+      if (_closed ||
+          epoch != _epoch ||
+          cacheEpoch != state.cacheEpoch ||
+          state.link != ClientLinkState.ready ||
+          profileEpoch != state.domainEpoch(api.Domain.DOMAIN_PROFILES) ||
+          sessionEpoch != state.domainEpoch(api.Domain.DOMAIN_SESSION)) {
+        throw StateError('Client context changed during bundle export');
+      }
+    }
+
+    check();
+    final content = await readDiagnosticsBundle(requestId);
+    check();
+    return exportClientBundle(destination, content, checkContext: check);
+  }
+
   Future<Uint8List> readDiagnosticsBundle(String requestId) async {
     final connection = _connection;
     final snapshot = state.snapshot;

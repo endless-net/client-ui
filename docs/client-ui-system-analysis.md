@@ -150,6 +150,11 @@ Synthetic bytes [1,2,3] проверяют transport/checksum, не формат
 неперезапись, два отдельных экспорта и cleanup после отмены. Native destination
 picker, session/UI binding, OS permissions и формат/redaction остаются отдельными
 незавершёнными acceptance gates; путь никогда не берётся из bundle handle.
+`ClientSession.exportDiagnosticsBundle` связывает свежий operation lookup,
+checksum-verified read и файловую запись одним session/context guard. Session
+regression проверяет успешный файл, отсутствие нового output при checksum mismatch
+и смене caller во время загрузки. Intention не acknowledge автоматически.
+Native picker и UI export action ещё не подключены; это не полный US-07 acceptance.
 Helper не пишет файлы, clipboard или сеть вне переданного RPC callback.
 
 Проверенный consumer commit `ed43df36c8feab083abd9b7b7b41e9ad3112dbd4`:
