@@ -119,6 +119,7 @@ class _EnrollmentFormState extends State<_EnrollmentForm> {
         decoration: const InputDecoration(labelText: 'Device hostname'),
       ),
       DropdownButton<api.EnrollmentMode>(
+        isExpanded: true,
         key: const Key('enroll-mode'),
         value: _mode,
         items: [

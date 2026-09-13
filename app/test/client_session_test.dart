@@ -6,9 +6,11 @@ import 'package:endlessnet/client_mutations.dart';
 import 'package:endlessnet/client_operation.dart';
 import 'package:endlessnet/client_profiles.dart';
 import 'package:endlessnet/client_session.dart';
+import 'package:endlessnet/client_session_panel.dart';
 import 'package:endlessnet/client_state_controller.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 
 class NoCallsClient implements api.ClientServiceClient {
   @override
@@ -91,6 +93,36 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  testWidgets(
+    'US-14: composed session panel remains scrollable with large text',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      connection.events.add(snapshot());
+      await tester.pump();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+            child: Scaffold(body: ClientSessionPanel(session: session)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.byKey(const Key('client-load-profiles')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('client-load-profiles')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   test(
     'US-03: acceptance snapshot refresh does not invalidate RPC result',

@@ -17,143 +17,145 @@ class ClientSessionPanel extends StatelessWidget {
   final ClientSession session;
 
   @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      ClientCleanupPanel(
-        state: session.state,
-        logout: (id) => session.submit(
-          api.OperationKind.OPERATION_KIND_LOGOUT,
-          (commands, mutation) => commands.logout(
-            api.LogoutRequest(
-              mutation: mutation,
-              profile: api.ProfileRef(profileId: id),
+  Widget build(BuildContext context) => SingleChildScrollView(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ClientCleanupPanel(
+          state: session.state,
+          logout: (id) => session.submit(
+            api.OperationKind.OPERATION_KIND_LOGOUT,
+            (commands, mutation) => commands.logout(
+              api.LogoutRequest(
+                mutation: mutation,
+                profile: api.ProfileRef(profileId: id),
+              ),
             ),
           ),
-        ),
-        forget: (id) => session.submit(
-          api.OperationKind.OPERATION_KIND_FORGET_LOCAL_ENROLLMENT,
-          (commands, mutation) => commands.forgetLocalEnrollment(
-            api.ForgetLocalEnrollmentRequest(
-              mutation: mutation,
-              profile: api.ProfileRef(profileId: id),
-              confirmed: true,
-            ),
-          ),
-        ),
-      ),
-      ClientEnrollmentPanel(
-        state: session.state,
-        enroll: (id, mode, hostname, token) => session.submit(
-          api.OperationKind.OPERATION_KIND_ENROLL,
-          (commands, mutation) {
-            final request = api.EnrollRequest(
-              mutation: mutation,
-              profile: api.ProfileRef(profileId: id),
-              mode: mode,
-              hostname: hostname,
-            );
-            if (token == null) {
-              request.browserLogin = true;
-            } else {
-              request.enrollmentToken = token;
-            }
-            return commands.enroll(request);
-          },
-        ),
-      ),
-      ClientCreateProfilePanel(
-        state: session.state,
-        create: (name, origin) => session.submit(
-          api.OperationKind.OPERATION_KIND_CREATE_PROFILE,
-          (commands, mutation) => commands.createProfile(
-            api.CreateProfileRequest(
-              mutation: mutation,
-              displayName: name,
-              controlOrigin: origin,
-            ),
-          ),
-        ),
-      ),
-      ClientConnectionPanel(
-        state: session.state,
-        renewSession: () => session.submit(
-          api.OperationKind.OPERATION_KIND_RENEW_SESSION,
-          (commands, mutation) => commands.renewSession(
-            api.RenewSessionRequest(
-              mutation: mutation,
-              profile: api.ProfileRef(
-                profileId: session.state.snapshot!.status.activeProfileId,
+          forget: (id) => session.submit(
+            api.OperationKind.OPERATION_KIND_FORGET_LOCAL_ENROLLMENT,
+            (commands, mutation) => commands.forgetLocalEnrollment(
+              api.ForgetLocalEnrollmentRequest(
+                mutation: mutation,
+                profile: api.ProfileRef(profileId: id),
+                confirmed: true,
               ),
             ),
           ),
         ),
-        connect: () => session.submit(
-          api.OperationKind.OPERATION_KIND_CONNECT,
-          (commands, mutation) {
-            return commands.connect(
-              api.ConnectRequest(
+        ClientEnrollmentPanel(
+          state: session.state,
+          enroll: (id, mode, hostname, token) => session.submit(
+            api.OperationKind.OPERATION_KIND_ENROLL,
+            (commands, mutation) {
+              final request = api.EnrollRequest(
+                mutation: mutation,
+                profile: api.ProfileRef(profileId: id),
+                mode: mode,
+                hostname: hostname,
+              );
+              if (token == null) {
+                request.browserLogin = true;
+              } else {
+                request.enrollmentToken = token;
+              }
+              return commands.enroll(request);
+            },
+          ),
+        ),
+        ClientCreateProfilePanel(
+          state: session.state,
+          create: (name, origin) => session.submit(
+            api.OperationKind.OPERATION_KIND_CREATE_PROFILE,
+            (commands, mutation) => commands.createProfile(
+              api.CreateProfileRequest(
+                mutation: mutation,
+                displayName: name,
+                controlOrigin: origin,
+              ),
+            ),
+          ),
+        ),
+        ClientConnectionPanel(
+          state: session.state,
+          renewSession: () => session.submit(
+            api.OperationKind.OPERATION_KIND_RENEW_SESSION,
+            (commands, mutation) => commands.renewSession(
+              api.RenewSessionRequest(
                 mutation: mutation,
                 profile: api.ProfileRef(
                   profileId: session.state.snapshot!.status.activeProfileId,
                 ),
               ),
-            );
-          },
-        ),
-        disconnect: () => session.submit(
-          api.OperationKind.OPERATION_KIND_DISCONNECT,
-          (commands, mutation) {
-            return commands.disconnect(
-              api.DisconnectRequest(
-                mutation: mutation,
-                profile: api.ProfileRef(
-                  profileId: session.state.snapshot!.status.activeProfileId,
+            ),
+          ),
+          connect: () => session.submit(
+            api.OperationKind.OPERATION_KIND_CONNECT,
+            (commands, mutation) {
+              return commands.connect(
+                api.ConnectRequest(
+                  mutation: mutation,
+                  profile: api.ProfileRef(
+                    profileId: session.state.snapshot!.status.activeProfileId,
+                  ),
                 ),
+              );
+            },
+          ),
+          disconnect: () => session.submit(
+            api.OperationKind.OPERATION_KIND_DISCONNECT,
+            (commands, mutation) {
+              return commands.disconnect(
+                api.DisconnectRequest(
+                  mutation: mutation,
+                  profile: api.ProfileRef(
+                    profileId: session.state.snapshot!.status.activeProfileId,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        ClientRecoveryPanel(
+          state: session.state,
+          recover: session.recoverPending,
+          acknowledge: session.journal.acknowledge,
+          openBrowser: (uri) =>
+              launchUrl(uri, mode: LaunchMode.externalApplication),
+        ),
+        ClientProfilesPanel(
+          state: session.state,
+          load: session.listProfiles,
+          remove: (id) => session.submit(
+            api.OperationKind.OPERATION_KIND_REMOVE_PROFILE,
+            (commands, mutation) => commands.removeProfile(
+              api.RemoveProfileRequest(
+                mutation: mutation,
+                profile: api.ProfileRef(profileId: id),
               ),
-            );
-          },
-        ),
-      ),
-      ClientRecoveryPanel(
-        state: session.state,
-        recover: session.recoverPending,
-        acknowledge: session.journal.acknowledge,
-        openBrowser: (uri) =>
-            launchUrl(uri, mode: LaunchMode.externalApplication),
-      ),
-      ClientProfilesPanel(
-        state: session.state,
-        load: session.listProfiles,
-        remove: (id) => session.submit(
-          api.OperationKind.OPERATION_KIND_REMOVE_PROFILE,
-          (commands, mutation) => commands.removeProfile(
-            api.RemoveProfileRequest(
-              mutation: mutation,
-              profile: api.ProfileRef(profileId: id),
+            ),
+          ),
+          rename: (id, name) => session.submit(
+            api.OperationKind.OPERATION_KIND_RENAME_PROFILE,
+            (commands, mutation) => commands.renameProfile(
+              api.RenameProfileRequest(
+                mutation: mutation,
+                profile: api.ProfileRef(profileId: id),
+                displayName: name,
+              ),
+            ),
+          ),
+          select: (id) => session.submit(
+            api.OperationKind.OPERATION_KIND_SELECT_PROFILE,
+            (commands, mutation) => commands.selectProfile(
+              api.SelectProfileRequest(
+                mutation: mutation,
+                profile: api.ProfileRef(profileId: id),
+              ),
             ),
           ),
         ),
-        rename: (id, name) => session.submit(
-          api.OperationKind.OPERATION_KIND_RENAME_PROFILE,
-          (commands, mutation) => commands.renameProfile(
-            api.RenameProfileRequest(
-              mutation: mutation,
-              profile: api.ProfileRef(profileId: id),
-              displayName: name,
-            ),
-          ),
-        ),
-        select: (id) => session.submit(
-          api.OperationKind.OPERATION_KIND_SELECT_PROFILE,
-          (commands, mutation) => commands.selectProfile(
-            api.SelectProfileRequest(
-              mutation: mutation,
-              profile: api.ProfileRef(profileId: id),
-            ),
-          ),
-        ),
-      ),
-    ],
+      ],
+    ),
   );
 }

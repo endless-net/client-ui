@@ -92,6 +92,12 @@ logout/local forget не снимают ownership. UI не обещает воз
 
 ## 3. Команды и восстановление
 
+Составная ClientSessionPanel имеет общий scroll container, enrollment mode dropdown
+ограничен доступной шириной. US-14 widget regression проверяет всю session panel
+при 360×640 и text scale 2, отсутствие RenderFlex overflow и достижимость profile
+refresh через прокрутку. Это локальная layout-проверка, не полная accessibility
+или native mobile product acceptance.
+
 `client_cleanup_panel.dart` подключает отдельные journaled Logout и
 ForgetLocalEnrollment(confirmed=true) для active profile. Каждое действие требует
 подтверждения; local forget дополнительно требует ACCESS_ADMINISTRATOR и capability.
