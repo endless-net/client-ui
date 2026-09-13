@@ -9,10 +9,15 @@ import 'client_mutations.dart';
 import 'client_operation.dart';
 import 'client_profiles.dart';
 import 'client_networks.dart';
+import 'client_preferences.dart';
 import 'client_state_controller.dart';
 import 'local_client_events.dart';
 
 abstract interface class ClientConnection {
+  Future<ClientPreferences> getPreferences(
+    String profileId,
+    void Function() checkContext,
+  );
   Future<ClientOperation> recoverOperation(
     String requestId,
     api.OperationKind kind,
@@ -32,6 +37,11 @@ abstract interface class ClientConnection {
 final class _LocalConnection implements ClientConnection {
   _LocalConnection(this.source);
   final LocalClientEvents source;
+  @override
+  Future<ClientPreferences> getPreferences(
+    String profileId,
+    void Function() checkContext,
+  ) => source.getPreferences(profileId, checkContext);
   @override
   Future<ClientOperation> recoverOperation(
     String requestId,
@@ -169,6 +179,53 @@ final class ClientSession {
     } finally {
       _submitting.remove(kind);
     }
+  }
+
+  Future<ClientPreferences> getPreferences() async {
+    final connection = _connection;
+    final snapshot = state.snapshot;
+    if (_closed ||
+        connection == null ||
+        snapshot == null ||
+        state.link != ClientLinkState.ready ||
+        snapshot.runtime.callerAccess == api.Access.ACCESS_OBSERVER ||
+        snapshot.status.activeProfileId.isEmpty) {
+      throw StateError('Preferences require a current owner profile');
+    }
+    final epoch = _epoch;
+    final cacheEpoch = state.cacheEpoch;
+    final domains = {
+      for (final domain in [
+        api.Domain.DOMAIN_PROFILES,
+        api.Domain.DOMAIN_PREFERENCES,
+        api.Domain.DOMAIN_MANAGED_SETTINGS,
+      ])
+        domain: state.domainEpoch(domain),
+    };
+    void checkContext() {
+      if (_closed ||
+          epoch != _epoch ||
+          cacheEpoch != state.cacheEpoch ||
+          state.link != ClientLinkState.ready ||
+          domains.entries.any(
+            (entry) => state.domainEpoch(entry.key) != entry.value,
+          )) {
+        throw StateError('Preferences context changed during read');
+      }
+    }
+
+    final result = await connection.getPreferences(
+      snapshot.status.activeProfileId,
+      checkContext,
+    );
+    checkContext();
+    if (result.preferences.profileId != snapshot.status.activeProfileId ||
+        result.preferences.metadata.instanceId != snapshot.runtime.instanceId ||
+        result.preferences.metadata.revision <
+            state.snapshot!.status.metadata.revision) {
+      throw StateError('Stale preferences projection');
+    }
+    return result;
   }
 
   /// A read never grants trust. Confirmation must separately bind the exact

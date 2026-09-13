@@ -8,6 +8,7 @@ import 'package:endlessnet/client_mutations.dart';
 import 'package:endlessnet/client_operation.dart';
 import 'package:endlessnet/client_profiles.dart';
 import 'package:endlessnet/client_networks.dart';
+import 'package:endlessnet/client_preferences.dart';
 import 'package:endlessnet/client_session.dart';
 import 'package:endlessnet/client_session_panel.dart';
 import 'package:endlessnet/client_state_controller.dart';
@@ -22,6 +23,12 @@ class NoCallsClient implements api.ClientServiceClient {
 }
 
 class FakeConnection implements ClientConnection {
+  Future<ClientPreferences> Function(String, void Function())? preferences;
+  @override
+  Future<ClientPreferences> getPreferences(
+    String profileId,
+    void Function() checkContext,
+  ) => preferences!(profileId, checkContext);
   Future<ClientOperation> Function(String, api.OperationKind)? lookup;
   @override
   Future<ClientOperation> recoverOperation(String id, api.OperationKind kind) =>
@@ -174,6 +181,87 @@ void main() {
     await session.close();
     await directory.delete(recursive: true);
   });
+
+  test(
+    'US-10: preferences reject observer, stale and invalidated reads',
+    () async {
+      await expectLater(session.getPreferences(), throwsStateError);
+      connection.events.add(
+        snapshot()..snapshot.status.activeProfileId = 'profile-a',
+      );
+      await pumpEventQueue();
+      final response = api.GetPreferencesResponse()
+        ..mergeFromProto3Json({
+          'preferences': {
+            'profileId': 'profile-a',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'allowInbound': {'requested': false},
+          },
+        });
+      final policy = api.ListManagedSettingsResponse()
+        ..mergeFromProto3Json({
+          'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+        });
+      Future<ClientPreferences> read(String id, void Function() check) =>
+          readClientPreferences(
+            instanceId: 'runtime-a',
+            profileId: id,
+            get: (_) async => response,
+            listManaged: (_) async => policy,
+            checkContext: check,
+          );
+      connection.preferences = read;
+      expect(
+        (await session.getPreferences()).preferences.allowInbound
+            .hasRequested(),
+        isTrue,
+      );
+      final domains = [
+        'DOMAIN_PREFERENCES',
+        'DOMAIN_PREFERENCES',
+        'DOMAIN_MANAGED_SETTINGS',
+        'DOMAIN_PROFILES',
+      ];
+      for (var i = 0; i < domains.length; i++) {
+        final pending = Completer<api.ListManagedSettingsResponse>();
+        connection.preferences = (id, check) => readClientPreferences(
+          instanceId: 'runtime-a',
+          profileId: id,
+          get: (_) async => response,
+          listManaged: (_) => pending.future,
+          checkContext: check,
+        );
+        final rejected = expectLater(
+          session.getPreferences(),
+          throwsStateError,
+        );
+        await pumpEventQueue();
+        connection.events.add(
+          api.WatchEventsResponse()..mergeFromProto3Json({
+            'sequence': '${i + 2}',
+            'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
+            'invalidated': {'domain': domains[i], 'profileId': 'profile-a'},
+          }),
+        );
+        await pumpEventQueue();
+        pending.complete(policy);
+        await rejected;
+        connection.preferences = read;
+        await session.getPreferences();
+      }
+      response.preferences.metadata.revision -= 1;
+      policy.metadata.revision -= 1;
+      await expectLater(session.getPreferences(), throwsStateError);
+      final observer = snapshot()..sequence += 5;
+      observer.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      connection.events.add(observer);
+      await pumpEventQueue();
+      connection.preferences = (_, _) =>
+          throw TestFailure('Observer cannot read preferences');
+      await expectLater(session.getPreferences(), throwsStateError);
+      expect(await session.journal.pending(), isEmpty);
+    },
+  );
 
   test(
     'US-07: bundle download rechecks operation and context without acknowledging',

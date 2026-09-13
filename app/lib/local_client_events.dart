@@ -5,6 +5,7 @@ import 'client_event_stream.dart';
 import 'client_mutations.dart';
 import 'client_profiles.dart';
 import 'client_networks.dart';
+import 'client_preferences.dart';
 
 /// Production local transport binding for the typed event consumer. The shell
 /// must clear domain caches on disconnect and start a fresh subscription.
@@ -15,6 +16,20 @@ final class LocalClientEvents {
   final api.ClientServiceClient _client;
   final api.RuntimeInfo runtime;
   bool _closed = false;
+
+  Future<ClientPreferences> getPreferences(
+    String profileId,
+    void Function() checkContext,
+  ) => readClientPreferences(
+    instanceId: runtime.instanceId,
+    profileId: profileId,
+    get: _client.getPreferences,
+    listManaged: _client.listManagedSettings,
+    checkContext: () {
+      if (_closed) throw StateError('Local client is closed');
+      checkContext();
+    },
+  );
 
   Future<api.ReadDiagnosticsBundleResponse> readDiagnosticsBundle(
     api.ReadDiagnosticsBundleRequest request,

@@ -321,6 +321,14 @@
         {
           "path": "app/test/client_runtime_snapshot_test.dart",
           "scope": "Capability denial only; no preference editor"
+        },
+        {
+          "path": "app/test/mobile_contract_widget_test.dart",
+          "scope": "Shared typed preferences/policy read preserves optional false versus absence, requested/effective and locks; rejects mixed revisions, duplicate keys and wrong value kinds. No editor, native runtime or apply acceptance"
+        },
+        {
+          "path": "app/test/client_session_test.dart",
+          "scope": "Owner-scoped preferences read rejects stale metadata and repeated preferences, managed-settings and profile invalidations without writing the intention journal"
         }
       ],
       "acceptanceEvidence": []

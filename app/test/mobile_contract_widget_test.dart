@@ -10,6 +10,7 @@ import 'package:endlessnet/client_recovery_panel.dart';
 import 'package:endlessnet/client_identity_panel.dart';
 import 'package:endlessnet/client_diagnostics_panel.dart';
 import 'package:endlessnet/client_bundle_chunks.dart';
+import 'package:endlessnet/client_preferences.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,171 @@ import 'support/contract_test_scaffold.dart';
 
 /// Reused by the native integration-test host; no desktop channel is imported.
 void main() {
+  test(
+    'US-10: preference projection preserves presence and policy without writes',
+    () async {
+      final response = api.GetPreferencesResponse()
+        ..mergeFromProto3Json({
+          'preferences': {
+            'metadata': {'instanceId': 'preferences-test', 'revision': '7'},
+            'profileId': 'profile-a',
+            'allowInbound': {'effective': true, 'requested': false},
+            'acceptDns': {'effective': false},
+            'lifecycle': {
+              'uiQuit': {
+                'effective': 'LIFECYCLE_BEHAVIOR_KEEP_INTENT',
+                'requested': 'LIFECYCLE_BEHAVIOR_DISCONNECT',
+                'allowedValues': [
+                  'LIFECYCLE_BEHAVIOR_KEEP_INTENT',
+                  'LIFECYCLE_BEHAVIOR_DISCONNECT',
+                ],
+              },
+            },
+          },
+        });
+      final policies = api.ListManagedSettingsResponse()
+        ..mergeFromProto3Json({
+          'metadata': {'instanceId': 'preferences-test', 'revision': '7'},
+          'settings': [
+            {
+              'key': 'PREFERENCE_KEY_ALLOW_INBOUND',
+              'booleanValue': false,
+              'control': {
+                'locked': true,
+                'source': 'SETTING_SOURCE_ACCOUNT_POLICY',
+                'policyId': 'policy-a',
+              },
+            },
+          ],
+        });
+      var checks = 0;
+      final result = await readClientPreferences(
+        instanceId: 'preferences-test',
+        profileId: 'profile-a',
+        get: (request) async {
+          expect(request.profile.profileId, 'profile-a');
+          return response;
+        },
+        listManaged: (request) async {
+          expect(request.profile.profileId, 'profile-a');
+          response.preferences.allowInbound.requested = true;
+          return policies;
+        },
+        checkContext: () {
+          checks++;
+        },
+      );
+      expect(checks, 3);
+      expect(result.preferences.allowInbound.hasRequested(), isTrue);
+      expect(result.preferences.allowInbound.requested, isFalse);
+      expect(result.preferences.allowInbound.effective, isTrue);
+      expect(result.preferences.acceptDns.hasRequested(), isFalse);
+      expect(
+        result.preferences.lifecycle.uiQuit.requested,
+        api.LifecycleBehavior.LIFECYCLE_BEHAVIOR_DISCONNECT,
+      );
+      expect(
+        result.preferences.lifecycle.uiQuit.effective,
+        api.LifecycleBehavior.LIFECYCLE_BEHAVIOR_KEEP_INTENT,
+      );
+      policies.settings.single.control.locked = false;
+      expect(result.managed.single.control.locked, isTrue);
+      expect(result.managed.single.hasBooleanValue(), isTrue);
+      expect(result.managed.single.booleanValue, isFalse);
+      expect(result.preferences.isFrozen, isTrue);
+      expect(result.managed.single.isFrozen, isTrue);
+      expect(() => result.managed.clear(), throwsUnsupportedError);
+    },
+  );
+
+  test(
+    'US-10: mixed revisions and invalid policy entries never become a projection',
+    () async {
+      final response = api.GetPreferencesResponse()
+        ..mergeFromProto3Json({
+          'preferences': {
+            'profileId': 'profile-a',
+            'metadata': {'instanceId': 'preferences-test', 'revision': '7'},
+          },
+        });
+      final policies = api.ListManagedSettingsResponse()
+        ..mergeFromProto3Json({
+          'metadata': {'instanceId': 'preferences-test', 'revision': '7'},
+          'settings': [
+            {
+              'key': 'PREFERENCE_KEY_ACCEPT_DNS',
+              'booleanValue': false,
+              'control': {'source': 'SETTING_SOURCE_DEFAULT'},
+            },
+          ],
+        });
+      for (final change in <void Function(api.ListManagedSettingsResponse)>[
+        (r) => r.clearMetadata(),
+        (r) => r.metadata.instanceId = 'another-runtime',
+        (r) => r.metadata.revision += 1,
+        (r) => r.settings.add(
+          api.ManagedSetting.fromBuffer(r.settings.single.writeToBuffer()),
+        ),
+        (r) => r.settings.single.clearControl(),
+        (r) => r.settings.single.clearBooleanValue(),
+        (r) => r.settings.single.key = api.PreferenceKey.PREFERENCE_KEY_UI_QUIT,
+        (r) => r.settings.single.key =
+            api.PreferenceKey.PREFERENCE_KEY_UNSPECIFIED,
+      ]) {
+        final invalid = api.ListManagedSettingsResponse.fromBuffer(
+          policies.writeToBuffer(),
+        );
+        change(invalid);
+        await expectLater(
+          readClientPreferences(
+            instanceId: 'preferences-test',
+            profileId: 'profile-a',
+            get: (_) async => response,
+            listManaged: (_) async => invalid,
+            checkContext: () {},
+          ),
+          throwsFormatException,
+        );
+      }
+      for (final change in <void Function(api.GetPreferencesResponse)>[
+        (r) => r.clearPreferences(),
+        (r) => r.preferences.clearMetadata(),
+        (r) => r.preferences.profileId = 'another-profile',
+        (r) => r.preferences.metadata.instanceId = 'another-runtime',
+        (r) => r.preferences.metadata.revision -= 7,
+      ]) {
+        final invalid = api.GetPreferencesResponse.fromBuffer(
+          response.writeToBuffer(),
+        );
+        change(invalid);
+        await expectLater(
+          readClientPreferences(
+            instanceId: 'preferences-test',
+            profileId: 'profile-a',
+            get: (_) async => invalid,
+            listManaged: (_) =>
+                throw TestFailure('Invalid first read must stop'),
+            checkContext: () {},
+          ),
+          throwsFormatException,
+        );
+      }
+      var checks = 0;
+      await expectLater(
+        readClientPreferences(
+          instanceId: 'preferences-test',
+          profileId: 'profile-a',
+          get: (_) async => response,
+          listManaged: (_) => throw TestFailure('Invalidated read must stop'),
+          checkContext: () {
+            if (++checks == 2) throw StateError('Invalidated');
+          },
+        ),
+        throwsStateError,
+      );
+    },
+  );
+
   testWidgets(
     'US-07: export is explicit and cancellation retains the operation',
     (tester) async {

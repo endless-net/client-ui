@@ -115,6 +115,19 @@ successful compilation as simulator execution or extend the timeout as proof.
 
 ## Validation
 
+### Preferences/policy read foundation (2026-09-13)
+
+`client_preferences.dart` combines typed GetPreferences/ListManagedSettings only
+at one runtime revision. Shared tests preserve absent versus explicit false,
+requested versus effective lifecycle values and immutable policy locks; they
+reject malformed context, mixed revisions, duplicate keys and wrong value kinds.
+Session tests reject observer/stale reads and repeated domain invalidations.
+The shared test file is already imported by the Android/iOS integration host;
+this is test inclusion, not verified runner execution. Local validation passed
+177 Flutter tests (11 skipped), analyze and Go tests. The new paths do not yet
+have producer-process evidence, a preference editor or actual apply acceptance.
+The full migration gate remains 0/14, not completed.
+
 ### Operation envelope checks (2026-09-13)
 
 The mutation boundary rejects nil/malformed request UUIDs before submission or

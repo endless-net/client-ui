@@ -342,6 +342,20 @@ Rename никогда не меняет Account identity/control origin.
 
 ## 5. Сроки, предпочтения и диагностика
 
+Реализован read foundation US-10: `ClientSession.getPreferences` через прямой
+typed local binding читает `GetPreferences` и `ListManagedSettings`. Consumer
+публикует immutable projection только при совпадении instance/revision обоих
+ответов, явно заданном active profile и действующем owner context. Повторные
+invalidation preferences/managed settings/profiles отменяют незавершённое чтение;
+устаревшая ревизия относительно текущего status не принимается. Optional `false`
+сохраняется отдельно от отсутствующего override; requested/effective, source и
+lock не вычисляются UI. Некорректные и повторяющиеся managed keys/value kinds
+отвергаются. Read не пишет intention journal и не повторяется автоматически.
+Shared tests входят в desktop и mobile harness, session checks — в desktop suite;
+runner execution этого изменения ещё не подтверждено. Preferences editor,
+Set/Reset UX, atomic producer validation/apply и platform lifecycle acceptance
+остаются незавершёнными; production shell ещё использует старый consumer.
+
 Session.expires_at и credential.expires_at являются разными фактами. Для каждого
 UI показывает отдельно expiry, warning и доступный следующий шаг; отсутствие
 Timestamp означает неизвестный срок. UI не устанавливает fictitious validity.
