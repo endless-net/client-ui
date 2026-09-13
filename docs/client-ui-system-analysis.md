@@ -105,6 +105,13 @@ epoch; отправка проверяет показанные поля, snapsh
 поздние успех/ошибку и полные RU/EN тексты без повторной команды при смене языка.
 Это локальные проверки компонента, не atomic ownership/OS acceptance.
 
+ClientNetworksPanel принимает RU/EN для каталога, selected/empty и notices.
+Каталог привязан к controller, active profile и epochs профилей/сетей; callback
+выбора дополнительно проверяет показанные snapshot и каталог. Поздний lookup
+старого controller не публикуется. 12 short widget-векторов проверяют эти races,
+полные RU/EN тексты, смену языка без повторного запроса и отсутствие optimistic
+selection. Это component evidence, не реальное переключение сети или UI-AC-13.
+
 Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
 оставляют открытыми версии ОС, принятые assistive technologies, lifecycle
