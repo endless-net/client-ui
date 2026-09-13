@@ -360,8 +360,13 @@ Policy lock запрещает изменения, invalidation удаляет d
 старого кадра. Select/Clear связаны с session journal; acceptance операции не
 означает applied, результат восстанавливается отдельно. Четыре shared widget
 tests проверяют select, cancel/confirm clear, lock и invalidation; значения
-dropdown задаются через callbacks, не native gestures. Select/Clear producer
-process scenarios и actual traffic/platform acceptance ещё нужны.
+dropdown задаются через callbacks, не native gestures. Producer process suite
+добавляет select-exit, clear-exit и failed-exit: joint read перед командой,
+точные profile/node/family/LAN и mutation context, recovery по исходному UUID,
+typed selection либо failure без автоматического retry/clear/downgrade.
+Последняя per-family projection не меняется от operation outcome, journal
+сохраняется до явного acknowledgement. Новые process cases ожидают CI execution;
+actual traffic/platform acceptance остаётся отдельным незакрытым требованием.
 
 US-11 read foundation: `ClientSession.listResources` использует typed local RPC
 и immutable каталог. Search ограничен 256 UTF-8 bytes; фильтры фиксируются перед

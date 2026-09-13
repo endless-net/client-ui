@@ -144,8 +144,16 @@ are supplied through callbacks, while action buttons are tapped. A pending
 operation never becomes an optimistic applied state. The production session
 panel binds Select/Clear to the existing operation journal. These shared tests
 are included by desktop and mobile host suites, but this change has only local
-widget execution evidence until its GitHub jobs finish. Select/Clear producer
-process scenarios and actual routing/fail-closed platform acceptance remain open.
+widget execution evidence until its GitHub jobs finish. The producer process
+suite adds select-exit, clear-exit and failed-exit with a joint catalog/status
+read, exact mutation context and explicit dual-stack/BLOCK selection, held-open
+WatchEvents and recovery by the original UUID. Typed selection (including empty
+Clear selection) and UNSUPPORTED failure remain distinct; the previous partial
+family projection is not rewritten from operation success. Host verification
+rejects extra commands, including implicit clear, downgrade or retry. Local
+offline tests validate outcome fixtures; these new process cases are skipped
+locally and await execution on the pinned producer host in desktop CI. They do
+not prove actual routing/fail-closed platform acceptance or mobile native IPC.
 
 ### Resource reader foundation (2026-09-13)
 

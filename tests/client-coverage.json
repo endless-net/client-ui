@@ -194,6 +194,10 @@
         {
           "path": "app/test/client_session_test.dart",
           "scope": "Owner-scoped exit-node read rejects repeated exit/profile/peer/network invalidations and stale revisions without mutation or journal write"
+        },
+        {
+          "path": "app/test/client_session_process_test.dart",
+          "scope": "Producer-host select-exit, clear-exit and failed-exit cases: joint read, exact explicit mode/LAN and UUID context, typed selection/failure recovery, no optimistic family state and no extra command. Local outcome fixture validation only until CI execution; no actual routing or mobile native IPC evidence"
         }
       ],
       "acceptanceEvidence": []
