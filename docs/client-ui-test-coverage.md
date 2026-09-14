@@ -1,5 +1,15 @@
 # Client v0 test coverage ledger
 
+Catalog action semantics addition (2026-09-14): existing profile/network/resource
+context tests now enable Flutter semantics and assert exact localized button
+labels containing object type, display name and ID. Same-name rows remain
+distinguishable, including disabled profile actions and blocked network selection.
+The resource locale suite also verifies the browser action label. Tests scroll
+to the real controls; visible captions and command/context guards are unchanged.
+These are semantics-tree assertions, not native screen-reader acceptance.
+Final pinned validation: 872 Flutter tests passed, 30 skipped; analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Update handoff race correction (2026-09-14): seven added async regressions in
 `client_update_notification_delivery_test.dart` reproduce duplicate success and
 implicit failure retry when update invalidation overlaps delivery. Both read/send

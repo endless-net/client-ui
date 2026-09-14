@@ -85,6 +85,8 @@ void main() {
     for (final scenario in cases) {
       testWidgets('resource ${scenario.$1} in $initial', (tester) async {
         final state = ClientStateController();
+        final semantics = tester.ensureSemantics();
+
         final stream = StreamController<api.WatchEventsResponse>();
         await state.attach(stream.stream);
         final snapshot = fixtures.snapshot(1);
@@ -200,6 +202,15 @@ void main() {
         Future<void> tap(String key) async {
           final f = find.byKey(Key(key));
           await tester.ensureVisible(f);
+          await tester.pumpAndSettle();
+          if (key == 'open-resource-app') {
+            expect(
+              tester.getSemantics(f).label,
+              initial == ClientLocale.ru
+                  ? 'Открыть ресурс Example, ID app, в браузере'
+                  : 'Open resource Example, ID app, in browser',
+            );
+          }
           await tester.tap(f);
           await tester.pumpAndSettle();
         }
@@ -274,6 +285,7 @@ void main() {
           loads,
           ['opened', 'notOpened', 'destination'].contains(scenario.$1) ? 2 : 1,
         );
+        semantics.dispose();
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.runAsync(() async {
           await state.detach();

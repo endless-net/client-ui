@@ -355,6 +355,10 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
                           'Open resource in browser',
                           'Открыть ресурс в браузере',
                         ),
+                        semanticsLabel: _text(
+                          'Open resource ${resource.displayName}, ID ${resource.id}, in browser',
+                          'Открыть ресурс ${resource.displayName}, ID ${resource.id}, в браузере',
+                        ),
                       ),
                     ),
                   Text(
@@ -400,6 +404,15 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
                             enabled
                                 ? _text('Enable resource', 'Включить ресурс')
                                 : _text('Disable resource', 'Отключить ресурс'),
+                            semanticsLabel: enabled
+                                ? _text(
+                                    'Enable resource ${resource.displayName}, ID ${resource.id}',
+                                    'Включить ресурс ${resource.displayName}, ID ${resource.id}',
+                                  )
+                                : _text(
+                                    'Disable resource ${resource.displayName}, ID ${resource.id}',
+                                    'Отключить ресурс ${resource.displayName}, ID ${resource.id}',
+                                  ),
                           ),
                         ),
                     ],

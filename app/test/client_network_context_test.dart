@@ -50,6 +50,8 @@ void main() {
         tester,
       ) async {
         tester.view.physicalSize = const Size(360, 640);
+        final semantics = tester.ensureSemantics();
+
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
@@ -138,6 +140,10 @@ void main() {
         final select = find.byKey(const ValueKey('select-network-b'));
         await tester.ensureVisible(select);
         await tester.pumpAndSettle();
+        expect(
+          tester.getSemantics(select).label,
+          ru ? 'Выбрать сеть Office, ID b' : 'Select network Office, ID b',
+        );
         if (denied) {
           expect(tester.widget<TextButton>(select).onPressed, isNull);
         } else {
@@ -154,6 +160,7 @@ void main() {
         expect(find.text('Office'), findsNothing);
         expect(find.textContaining('account-'), findsNothing);
         expect(find.byKey(const ValueKey('select-network-b')), findsNothing);
+        semantics.dispose();
         await tester.pumpWidget(const SizedBox());
         await tester.runAsync(() async {
           await state.detach();

@@ -302,7 +302,13 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                                   );
                                 }
                               : null,
-                          child: Text(_text('Rename', 'Переименовать')),
+                          child: Text(
+                            _text('Rename', 'Переименовать'),
+                            semanticsLabel: _text(
+                              'Rename profile ${profile.displayName}, ID ${profile.id}',
+                              'Переименовать профиль ${profile.displayName}, ID ${profile.id}',
+                            ),
+                          ),
                         ),
                         profile.active
                             ? Text(_text('Active', 'Активный'))
@@ -320,7 +326,13 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                                         }
                                       }
                                     : null,
-                                child: Text(_text('Select', 'Выбрать')),
+                                child: Text(
+                                  _text('Select', 'Выбрать'),
+                                  semanticsLabel: _text(
+                                    'Select profile ${profile.displayName}, ID ${profile.id}',
+                                    'Выбрать профиль ${profile.displayName}, ID ${profile.id}',
+                                  ),
+                                ),
                               ),
                         TextButton(
                           key: ValueKey('remove-profile-${profile.id}'),
@@ -340,7 +352,13 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                                   }
                                 }
                               : null,
-                          child: Text(_text('Remove', 'Удалить')),
+                          child: Text(
+                            _text('Remove', 'Удалить'),
+                            semanticsLabel: _text(
+                              'Remove profile ${profile.displayName}, ID ${profile.id}',
+                              'Удалить профиль ${profile.displayName}, ID ${profile.id}',
+                            ),
+                          ),
                         ),
                       ],
                     ),

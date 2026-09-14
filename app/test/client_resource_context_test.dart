@@ -18,6 +18,8 @@ void main() {
       'UF-19 same-name resources retain network and overlap identity in $locale',
       (tester) async {
         tester.view.physicalSize = const Size(360, 640);
+        final semantics = tester.ensureSemantics();
+
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
@@ -128,6 +130,17 @@ void main() {
         }
         expect(find.text('Office'), findsNWidgets(2));
         expect(tester.takeException(), isNull);
+        for (final id in ['a', 'b']) {
+          for (final enabled in [true, false]) {
+            final button = find.byKey(ValueKey('resource-$id-$enabled'));
+            await tester.ensureVisible(button);
+            await tester.pumpAndSettle();
+            final verb = enabled
+                ? (ru ? 'Включить ресурс' : 'Enable resource')
+                : (ru ? 'Отключить ресурс' : 'Disable resource');
+            expect(tester.getSemantics(button).label, '$verb Office, ID $id');
+          }
+        }
         final enable = find.byKey(const ValueKey('resource-b-true'));
         await tester.ensureVisible(enable);
         await tester.pumpAndSettle();
@@ -136,6 +149,7 @@ void main() {
         expect(commands, 1);
         expect(find.text('Office'), findsNothing);
         expect(tester.takeException(), isNull);
+        semantics.dispose();
         await tester.pumpWidget(const SizedBox());
         await tester.runAsync(() async {
           await state.detach();

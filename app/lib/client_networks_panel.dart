@@ -186,7 +186,13 @@ class _ClientNetworksPanelState extends State<ClientNetworksPanel> {
                                     if (current()) _run(network.id);
                                   }
                                 : null,
-                            child: Text(_text('Select', 'Выбрать')),
+                            child: Text(
+                              _text('Select', 'Выбрать'),
+                              semanticsLabel: _text(
+                                'Select network ${network.name}, ID ${network.id}',
+                                'Выбрать сеть ${network.name}, ID ${network.id}',
+                              ),
+                            ),
                           ),
                   ],
                 ),

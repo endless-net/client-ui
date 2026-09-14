@@ -89,6 +89,8 @@ void main() {
         'UBR-23 profile context absent=$absent blocked=$blocked in $locale',
         (tester) async {
           tester.view.physicalSize = const Size(360, 640);
+          final semantics = tester.ensureSemantics();
+
           tester.view.devicePixelRatio = 1;
           addTearDown(tester.view.resetPhysicalSize);
           addTearDown(tester.view.resetDevicePixelRatio);
@@ -195,6 +197,23 @@ void main() {
           final select = find.byKey(const ValueKey('select-profile-b'));
           await tester.ensureVisible(select);
           await tester.pumpAndSettle();
+          expect(
+            tester.getSemantics(select).label,
+            ru ? 'Выбрать профиль Office, ID b' : 'Select profile Office, ID b',
+          );
+          for (final id in ['a', 'b']) {
+            for (final action in ['rename', 'remove']) {
+              final button = find.byKey(ValueKey('$action-profile-$id'));
+              await tester.ensureVisible(button);
+              await tester.pumpAndSettle();
+              final verb = action == 'rename'
+                  ? (ru ? 'Переименовать профиль' : 'Rename profile')
+                  : (ru ? 'Удалить профиль' : 'Remove profile');
+              expect(tester.getSemantics(button).label, '$verb Office, ID $id');
+            }
+          }
+          await tester.ensureVisible(select);
+          await tester.pumpAndSettle();
           if (blocked) {
             expect(tester.widget<TextButton>(select).onPressed, isNull);
           } else {
@@ -211,6 +230,7 @@ void main() {
           expect(find.text('Office'), findsNothing);
           expect(find.textContaining('control-a.example.test'), findsNothing);
           expect(find.byKey(const ValueKey('select-profile-b')), findsNothing);
+          semantics.dispose();
           await tester.pumpWidget(const SizedBox());
           await tester.runAsync(() async {
             await state.detach();

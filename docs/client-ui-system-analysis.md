@@ -20,6 +20,14 @@ producer main `60ff0eec554df0b77fdcd9a8fed7d6db933da65e` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+UF-14/UBR-19: повторяющиеся кнопки профилей (select/rename/remove), сетей
+(select) и ресурсов (open/enable/disable) имеют отдельные RU/EN semantic labels
+с типом объекта, именем и ID. Даже одинаковые display names различимы при
+фокусе на кнопке. Видимый короткий текст и guards команд сохранены. Context
+widget tests проверяют реальные labels в Flutter semantics tree после прокрутки,
+включая disabled действия; resource locale suite проверяет browser label.
+Эта проверка не заменяет ручное озвучивание NVDA/VoiceOver/TalkBack/Orca.
+
 UF-15: metadata invalidation во время OS handoff больше не теряет успешный
 receipt и не отправляет тот же релиз повторно. Receipt связан с lifecycle/caller
 контекстом и fingerprint релиза, а не с identity заменённого объекта projection.
