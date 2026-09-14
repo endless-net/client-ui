@@ -5,6 +5,13 @@
 Все 104 требования остаются в [матрице](../tests/client-coverage.json);
 полностью принятых US: 0 из 14.
 
+Повторная проверка producer на UI `f192138`: `ls-remote` и локальный
+`client/origin/main` совпадают на `f77191cfdf60a56889bc8d73c4f48cbaad2840c8`.
+`proto/client/v0` и `packages/client_api` не отличаются от UI pin; новые runtime
+commits не требуют смены SDK или версии UI. Текущая Windows privileged wiring и
+конкретные зависимости Linux/macOS/mobile перепроверены в
+[аудите privileged adapter](native-privileged-recovery.md).
+
 Последующее дополнение: Windows native permission, toast delivery и COM activation
 source добавлены после этого snapshot; см. актуальные evidence/ограничения в
 [SA](client-ui-system-analysis.md) и [ledger](client-ui-test-coverage.md).

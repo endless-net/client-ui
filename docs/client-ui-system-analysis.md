@@ -20,6 +20,13 @@ producer main `60ff0eec554df0b77fdcd9a8fed7d6db933da65e` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Producer main повторно проверен на UI `f192138`: remote и локальный origin/main
+равны `f77191cfdf60a56889bc8d73c4f48cbaad2840c8`. Proto v0 и Dart SDK идентичны
+закреплённым; версии/pin не меняются. [Аудит privileged adapter](native-privileged-recovery.md)
+заменяет устаревшее описание ещё не подключённого Windows shell и фиксирует
+недостающие конкретные Linux/macOS authorization/distribution и mobile bridge
+контракты. Их отсутствие не даёт права копировать runtime или угадывать launcher.
+
 UBR-09/10/UF-07: каталог сетей показывает Account ID и независимые IPv4/IPv6
 диапазоны из `Network`, а для невыбранной сети — доступность выбора и роль
 ответственного. Ранее отображались только имя/ID и disabled-кнопка. Отсутствующее
