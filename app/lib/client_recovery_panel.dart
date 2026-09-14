@@ -38,6 +38,19 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
   _RecoveryNotice? _notice;
   int? _epoch;
   bool _busy = false;
+  Object _binding = Object();
+
+  @override
+  void didUpdateWidget(covariant ClientRecoveryPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.state, widget.state)) {
+      _binding = Object();
+      _results = [];
+      _notice = null;
+      _epoch = null;
+      _busy = false;
+    }
+  }
 
   bool get _owner =>
       mounted &&
@@ -53,6 +66,7 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
       return;
     }
     final epoch = widget.state.cacheEpoch;
+    final binding = _binding;
     setState(() {
       _busy = true;
       _notice = null;
@@ -61,7 +75,12 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
       // Re-read the operation immediately before using its sensitive action.
       // A displayed URL may have expired or been replaced since the last lookup.
       final results = await widget.recover();
-      if (!mounted || !_owner || epoch != widget.state.cacheEpoch) return;
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          !_owner ||
+          epoch != widget.state.cacheEpoch) {
+        return;
+      }
       final current = results.singleWhere(
         (op) =>
             op.value.id == displayed.value.id &&
@@ -97,17 +116,29 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
       // Producer validates the URL against trusted origin/provider policy.
       // No URL, token or launch exception is logged or placed in a notice.
       final opened = await widget.openBrowser!(uri);
-      if (!mounted || !_owner || epoch != widget.state.cacheEpoch) return;
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          !_owner ||
+          epoch != widget.state.cacheEpoch) {
+        return;
+      }
       setState(
         () => _notice = opened
             ? _RecoveryNotice.browserOpened
             : _RecoveryNotice.browserUnavailable,
       );
     } catch (_) {
-      if (!mounted || !_owner || epoch != widget.state.cacheEpoch) return;
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          !_owner ||
+          epoch != widget.state.cacheEpoch) {
+        return;
+      }
       setState(() => _notice = _RecoveryNotice.browserFailed);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(binding, _binding)) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -119,8 +150,12 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
       return;
     }
     final epoch = widget.state.cacheEpoch;
+    final binding = _binding;
     void check() {
-      if (!mounted || !_owner || epoch != widget.state.cacheEpoch) {
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          !_owner ||
+          epoch != widget.state.cacheEpoch) {
         throw StateError('Export context changed');
       }
     }
@@ -150,11 +185,16 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
             : _RecoveryNotice.exportCancelled,
       );
     } catch (_) {
-      if (mounted && _owner && epoch == widget.state.cacheEpoch) {
+      if (mounted &&
+          identical(binding, _binding) &&
+          _owner &&
+          epoch == widget.state.cacheEpoch) {
         setState(() => _notice = _RecoveryNotice.exportFailed);
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(binding, _binding)) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -166,6 +206,7 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
       return;
     }
     final epoch = widget.state.cacheEpoch;
+    final binding = _binding;
     setState(() {
       _busy = true;
       if (_epoch != epoch) _results = [];
@@ -175,7 +216,12 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
     try {
       if (acknowledgement == null) {
         final results = await widget.recover();
-        if (!mounted || widget.state.cacheEpoch != epoch || !_owner) return;
+        if (!mounted ||
+            !identical(binding, _binding) ||
+            widget.state.cacheEpoch != epoch ||
+            !_owner) {
+          return;
+        }
         setState(() {
           _results = List.unmodifiable(results);
           if (results.isEmpty) _notice = _RecoveryNotice.empty;
@@ -183,7 +229,12 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
       } else {
         if (!acknowledgement.terminal) return;
         await widget.acknowledge(acknowledgement);
-        if (!mounted || widget.state.cacheEpoch != epoch || !_owner) return;
+        if (!mounted ||
+            !identical(binding, _binding) ||
+            widget.state.cacheEpoch != epoch ||
+            !_owner) {
+          return;
+        }
         setState(() {
           _results = _results
               .where(
@@ -194,10 +245,17 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
         });
       }
     } catch (_) {
-      if (!mounted || widget.state.cacheEpoch != epoch || !_owner) return;
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          widget.state.cacheEpoch != epoch ||
+          !_owner) {
+        return;
+      }
       setState(() => _notice = _RecoveryNotice.recoveryFailed);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(binding, _binding)) {
+        setState(() => _busy = false);
+      }
     }
   }
 

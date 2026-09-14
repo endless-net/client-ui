@@ -1,5 +1,16 @@
 # Client v0 test coverage ledger
 
+Recovery controller replacement correction (2026-09-14): cacheEpoch alone did
+not distinguish different controllers with the same epoch. The panel now revokes
+its asynchronous binding and clears results/notices/busy when its controller is
+replaced. All lookup, browser, export and acknowledgement continuations, including
+finally blocks, require the original binding. Four tests replace ready controllers
+with equal epochs while work is pending, start a new lookup, then complete the
+old work: no stale result/browser/export and no clearing of the new busy state.
+Injected callbacks only; no actual producer/browser/export acceptance is claimed.
+Validation: 892 Flutter tests passed, 30 skipped; pinned analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Identity confirmation keyboard/layout audit (2026-09-14): existing owner trust
 coverage now runs in RU/EN at 360x640 and 200% text. Inspection, explicit comparison
 checkbox and final trust use Tab/Space/Enter. Origin and 64-character announcement
