@@ -192,7 +192,7 @@
         },
         {
           "path": "app/test/client_connection_activation_test.dart",
-          "scope": "Current owner profile displays typed pending action, recovery failure and runtime failures with distinct action owners; raw reasons/browser URL stay hidden, replacement snapshot clears guidance and rendering submits nothing. Shared desktop/mobile harness; local regression only pending runner execution, not complete state usability acceptance"
+          "scope": "Current owner profile displays typed pending action, recovery failure and runtime failures with distinct action owners; raw reasons/browser URL stay hidden, replacement snapshot clears guidance and rendering submits nothing. Six short controller A-B-A tests cover connect/disconnect/renew late success/error: no old notice or release of a newer action. Shared desktop/mobile harness; local regression only pending runner execution, not complete state usability acceptance"
         },
         {
           "path": "app/test/mobile_contract_widget_test.dart",

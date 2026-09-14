@@ -13,6 +13,100 @@ import 'package:flutter_test/flutter_test.dart';
 // Deliberately retain a callback to simulate queued activation from an older
 // frame. This does not replace platform keyboard/hit-test acceptance.
 void main() {
+  for (final action in ['connect', 'disconnect', 'renew-session']) {
+    for (final failed in [false, true]) {
+      testWidgets(
+        'controller replacement isolates $action completion error=$failed',
+        (tester) async {
+          final states = [ClientStateController(), ClientStateController()];
+          final sources = [
+            StreamController<api.WatchEventsResponse>(),
+            StreamController<api.WatchEventsResponse>(),
+          ];
+          for (var i = 0; i < 2; i++) {
+            await states[i].attach(sources[i].stream);
+            sources[i].add(_snapshot());
+          }
+          await tester.pump();
+          expect(states[0].cacheEpoch, states[1].cacheEpoch);
+          final old = Completer<ClientOperation>();
+          final fresh = Completer<ClientOperation>();
+          var calls = 0;
+          Future<ClientOperation> command() {
+            calls++;
+            return calls == 1 ? old.future : fresh.future;
+          }
+
+          Future<void> render(int index) => tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: ClientConnectionPanel(
+                    state: states[index],
+                    connect: command,
+                    disconnect: command,
+                    renewSession: command,
+                  ),
+                ),
+              ),
+            ),
+          );
+          final button = find.byKey(Key('client-$action'));
+          await render(0);
+          await tester.ensureVisible(button);
+          await tester.tap(button);
+          await tester.pump();
+          expect(calls, 1);
+          await render(1);
+          // Returning to the original instance must not revive its old request.
+          await render(0);
+          expect(tester.widget<ButtonStyleButton>(button).onPressed, isNotNull);
+          await tester.ensureVisible(button);
+          await tester.tap(button);
+          await tester.pump();
+          expect(calls, 2);
+          final result = ClientOperation.fromProto(
+            api.Operation(
+              id: 'operation',
+              kind: switch (action) {
+                'disconnect' => api.OperationKind.OPERATION_KIND_DISCONNECT,
+                'renew-session' =>
+                  api.OperationKind.OPERATION_KIND_RENEW_SESSION,
+                _ => api.OperationKind.OPERATION_KIND_CONNECT,
+              },
+              state: api.OperationState.OPERATION_STATE_PENDING,
+            ),
+          );
+          if (failed) {
+            old.completeError(StateError('private old error'));
+          } else {
+            old.complete(result);
+          }
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('client-command-announcement')),
+            findsNothing,
+          );
+          expect(tester.widget<ButtonStyleButton>(button).onPressed, isNull);
+          fresh.complete(result);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('client-command-announcement')),
+            findsOneWidget,
+          );
+          expect(tester.widget<ButtonStyleButton>(button).onPressed, isNotNull);
+          await tester.pumpWidget(const SizedBox());
+          await tester.runAsync(() async {
+            for (var i = 0; i < 2; i++) {
+              await states[i].detach();
+              await sources[i].close();
+              states[i].dispose();
+            }
+          });
+        },
+      );
+    }
+  }
   testWidgets('US-03 displays typed status guidance without sensitive payload', (
     tester,
   ) async {
@@ -253,101 +347,103 @@ void main() {
       'dispose',
       'duplicate',
     ]) {
-      testWidgets('US-03/09 queued $action rejects $change replacement', (
-        tester,
-      ) async {
-        final state = ClientStateController();
-        final source = StreamController<api.WatchEventsResponse>();
-        await state.attach(source.stream);
-        final pending = Completer<ClientOperation>();
-        var calls = 0;
-        Future<ClientOperation> submit() {
-          calls++;
-          return pending.future;
-        }
+      testWidgets(
+        'US-03/09 queued $action rejects $change replacement',
+        (tester) async {
+          final state = ClientStateController();
+          final source = StreamController<api.WatchEventsResponse>();
+          await state.attach(source.stream);
+          final pending = Completer<ClientOperation>();
+          var calls = 0;
+          Future<ClientOperation> submit() {
+            calls++;
+            return pending.future;
+          }
 
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: ClientConnectionPanel(
-                state: state,
-                connect: submit,
-                disconnect: submit,
-                renewSession: submit,
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: ClientConnectionPanel(
+                  state: state,
+                  connect: submit,
+                  disconnect: submit,
+                  renewSession: submit,
+                ),
               ),
             ),
-          ),
-        );
-        final snapshot = _snapshot();
-        source.add(snapshot);
-        await tester.pump();
-        expect(state.link, ClientLinkState.ready);
-        final queued = tester
-            .widget<ButtonStyleButton>(find.byKey(Key('client-$action')))
-            .onPressed!;
+          );
+          final snapshot = _snapshot();
+          source.add(snapshot);
+          await tester.pump();
+          expect(state.link, ClientLinkState.ready);
+          final queued = tester
+              .widget<ButtonStyleButton>(find.byKey(Key('client-$action')))
+              .onPressed!;
 
-        if (change == 'duplicate') {
-          queued();
-          queued();
-          expect(calls, 1);
-        } else {
-          if (change == 'detach') {
-            await tester.runAsync(state.detach);
-          } else if (change == 'dispose') {
-            await tester.pumpWidget(const SizedBox());
+          if (change == 'duplicate') {
+            queued();
+            queued();
+            expect(calls, 1);
           } else {
-            final replacement = api.WatchEventsResponse.fromBuffer(
-              snapshot.writeToBuffer(),
-            );
-            replacement.sequence += 1;
-            replacement.metadata.revision += 1;
-            replacement.snapshot.status.metadata.revision += 1;
-            switch (change) {
-              case 'profile':
-                replacement.snapshot.status.activeProfileId = 'profile-b';
-              case 'observer':
-                replacement.snapshot.runtime.callerAccess =
-                    api.Access.ACCESS_OBSERVER;
-                replacement.snapshot.status.clearActiveProfileId();
-                replacement.snapshot.status.clearSession();
-              case 'capability':
-                replacement.snapshot.runtime.capabilities.clear();
-              case 'status':
-                final status = replacement.snapshot.status;
-                status.connectionPhase =
-                    api.ConnectionPhase.CONNECTION_PHASE_CONNECTING;
-                replacement.clearSnapshot();
-                replacement.statusChanged = status;
-              case 'session':
-                replacement.clearSnapshot();
-                replacement.ensureSessionChanged().state =
-                    api.SessionState.SESSION_STATE_RENEWING;
+            if (change == 'detach') {
+              await tester.runAsync(state.detach);
+            } else if (change == 'dispose') {
+              await tester.pumpWidget(const SizedBox());
+            } else {
+              final replacement = api.WatchEventsResponse.fromBuffer(
+                snapshot.writeToBuffer(),
+              );
+              replacement.sequence += 1;
+              replacement.metadata.revision += 1;
+              replacement.snapshot.status.metadata.revision += 1;
+              switch (change) {
+                case 'profile':
+                  replacement.snapshot.status.activeProfileId = 'profile-b';
+                case 'observer':
+                  replacement.snapshot.runtime.callerAccess =
+                      api.Access.ACCESS_OBSERVER;
+                  replacement.snapshot.status.clearActiveProfileId();
+                  replacement.snapshot.status.clearSession();
+                case 'capability':
+                  replacement.snapshot.runtime.capabilities.clear();
+                case 'status':
+                  final status = replacement.snapshot.status;
+                  status.connectionPhase =
+                      api.ConnectionPhase.CONNECTION_PHASE_CONNECTING;
+                  replacement.clearSnapshot();
+                  replacement.statusChanged = status;
+                case 'session':
+                  replacement.clearSnapshot();
+                  replacement.ensureSessionChanged().state =
+                      api.SessionState.SESSION_STATE_RENEWING;
+              }
+              source.add(replacement);
+              await tester.pump();
+              expect(state.link, ClientLinkState.ready);
             }
-            source.add(replacement);
-            await tester.pump();
-            expect(state.link, ClientLinkState.ready);
+            queued();
+            expect(calls, 0);
           }
-          queued();
-          expect(calls, 0);
-        }
-        pending.complete(
-          ClientOperation.fromProto(
-            api.Operation(
-              id: 'synthetic-operation',
-              kind: api.OperationKind.OPERATION_KIND_CONNECT,
-              state: api.OperationState.OPERATION_STATE_PENDING,
+          pending.complete(
+            ClientOperation.fromProto(
+              api.Operation(
+                id: 'synthetic-operation',
+                kind: api.OperationKind.OPERATION_KIND_CONNECT,
+                state: api.OperationState.OPERATION_STATE_PENDING,
+              ),
             ),
-          ),
-        );
-        await tester.pump();
-        await tester.pumpWidget(const SizedBox());
-        await tester.runAsync(() async {
-          await state.detach();
-          await source.close();
-          state.dispose();
-        });
-        expect(tester.takeException(), isNull);
-      }, timeout: const Timeout(Duration(seconds: 20)));
+          );
+          await tester.pump();
+          await tester.pumpWidget(const SizedBox());
+          await tester.runAsync(() async {
+            await state.detach();
+            await source.close();
+            state.dispose();
+          });
+          expect(tester.takeException(), isNull);
+        },
+        timeout: const Timeout(Duration(seconds: 20)),
+      );
     }
   }
 }

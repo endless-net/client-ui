@@ -36,6 +36,18 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
   bool get _disconnecting => _pending.contains(_ClientAction.disconnect);
   _ConnectionNotice? _notice;
   int? _noticeEpoch;
+  Object _binding = Object();
+
+  @override
+  void didUpdateWidget(covariant ClientConnectionPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.state, widget.state)) {
+      _binding = Object();
+      _pending.clear();
+      _notice = null;
+      _noticeEpoch = null;
+    }
+  }
 
   Future<void> _run(
     _ClientAction action,
@@ -52,6 +64,7 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
       return;
     }
     final epoch = widget.state.cacheEpoch;
+    final binding = _binding;
     setState(() {
       _pending.add(action);
       _notice = null;
@@ -63,7 +76,11 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
         _ClientAction.disconnect => widget.disconnect(),
         _ClientAction.renewSession => widget.renewSession(),
       };
-      if (!mounted || widget.state.cacheEpoch != epoch) return;
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          widget.state.cacheEpoch != epoch) {
+        return;
+      }
       setState(() {
         _notice = operation.succeeded
             ? _ConnectionNotice.completed
@@ -72,11 +89,15 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
             : _ConnectionNotice.accepted;
       });
     } catch (_) {
-      if (!mounted || widget.state.cacheEpoch != epoch) return;
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          widget.state.cacheEpoch != epoch) {
+        return;
+      }
       // Raw transport/exception text can contain credentials or private URLs.
       setState(() => _notice = _ConnectionNotice.unknown);
     } finally {
-      if (mounted) {
+      if (mounted && identical(binding, _binding)) {
         setState(() {
           _pending.remove(action);
         });
