@@ -14,6 +14,26 @@
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Windows opt-in implementation: MSI больше не создаёт HKCU Run запись UI.
+Windows host обслуживает `endlessnet/ui-autostart` (`read`, `setEnabled` с bool);
+entrypoint подключает общий RU/EN panel. Только явное включение записывает
+quoted путь текущего executable без runtime CLI и аргументов в
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\EndlessNet`.
+Явное выключение удаляет совпадающую запись. Чтение не создаёт ключ/значение.
+Чужая команда, старый путь, неправильный registry type, malformed или слишком
+длинное значение дают безопасную ошибку, а не перезапись. Legacy формат
+установщика не поддерживается. Ограничение 260 символов следует
+[Windows Run contract](https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys).
+
+Результат `registered` означает наличие записи, а не разрешение Windows:
+StartupApproved не читается и не изменяется, отдельная кнопка открывает Windows
+Startup apps settings. `notConfigured` означает отсутствие записи текущего
+пользователя. Служба и намерение VPN не изменяются. Это заменяет прежнее описание
+безусловной MSI регистрации и Windows panel только со ссылкой на настройки.
+Реальные login, OS policy, upgrade/uninstall и очистка UI-owned Run записи для
+разных пользователей ещё требуют distribution acceptance; перенос executable
+не мигрирует прежний путь. Native unit boundary не заменяет эти проверки.
+
 Пользователь утвердил следующие решения при переносе цели в новую задачу:
 
 - Windows AppUserModelID процесса UI и MSI shortcut: `EndlessNet.Client`.

@@ -270,10 +270,6 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       <Component Id="AppIcon" Guid="*" Bitness="always64">
         <File Id="AppIconFile" Source="$(var.IconFile)" Name="endlessnet.ico" KeyPath="yes" />
       </Component>
-      <Component Id="AppAutostart" Guid="*" Bitness="always64">
-        <RemoveRegistryValue Id="RemoveLegacyAutostartName" Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet Tray" />
-        <RegistryValue Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="EndlessNet" Value="&quot;[INSTALLFOLDER]endlessnet.exe&quot; --debug --debug-log-dir %s" Type="string" KeyPath="yes" />
-      </Component>
       <Component Id="EventLogSource" Guid="*" Bitness="always64">
         <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\EventLog\Application\%s">
           <RegistryValue Name="EventMessageFile" Type="expandable" Value="[System64Folder]EventCreate.exe" KeyPath="yes" />
@@ -335,7 +331,6 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
 		xmlAttrEscape(opts.ServiceOptions.Description),
 		xmlAttrEscape(strings.Join(serviceArgs, " ")),
 		xmlAttrEscape(opts.ServiceOptions.ServiceName),
-		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
 		xmlAttrEscape(opts.ServiceOptions.EventLogSource),
 		xmlAttrEscape(opts.ServiceOptions.DebugLogDir),
 	)

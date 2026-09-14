@@ -55,8 +55,8 @@ class _WindowsAutostartState extends State<ClientWindowsAutostartPanel> {
       Text(text('Start UI at sign-in', 'Запускать интерфейс при входе')),
       Text(
         text(
-          'Manage EndlessNet in Windows Startup apps settings. The installer registers the UI; its current startup permission is not checked here. This does not change the runtime connection intent.',
-          'Управляйте EndlessNet в настройках автозагрузки Windows. Установщик регистрирует интерфейс; текущее разрешение автозапуска здесь не проверяется. Это не меняет намерение подключения службы.',
+          'After enabling UI autostart, manage EndlessNet in Windows Startup apps settings. Its current startup permission is not checked here. This does not change the runtime connection intent.',
+          'После включения автозапуска интерфейса управляйте EndlessNet в настройках автозагрузки Windows. Текущее разрешение автозапуска здесь не проверяется. Это не меняет намерение подключения службы.',
         ),
       ),
       TextButton(

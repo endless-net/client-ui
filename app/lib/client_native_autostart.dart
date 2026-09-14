@@ -6,6 +6,8 @@ const _channel = MethodChannel('endlessnet/ui-autostart');
 Future<ClientAutostartSetting> _invoke(String method, [bool? enabled]) async {
   try {
     return switch (await _channel.invokeMethod<String>(method, enabled)) {
+      'notConfigured' => ClientAutostartSetting.notConfigured,
+      'registered' => ClientAutostartSetting.registered,
       'enabled' => ClientAutostartSetting.enabled,
       'disabled' => ClientAutostartSetting.disabled,
       'requiresApproval' => ClientAutostartSetting.requiresApproval,

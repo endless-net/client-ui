@@ -86,7 +86,11 @@
         },
         {
           "path": "app/test/client_native_autostart_test.dart",
-          "scope": "Nine short channel/widget tests: authoritative enabled/disabled/requiresApproval/unsupported on read and boolean-only set, missing/malformed/error distinction, RU/EN approval and unsupported UI with writes disabled. macOS SMAppService source added for 13+, older OS unsupported without fallback; native compilation, registration/approval/login and install/upgrade unverified"
+          "scope": "Short channel/widget tests include registered/notConfigured Windows states, opt-in RU/EN enable and removal with no implied OS permission, plus enabled/disabled/requiresApproval/unsupported mapping and error handling. Windows source compiled locally; real registration/approval/login and install/upgrade unverified"
+        },
+        {
+          "path": "app/windows/runner/ui_autostart_test.cpp",
+          "scope": "Locally executed native handler with fake Win32 boundary: HKCU-only fixed value, no read-side write, explicit enable/delete, unknown command and wrong type refusal, embedded NUL rejection, access failure, missing key, invalid method/arguments and long command rejection. No actual registry or login acceptance; CMake target ui_autostart_test is explicitly invoked"
         },
         {
           "path": "app/test/client_linux_autostart_test.dart",

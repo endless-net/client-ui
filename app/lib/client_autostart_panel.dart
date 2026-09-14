@@ -110,6 +110,10 @@ class _AutostartState extends State<ClientAutostartPanel> {
                   'Не удалось прочитать или изменить автозапуск. Неизвестная запись не перезаписывается.',
                 )
               : switch (_setting) {
+                  ClientAutostartSetting.registered => text(
+                    'User autostart entry registered. Windows startup permission is not checked; review it in Windows startup settings.',
+                    'Запись автозапуска пользователя создана. Разрешение Windows не проверено; проверьте его в настройках автозагрузки Windows.',
+                  ),
                   ClientAutostartSetting.enabled => text(
                     'User autostart entry enabled.',
                     'Автозапуск пользователя включён.',

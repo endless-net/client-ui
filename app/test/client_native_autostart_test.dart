@@ -15,7 +15,58 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  for (final locale in ClientLocale.values) {
+    testWidgets('Windows registration is opt-in and not OS permission: $locale', (
+      tester,
+    ) async {
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return call.arguments == true ? 'registered' : 'notConfigured';
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ClientAutostartPanel(
+                read: readNativeClientAutostart,
+                write: writeNativeClientAutostart,
+                locale: locale,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(calls.map((c) => c.method), ['read']);
+      await tester.tap(find.byKey(const Key('ui-autostart-enable')));
+      await tester.pumpAndSettle();
+      expect(calls.last.arguments, true);
+      expect(
+        find.text(
+          locale == ClientLocale.en
+              ? 'User autostart entry registered. Windows startup permission is not checked; review it in Windows startup settings.'
+              : 'Запись автозапуска пользователя создана. Разрешение Windows не проверено; проверьте его в настройках автозагрузки Windows.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('User autostart entry enabled.'), findsNothing);
+      await tester.tap(find.byKey(const Key('ui-autostart-disable')));
+      await tester.pumpAndSettle();
+      expect(calls.map((c) => c.arguments), [null, true, false]);
+      expect(
+        find.textContaining(
+          locale == ClientLocale.en
+              ? 'No user autostart entry.'
+              : 'Пользовательская запись отсутствует.',
+        ),
+        findsOneWidget,
+      );
+    });
+  }
   for (final state in [
+    ClientAutostartSetting.notConfigured,
+    ClientAutostartSetting.registered,
     ClientAutostartSetting.enabled,
     ClientAutostartSetting.disabled,
     ClientAutostartSetting.requiresApproval,

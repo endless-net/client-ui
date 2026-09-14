@@ -80,7 +80,6 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`<Files Include="$(var.AppBundleDir)\native_assets.json" />`,
 		`ComponentGroup Id="EndlessNetAppDataFiles" Directory="EndlessNetAppDataFolder"`,
 		`<Files Include="$(var.AppBundleDir)\data\**" />`,
-		`Software\Microsoft\Windows\CurrentVersion\Run`,
 		`<ServiceInstall`,
 		`Name="endlessnet-client"`,
 		`--windows-service`,
@@ -120,6 +119,8 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		t.Fatalf("state removal condition count = %d, want 2:\n%s", got, artifacts.WixSource)
 	}
 	for _, forbidden := range []string{
+		`AppAutostart`,
+		`Software\Microsoft\Windows\CurrentVersion\Run`,
 		`DeepLinkProtocol`,
 		`Software\Classes\endlessnet`,
 		`URL:EndlessNet Enrollment`,

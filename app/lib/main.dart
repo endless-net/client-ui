@@ -119,7 +119,7 @@ Future<void> main(List<String> args) async {
       openWindowsAutostartSettings: Platform.isWindows
           ? openWindowsClientAutostartSettings
           : null,
-      readAutostart: Platform.isMacOS
+      readAutostart: Platform.isMacOS || Platform.isWindows
           ? readNativeClientAutostart
           : Platform.isLinux
           ? () async {
@@ -128,7 +128,7 @@ Future<void> main(List<String> args) async {
               return store.read();
             }
           : null,
-      writeAutostart: Platform.isMacOS
+      writeAutostart: Platform.isMacOS || Platform.isWindows
           ? writeNativeClientAutostart
           : Platform.isLinux
           ? (enabled) async {

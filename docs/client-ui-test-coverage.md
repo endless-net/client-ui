@@ -1,5 +1,28 @@
 # Client v0 test coverage ledger
 
+Windows opt-in autostart addition (2026-09-14): MSI automatic Run registration
+removed, UI explicitly registers/removes its current executable for HKCU.
+Native handler unit checks run against fake Win32 functions, never real registry:
+read-only behavior, explicit writes/deletes, fixed HKCU/name, stale/foreign/type/NUL
+rejection, missing keys, failed access, argument/method and length admission.
+RU/EN widget/channel tests distinguish registration from Windows permission and
+verify enable/remove only after explicit actions. Installer test rejects any
+automatic Run entry. Local Go full, Flutter analysis, Flutter full (810 passed,
+30 skipped), Windows Debug compile and all 13 policy/trace tests passed.
+The 104-requirement ledger remains partial, 0/14 accepted scenarios.
+
+Native unit command after configuring/building the Windows host:
+
+```powershell
+cmake --build app/build/windows/x64 --config Debug --target ui_autostart_test
+.\app\build\windows\x64\runner\Debug\ui_autostart_test.exe
+```
+
+This explicit unit target is excluded from default build and not yet a runner
+qualification. OS permission, real sign-in and distribution cleanup/upgrade for
+all users remain unverified. Earlier statements that MSI registers autostart
+describe the superseded implementation.
+
 Windows shell identity addition (2026-09-14): the UI sets the approved
 `EndlessNet.Client` AppUserModelID before creating Flutter windows, and the MSI
 Start Menu shortcut carries the matching `System.AppUserModel.ID`. The existing
