@@ -69,6 +69,25 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  tray_host_.Initialize(RegisterWindowMessageW(L"TaskbarCreated"));
+  tray_host_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "endlessnet/ui-tray-host",
+          &flutter::StandardMethodCodec::GetInstance());
+  tray_host_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
+    if (call.method_name() != "isAvailable") {
+      result->NotImplemented();
+      return;
+    }
+    if (call.arguments() &&
+        !std::holds_alternative<std::monostate>(*call.arguments())) {
+      result->Error("invalid_arguments", "Tray host query takes no arguments");
+      return;
+    }
+    result->Success(flutter::EncodableValue(
+        tray_host_.Available(GetShellWindow() != nullptr)));
+  });
+
   autostart_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(), "endlessnet/ui-autostart",
@@ -149,6 +168,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  tray_host_channel_.reset();
   notification_activation_.reset();
   notification_channel_.reset();
   autostart_channel_.reset();
@@ -164,6 +184,8 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // Observe the broadcast even if a plugin consumes it below.
+  tray_host_.OnMessage(message);
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

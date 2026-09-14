@@ -2,8 +2,8 @@ import 'package:tray_manager/tray_manager.dart';
 import 'package:flutter/services.dart';
 
 Future<bool> readClientTrayHostAvailability(String platform) async {
-  if (platform == 'windows' || platform == 'macos') return true;
-  if (platform != 'linux') return false;
+  if (platform == 'macos') return true;
+  if (platform != 'linux' && platform != 'windows') return false;
   try {
     return await const MethodChannel(
           'endlessnet/ui-tray-host',

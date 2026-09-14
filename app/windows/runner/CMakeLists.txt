@@ -53,3 +53,6 @@ target_compile_definitions(ui_notifications_test PRIVATE "NOMINMAX")
 target_include_directories(ui_notifications_test PRIVATE
   "${FLUTTER_MANAGED_DIR}/ephemeral/cpp_client_wrapper/include")
 target_link_libraries(ui_notifications_test PRIVATE "windowsapp.lib")
+
+add_executable(ui_tray_host_test EXCLUDE_FROM_ALL "ui_tray_host_test.cpp")
+apply_standard_settings(ui_tray_host_test)

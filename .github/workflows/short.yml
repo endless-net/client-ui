@@ -36,7 +36,7 @@ jobs:
           node scripts/check-client-coverage.mjs
       - name: Short Go tests
         run: go test -short ./...
-      - name: Short Linux notification protocol unit tests
+      - name: Short native protocol and tray state unit tests
         run: |
           if ! pkg-config --exists gio-2.0; then
             sudo apt-get update
@@ -47,6 +47,8 @@ jobs:
           app/.dart_tool/notification_protocol_test
           c++ -std=c++17 -Wall -Werror app/linux/runner/tray_host_protocol_test.cc $(pkg-config --cflags --libs gio-2.0) -o app/.dart_tool/tray_host_protocol_test
           app/.dart_tool/tray_host_protocol_test
+          c++ -std=c++17 -Wall -Werror app/windows/runner/ui_tray_host_test.cpp -o app/.dart_tool/ui_tray_host_test
+          app/.dart_tool/ui_tray_host_test
       - name: Resolve locked Flutter dependencies
         working-directory: app
         run: flutter pub get --enforce-lockfile

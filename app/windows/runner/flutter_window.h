@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "win32_window.h"
+#include "ui_tray_host.h"
 
 class UiNotificationActivationHost;
 
@@ -36,6 +37,8 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> destination_channel_;
   bool destination_picker_open_ = false;
+  UiTrayHostState tray_host_;
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> tray_host_channel_;
   std::unique_ptr<UiNotificationActivationHost> notification_activation_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> autostart_channel_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> notification_channel_;

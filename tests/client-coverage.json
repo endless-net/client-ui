@@ -74,7 +74,11 @@
       "testEvidence": [
         {
           "path": "app/test/client_tray_host_test.dart",
-          "scope": "13 short tests: supported tray methods/lifetime plus Linux availability requiring explicit native true, missing/error/malformed refusal and no Linux query on other platforms. Composed desktop tests separately exercise absent/lost host and pending-hide race. Actual GNOME tray visibility/interaction unverified"
+          "scope": "15 short tests: supported tray methods/lifetime plus Linux/Windows availability requiring explicit native true and missing/error/malformed refusal; macOS still uses plugin readiness. Composed desktop tests separately exercise absent/lost host and pending-hide race. Actual OS tray visibility/interaction unverified"
+        },
+        {
+          "path": "app/windows/runner/ui_tray_host_test.cpp",
+          "scope": "Portable native state unit executed locally in Ubuntu: failed TaskbarCreated registration, absent Shell, unrelated message, restart invalidation and independent replacement lifetime. Windows release host compiled; actual Win32 Shell query/broadcast and Explorer/DPI/focus acceptance unverified"
         },
         {
           "path": "app/linux/runner/tray_host_protocol_test.cc",

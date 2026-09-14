@@ -1,5 +1,17 @@
 # Client v0 test coverage ledger
 
+Windows tray lifetime correction (2026-09-14): native state invalidates readiness
+after TaskbarCreated, rejects failed message registration and requires a present
+Shell. The broadcast is observed before plugin dispatch. The existing desktop
+loss/close guards show the main window when readiness is lost. Two additional
+Windows channel tests check explicit true and missing/error/malformed responses.
+`ui_tray_host_test.cpp` executed locally in Ubuntu without OS calls; it also runs
+in the existing short job. Windows release compilation passed. This does not
+prove real Explorer restart, DPI behavior, icon visibility or foreground focus;
+automatic icon/readiness restoration remains open.
+Final pinned validation: 874 Flutter tests passed, 30 skipped; analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Catalog action semantics addition (2026-09-14): existing profile/network/resource
 context tests now enable Flutter semantics and assert exact localized button
 labels containing object type, display name and ID. Same-name rows remain

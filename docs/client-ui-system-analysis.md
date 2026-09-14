@@ -20,6 +20,21 @@ producer main `60ff0eec554df0b77fdcd9a8fed7d6db933da65e` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Windows tray readiness больше не является константой: argument-free native
+`isAvailable` требует зарегистрированный `TaskbarCreated`, существующий Shell и
+отсутствие сообщения о пересоздании taskbar в текущем UI lifetime. Broadcast
+наблюдается до передачи сообщения плагинам. После него прежняя регистрация
+иконки не считается действующей, даже если Shell уже вернулся. Существующий
+poll/close guard показывает окно и не скрывает его в неподтверждённый трей.
+Основание: [Microsoft TaskbarCreated](https://learn.microsoft.com/en-us/windows/win32/shell/taskbar)
+(также может приходить при смене DPI) и
+[GetShellWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getshellwindow).
+Это обнаружение потери Shell/регистрации, не доказательство видимости иконки;
+автоматическая повторная регистрация readiness пока не реализована. Portable
+C++ state unit выполнен локально, Windows release host скомпилирован; реальный
+restart Explorer/DPI/focus остаётся platform acceptance. macOS пока использует
+plugin readiness без дополнительной host-проверки.
+
 UF-14/UBR-19: повторяющиеся кнопки профилей (select/rename/remove), сетей
 (select) и ресурсов (open/enable/disable) имеют отдельные RU/EN semantic labels
 с типом объекта, именем и ID. Даже одинаковые display names различимы при
