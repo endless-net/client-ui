@@ -15,6 +15,49 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  test(
+    'Windows shutdown is explicit, argument-free and never initializes',
+    () async {
+      final calls = <String>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call.method);
+        expect(call.arguments, isNull);
+        return true;
+      });
+      expect(await shutdownWindowsClientNotifications(), isTrue);
+      expect(calls, ['shutdown']);
+      messenger.setMockMethodCallHandler(channel, (_) async => 'true');
+      expect(await shutdownWindowsClientNotifications(), isFalse);
+      messenger.setMockMethodCallHandler(channel, null);
+      expect(await shutdownWindowsClientNotifications(), isFalse);
+    },
+  );
+  test(
+    'Windows host initialization is explicit and accepts only true',
+    () async {
+      var calls = 0;
+      for (final value in [true, false, null, 'true', 1]) {
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          calls++;
+          expect(call.method, 'initialize');
+          expect(call.arguments, isNull);
+          return value;
+        });
+        expect(await initializeWindowsClientNotifications(), value == true);
+      }
+      expect(calls, 5);
+    },
+  );
+  test(
+    'missing or failed Windows initialization remains unavailable',
+    () async {
+      expect(await initializeWindowsClientNotifications(), isFalse);
+      messenger.setMockMethodCallHandler(channel, (_) async {
+        throw PlatformException(code: 'private-registration-detail');
+      });
+      expect(await initializeWindowsClientNotifications(), isFalse);
+    },
+  );
   for (final permission in ClientNotificationPermission.values) {
     test('explicit native permission $permission sends no payload', () async {
       messenger.setMockMethodCallHandler(channel, (call) async {

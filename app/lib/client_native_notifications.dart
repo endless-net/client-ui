@@ -4,6 +4,25 @@ import 'client_notification_delivery.dart';
 
 const _channel = MethodChannel('endlessnet/ui-notifications');
 
+/// Windows COM activation belongs to the primary UI process only. Call after
+/// acquiring the instance lock; failure leaves delivery explicitly unavailable.
+Future<bool> initializeWindowsClientNotifications() async {
+  return _controlWindowsNotificationHost('initialize');
+}
+
+/// Revoke activation before releasing the primary instance lock.
+Future<bool> shutdownWindowsClientNotifications() async {
+  return _controlWindowsNotificationHost('shutdown');
+}
+
+Future<bool> _controlWindowsNotificationHost(String method) async {
+  try {
+    return await _channel.invokeMethod<Object?>(method) == true;
+  } catch (_) {
+    return false;
+  }
+}
+
 enum ClientNotificationPermission {
   granted,
   denied,

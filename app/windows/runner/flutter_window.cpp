@@ -68,9 +68,6 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
-  if (show_on_first_frame_) {
-    notification_activation_ = std::make_unique<UiNotificationActivationHost>(GetHandle());
-  }
 
   autostart_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
@@ -83,7 +80,33 @@ bool FlutterWindow::OnCreate() {
           flutter_controller_->engine()->messenger(), "endlessnet/ui-notifications",
           &flutter::StandardMethodCodec::GetInstance());
   notification_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
-    if (call.method_name() == "deliver") {
+    if (call.method_name() == "initialize" || call.method_name() == "shutdown") {
+      if (call.arguments() &&
+          !std::holds_alternative<std::monostate>(*call.arguments())) {
+        result->Error("invalid_arguments", "Notification host control takes no arguments");
+        return;
+      }
+      if (call.method_name() == "shutdown") {
+        notification_activation_.reset();
+        result->Success(flutter::EncodableValue(true));
+        return;
+      }
+      if (!show_on_first_frame_) {
+        result->Success(flutter::EncodableValue(false));
+        return;
+      }
+      // Only the Dart entrypoint holding the single-instance lock calls this.
+      // Window construction itself must never compete with the primary factory.
+      if (!notification_activation_ || !notification_activation_->ready()) {
+        try {
+          notification_activation_ = std::make_unique<UiNotificationActivationHost>(GetHandle());
+        } catch (...) {
+          result->Success(flutter::EncodableValue(false));
+          return;
+        }
+      }
+      result->Success(flutter::EncodableValue(notification_activation_->ready()));
+    } else if (call.method_name() == "deliver") {
       HandleUiNotificationDelivery(call, std::move(result),
           notification_activation_ && notification_activation_->ready());
     } else {

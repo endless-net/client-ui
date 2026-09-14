@@ -1,5 +1,14 @@
 # Client v0 test coverage ledger
 
+COM primary-process ordering correction (2026-09-14): native window creation no
+longer registers activation. Dart explicitly initializes only after acquiring
+the instance lock, and shuts activation down before releasing it. Failed shutdown
+retains the lock until process termination. Three additional short channel tests
+cover no-argument commands, strict true acknowledgment and missing/error results;
+ordering was inspected in source, not proved with a multi-process OS test.
+Local Go full, Flutter analyze, 819 Flutter tests (30 skipped), 13 Node checks
+and Windows Debug compilation passed; integration runners were not started.
+
 Windows toast/COM source addition (2026-09-14): real Show adapter, strict payload
 and fixed launch action, WRL activator/factory with closed-host rejection, and MSI
 LocalServer32/shortcut property are implemented. Expanded native unit target

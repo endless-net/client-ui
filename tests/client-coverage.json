@@ -682,7 +682,7 @@
         },
         {
           "path": "app/test/client_notification_permission_test.dart",
-          "scope": "12 short tests: no-argument explicit permission channel, distinct granted/denied/managedDenied/unsupported/unavailable, missing/failed/malformed host never grants, no request on build, single-flight and stale disabled click guards, exact RU/EN outcomes and disposal suppression. Windows native permission query compiled; actual OS policy/authorization and click behavior unverified"
+          "scope": "15 short tests: permission channel and exact RU/EN outcomes plus argument-free explicit Windows initialize/shutdown, strict boolean acknowledgment and missing/error rejection. Source initializes COM only after primary instance lock and shuts it down before releasing lock. Tests do not execute a multi-process race or prove installed COM activation"
         },
         {
           "path": "app/windows/runner/ui_notifications_test.cpp",

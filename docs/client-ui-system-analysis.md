@@ -20,6 +20,16 @@ producer main `60ff0eec554df0b77fdcd9a8fed7d6db933da65e` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+COM single-instance correction: создание native window больше не регистрирует
+factory. `main.dart` вызывает argument-free `initialize` только после успешного
+instance lock и window initialization; secondary/version/error paths этого не
+делают. Повторная успешная инициализация сохраняет существующий host.
+При выходе `shutdown` отключает callback и отзывает factory до освобождения lock.
+Если native shutdown не подтверждён, lock удерживается до process termination.
+Это устраняет source-порядок, допускавший competing factory во вторичном UI.
+Три новых Dart channel tests проверяют команды и boolean acknowledgment;
+реальная гонка процессов и холодная COM activation ещё требуют acceptance.
+
 Windows notification delivery source теперь реализована: строгий title/body
 payload → WinRT XML text nodes → `ToastGeneric`/`ToastNotifier.Show`.
 Повторно проверяется OS setting; неготовый COM activator даёт unavailable.

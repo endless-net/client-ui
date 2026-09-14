@@ -76,6 +76,9 @@ Future<void> main(List<String> args) async {
 
   await windowManager.ensureInitialized();
   await windowManager.setPreventClose(true);
+  if (Platform.isWindows) {
+    await initializeWindowsClientNotifications();
+  }
   final endpoint = config.endpoint;
   final session = ClientSession(
     endpoint: endpoint,
@@ -163,9 +166,15 @@ Future<void> main(List<String> args) async {
       showWindow: config.showWindow,
       showSignal: showSignalWriteTime,
       onExit: () async {
+        final activationStopped =
+            !Platform.isWindows || await shutdownWindowsClientNotifications();
         await logger.close();
-        await _instanceLock?.close();
-        _instanceLock = null;
+        // If native teardown failed, retain the lock until process termination;
+        // do not admit another primary while this factory may still be alive.
+        if (activationStopped) {
+          await _instanceLock?.close();
+          _instanceLock = null;
+        }
       },
     ),
   );
