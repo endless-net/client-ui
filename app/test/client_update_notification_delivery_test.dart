@@ -194,6 +194,87 @@ void main() {
       expect(bodies.last, contains('проверенное обновление'));
     },
   );
+  for (final refreshFirst in [false, true]) {
+    test(
+      'in-flight failure waits for explicit retry after refresh first=$refreshFirst',
+      () async {
+        delivery.enabled = true;
+        await emit(snapshot(1));
+        reads.first.complete(updates.projection());
+        await pumpEventQueue();
+        await emit(invalidated(2));
+        if (refreshFirst) {
+          reads.last.complete(updates.projection());
+          await pumpEventQueue();
+        }
+        sends.first.complete(ClientNotificationDeliveryResult.failed);
+        await pumpEventQueue();
+        if (!refreshFirst) {
+          reads.last.complete(updates.projection());
+          await pumpEventQueue();
+        }
+        expect(sends, hasLength(1));
+        expect(delivery.result, ClientNotificationDeliveryResult.failed);
+        delivery.retry();
+        await pumpEventQueue();
+        expect(sends, hasLength(2));
+      },
+    );
+    test(
+      'in-flight success survives metadata refresh first=$refreshFirst',
+      () async {
+        delivery.enabled = true;
+        await emit(snapshot(1));
+        reads.first.complete(updates.projection());
+        await pumpEventQueue();
+        expect(sends, hasLength(1));
+        await emit(invalidated(2));
+        if (refreshFirst) {
+          reads.last.complete(updates.projection());
+          await pumpEventQueue();
+        }
+        sends.first.complete(ClientNotificationDeliveryResult.delivered);
+        await pumpEventQueue();
+        if (!refreshFirst) {
+          reads.last.complete(updates.projection());
+          await pumpEventQueue();
+        }
+        expect(sends, hasLength(1));
+      },
+    );
+  }
+  for (final outcome in [
+    ClientNotificationDeliveryResult.delivered,
+    ClientNotificationDeliveryResult.failed,
+  ]) {
+    test('old release $outcome does not suppress a newer release', () async {
+      delivery.enabled = true;
+      await emit(snapshot(1));
+      reads.first.complete(updates.projection());
+      await pumpEventQueue();
+      await emit(invalidated(2));
+      reads.last.complete(
+        updates.projection()..available.releaseId = 'new-release',
+      );
+      await pumpEventQueue();
+      sends.first.complete(outcome);
+      await pumpEventQueue();
+      expect(sends, hasLength(2));
+    });
+  }
+  test('disable and re-enable revoke an outstanding success receipt', () async {
+    delivery.enabled = true;
+    await emit(snapshot(1));
+    reads.first.complete(updates.projection());
+    await pumpEventQueue();
+    delivery.enabled = false;
+    delivery.enabled = true;
+    reads.last.complete(updates.projection());
+    await pumpEventQueue();
+    sends.first.complete(ClientNotificationDeliveryResult.delivered);
+    await pumpEventQueue();
+    expect(sends, hasLength(2));
+  });
   test('metadata expiry withdraws notice without another read', () async {
     var now = updates.clock;
     var count = 0;

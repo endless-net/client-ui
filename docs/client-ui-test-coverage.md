@@ -1,5 +1,15 @@
 # Client v0 test coverage ledger
 
+Update handoff race correction (2026-09-14): seven added async regressions in
+`client_update_notification_delivery_test.dart` reproduce duplicate success and
+implicit failure retry when update invalidation overlaps delivery. Both read/send
+completion orders now preserve the same-release receipt or explicit-retry state.
+A newer release is not suppressed by either old outcome; disable/re-enable
+revokes an old receipt. Receipts are lifecycle-bound and expire. The suite now
+has 14 tests; no actual OS display or cross-process dedup is claimed.
+Final pinned validation: 872 Flutter tests passed, 30 skipped; analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Resource identity/handoff correction (2026-09-14): the catalog displays resource
 and network IDs so same-name resources and disclosed overlap IDs are distinguishable.
 Two RU/EN short tests in `client_resource_context_test.dart` use 360x640/200%,

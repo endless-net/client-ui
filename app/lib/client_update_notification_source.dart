@@ -68,14 +68,7 @@ final class ClientUpdateNotificationSource extends ChangeNotifier {
       _expiry?.cancel();
       _expiry = null;
     }
-    notice = _planner.observe(
-      snapshot: snapshot,
-      info: _info,
-      uiBuild: uiBuild,
-      ready: state.link == ClientLinkState.ready,
-      enabled: _enabled,
-      now: _now(),
-    );
+    notice = _observe();
     notifyListeners();
     if (key != null && !_loading && !_attempted) {
       _attempted = true;
@@ -83,6 +76,15 @@ final class ClientUpdateNotificationSource extends ChangeNotifier {
       unawaited(_read(_generation));
     }
   }
+
+  ClientUpdateNotice? _observe() => _planner.observe(
+    snapshot: state.snapshot,
+    info: _info,
+    uiBuild: uiBuild,
+    ready: state.link == ClientLinkState.ready,
+    enabled: _enabled,
+    now: _now(),
+  );
 
   Future<void> _read(int generation) async {
     try {
@@ -126,9 +128,12 @@ final class ClientUpdateNotificationSource extends ChangeNotifier {
 
   bool acknowledge(ClientUpdateNotice value) {
     final accepted = _planner.acknowledge(value, _now());
-    if (accepted) notice = null;
+    notice = _observe(); // Also withdraw expired metadata before another send.
     return accepted;
   }
+
+  bool acceptsReceipt(ClientUpdateNotice value) =>
+      !_disposed && _planner.acceptsReceipt(value, _now());
 
   @override
   void dispose() {

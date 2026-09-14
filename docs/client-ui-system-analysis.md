@@ -20,6 +20,16 @@ producer main `60ff0eec554df0b77fdcd9a8fed7d6db933da65e` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+UF-15: metadata invalidation во время OS handoff больше не теряет успешный
+receipt и не отправляет тот же релиз повторно. Receipt связан с lifecycle/caller
+контекстом и fingerprint релиза, а не с identity заменённого объекта projection.
+Disconnect/disable/observer/profile change и expiry по-прежнему отзывают старый
+receipt. Ошибка той же доставки переживает refresh и требует явного Retry;
+успех или ошибка прежнего релиза не подавляют notice нового релиза. Семь новых
+async regression проверяют оба порядка завершения read/send, оба исхода для
+нового релиза и disable/re-enable. Эти проверки используют controlled adapter;
+фактический показ уведомления ОС и persistent dedup не заявляются.
+
 UF-19: ресурс теперь показывает собственный ID и network ID рядом с именем,
 поэтому disclosed overlap IDs можно сопоставить с загруженными строками.
 Одинаковые имена/адреса не скрывают принадлежность ресурса сети. Два новых RU/EN

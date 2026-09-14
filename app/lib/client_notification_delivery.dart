@@ -89,7 +89,11 @@ final class ClientNotificationDelivery extends ChangeNotifier {
   void _changed() {
     if (_disposed) return;
     _pending = _planned();
-    if (!_pending.contains(_failedNotice)) {
+    final failed = _failedNotice;
+    final retainedUpdateFailure =
+        failed is ClientUpdateNotice &&
+        _updates?.acceptsReceipt(failed) == true;
+    if (!_pending.contains(failed) && !retainedUpdateFailure) {
       _failedNotice = null;
       _result = null;
     }
@@ -111,7 +115,13 @@ final class ClientNotificationDelivery extends ChangeNotifier {
     try {
       while (!_disposed && _pending.isNotEmpty) {
         final notice = _pending.first;
-        if (identical(notice, _failedNotice)) break;
+        final failed = _failedNotice;
+        if (identical(notice, failed) ||
+            (notice is ClientUpdateNotice &&
+                failed is ClientUpdateNotice &&
+                notice.sameDeliveryAs(failed))) {
+          break;
+        }
         ClientNotificationDeliveryResult outcome;
         try {
           final (title, body) = switch (notice) {
@@ -124,6 +134,33 @@ final class ClientNotificationDelivery extends ChangeNotifier {
           outcome = ClientNotificationDeliveryResult.failed;
         }
         if (_disposed) break;
+        if (notice is ClientUpdateNotice &&
+            outcome == ClientNotificationDeliveryResult.delivered) {
+          // Refresh may have replaced or temporarily withdrawn this notice.
+          // Record only a still-valid lifecycle receipt; recompute the queue so
+          // a newer release remains pending while the same release is deduped.
+          if (_updates?.acknowledge(notice) == true) {
+            _failedNotice = null;
+            _result = outcome;
+            notifyListeners();
+          }
+          _pending = _planned();
+          continue;
+        }
+        if (notice is ClientUpdateNotice &&
+            _updates?.acceptsReceipt(notice) == true) {
+          _failedNotice = notice;
+          _result = outcome;
+          notifyListeners();
+          if (_pending.any(
+            (candidate) =>
+                candidate is ClientUpdateNotice &&
+                !candidate.sameDeliveryAs(notice),
+          )) {
+            continue;
+          }
+          break;
+        }
         // _changed runs during delivery, invalidating old receipts immediately.
         // A late completion must not alter a newer context or disabled state.
         if (!_pending.contains(notice)) continue;
@@ -134,7 +171,6 @@ final class ClientNotificationDelivery extends ChangeNotifier {
           break;
         }
         if (notice is ClientDeadlineNotice) _planner.acknowledge(notice);
-        if (notice is ClientUpdateNotice) _updates?.acknowledge(notice);
         _pending = _planned();
         notifyListeners();
       }

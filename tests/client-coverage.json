@@ -710,7 +710,7 @@
         },
         {
           "path": "app/test/client_update_notification_delivery_test.dart",
-          "scope": "Seven short tests: opt-in discovery and shared serial queue, latest invalidation with one read at a time, observer/disabled discard, explicit lookup and delivery retry, release dedup and one-shot expiry without polling. Controlled adapters only; no actual OS display or full platform acceptance"
+          "scope": "14 short tests: opt-in discovery and serial queue, latest invalidation, observer/disabled discard, explicit lookup/delivery retry, dedup and expiry. Seven race cases cover both read/send orders for success/failure, newer release after either outcome, and disable/re-enable receipt revocation. Controlled adapters only; no actual OS display or full platform acceptance"
         },
         {
           "path": "app/test/client_notification_permission_test.dart",
