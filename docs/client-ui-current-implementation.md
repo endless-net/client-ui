@@ -1,13 +1,13 @@
 # Текущая реализация Client UI — 2026-09-14
 
-Проверенный UI commit: `b940e0c8b1e87514ceac90c9c9fee3a00d493417` (main),
+Проверенный UI commit: `853c42d` (main),
 чистое рабочее дерево до аудита.
 Это проверка source gate первой стадии цели, не platform acceptance.
 Все 104 требования остаются в [матрице](../tests/client-coverage.json);
 полностью принятых US: 0 из 14.
 
-Повторная проверка producer на UI `b940e0c`: `ls-remote` и локальный
-`client/origin/main` совпадают на `712a0155de7180007e248fdeada3c22675c968f4`.
+Повторная проверка producer на UI `853c42d`: `ls-remote` и локальный
+`client/origin/main` совпадают на `09a7dd4f12f929ed3b175060f0a3afc7bf015b90`.
 `proto/client/v0` и `packages/client_api` не отличаются от UI pin; новые runtime
 commits не требуют смены SDK или версии UI. Текущая Windows privileged wiring и
 конкретные зависимости Linux/macOS/mobile перепроверены в
@@ -16,14 +16,15 @@ commits не требуют смены SDK или версии UI. Текуща�
 Windows native permission, toast delivery, COM activation, обнаружение потери
 трея и явное восстановление регистрации уже входят в этот snapshot. Их наличие
 в source не закрывает installed/native acceptance. Последняя проверка кода:
-878 Flutter tests passed, 30 skipped; analyze, Go, 13 Node checks, native tray
-state unit и Windows release build прошли. Исторические integration runs в
+926 Flutter tests passed, 30 skipped; analyze, Go и 13 Node checks прошли.
+Native tray state unit и Windows release build прошли на `622466e`; они
+не являются повторной native проверкой текущего commit. Исторические integration runs в
 [ledger](client-ui-test-coverage.md) относятся к указанным там старым commits.
 
 ## Producer и принятые решения
 
 `git ls-remote` для client/main и локальный client/origin/main совпали:
-`712a0155de7180007e248fdeada3c22675c968f4`. Сравнение `proto/client/v0` и
+`09a7dd4f12f929ed3b175060f0a3afc7bf015b90`. Сравнение `proto/client/v0` и
 `packages/client_api` с UI pin `cd05fcddb858877b10ecefe7b0b4a3819d2c6f3b`
 не показало изменений. Текущие контракт/SDK поэтому актуальны без смены pin,
 версии приложения, протокола или manifest generation.
@@ -48,7 +49,7 @@ desktop close и opt-in, accessibility. Их больше не следует з
 | UF | Текущая реализация | Оставшийся результат |
 |---|---|---|
 | 01 | Desktop hosts Windows/Linux/macOS, metadata target и protected local transport | Продуктовые Android/iOS hosts и bridge; distribution/совместимая установка пяти платформ |
-| 02 | Window/tray, Windows/Linux host loss guard и явное восстановление, Windows opt-in HKCU, Linux desktop entry, macOS SMAppService | macOS tray availability; реальная доступность tray, quick surfaces mobile, login и cleanup при distribution lifecycle |
+| 02 | Window/tray, Windows Shell/icon bounds, Linux watcher и macOS status-item bounds, явное восстановление, desktop autostart opt-in | Реальная доступность tray, quick surfaces mobile, login и cleanup при distribution lifecycle |
 | 03 | Typed enrollment, browser action, journal/recovery | Одноразовый проверяемый callback по producer contract; native permission и реальные enrollment/approval |
 | 04 | Snapshot/revision, отдельные link/phase/reason, next action | Полный набор состояний на реальных hosts без ложного вывода об установке службы |
 | 05 | Connect/Disconnect, tray, durable request ID | Реальные tunnel outcomes, restart/resume и согласованность quick surfaces |
@@ -88,8 +89,17 @@ desktop close и opt-in, accessibility. Их больше не следует з
   перед скрытием. Windows отслеживает Shell/TaskbarCreated, Linux — watcher;
   ошибка/потеря показывает окно. Явное восстановление удаляет старую регистрацию
   перед созданием и повторной проверкой, не скрывая окно автоматически. Повторная
-  потеря во время восстановления сохраняет неготовность. macOS пока полагается
-  на успешный ответ plugin: независимой проверки availability там нет.
+  потеря во время восстановления сохраняет неготовность. Windows дополнительно
+  проверяет Shell_NotifyIconGetRect, macOS — непустые конечные bounds окна
+  status item через pinned plugin. Геометрия не доказывает видимость и
+  доступность пользователю в реальной конфигурации панели/overflow.
+- После исходного аудита исправлены lifetime guards recovery, connection,
+  cleanup, каталогов, diagnostics, preferences, exit, resources, update и support.
+  A-B-A замена контроллера не возвращает старым callbacks право менять новую
+  панель. Регрессии keyed-форм подтверждают сброс черновиков и token input.
+- Desktop actions и Quit dialog доступны при 200% в локальных layout-тестах;
+  добавлены проверки клавиатуры для peers и identity confirmation, а offline
+  help раскрывает expanded semantics. Это не полный accessibility acceptance.
 - Android/iOS product folders в `app` отсутствуют; mobile test harness нельзя
   считать продуктом. Сначала нужен реальный разрешённый transport/ABI контракт.
 
@@ -99,7 +109,7 @@ desktop close и opt-in, accessibility. Их больше не следует з
    keyboard traversal/activation, focus, читаемость при 200% и точные RU/EN labels.
    Уже есть отдельные проверки exit choices, recovery, профилей, сетей и ресурсов;
    это не доказательство полного набора состояний всех 16 session panels.
-2. Независимая macOS tray availability и distribution lifecycle новых платформ:
+2. Distribution lifecycle новых платформ:
    package identity, install/repair/upgrade/uninstall, cleanup autostart. Существующие
    `app/linux`/`app/macos` hosts и compile jobs не заменяют distribution artifacts.
 3. Mobile hosts/bridge, callback и non-Windows privileged/export flows после получения
