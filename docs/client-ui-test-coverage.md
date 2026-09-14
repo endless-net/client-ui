@@ -1,5 +1,16 @@
 # Client v0 test coverage ledger
 
+Peer accessibility source check (2026-09-14): two RU/EN widgets use a 360x640
+viewport and 200% text. Keyboard events activate refresh and expand/collapse two
+same-name peers. The reader sees the exact search once; details remain reachable
+by scrolling. TextPainter measurement compares complete text height against each
+rendered paragraph, including a long hostname, instead of relying only on lack
+of overflow errors. The current panel passes without production changes.
+This is component keyboard/layout evidence, not native speech or large-list
+performance acceptance and not full completion of UI-AC-13.
+Validation: 880 Flutter tests passed, 30 skipped; pinned analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Explicit tray restoration (2026-09-14): the visible desktop shell offers a retry
 after loss or failed initialization. Windows preparation happens before plugin
 registration; a subsequent TaskbarCreated still invalidates readiness. Three new

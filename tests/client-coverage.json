@@ -617,6 +617,10 @@
           "scope": "All 12 snapshot/path/health enum values have exact RU/EN labels; six short widget vectors compare entire expanded peer details, empty catalog and error text in both locales without repeat queries. Diagnostic codes and observations remain source data. Not full-app UI-AC-13, native accessibility or reachability acceptance"
         },
         {
+          "path": "app/test/client_peer_layout_test.dart",
+          "scope": "Two RU/EN short widgets at 360x640 and 200% text: keyboard activation of search refresh and expand/collapse of two same-name peers, exact search request and one read, scrollable path details, full rendered text bounds including long hostnames. No native screen-reader or large-catalog performance acceptance"
+        },
+        {
           "path": "app/test/client_identity_locale_test.dart",
           "scope": "Ten short RU/EN identity vectors compare complete displayed identity and four notices, reject trust after changed announcement and stale callback after reconfirmation, and switch locale without repeat reads/commands. Unit/component evidence only, not native elevation, established trust or full UI-AC-13"
         },
