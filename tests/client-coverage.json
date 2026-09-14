@@ -685,6 +685,10 @@
           "scope": "Five composed-shell tests: explicit enable/retry/disable without runtime mutation, restored setting without implicit save, read/write failure privacy, ordered rapid writes with stale failure suppression, observer quit awaits pending save and rejects stale toggle. Production native adapter remains absent; not OS delivery or native restart acceptance"
         },
         {
+          "path": "app/test/client_update_notifications_test.dart",
+          "scope": "Eight short planner tests: reuse update projection validation, expiry/late acknowledgment, disabled/observer/offline receipt invalidation, malformed/unverified/stale/pairing rejection, non-available silence, release/classification versus revision dedup, fixed RU/EN ordinary notice without private data. Planner is not yet connected to discovery or the delivery queue; no OS update notification claim"
+        },
+        {
           "path": "app/test/client_notification_permission_test.dart",
           "scope": "15 short tests: permission channel and exact RU/EN outcomes plus argument-free explicit Windows initialize/shutdown, strict boolean acknowledgment and missing/error rejection. Source initializes COM only after primary instance lock and shuts it down before releasing lock. Tests do not execute a multi-process race or prove installed COM activation"
         },

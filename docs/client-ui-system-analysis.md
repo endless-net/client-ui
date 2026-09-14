@@ -20,6 +20,17 @@ producer main `60ff0eec554df0b77fdcd9a8fed7d6db933da65e` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Verified update notice planner добавлен в `client_update_notifications.dart`.
+Общая `validateClientUpdateInfo` используется и прежним reader, и planner:
+подпись проверяет producer; UI проверяет pairing/context/срок/формат projection.
+Planner не выводит release/version/key/URL или identity, различает ordinary,
+security и mandatory фиксированным RU/EN текстом и предлагает проверить
+совместимость, не устанавливает пакет. Fingerprint использует scope,
+release/manifest/classification, а не revision; stale/expired/observer/disabled
+состояния не дают уведомления или acknowledgment. Память bounded/in-memory.
+Это отдельная реализованная часть UF-15/BP-UI-13: подключения к общей очереди,
+invalidation-driven read и expiry timer пока нет, OS delivery этим не заявляется.
+
 Linux tray host detection: native argument-free `isAvailable` читает
 `org.kde.StatusNotifierWatcher.IsStatusNotifierHostRegistered` через D-Bus
 Properties.Get, с timeout 1000 ms и NO_AUTO_START. Проверяется строго bool;

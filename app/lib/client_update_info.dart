@@ -26,14 +26,31 @@ Future<api.UpdateInfo> readClientUpdateInfo({
   if (!response.hasInfo()) {
     throw const FormatException('Missing update projection');
   }
-  final info = api.UpdateInfo.fromBuffer(response.info.writeToBuffer());
+  return validateClientUpdateInfo(
+    source: response.info,
+    instanceId: instanceId,
+    installedRuntime: installed,
+    reportedUi: request.reportedUi,
+    now: now,
+  );
+}
+
+/// Shared admission for a producer projection; does not verify a signature.
+api.UpdateInfo validateClientUpdateInfo({
+  required api.UpdateInfo source,
+  required String instanceId,
+  required api.BuildIdentity installedRuntime,
+  required api.BuildIdentity reportedUi,
+  required DateTime Function() now,
+}) {
+  final info = api.UpdateInfo.fromBuffer(source.writeToBuffer());
   if (!info.hasMetadata() ||
       info.metadata.instanceId != instanceId ||
       info.metadata.revision <= 0 ||
       !info.hasInstalledRuntime() ||
-      info.installedRuntime != installed ||
+      info.installedRuntime != installedRuntime ||
       !info.hasReportedUi() ||
-      info.reportedUi != request.reportedUi ||
+      info.reportedUi != reportedUi ||
       !info.hasInstalledPair() ||
       info.installedPair.state ==
           api.CompatibilityState.COMPATIBILITY_STATE_UNSPECIFIED ||
@@ -72,8 +89,8 @@ Future<api.UpdateInfo> readClientUpdateInfo({
         ) ||
         !update.hasRuntime() ||
         update.runtime.version.isEmpty ||
-        update.runtime.platform != installed.platform ||
-        update.runtime.architecture != installed.architecture ||
+        update.runtime.platform != installedRuntime.platform ||
+        update.runtime.architecture != installedRuntime.architecture ||
         update.pairedUiVersion.isEmpty ||
         !update.hasCompatibility() ||
         update.compatibility.state ==

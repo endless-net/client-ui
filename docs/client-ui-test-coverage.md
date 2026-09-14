@@ -1,5 +1,13 @@
 # Client v0 test coverage ledger
 
+Verified update notice planner addition (2026-09-14): eight new short tests check
+admission, expiry, context invalidation, dedup and privacy; reader now shares its
+existing projection validator with the planner. Full Flutter passed 833 tests,
+30 skipped; Flutter analyze, Go full and 13 Node checks passed. The planner is
+not yet wired to notification discovery/delivery. Next required source work is
+queue integration, update-domain invalidation and expiration scheduling; no
+native update notification or completed UF-15/US-14 is claimed.
+
 Linux tray host availability addition (2026-09-14): three channel tests and
 three composed-shell cases cover strict availability, absent/lost host and
 late hide completion after loss. Native GLib unit checks the D-Bus variant type;
