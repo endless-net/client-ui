@@ -1,5 +1,13 @@
 # Client v0 test coverage ledger
 
+Form controller isolation (2026-09-14): four pending-command tests cover existing
+keyed enrollment/profile creation forms under A-B-A controller replacement.
+Drafts and token input are discarded; old success/error cannot alter the fresh
+draft or release its pending command, while fresh completion remains visible.
+Injected callbacks only; no producer enrollment or browser callback acceptance.
+Validation: 926 Flutter tests passed, 30 skipped; pinned analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Remaining panel request invalidation (2026-09-14): diagnostics, exit and preferences
 reset now revoke a binding and release busy; their continuations and finally blocks
 require it. Resource reset releases busy and its existing query serial also guards

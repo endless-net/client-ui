@@ -601,6 +601,10 @@
           "scope": "Seven short tests: all ProfileState RU/EN labels, same-name profiles distinguished by account identity/ID, control origin and selected network ID, explicit absent fields, policy denial and access-administrator role, actual selection by ID and observer cleanup at 360x640/200%. Consumer/mock evidence, not native multi-profile or tunnel acceptance"
         },
         {
+          "path": "app/test/client_form_binding_test.dart",
+          "scope": "Four pending-command regressions for enrollment and profile creation under A-B-A controller replacement: forms discard drafts and token input, old success/error cannot alter the fresh draft or release its pending command, and fresh completion remains visible. Injected callbacks only, not producer enrollment or browser callback acceptance"
+        },
+        {
           "path": "app/test/client_create_profile_activation_test.dart",
           "scope": "12 short create-profile widget vectors: stale displayed input/snapshot/controller rejection, late response/error suppression, exact RU/EN form and typed notices with locale changes without replay. Component evidence only, not producer ownership enforcement, full-app switching or OS acceptance"
         },
