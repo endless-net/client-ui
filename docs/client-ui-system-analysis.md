@@ -12,9 +12,9 @@
   [Windows HTTP v2 as-is](architecture-and-future.md)
   сохраняет дату своей проверки и не является целевым дизайном.
 
-Текущий source gate по всем UF на `97fec77`:
+Текущий source gate по всем UF на `b940e0c`:
 [сводка реализации](client-ui-current-implementation.md). Проверенный актуальный
-producer main `60ff0eec554df0b77fdcd9a8fed7d6db933da65e` не меняет proto/Dart SDK
+producer main `712a0155de7180007e248fdeada3c22675c968f4` не меняет proto/Dart SDK
 относительно UI pin; смена pin/версий не требуется. Основные конкретные UI-owned
 пробелы и внешние mobile/callback зависимости разделены в сводке.
 

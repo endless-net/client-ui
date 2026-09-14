@@ -1,27 +1,29 @@
 # Текущая реализация Client UI — 2026-09-14
 
-Проверенный UI commit: `97fec77` (main), чистое рабочее дерево до аудита.
+Проверенный UI commit: `b940e0c8b1e87514ceac90c9c9fee3a00d493417` (main),
+чистое рабочее дерево до аудита.
 Это проверка source gate первой стадии цели, не platform acceptance.
 Все 104 требования остаются в [матрице](../tests/client-coverage.json);
 полностью принятых US: 0 из 14.
 
-Повторная проверка producer на UI `f192138`: `ls-remote` и локальный
-`client/origin/main` совпадают на `f77191cfdf60a56889bc8d73c4f48cbaad2840c8`.
+Повторная проверка producer на UI `b940e0c`: `ls-remote` и локальный
+`client/origin/main` совпадают на `712a0155de7180007e248fdeada3c22675c968f4`.
 `proto/client/v0` и `packages/client_api` не отличаются от UI pin; новые runtime
 commits не требуют смены SDK или версии UI. Текущая Windows privileged wiring и
 конкретные зависимости Linux/macOS/mobile перепроверены в
 [аудите privileged adapter](native-privileged-recovery.md).
 
-Последующее дополнение: Windows native permission, toast delivery и COM activation
-source добавлены после этого snapshot; см. актуальные evidence/ограничения в
-[SA](client-ui-system-analysis.md) и [ledger](client-ui-test-coverage.md).
-Первый пункт следующего порядка ниже теперь реализован на уровне source/unit;
-его installed/native acceptance остаётся открытым.
+Windows native permission, toast delivery, COM activation, обнаружение потери
+трея и явное восстановление регистрации уже входят в этот snapshot. Их наличие
+в source не закрывает installed/native acceptance. Последняя проверка кода:
+878 Flutter tests passed, 30 skipped; analyze, Go, 13 Node checks, native tray
+state unit и Windows release build прошли. Исторические integration runs в
+[ledger](client-ui-test-coverage.md) относятся к указанным там старым commits.
 
 ## Producer и принятые решения
 
 `git ls-remote` для client/main и локальный client/origin/main совпали:
-`60ff0eec554df0b77fdcd9a8fed7d6db933da65e`. Сравнение `proto` и
+`712a0155de7180007e248fdeada3c22675c968f4`. Сравнение `proto/client/v0` и
 `packages/client_api` с UI pin `cd05fcddb858877b10ecefe7b0b4a3819d2c6f3b`
 не показало изменений. Текущие контракт/SDK поэтому актуальны без смены pin,
 версии приложения, протокола или manifest generation.
@@ -46,7 +48,7 @@ desktop close и opt-in, accessibility. Их больше не следует з
 | UF | Текущая реализация | Оставшийся результат |
 |---|---|---|
 | 01 | Desktop hosts Windows/Linux/macOS, metadata target и protected local transport | Продуктовые Android/iOS hosts и bridge; distribution/совместимая установка пяти платформ |
-| 02 | Window/tray, Windows opt-in HKCU, Linux desktop entry, macOS SMAppService | Реальная доступность tray, quick surfaces mobile, login и cleanup при distribution lifecycle |
+| 02 | Window/tray, Windows/Linux host loss guard и явное восстановление, Windows opt-in HKCU, Linux desktop entry, macOS SMAppService | macOS tray availability; реальная доступность tray, quick surfaces mobile, login и cleanup при distribution lifecycle |
 | 03 | Typed enrollment, browser action, journal/recovery | Одноразовый проверяемый callback по producer contract; native permission и реальные enrollment/approval |
 | 04 | Snapshot/revision, отдельные link/phase/reason, next action | Полный набор состояний на реальных hosts без ложного вывода об установке службы |
 | 05 | Connect/Disconnect, tray, durable request ID | Реальные tunnel outcomes, restart/resume и согласованность quick surfaces |
@@ -59,7 +61,7 @@ desktop close и opt-in, accessibility. Их больше не следует з
 | 12 | Logout/local forget, confirmations и typed outcomes | Реальные remote cleanup/local removal и authorization failures |
 | 13 | Windows MSI/WinGet/signing/pairing scripts | Полный install/repair/upgrade/uninstall, outcome и state preservation; новые платформенные каналы |
 | 14 | RU/EN panels/shell/tray, persisted locale, semantics и large-text tests | Полный keyboard/focus/200% аудит и ручные NVDA/VoiceOver/TalkBack/Orca проверки |
-| 15 | Persisted opt-in, dispatcher, retry, deadline/blocked planner, Linux/macOS native delivery | Windows/Android/iOS native notifications; полнота значимых событий, OS permission/click и ограничения dedup |
+| 15 | Persisted opt-in, dispatcher, retry, deadline/blocked/update planner, Windows/Linux/macOS native delivery и activation | Android/iOS native notifications; полнота значимых событий, реальный OS permission/click и ограничения dedup |
 | 16 | Profile create/select/rename/remove, authoritative context guards | Реальные multi-profile flows и отказы переключения на пяти hosts |
 | 17 | Session renewal, независимые credential сроки | Реальная continuity и независимые истечения, включая mobile |
 | 18 | Preferences draft/apply/reset, presence vs false | Реальные apply failures, enforced policy и свежий effective результат |
@@ -74,28 +76,38 @@ desktop close и opt-in, accessibility. Их больше не следует з
 - `client_bundle_destination.dart` поддерживает три desktop платформы. macOS
   host содержит `DiagnosticsDestination` и выдаёт ограниченную по времени lease;
   утверждение «export только Windows» больше не актуально.
-- `client_native_notifications.dart` подключён к dispatcher. Linux и macOS
-  имеют native delivery, Windows runner пока содержит только autostart и
-  diagnostics channels. Настройки уведомлений существуют, но UF-15 не закрыт.
+- `client_native_notifications.dart` подключён к dispatcher. Все три desktop
+  runner имеют notification channel; Windows `ui_notifications.h` и
+  `ui_notification_activation.h` подключены в `flutter_window.cpp`. Primary UI
+  lifetime управляет COM activation. Это source и local unit/build evidence,
+  а не доказательство installed toast, OS permission или foreground activation.
 - `client_windows_autostart.dart`, native `ui_autostart.h` и общий panel дают
   explicit opt-in. MSI больше не регистрирует Run автоматически. Native unit
   проверяет fake Win32 boundary, а не фактический login/permission.
-- `client_desktop_app.dart` при plugin error не оставляет скрытое окно за
-  неинициализированным треем. Потеря OS tray host без ошибки плагина не обнаруживается;
-  это отдельный source-пробел, а не только недостающий acceptance run.
+- `client_desktop_app.dart` проверяет native tray availability периодически и
+  перед скрытием. Windows отслеживает Shell/TaskbarCreated, Linux — watcher;
+  ошибка/потеря показывает окно. Явное восстановление удаляет старую регистрацию
+  перед созданием и повторной проверкой, не скрывая окно автоматически. Повторная
+  потеря во время восстановления сохраняет неготовность. macOS пока полагается
+  на успешный ответ plugin: независимой проверки availability там нет.
 - Android/iOS product folders в `app` отсутствуют; mobile test harness нельзя
   считать продуктом. Сначала нужен реальный разрешённый transport/ABI контракт.
 
 ## Следующий порядок реализации
 
-1. Windows native notifications: permission/status, fixed RU/EN content, click
-   foreground, lifetime/dedup и unit boundary; готовый AppUserModelID — только основа.
-2. OS tray availability/loss detection и оставшиеся UI-owned desktop adapters;
-   distribution cleanup текущих autostart registrations.
-3. Mobile hosts/bridge, callback и privileged/export flows после получения
+1. Завершить accessibility/localization source audit: для loaded panels проверить
+   keyboard traversal/activation, focus, читаемость при 200% и точные RU/EN labels.
+   Уже есть отдельные проверки exit choices, recovery, профилей, сетей и ресурсов;
+   это не доказательство полного набора состояний всех 16 session panels.
+2. Независимая macOS tray availability и distribution lifecycle новых платформ:
+   package identity, install/repair/upgrade/uninstall, cleanup autostart. Существующие
+   `app/linux`/`app/macos` hosts и compile jobs не заменяют distribution artifacts.
+3. Mobile hosts/bridge, callback и non-Windows privileged/export flows после получения
    конкретного внешнего контракта. Не создавать runtime или TCP fallback в UI.
-4. Завершить accessibility/localization source audit и остальные source gaps,
-   затем повторить full implementation gate по BA/SA и всей матрице.
+4. Повторить full implementation gate по BA/SA и всей матрице, включая источники
+   update/support и точные distribution outcomes. Отсутствие TODO и зелёный
+   coverage checker не подтверждают полноту: checker проверяет трассировку 104 ID,
+   а не runtime/OS результаты. Все 14 US пока имеют implementation=partial.
 5. Только после закрытия source gate переходить к новым пяти-платформенным
    testserver integration runs и отдельно к реальной platform acceptance.
 
