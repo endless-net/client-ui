@@ -128,7 +128,7 @@ class _ClientPeersPanelState extends State<ClientPeersPanel> {
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text(_text('Peers', 'Устройства')),
+      Semantics(header: true, child: Text(_text('Peers', 'Устройства'))),
       TextField(
         key: const Key('client-peer-search'),
         controller: _search,

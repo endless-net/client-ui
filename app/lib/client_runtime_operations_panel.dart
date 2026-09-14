@@ -30,7 +30,12 @@ class ClientRuntimeOperationsPanel extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(locale.text(en: 'Runtime operations', ru: 'Операции службы')),
+          Semantics(
+            header: true,
+            child: Text(
+              locale.text(en: 'Runtime operations', ru: 'Операции службы'),
+            ),
+          ),
           Text(
             locale.text(
               en: 'Reported by the runtime. Recover saved intentions separately.',

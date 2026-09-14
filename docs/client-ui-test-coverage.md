@@ -1,5 +1,13 @@
 # Client v0 test coverage ledger
 
+Session headings (2026-09-14): explicit localized headings in the composed
+session view, plus heading semantics on existing peers/enrollment/operations
+titles. RU/EN tests verify 15 initial section labels as headings and reachable
+at 360x640/200%, retaining session warning/control reachability. Loaded operation
+headings and real assistive-technology navigation are not covered by this test.
+Validation: 927 Flutter tests passed, 30 skipped; pinned analyze, Go full and
+13 Node checks passed.
+
 Form controller isolation (2026-09-14): four pending-command tests cover existing
 keyed enrollment/profile creation forms under A-B-A controller replacement.
 Drafts and token input are discarded; old success/error cannot alter the fresh

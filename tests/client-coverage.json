@@ -790,7 +790,7 @@
         },
         {
           "path": "app/test/client_session_layout_test.dart",
-          "scope": "Active profile in the composed session panel with 360x640 bounds, text scale 2 and retained platform insets: scroll/hit-test reachability of session/credential warnings and profile controls, with no native connection opened. Included in desktop/mobile harness; runner execution pending, not full assistive-technology or native mobile acceptance"
+          "scope": "RU/EN active profile in the composed session panel at 360x640 and text scale 2: fifteen initial section labels expose heading semantics and remain reachable; session/credential warnings and profile controls remain scroll/hit-test accessible, without opening a native connection. Loaded runtime-operation heading and real screen-reader navigation require separate verification; not full assistive-technology or native mobile acceptance"
         },
         {
           "path": "app/test/mobile_contract_widget_test.dart",

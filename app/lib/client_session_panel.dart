@@ -49,6 +49,61 @@ class ClientSessionPanel extends StatelessWidget {
   final Future<bool> Function(String requestId, void Function() checkContext)?
   exportBundle;
 
+  Widget _section(Widget panel) {
+    final title = switch (panel) {
+      ClientSupportPanel() => locale.text(
+        en: 'Help and support',
+        ru: 'Справка и поддержка',
+      ),
+      ClientUpdatePanel() => locale.text(en: 'Updates', ru: 'Обновления'),
+      ClientExitPanel() => locale.text(
+        en: 'Internet exit',
+        ru: 'Выход в интернет',
+      ),
+      ClientResourcesPanel() => locale.text(en: 'Resources', ru: 'Ресурсы'),
+      ClientPreferencesPanel() => locale.text(
+        en: 'Runtime preferences',
+        ru: 'Настройки службы',
+      ),
+      ClientDiagnosticsPanel() => locale.text(
+        en: 'Diagnostics',
+        ru: 'Диагностика',
+      ),
+      ClientIdentityPanel() => locale.text(
+        en: 'Server identity',
+        ru: 'Идентичность сервера',
+      ),
+      ClientNetworksPanel() => locale.text(en: 'Networks', ru: 'Сети'),
+      ClientCleanupPanel() => locale.text(
+        en: 'Enrollment cleanup',
+        ru: 'Удаление регистрации',
+      ),
+      ClientCreateProfilePanel() => locale.text(
+        en: 'New profile',
+        ru: 'Новый профиль',
+      ),
+      ClientConnectionPanel() => locale.text(
+        en: 'Connection and session',
+        ru: 'Подключение и сессия',
+      ),
+      ClientRecoveryPanel() => locale.text(
+        en: 'Saved intentions',
+        ru: 'Сохранённые намерения',
+      ),
+      ClientProfilesPanel() => locale.text(en: 'Profiles', ru: 'Профили'),
+      // These panels own their headings; notifications are supplied by the host.
+      _ => null,
+    };
+    if (title == null) return panel;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Semantics(header: true, child: Text(title)),
+        panel,
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) => SafeArea(
     child: SingleChildScrollView(
@@ -424,7 +479,7 @@ class ClientSessionPanel extends StatelessWidget {
               ),
             ),
           ),
-        ],
+        ].map(_section).toList(),
       ),
     ),
   );

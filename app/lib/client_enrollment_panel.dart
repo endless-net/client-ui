@@ -171,10 +171,13 @@ class _EnrollmentFormState extends State<_EnrollmentForm> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          _text(
-            'Enroll the selected profile',
-            'Зарегистрировать выбранный профиль',
+        Semantics(
+          header: true,
+          child: Text(
+            _text(
+              'Enroll the selected profile',
+              'Зарегистрировать выбранный профиль',
+            ),
           ),
         ),
         TextField(
