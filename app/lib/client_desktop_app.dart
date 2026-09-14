@@ -296,7 +296,18 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
       } while (_trayDirty && mounted && _trayReady);
     } catch (_) {
       if (mounted) {
-        setState(() => _notice = _DesktopNotice.tray);
+        setState(() {
+          _trayReady = false;
+          _notice = _DesktopNotice.tray;
+        });
+        // A failed menu must not strand a UI that was already hidden.
+        if (widget.desktopIntegration) {
+          try {
+            await _show();
+          } catch (_) {
+            // Keep the tray unavailable; a later close follows the exit path.
+          }
+        }
       }
     } finally {
       _trayUpdating = false;
@@ -346,8 +357,18 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
               ? 'assets/icons/endlessnet.ico'
               : 'assets/icons/endlessnet.png',
         );
+        if (!mounted) return;
         _trayReady = true;
         await _refreshTray();
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _trayReady = false;
+          _notice = _DesktopNotice.tray;
+        });
+      }
+      if (!mounted) return;
+      try {
         await windowManager.waitUntilReadyToShow(
           const WindowOptions(
             title: 'EndlessNet',
@@ -355,14 +376,13 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
             minimumSize: Size(620, 460),
             center: true,
           ),
-          () async {
-            if (widget.showWindow) {
-              await _show();
-            } else {
-              await windowManager.hide();
-            }
-          },
         );
+        if (!mounted) return;
+        if (widget.showWindow || !_trayReady) {
+          await _show();
+        } else {
+          await windowManager.hide();
+        }
         _lastSignal = await widget.showSignal?.call();
         if (!mounted) return;
         _signals = Timer.periodic(
@@ -393,7 +413,25 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
 
   @override
   void onWindowClose() {
-    unawaited(windowManager.hide());
+    unawaited(_closeWindow());
+  }
+
+  Future<void> _closeWindow() async {
+    if (!mounted || _exiting || _busy) return;
+    if (!_trayReady) {
+      await _quit();
+      return;
+    }
+    try {
+      await windowManager.hide();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _trayReady = false;
+        _notice = _DesktopNotice.tray;
+      });
+      await _quit();
+    }
   }
 
   @override
@@ -518,7 +556,11 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     await session.close();
     await widget.onExit?.call();
     if (widget.desktopIntegration) {
-      await trayManager.destroy();
+      try {
+        await trayManager.destroy();
+      } catch (_) {
+        // An unavailable tray must not prevent closing the application window.
+      }
       await windowManager.destroy();
     }
   }

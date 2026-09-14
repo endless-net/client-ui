@@ -514,7 +514,7 @@
         },
         {
           "path": "app/test/client_desktop_app_test.dart",
-          "scope": "Explicit owner Quit sends one journaled UI_QUIT and retains pending UUID; observer exits without mutation; launch does not notify lifecycle; unavailable runtime offers Stay. Native window/tray integration disabled, Quit callback invoked directly; no OS lifecycle acceptance"
+          "scope": "Owner Quit journals UI_QUIT once; observer exits without mutation; launch sends no lifecycle; unavailable runtime offers Stay. Four native-channel-mocked widget cases verify hide for initialized tray, visible startup and exit after icon/menu failure, exit after hide failure, and window destruction despite tray cleanup failure. No real shell visibility or OS lifecycle acceptance"
         },
         {
           "path": "app/test/client_session_process_test.dart",

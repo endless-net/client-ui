@@ -14,6 +14,18 @@
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Desktop close correction: ошибка создания icon/menu сбрасывает tray readiness;
+window initialization продолжается, и UI показывается даже при `showWindow=false`.
+Ошибка обновления меню показывает окно и запрещает последующее скрытие в этот
+трей. Close скрывает только при готовом трее; иначе проходит через существующий
+Quit flow. Ошибка hide также ведёт в Quit; ошибка destroy трея не блокирует
+destroy окна. Show/hide после window setup ожидаются напрямую, поскольку callback
+`waitUntilReadyToShow` в закреплённом window_manager не ожидает async completion.
+Это source/widget correction, не доказательство фактической видимости tray в
+GNOME/macOS/Windows: потеря OS tray host без plugin error остаётся открытой.
+UI_QUIT по producer v0 и runtime-owned lifecycle preferences сохранён; UI не
+добавляет Disconnect, OS logoff/suspend/resume или изменение preferences при close.
+
 Windows opt-in implementation: MSI больше не создаёт HKCU Run запись UI.
 Windows host обслуживает `endlessnet/ui-autostart` (`read`, `setEnabled` с bool);
 entrypoint подключает общий RU/EN panel. Только явное включение записывает

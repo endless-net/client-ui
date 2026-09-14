@@ -9,7 +9,9 @@ import 'package:endlessnet/client_session_panel.dart';
 import 'package:endlessnet/client_mutations.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:window_manager/window_manager.dart';
 import 'client_session_test.dart' as fixtures;
 import 'client_privileged_session_test.dart' show ImmediateResponse;
 
@@ -39,6 +41,129 @@ class QuitClient extends fixtures.NoCallsClient {
 }
 
 void main() {
+  for (final failure in ['none', 'setIcon', 'setContextMenu', 'hide']) {
+    testWidgets('window close follows tray readiness: $failure', (
+      tester,
+    ) async {
+      final directory = (await tester.runAsync(
+        () => Directory.systemTemp.createTemp('en-close-'),
+      ))!;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final windowCalls = <String>[];
+      final trayCalls = <String>[];
+      const screens = MethodChannel('dev.leanflutter.plugins/screen_retriever');
+      final display = {
+        'id': 'test',
+        'size': {'width': 1920.0, 'height': 1080.0},
+        'visiblePosition': {'dx': 0.0, 'dy': 0.0},
+      };
+      messenger.setMockMethodCallHandler(
+        screens,
+        (call) async => switch (call.method) {
+          'getPrimaryDisplay' => display,
+          'getAllDisplays' => {
+            'displays': [display],
+          },
+          'getCursorScreenPoint' => {'dx': 0.0, 'dy': 0.0},
+          _ => null,
+        },
+      );
+      var closeRequested = false;
+      messenger.setMockMethodCallHandler(const MethodChannel('tray_manager'), (
+        call,
+      ) async {
+        trayCalls.add(call.method);
+        if (call.method == failure || call.method == 'destroy') {
+          throw PlatformException(code: 'unavailable');
+        }
+        return null;
+      });
+      messenger.setMockMethodCallHandler(
+        const MethodChannel('window_manager'),
+        (call) async {
+          windowCalls.add(call.method);
+          if (call.method == 'hide' && failure == 'hide' && closeRequested) {
+            throw PlatformException(code: 'unavailable');
+          }
+          if (call.method == 'getBounds') {
+            return {'x': 0.0, 'y': 0.0, 'width': 760.0, 'height': 560.0};
+          }
+          if (call.method.startsWith('is')) return false;
+          return null;
+        },
+      );
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(screens, null);
+        messenger.setMockMethodCallHandler(
+          const MethodChannel('tray_manager'),
+          null,
+        );
+        messenger.setMockMethodCallHandler(
+          const MethodChannel('window_manager'),
+          null,
+        );
+      });
+      final connection = fixtures.FakeConnection();
+      final session = ClientSession(
+        journal: ClientIntentJournal(directory),
+        open: () async => connection,
+      );
+      var exits = 0;
+      await tester.pumpWidget(
+        ClientDesktopApp(
+          session: session,
+          showWindow: false,
+          onExit: () async {
+            exits++;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        for (
+          var i = 0;
+          i < 100 && session.state.link.name != 'awaitingSnapshot';
+          i++
+        ) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+      });
+      expect(session.state.link.name, 'awaitingSnapshot');
+      final snapshot = fixtures.snapshot();
+      snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
+      connection.events.add(snapshot);
+      await tester.pumpAndSettle();
+      if (failure == 'setIcon' || failure == 'setContextMenu') {
+        expect(windowCalls, contains('show'));
+        expect(windowCalls, isNot(contains('hide')));
+      }
+      windowCalls.clear();
+      closeRequested = true;
+      final listener =
+          tester.state(find.byType(ClientDesktopApp)) as WindowListener;
+      await tester.runAsync(() async {
+        listener.onWindowClose();
+        for (var i = 0; i < 50 && failure != 'none' && exits == 0; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+      });
+      await tester.pumpAndSettle();
+      if (failure == 'none') {
+        expect(windowCalls, contains('hide'));
+        expect(exits, 0);
+        expect(connection.closed, isFalse);
+      } else {
+        expect(exits, 1);
+        expect(connection.closed, isTrue);
+        expect(windowCalls, contains('destroy'));
+        expect(trayCalls, contains('destroy'));
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.runAsync(session.close);
+      await tester.runAsync(() => directory.delete(recursive: true));
+    });
+  }
   for (final observer in [false, true]) {
     testWidgets(
       'US-12: explicit quit ${observer ? 'observer sends no mutation' : 'owner journals UI_QUIT once'}',

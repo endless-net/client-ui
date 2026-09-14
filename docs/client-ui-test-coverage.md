@@ -1,5 +1,14 @@
 # Client v0 test coverage ledger
 
+Desktop close correction (2026-09-14): four short widget cases exercise actual
+shell wiring against mocked window/tray/display channels. A working tray hides;
+icon/menu failure forces visible startup then follows Quit; hide failure exits;
+failed tray destruction still destroys the window. Observer fixture admits no
+runtime mutation. Existing owner tests separately verify the journaled UI_QUIT
+contract. Local full Flutter: 814 passed, 30 skipped; Go full, Flutter analysis
+and 13 Node checks passed. Actual tray visibility, loss of an OS tray host without
+a plugin error, desktop focus and runtime policy effects remain unverified.
+
 Windows opt-in autostart addition (2026-09-14): MSI automatic Run registration
 removed, UI explicitly registers/removes its current executable for HKCU.
 Native handler unit checks run against fake Win32 functions, never real registry:
