@@ -191,9 +191,19 @@ void main() {
           else ...[
             'Network a',
             'a',
+            ru ? 'ID аккаунта: Нет данных' : 'Account ID: Not reported',
+            ru ? 'Диапазон IPv4: Нет данных' : 'IPv4 range: Not reported',
+            ru ? 'Диапазон IPv6: Нет данных' : 'IPv6 range: Not reported',
             ru ? 'Выбрана' : 'Selected',
             'Network b',
             'b',
+            ru ? 'ID аккаунта: Нет данных' : 'Account ID: Not reported',
+            ru ? 'Диапазон IPv4: Нет данных' : 'IPv4 range: Not reported',
+            ru ? 'Диапазон IPv6: Нет данных' : 'IPv6 range: Not reported',
+            ru ? 'Выбор: Доступно' : 'Selection: Available',
+            ru
+                ? 'Ответственный за действие: Неизвестно'
+                : 'Action owner: Unknown',
             ru ? 'Выбрать' : 'Select',
           ],
         ]);

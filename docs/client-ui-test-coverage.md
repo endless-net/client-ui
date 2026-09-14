@@ -1,5 +1,16 @@
 # Client v0 test coverage ledger
 
+Network context addition (2026-09-14): six short RU/EN tests in
+`client_network_context_test.dart` distinguish same-name networks by Account ID
+and separate IPv4/IPv6 ranges; check explicit missing data, permission-required
+selection with access-administrator role, exact profile/network mutation IDs and
+observer cleanup. At 360x640/200%, fields and buttons are reached through the
+production scroll composition. Existing exact locale assertions include these
+fields. This is controlled consumer evidence, not network/traffic acceptance.
+Final pinned validation: 863 Flutter tests passed, 30 skipped; analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed. The existing
+network mutation test now scrolls its catalog as the production session does.
+
 Profile context addition (2026-09-14): `client_profile_context_test.dart` adds
 seven short tests for all ProfileState labels and RU/EN catalogs containing
 same-name profiles with distinct account identity/ID, control origin and network

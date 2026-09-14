@@ -1526,38 +1526,45 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: ContractTestScaffold(
-            body: ClientNetworksPanel(
-              state: state,
-              load: () => readClientNetworks(
-                (_) async => api.ListNetworksResponse()
-                  ..mergeFromProto3Json({
-                    'networks': [
-                      {'id': 'network-a', 'name': 'A'},
-                      {
-                        'id': 'network-b',
-                        'name': 'B',
-                        'selection': {'availability': 'AVAILABILITY_AVAILABLE'},
+            body: SingleChildScrollView(
+              child: ClientNetworksPanel(
+                state: state,
+                load: () => readClientNetworks(
+                  (_) async => api.ListNetworksResponse()
+                    ..mergeFromProto3Json({
+                      'networks': [
+                        {'id': 'network-a', 'name': 'A'},
+                        {
+                          'id': 'network-b',
+                          'name': 'B',
+                          'selection': {
+                            'availability': 'AVAILABILITY_AVAILABLE',
+                          },
+                        },
+                        {'id': 'network-c', 'name': 'C'},
+                      ],
+                      'selectedNetworkId': 'network-a',
+                      'page': {
+                        'metadata': {
+                          'instanceId': 'runtime-a',
+                          'revision': '7',
+                        },
                       },
-                      {'id': 'network-c', 'name': 'C'},
-                    ],
-                    'selectedNetworkId': 'network-a',
-                    'page': {
-                      'metadata': {'instanceId': 'runtime-a', 'revision': '7'},
-                    },
-                  }),
-                instanceId: 'runtime-a',
-                profileId: 'profile-a',
+                    }),
+                  instanceId: 'runtime-a',
+                  profileId: 'profile-a',
+                ),
+                select: (profile, network) async {
+                  calls.add((profile, network));
+                  return ClientOperation.fromProto(
+                    api.Operation(
+                      id: 'network-selection',
+                      kind: api.OperationKind.OPERATION_KIND_SELECT_NETWORK,
+                      state: api.OperationState.OPERATION_STATE_PENDING,
+                    ),
+                  );
+                },
               ),
-              select: (profile, network) async {
-                calls.add((profile, network));
-                return ClientOperation.fromProto(
-                  api.Operation(
-                    id: 'network-selection',
-                    kind: api.OperationKind.OPERATION_KIND_SELECT_NETWORK,
-                    state: api.OperationState.OPERATION_STATE_PENDING,
-                  ),
-                );
-              },
             ),
           ),
         ),
@@ -1582,6 +1589,7 @@ void main() {
         });
       events.add(snapshot);
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('client-load-networks')));
       await tester.tap(find.byKey(const Key('client-load-networks')));
       await tester.pump();
       expect(
@@ -1592,10 +1600,14 @@ void main() {
             .onPressed,
         isNull,
       );
+      await tester.ensureVisible(
+        find.byKey(const Key('select-network-network-b')),
+      );
       await tester.tap(find.byKey(const Key('select-network-network-b')));
       await tester.pump();
       expect(calls, [('profile-a', 'network-b')]);
       expect(state.snapshot!.status.network.id, 'network-a');
+      await tester.ensureVisible(find.byKey(const Key('client-load-networks')));
       await tester.tap(find.byKey(const Key('client-load-networks')));
       await tester.pump();
       events.add(

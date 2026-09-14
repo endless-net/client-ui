@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'client_networks.dart';
 import 'client_locale.dart';
 import 'client_operation.dart';
+import 'client_operation_labels.dart';
+import 'client_update_labels.dart';
 import 'client_state_controller.dart';
 
 class ClientNetworksPanel extends StatefulWidget {
@@ -35,6 +37,8 @@ class _ClientNetworksPanelState extends State<ClientNetworksPanel> {
   bool _busy = false;
   _NetworkNotice? _notice;
   String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
+  String _reported(String value) =>
+      value.isEmpty ? _text('Not reported', 'Нет данных') : value;
   String _noticeText(_NetworkNotice notice) => switch (notice) {
     _NetworkNotice.accepted => _text(
       'Network selection accepted. Recover the operation for its result.',
@@ -149,21 +153,43 @@ class _ClientNetworksPanelState extends State<ClientNetworksPanel> {
             for (final network in _catalog!.networks)
               ListTile(
                 title: Text(network.name),
-                subtitle: Text(network.id),
-                trailing: network.id == _catalog!.selectedNetworkId
-                    ? Text(_text('Selected', 'Выбрана'))
-                    : TextButton(
-                        key: ValueKey('select-network-${network.id}'),
-                        onPressed:
-                            !_busy &&
-                                network.selection.availability ==
-                                    api.Availability.AVAILABILITY_AVAILABLE
-                            ? () {
-                                if (current()) _run(network.id);
-                              }
-                            : null,
-                        child: Text(_text('Select', 'Выбрать')),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(network.id),
+                    Text(
+                      '${_text('Account ID', 'ID аккаунта')}: ${_reported(network.accountId)}',
+                    ),
+                    Text(
+                      '${_text('IPv4 range', 'Диапазон IPv4')}: ${_reported(network.ipv4Cidr)}',
+                    ),
+                    Text(
+                      '${_text('IPv6 range', 'Диапазон IPv6')}: ${_reported(network.ipv6Cidr)}',
+                    ),
+                    if (network.id != _catalog!.selectedNetworkId) ...[
+                      Text(
+                        '${_text('Selection', 'Выбор')}: ${updateAvailabilityLabel(network.selection.availability, widget.locale)}',
                       ),
+                      Text(
+                        '${_text('Action owner', 'Ответственный за действие')}: ${clientActionOwnerLabel(network.selection.actionOwner, locale: widget.locale)}',
+                      ),
+                    ],
+                    network.id == _catalog!.selectedNetworkId
+                        ? Text(_text('Selected', 'Выбрана'))
+                        : TextButton(
+                            key: ValueKey('select-network-${network.id}'),
+                            onPressed:
+                                !_busy &&
+                                    network.selection.availability ==
+                                        api.Availability.AVAILABILITY_AVAILABLE
+                                ? () {
+                                    if (current()) _run(network.id);
+                                  }
+                                : null,
+                            child: Text(_text('Select', 'Выбрать')),
+                          ),
+                  ],
+                ),
               ),
           ],
         ],
