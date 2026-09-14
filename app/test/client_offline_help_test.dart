@@ -6,6 +6,7 @@ import 'package:endlessnet/client_offline_help.dart';
 import 'package:endlessnet/client_state_controller.dart';
 import 'package:endlessnet/client_support_panel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -62,6 +63,63 @@ void main() {
     },
   );
   for (final initial in ClientLocale.values) {
+    testWidgets('offline help keyboard disclosure semantics in $initial', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final state = ClientStateController();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ClientSupportPanel(
+                state: state,
+                locale: initial,
+                load: () async =>
+                    throw StateError('Offline help must not read RPC'),
+                openBrowser: (_, _) async =>
+                    throw StateError('Offline help must not open browser'),
+              ),
+            ),
+          ),
+        ),
+      );
+      final button = find.byKey(const Key('client-offline-help'));
+      void check(bool expanded) {
+        expect(
+          tester.getSemantics(button),
+          matchesSemantics(
+            label: initial == ClientLocale.ru
+                ? 'Справка без интернета'
+                : 'Offline help',
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: true,
+            isFocusable: true,
+            isFocused: true,
+            hasTapAction: true,
+            hasFocusAction: true,
+            hasExpandedState: true,
+            isExpanded: expanded,
+          ),
+        );
+      }
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      check(false);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      check(true);
+      expect(find.byType(ClientOfflineHelp), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      check(false);
+      expect(find.byType(ClientOfflineHelp), findsNothing);
+      semantics.dispose();
+      await tester.pumpWidget(const SizedBox());
+      state.dispose();
+    });
     testWidgets(
       'all offline topics readable at narrow scaled layout in $initial',
       (tester) async {

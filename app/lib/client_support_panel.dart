@@ -150,12 +150,17 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          TextButton(
-            key: const Key('client-offline-help'),
-            onPressed: () {
-              if (mounted) setState(() => _help = !_help);
-            },
-            child: Text(_text('Offline help', 'Справка без интернета')),
+          MergeSemantics(
+            child: Semantics(
+              expanded: _help,
+              child: TextButton(
+                key: const Key('client-offline-help'),
+                onPressed: () {
+                  if (mounted) setState(() => _help = !_help);
+                },
+                child: Text(_text('Offline help', 'Справка без интернета')),
+              ),
+            ),
           ),
           if (_help)
             Text(

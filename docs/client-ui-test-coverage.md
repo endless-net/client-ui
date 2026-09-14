@@ -1,5 +1,16 @@
 # Client v0 test coverage ledger
 
+Offline help disclosure correction (2026-09-14): its button now exposes expanded
+state merged with its label, focus and action. Two RU/EN keyboard tests check Tab
+focus, Enter opening/closing, exact semantic flags and no RPC/browser access.
+The initial unmerged wrapper failed the button semantics assertion; MergeSemantics
+places the state on the actionable node. Existing large-text topic tests pass.
+This verifies Flutter semantics, not native screen-reader output. Unknown producer
+topic keys still report that the requested topic is not bundled; no key mapping
+or runtime contract is invented by this change.
+Validation: 882 Flutter tests passed, 30 skipped; pinned analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Peer accessibility source check (2026-09-14): two RU/EN widgets use a 360x640
 viewport and 200% text. Keyboard events activate refresh and expand/collapse two
 same-name peers. The reader sees the exact search once; details remain reachable

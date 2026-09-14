@@ -638,7 +638,7 @@
         },
         {
           "path": "app/test/client_offline_help_test.dart",
-          "scope": "Three short tests: twelve UI-owned RU/EN task topics, critical recovery/cleanup/privacy meaning checks, all topics expanded at 360x640/text scale 2 with locale-switch retention, zero RPC/browser and no overflow. Producer key mapping, native accessibility and product approval remain unverified"
+          "scope": "Five short tests: twelve UI-owned RU/EN task topics, critical recovery/cleanup/privacy meaning checks, all topics expanded at 360x640/text scale 2 with locale-switch retention, zero RPC/browser and no overflow. RU/EN keyboard disclosure tests assert one semantic button with expanded state, retained focus and Enter open/close without RPC/browser. Producer key mapping, native accessibility and product approval remain unverified"
         },
         {
           "path": "app/test/client_update_locale_test.dart",
