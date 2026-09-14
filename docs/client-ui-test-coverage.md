@@ -1,5 +1,16 @@
 # Client v0 test coverage ledger
 
+Windows tray icon verification (2026-09-14): availability now also requires the
+exact plugin icon's successful Shell_NotifyIconGetRect result and nonempty bounds.
+Preparation deliberately checks only the Shell/lifetime, before icon creation.
+Portable native checks cover query failure, empty/inverted rectangles, valid
+negative monitor coordinates, absent icon/Shell and restart invalidation despite
+a successful geometry query. The unit does not invoke Shell_NotifyIconGetRect;
+actual registration, overflow presentation and clicking remain OS acceptance.
+Validation: 882 Flutter tests passed, 30 skipped; pinned analyze, Go full,
+13 Node checks, native tray state unit, Windows release build and the
+104-requirement coverage checker passed.
+
 Offline help disclosure correction (2026-09-14): its button now exposes expanded
 state merged with its label, focus and action. Two RU/EN keyboard tests check Tab
 focus, Enter opening/closing, exact semantic flags and no RPC/browser access.

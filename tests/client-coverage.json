@@ -78,7 +78,7 @@
         },
         {
           "path": "app/windows/runner/ui_tray_host_test.cpp",
-          "scope": "Portable native state unit executed locally in Ubuntu: failed TaskbarCreated registration, absent Shell, unrelated message, restart invalidation, preparation before registration with subsequent restart invalidation, and independent replacement lifetime. Windows release host compiled; actual Win32 Shell query/broadcast and Explorer/DPI/focus acceptance unverified"
+          "scope": "Portable native state unit executed locally in Ubuntu: failed TaskbarCreated registration, absent Shell/icon, failed geometry query, empty/inverted and valid negative-coordinate rectangles, restart invalidation even with an icon, preparation before registration and independent replacement lifetime. Windows release host compiled; actual Win32 icon/Shell query/broadcast and Explorer/DPI/focus acceptance unverified"
         },
         {
           "path": "app/linux/runner/tray_host_protocol_test.cc",

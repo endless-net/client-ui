@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <shobjidl.h>
+#include <shellapi.h>
 #include <wrl/client.h>
 #include <flutter/standard_method_codec.h>
 
@@ -87,9 +88,23 @@ bool FlutterWindow::OnCreate() {
     }
     if (call.method_name() == "prepareRegistration") {
       tray_host_.PrepareRegistration();
+      result->Success(flutter::EncodableValue(
+          tray_host_.Available(GetShellWindow() != nullptr)));
+      return;
     }
+    // tray_manager 0.5.3 registers ID 1 on the root Flutter window. Query that
+    // exact icon: the plugin does not propagate Shell_NotifyIcon failures.
+    NOTIFYICONIDENTIFIER identifier{};
+    identifier.cbSize = sizeof(identifier);
+    identifier.hWnd = GetHandle();
+    identifier.uID = 1;
+    RECT bounds{};
+    const HRESULT query = Shell_NotifyIconGetRect(&identifier, &bounds);
+    const bool icon_present = UiTrayIconBoundsAvailable(
+        query == S_OK,
+        bounds.left, bounds.top, bounds.right, bounds.bottom);
     result->Success(flutter::EncodableValue(
-        tray_host_.Available(GetShellWindow() != nullptr)));
+        tray_host_.IconAvailable(GetShellWindow() != nullptr, icon_present)));
   });
 
   autostart_channel_ =

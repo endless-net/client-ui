@@ -20,6 +20,16 @@ producer main `712a0155de7180007e248fdeada3c22675c968f4` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Windows `isAvailable` дополнительно запрашивает `Shell_NotifyIconGetRect` для
+конкретного значка закреплённого tray_manager 0.5.3 (root HWND, ID 1). Только
+`S_OK` с непустым прямоугольником подтверждает наличие регистрации; plugin success
+недостаточен, поскольку плагин не возвращает ошибку `Shell_NotifyIcon`.
+Отрицательные координаты допустимы для нескольких мониторов. Подготовка новой
+регистрации проверяет Shell без требования уже существующего значка.
+Основание: [Microsoft Shell_NotifyIconGetRect](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shell_notifyicongetrect).
+Это проверка регистрации/геометрии, не гарантия видимости в overflow menu или
+доступности реального нажатия; native platform acceptance остаётся отдельной.
+
 Windows tray readiness больше не является константой: argument-free native
 `isAvailable` требует зарегистрированный `TaskbarCreated`, существующий Shell и
 отсутствие сообщения о пересоздании taskbar после подготовки регистрации. Broadcast

@@ -3,6 +3,12 @@
 
 #include <cstdint>
 
+inline bool UiTrayIconBoundsAvailable(bool query_succeeded, std::int32_t left,
+                                     std::int32_t top, std::int32_t right,
+                                     std::int32_t bottom) {
+  return query_succeeded && right > left && bottom > top;
+}
+
 // Readiness is local to one UI host. TaskbarCreated can also accompany a DPI
 // change; either way old icon registration is no longer trusted. The shell
 // shows the main window instead of assuming that the plugin restored its icon.
@@ -21,6 +27,10 @@ class UiTrayHostState {
 
   bool Available(bool shell_present) const {
     return restart_message_ != 0 && shell_present && !invalidated_;
+  }
+
+  bool IconAvailable(bool shell_present, bool icon_present) const {
+    return Available(shell_present) && icon_present;
   }
 
   // Called before plugin registration, never after it. A restart during the
