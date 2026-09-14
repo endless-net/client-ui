@@ -20,6 +20,14 @@ producer main `712a0155de7180007e248fdeada3c22675c968f4` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+macOS readiness теперь требует конечный непустой прямоугольник из текущего
+`trayManager.getBounds()`: закреплённый native plugin читает
+`statusItem.button.window.frame`, возвращая null при отсутствии окна значка.
+Отсутствие, ошибка и некорректные координаты запрещают скрытие через существующий
+общий guard и оставляют возможность явного восстановления. Наличие геометрии
+не доказывает видимость/доступность значка при ограниченном месте в menu bar;
+это ограничение и реальная AppKit acceptance остаются открытыми.
+
 Windows `isAvailable` дополнительно запрашивает `Shell_NotifyIconGetRect` для
 конкретного значка закреплённого tray_manager 0.5.3 (root HWND, ID 1). Только
 `S_OK` с непустым прямоугольником подтверждает наличие регистрации; plugin success
@@ -50,8 +58,8 @@ poll/close guard показывает окно и не скрывает его �
 не разрешает скрытие окна и оставляет действие повторного восстановления.
 Автоматическая повторная регистрация пока не реализована. Portable
 C++ state unit выполнен локально, Windows release host скомпилирован; реальный
-restart Explorer/DPI/focus остаётся platform acceptance. macOS пока использует
-plugin readiness без дополнительной host-проверки.
+restart Explorer/DPI/focus остаётся platform acceptance. Проверка macOS окна
+значка описана выше отдельно от реальной видимости.
 
 UF-14/UBR-19: повторяющиеся кнопки профилей (select/rename/remove), сетей
 (select) и ресурсов (open/enable/disable) имеют отдельные RU/EN semantic labels
@@ -157,7 +165,8 @@ Shell проверяет host перед первым скрытием и при
 с одним background read одновременно. Потеря host сбрасывает readiness и
 показывает окно; поздний hide после этой потери повторно показывает UI.
 Close без host проходит через Quit. Автоматическое восстановление readiness
-после потери не заявляется; Windows/macOS пока используют plugin readiness.
+после потери не заявляется; явное восстановление и проверки Windows/macOS
+добавлены выше.
 Наличие host не доказывает фактическую видимость конкретной иконки или OS focus.
 GLib unit, native syntax check в локальной Ubuntu и channel/widget tests пройдены;
 реальный GNOME host/extension и native desktop acceptance ещё требуются.
@@ -214,7 +223,8 @@ Quit flow. Ошибка hide также ведёт в Quit; ошибка destroy
 destroy окна. Show/hide после window setup ожидаются напрямую, поскольку callback
 `waitUntilReadyToShow` в закреплённом window_manager не ожидает async completion.
 Это source/widget correction, не доказательство фактической видимости tray в
-GNOME/macOS/Windows: потеря OS tray host без plugin error остаётся открытой.
+GNOME/macOS/Windows. Последующие host/geometry guards описаны выше; реальная
+видимость, взаимодействие и OS focus остаются platform acceptance.
 UI_QUIT по producer v0 и runtime-owned lifecycle preferences сохранён; UI не
 добавляет Disconnect, OS logoff/suspend/resume или изменение preferences при close.
 

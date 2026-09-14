@@ -12,7 +12,11 @@ void main() {
   const channel = MethodChannel('endlessnet/ui-tray-host');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-  tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  const trayChannel = MethodChannel('tray_manager');
+  tearDown(() {
+    messenger.setMockMethodCallHandler(channel, null);
+    messenger.setMockMethodCallHandler(trayChannel, null);
+  });
   test(
     'Windows registration preparation requires native true with no arguments',
     () async {
@@ -53,13 +57,37 @@ void main() {
       expect(await readClientTrayHostAvailability(platform), isFalse);
     });
   }
-  test('macOS uses plugin readiness without a watcher query', () async {
+  test('macOS requires live finite nonempty status item bounds', () async {
     messenger.setMockMethodCallHandler(
       channel,
       (_) async => throw StateError('unexpected'),
     );
-    expect(await readClientTrayHostAvailability('macos'), isTrue);
+    for (final size in [24.0, 0.0, -1.0, double.nan, double.infinity]) {
+      messenger.setMockMethodCallHandler(trayChannel, (call) async {
+        expect(call.method, 'getBounds');
+        return {'x': -100.0, 'y': -200.0, 'width': size, 'height': 24.0};
+      });
+      expect(await readClientTrayHostAvailability('macos'), size == 24.0);
+    }
+    for (final value in [
+      null,
+      'invalid',
+      <String, Object?>{},
+      {'x': double.nan, 'y': 0.0, 'width': 24.0, 'height': 24.0},
+      {'x': 0.0, 'y': double.infinity, 'width': 24.0, 'height': 24.0},
+      {'x': 0.0, 'y': 0.0, 'width': 24.0, 'height': 0.0},
+    ]) {
+      messenger.setMockMethodCallHandler(trayChannel, (_) async => value);
+      expect(await readClientTrayHostAvailability('macos'), isFalse);
+    }
     expect(await readClientTrayHostAvailability('android'), isFalse);
+  });
+  test('missing or failed macOS status item query is unavailable', () async {
+    expect(await readClientTrayHostAvailability('macos'), isFalse);
+    messenger.setMockMethodCallHandler(trayChannel, (_) async {
+      throw PlatformException(code: 'private native detail');
+    });
+    expect(await readClientTrayHostAvailability('macos'), isFalse);
   });
   for (final platform in ['windows', 'macos', 'linux']) {
     test('$platform installs menu using only supported methods', () async {

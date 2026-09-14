@@ -2,7 +2,21 @@ import 'package:tray_manager/tray_manager.dart';
 import 'package:flutter/services.dart';
 
 Future<bool> readClientTrayHostAvailability(String platform) async {
-  if (platform == 'macos') return true;
+  if (platform == 'macos') {
+    // The pinned plugin queries its status item's button window, returning null
+    // if the item/button/window no longer exists. Geometry is not visibility.
+    try {
+      final bounds = await trayManager.getBounds();
+      return bounds != null &&
+          bounds.left.isFinite &&
+          bounds.top.isFinite &&
+          bounds.right.isFinite &&
+          bounds.bottom.isFinite &&
+          !bounds.isEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
   if (platform != 'linux' && platform != 'windows') return false;
   try {
     return await const MethodChannel(

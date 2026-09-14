@@ -1,5 +1,16 @@
 # Client v0 test coverage ledger
 
+macOS tray window presence (2026-09-14): availability no longer returns a constant
+true. The inspected pinned tray_manager 0.5.3 getBounds implementation queries
+its current statusItem.button.window.frame and returns null when absent. The
+consumer requires finite nonempty bounds and rejects exceptions/malformed values.
+Two channel-mocked tests cover missing host, native failure, absent item, invalid
+geometry and valid negative monitor coordinates. Existing composed desktop tests
+cover the generic availability-loss/close/restoration path. This does not prove
+NSStatusItem visibility, menu bar overflow or real AppKit interaction/compilation.
+Validation: 883 Flutter tests passed, 30 skipped; pinned analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Windows tray icon verification (2026-09-14): availability now also requires the
 exact plugin icon's successful Shell_NotifyIconGetRect result and nonempty bounds.
 Preparation deliberately checks only the Shell/lifetime, before icon creation.

@@ -74,7 +74,7 @@
       "testEvidence": [
         {
           "path": "app/test/client_tray_host_test.dart",
-          "scope": "16 short tests: supported tray methods/lifetime, Linux/Windows availability requiring explicit native true and missing/error/malformed refusal, and Windows pre-registration channel. macOS still uses plugin readiness. Composed desktop tests separately exercise absent/lost host, pending-hide race, explicit restoration with cleanup before setIcon, failed cleanup and loss during restoration. Actual OS tray visibility/interaction unverified"
+          "scope": "17 short tests: supported tray methods/lifetime, Linux/Windows explicit native availability and Windows pre-registration channel. macOS requires live finite nonempty plugin status-item bounds; missing/error/malformed and nonfinite coordinates are unavailable, negative monitor coordinates allowed. Composed desktop tests separately exercise absent/lost host, pending-hide race, explicit restoration with cleanup before setIcon, failed cleanup and loss during restoration. Actual OS tray visibility/interaction unverified"
         },
         {
           "path": "app/windows/runner/ui_tray_host_test.cpp",
