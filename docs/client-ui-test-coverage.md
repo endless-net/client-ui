@@ -1,5 +1,15 @@
 # Client v0 test coverage ledger
 
+Linux tray host availability addition (2026-09-14): three channel tests and
+three composed-shell cases cover strict availability, absent/lost host and
+late hide completion after loss. Native GLib unit checks the D-Bus variant type;
+`tray_host.cc` passed a local Ubuntu syntax check using real Flutter/GTK headers.
+The existing short Linux job runs this unit executable without a session bus.
+Real watcher interaction, icon visibility and window focus remain unverified.
+Local full Flutter passed 825 tests with 30 skips; after the final unavailable
+notice change, all 11 desktop lifecycle tests and analyze passed again. Go full
+and all 13 Node checks passed. No integration runner was dispatched.
+
 COM primary-process ordering correction (2026-09-14): native window creation no
 longer registers activation. Dart explicitly initializes only after acquiring
 the instance lock, and shuts activation down before releasing it. Failed shutdown

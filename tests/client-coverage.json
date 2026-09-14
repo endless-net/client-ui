@@ -74,7 +74,11 @@
       "testEvidence": [
         {
           "path": "app/test/client_tray_host_test.dart",
-          "scope": "Ten short tests: Linux only installs supported context menu; Windows/macOS preserve tooltip/popup, disposed host makes no call, menu keys read after pending tooltip, unknown platform rejected. Pinned tray_manager 0.5.3 native source confirms Linux lacks tooltip/popup. Actual desktop rendering/click and runtime effects unverified"
+          "scope": "13 short tests: supported tray methods/lifetime plus Linux availability requiring explicit native true, missing/error/malformed refusal and no Linux query on other platforms. Composed desktop tests separately exercise absent/lost host and pending-hide race. Actual GNOME tray visibility/interaction unverified"
+        },
+        {
+          "path": "app/linux/runner/tray_host_protocol_test.cc",
+          "scope": "Executed local GLib unit executable checks exact (variant boolean) D-Bus property response, true/false, missing and malformed types. Native channel syntax compiled with real Flutter/GTK headers. Does not contact a real watcher; included in existing short Linux job"
         },
         {
           "path": "app/test/client_windows_autostart_test.dart",

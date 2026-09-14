@@ -20,6 +20,23 @@ producer main `60ff0eec554df0b77fdcd9a8fed7d6db933da65e` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Linux tray host detection: native argument-free `isAvailable` читает
+`org.kde.StatusNotifierWatcher.IsStatusNotifierHostRegistered` через D-Bus
+Properties.Get, с timeout 1000 ms и NO_AUTO_START. Проверяется строго bool;
+ошибка/отсутствие/неправильный тип не означает доступный трей. Используется
+[KDE wire interface](https://github.com/KDE/plasma-workspace/blob/master/xembed-sni-proxy/org.kde.StatusNotifierWatcher.xml)
+с [семантикой host registration](https://specifications.freedesktop.org/status-notifier-item/latest/status-notifier-watcher.html).
+Legacy tray fallback не используется.
+
+Shell проверяет host перед первым скрытием и при close, а затем раз в секунду
+с одним background read одновременно. Потеря host сбрасывает readiness и
+показывает окно; поздний hide после этой потери повторно показывает UI.
+Close без host проходит через Quit. Автоматическое восстановление readiness
+после потери не заявляется; Windows/macOS пока используют plugin readiness.
+Наличие host не доказывает фактическую видимость конкретной иконки или OS focus.
+GLib unit, native syntax check в локальной Ubuntu и channel/widget tests пройдены;
+реальный GNOME host/extension и native desktop acceptance ещё требуются.
+
 COM single-instance correction: создание native window больше не регистрирует
 factory. `main.dart` вызывает argument-free `initialize` только после успешного
 instance lock и window initialization; secondary/version/error paths этого не

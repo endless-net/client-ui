@@ -1,6 +1,7 @@
 #include "my_application.h"
 #include "notifications.h"
 #include "bundle_destination.h"
+#include "tray_host.h"
 
 #include <flutter_linux/flutter_linux.h>
 #ifdef GDK_WINDOWING_X11
@@ -76,6 +77,8 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+  register_tray_host(fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+                    g_application_get_dbus_connection(application));
   register_notifications(fl_engine_get_binary_messenger(fl_view_get_engine(view)),
                          g_application_get_dbus_connection(application), window);
   register_bundle_destination(fl_engine_get_binary_messenger(fl_view_get_engine(view)), window);

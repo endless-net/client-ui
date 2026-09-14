@@ -58,12 +58,14 @@ class ClientDesktopApp extends StatefulWidget {
     this.writeAutostart,
     this.openWindowsAutostartSettings,
     this.openAutostartSettings,
+    this.readTrayAvailability,
   });
   final ClientSession session;
   final Future<ClientAutostartSetting> Function()? readAutostart;
   final Future<ClientAutostartSetting> Function(bool)? writeAutostart;
   final Future<bool> Function()? openWindowsAutostartSettings;
   final Future<bool> Function()? openAutostartSettings;
+  final Future<bool> Function()? readTrayAvailability;
   final DeliverClientNotification? deliverNotification;
   final bool initialNotifications;
   final bool notificationReadFailed;
@@ -188,6 +190,38 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   late final ClientTray _tray;
   late final ClientNotificationDelivery _notifications;
   bool _trayReady = false;
+  bool _trayAvailabilityChecking = false;
+  Future<bool> _readTrayAvailability() =>
+      widget.readTrayAvailability?.call() ??
+      readClientTrayHostAvailability(Platform.operatingSystem);
+
+  Future<void> _checkTrayAvailability() async {
+    if (!mounted || _exiting || !_trayReady || _trayAvailabilityChecking) {
+      return;
+    }
+    _trayAvailabilityChecking = true;
+    try {
+      final available = await _readTrayAvailability();
+      if (!mounted || _exiting || available) return;
+      setState(() {
+        _trayReady = false;
+        _notice = _DesktopNotice.tray;
+      });
+      await _show();
+    } catch (_) {
+      if (mounted && !_exiting) {
+        setState(() => _trayReady = false);
+        try {
+          await _show();
+        } catch (_) {
+          /* Native window failure. */
+        }
+      }
+    } finally {
+      _trayAvailabilityChecking = false;
+    }
+  }
+
   bool _trayUpdating = false;
   bool _trayDirty = false;
   ClientSession get session => widget.session;
@@ -360,6 +394,13 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
         if (!mounted) return;
         _trayReady = true;
         await _refreshTray();
+        if (_trayReady && !await _readTrayAvailability()) {
+          if (!mounted) return;
+          setState(() {
+            _trayReady = false;
+            _notice = _DesktopNotice.tray;
+          });
+        }
       } catch (_) {
         if (!mounted) return;
         setState(() {
@@ -385,10 +426,10 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
         }
         _lastSignal = await widget.showSignal?.call();
         if (!mounted) return;
-        _signals = Timer.periodic(
-          const Duration(seconds: 1),
-          (_) => unawaited(_checkSignal()),
-        );
+        _signals = Timer.periodic(const Duration(seconds: 1), (_) {
+          unawaited(_checkSignal());
+          unawaited(_checkTrayAvailability());
+        });
       } catch (_) {
         if (mounted) {
           setState(() => _notice = _DesktopNotice.integration);
@@ -418,12 +459,25 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
 
   Future<void> _closeWindow() async {
     if (!mounted || _exiting || _busy) return;
+    if (_trayReady) {
+      try {
+        final available = await _readTrayAvailability();
+        _trayReady = _trayReady && available;
+      } catch (_) {
+        _trayReady = false;
+      }
+      if (!mounted || _exiting || _busy) return;
+    }
     if (!_trayReady) {
       await _quit();
       return;
     }
     try {
       await windowManager.hide();
+      if (mounted && !_exiting && !_trayReady) {
+        // Host loss may have shown the window while hide was still pending.
+        await _show();
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {

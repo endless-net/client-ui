@@ -2,6 +2,7 @@
 library;
 
 import 'dart:io';
+import 'dart:async';
 import 'package:endlessnet/client_desktop_app.dart';
 import 'package:endlessnet/client_intent_journal.dart';
 import 'package:endlessnet/client_session.dart';
@@ -41,7 +42,15 @@ class QuitClient extends fixtures.NoCallsClient {
 }
 
 void main() {
-  for (final failure in ['none', 'setIcon', 'setContextMenu', 'hide']) {
+  for (final failure in [
+    'none',
+    'setIcon',
+    'setContextMenu',
+    'hide',
+    'hostAbsent',
+    'hostLost',
+    'hostLostWhileHiding',
+  ]) {
     testWidgets('window close follows tray readiness: $failure', (
       tester,
     ) async {
@@ -70,6 +79,8 @@ void main() {
         },
       );
       var closeRequested = false;
+      final hiding = Completer<void>();
+      var hostAvailable = failure != 'hostAbsent';
       messenger.setMockMethodCallHandler(const MethodChannel('tray_manager'), (
         call,
       ) async {
@@ -83,6 +94,11 @@ void main() {
         const MethodChannel('window_manager'),
         (call) async {
           windowCalls.add(call.method);
+          if (call.method == 'hide' &&
+              closeRequested &&
+              failure == 'hostLostWhileHiding') {
+            await hiding.future;
+          }
           if (call.method == 'hide' && failure == 'hide' && closeRequested) {
             throw PlatformException(code: 'unavailable');
           }
@@ -114,6 +130,7 @@ void main() {
         ClientDesktopApp(
           session: session,
           showWindow: false,
+          readTrayAvailability: () async => hostAvailable,
           onExit: () async {
             exits++;
           },
@@ -134,22 +151,45 @@ void main() {
       snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
       connection.events.add(snapshot);
       await tester.pumpAndSettle();
-      if (failure == 'setIcon' || failure == 'setContextMenu') {
+      if (failure == 'setIcon' ||
+          failure == 'setContextMenu' ||
+          failure == 'hostAbsent') {
         expect(windowCalls, contains('show'));
         expect(windowCalls, isNot(contains('hide')));
       }
       windowCalls.clear();
+      if (failure == 'hostLost') {
+        hostAvailable = false;
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pumpAndSettle();
+        expect(windowCalls, contains('show'));
+        expect(windowCalls, isNot(contains('hide')));
+        windowCalls.clear();
+      }
       closeRequested = true;
       final listener =
           tester.state(find.byType(ClientDesktopApp)) as WindowListener;
-      await tester.runAsync(() async {
+      if (failure == 'hostLostWhileHiding') {
         listener.onWindowClose();
-        for (var i = 0; i < 50 && failure != 'none' && exits == 0; i++) {
-          await Future<void>.delayed(const Duration(milliseconds: 10));
-        }
-      });
+        await tester.pump();
+        expect(windowCalls, contains('hide'));
+        hostAvailable = false;
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pumpAndSettle();
+        expect(windowCalls.where((c) => c == 'show').length, 1);
+        hiding.complete();
+        await tester.pumpAndSettle();
+        expect(windowCalls.where((c) => c == 'show').length, 2);
+      } else {
+        await tester.runAsync(() async {
+          listener.onWindowClose();
+          for (var i = 0; i < 50 && failure != 'none' && exits == 0; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+          }
+        });
+      }
       await tester.pumpAndSettle();
-      if (failure == 'none') {
+      if (failure == 'none' || failure == 'hostLostWhileHiding') {
         expect(windowCalls, contains('hide'));
         expect(exits, 0);
         expect(connection.closed, isFalse);

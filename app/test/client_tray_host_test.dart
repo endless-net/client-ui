@@ -2,11 +2,46 @@
 library;
 
 import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:endlessnet/client_tray_host.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tray_manager/tray_manager.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const channel = MethodChannel('endlessnet/ui-tray-host');
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  test('Linux tray availability requires an explicit native true', () async {
+    for (final value in [true, false, null, 'true', 1]) {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'isAvailable');
+        expect(call.arguments, isNull);
+        return value;
+      });
+      expect(await readClientTrayHostAvailability('linux'), value == true);
+    }
+  });
+  test('missing or failed Linux watcher is not an available tray', () async {
+    expect(await readClientTrayHostAvailability('linux'), isFalse);
+    messenger.setMockMethodCallHandler(channel, (_) async {
+      throw PlatformException(code: 'private bus details');
+    });
+    expect(await readClientTrayHostAvailability('linux'), isFalse);
+  });
+  test(
+    'non-Linux desktop uses plugin readiness without a watcher query',
+    () async {
+      messenger.setMockMethodCallHandler(
+        channel,
+        (_) async => throw StateError('unexpected'),
+      );
+      expect(await readClientTrayHostAvailability('windows'), isTrue);
+      expect(await readClientTrayHostAvailability('macos'), isTrue);
+      expect(await readClientTrayHostAvailability('android'), isFalse);
+    },
+  );
   for (final platform in ['windows', 'macos', 'linux']) {
     test('$platform installs menu using only supported methods', () async {
       final calls = <String>[];
