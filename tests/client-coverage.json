@@ -686,7 +686,11 @@
         },
         {
           "path": "app/test/client_update_notifications_test.dart",
-          "scope": "Eight short planner tests: reuse update projection validation, expiry/late acknowledgment, disabled/observer/offline receipt invalidation, malformed/unverified/stale/pairing rejection, non-available silence, release/classification versus revision dedup, fixed RU/EN ordinary notice without private data. Planner is not yet connected to discovery or the delivery queue; no OS update notification claim"
+          "scope": "Eight short planner tests: reuse update projection validation, expiry/late acknowledgment, disabled/observer/offline receipt invalidation, malformed/unverified/stale/pairing rejection, non-available silence, release/classification versus revision dedup, fixed RU/EN ordinary notice without private data. Discovery and queue tested separately; no OS update notification claim"
+        },
+        {
+          "path": "app/test/client_update_notification_delivery_test.dart",
+          "scope": "Seven short tests: opt-in discovery and shared serial queue, latest invalidation with one read at a time, observer/disabled discard, explicit lookup and delivery retry, release dedup and one-shot expiry without polling. Controlled adapters only; no actual OS display or full platform acceptance"
         },
         {
           "path": "app/test/client_notification_permission_test.dart",

@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:endlessnet_client_api/client_api.dart' as api;
 
 import 'client_deadline_notifications.dart';
 import 'client_locale.dart';
 import 'client_state_controller.dart';
+import 'client_update_notifications.dart';
+import 'client_update_notification_source.dart';
 
 enum ClientNotificationDeliveryResult {
   delivered,
@@ -22,15 +25,28 @@ typedef DeliverClientNotification =
     );
 
 /// Serializes delivery from validated state. No automatic permission prompts,
-/// timers or retry loop: a failed delivery requires explicit [retry].
+/// retry loop: a failed delivery requires explicit [retry]. Update metadata has
+/// a one-shot expiration timer, with no automatic discovery retry.
 final class ClientNotificationDelivery extends ChangeNotifier {
   ClientNotificationDelivery({
     required this.state,
     required this.deliver,
     required ClientLocale locale,
     required bool enabled,
+    api.BuildIdentity? uiBuild,
+    Future<api.UpdateInfo> Function()? loadUpdates,
+    DateTime Function()? now,
   }) : _locale = locale,
        _enabled = enabled {
+    if (uiBuild != null && loadUpdates != null) {
+      _updates = ClientUpdateNotificationSource(
+        state: state,
+        uiBuild: uiBuild,
+        load: loadUpdates,
+        enabled: enabled,
+        now: now,
+      )..addListener(_changed);
+    }
     state.addListener(_changed);
     _changed();
   }
@@ -42,12 +58,14 @@ final class ClientNotificationDelivery extends ChangeNotifier {
   bool _enabled;
   bool _disposed = false;
   bool _running = false;
-  ClientDeadlineNotice? _failedNotice;
-  List<ClientDeadlineNotice> _pending = const [];
+  ClientUpdateNotificationSource? _updates;
+  Object? _failedNotice;
+  List<Object> _pending = const [];
   ClientNotificationDeliveryResult? _result;
 
   ClientNotificationDeliveryResult? get result => _result;
   bool get enabled => _enabled;
+  bool get updateLookupFailed => _updates?.failed ?? false;
 
   set locale(ClientLocale value) {
     if (_disposed) return;
@@ -57,22 +75,20 @@ final class ClientNotificationDelivery extends ChangeNotifier {
   set enabled(bool value) {
     if (_disposed || value == _enabled) return;
     _enabled = value;
+    _updates?.enabled = value;
     _changed();
   }
 
   void retry() {
     if (_disposed || _running) return;
     _failedNotice = null;
+    _updates?.retry();
     _changed();
   }
 
   void _changed() {
     if (_disposed) return;
-    _pending = _planner.observe(
-      snapshot: state.snapshot,
-      ready: state.link == ClientLinkState.ready,
-      enabled: _enabled,
-    );
+    _pending = _planned();
     if (!_pending.contains(_failedNotice)) {
       _failedNotice = null;
       _result = null;
@@ -80,6 +96,15 @@ final class ClientNotificationDelivery extends ChangeNotifier {
     notifyListeners();
     if (!_running) unawaited(_drain());
   }
+
+  List<Object> _planned() => [
+    ..._planner.observe(
+      snapshot: state.snapshot,
+      ready: state.link == ClientLinkState.ready,
+      enabled: _enabled,
+    ),
+    ?_updates?.notice,
+  ];
 
   Future<void> _drain() async {
     _running = true;
@@ -89,7 +114,12 @@ final class ClientNotificationDelivery extends ChangeNotifier {
         if (identical(notice, _failedNotice)) break;
         ClientNotificationDeliveryResult outcome;
         try {
-          outcome = await deliver(notice.title(_locale), notice.body(_locale));
+          final (title, body) = switch (notice) {
+            ClientDeadlineNotice n => (n.title(_locale), n.body(_locale)),
+            ClientUpdateNotice n => (n.title(_locale), n.body(_locale)),
+            _ => throw StateError('Unknown notification'),
+          };
+          outcome = await deliver(title, body);
         } catch (_) {
           outcome = ClientNotificationDeliveryResult.failed;
         }
@@ -103,12 +133,9 @@ final class ClientNotificationDelivery extends ChangeNotifier {
           notifyListeners();
           break;
         }
-        _planner.acknowledge(notice);
-        _pending = _planner.observe(
-          snapshot: state.snapshot,
-          ready: state.link == ClientLinkState.ready,
-          enabled: _enabled,
-        );
+        if (notice is ClientDeadlineNotice) _planner.acknowledge(notice);
+        if (notice is ClientUpdateNotice) _updates?.acknowledge(notice);
+        _pending = _planned();
         notifyListeners();
       }
     } finally {
@@ -121,6 +148,8 @@ final class ClientNotificationDelivery extends ChangeNotifier {
     _disposed = true;
     state.removeListener(_changed);
     _planner.clear();
+    _updates?.removeListener(_changed);
+    _updates?.dispose();
     _pending = const [];
     _failedNotice = null;
     super.dispose();

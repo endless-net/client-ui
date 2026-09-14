@@ -1,5 +1,15 @@
 # Client v0 test coverage ledger
 
+Verified update discovery/delivery addition (2026-09-14): seven short tests in
+`client_update_notification_delivery_test.dart` cover opt-in discovery, the shared
+serial queue, latest invalidation during an outstanding read, observer/disabled
+discard, explicit lookup/delivery retry, release dedup and one-shot expiry.
+The desktop shell supplies `ClientSession.getUpdateInfo`; lookup failures have
+fixed RU/EN text and an explicit retry. Full pinned Flutter passed 840 tests,
+30 skipped; analyze, Go full and all 13 Node checks passed. This supersedes the
+planner-only wiring limitation below. Adapters are controlled in these tests;
+real OS update display and complete UF-15/US-14 acceptance remain unverified.
+
 Verified update notice planner addition (2026-09-14): eight new short tests check
 admission, expiry, context invalidation, dedup and privacy; reader now shares its
 existing projection validator with the planner. Full Flutter passed 833 tests,

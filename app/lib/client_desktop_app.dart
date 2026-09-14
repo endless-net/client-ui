@@ -274,6 +274,10 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     _notificationStorageFailed = widget.notificationReadFailed;
     _notifications = ClientNotificationDelivery(
       state: session.state,
+      uiBuild: widget.uiBuild,
+      loadUpdates: widget.uiBuild == null
+          ? null
+          : () => session.getUpdateInfo(widget.uiBuild!),
       locale: _locale,
       enabled:
           widget.initialNotifications && widget.deliverNotification != null,

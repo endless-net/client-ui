@@ -28,8 +28,16 @@ security и mandatory фиксированным RU/EN текстом и пре�
 совместимость, не устанавливает пакет. Fingerprint использует scope,
 release/manifest/classification, а не revision; stale/expired/observer/disabled
 состояния не дают уведомления или acknowledgment. Память bounded/in-memory.
-Это отдельная реализованная часть UF-15/BP-UI-13: подключения к общей очереди,
-invalidation-driven read и expiry timer пока нет, OS delivery этим не заявляется.
+`ClientUpdateNotificationSource` подключает planner к общей последовательной
+очереди через `ClientSession.getUpdateInfo`: чтение только после opt-in и ready
+owner context, затем по DOMAIN_UPDATES invalidation или явному retry ошибки.
+Параллельных чтений нет; устаревший ответ после смены context отбрасывается.
+Обычный snapshot не запускает повторное чтение. Одноразовый timer снимает notice
+по expiresAt без polling. Ошибка проверки имеет фиксированное RU/EN объяснение
+и явный retry в настройках уведомлений. OS adapter получает только фиксированный
+текст; acknowledgment и dedup выполняются после успешной передачи системе.
+Семь новых unit-тестов проверяют очередь и discovery, но фактический показ ОС,
+platform acceptance и завершение UF-15/US-14 этим не заявляются.
 
 Linux tray host detection: native argument-free `isAvailable` читает
 `org.kde.StatusNotifierWatcher.IsStatusNotifierHostRegistered` через D-Bus

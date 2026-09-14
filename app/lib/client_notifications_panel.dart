@@ -58,18 +58,18 @@ class ClientNotificationsPanel extends StatelessWidget {
           key: const Key('client-ui-notifications'),
           title: Text(
             text(
-              'Session and credential notifications',
-              'Уведомления о сессии и учётных данных',
+              'Session, credential and update notifications',
+              'Уведомления о сессии, учётных данных и обновлениях',
             ),
           ),
           subtitle: Text(
             text(
               persistent
-                  ? 'Warnings about expiry and blocked device credentials. The choice is saved on this device; system permission is separate.'
-                  : 'Warnings about expiry and blocked device credentials. This choice applies to this run only.',
+                  ? 'Warnings about expiry, blocked device credentials and verified updates. The choice is saved on this device; system permission is separate.'
+                  : 'Warnings about expiry, blocked device credentials and verified updates. This choice applies to this run only.',
               persistent
-                  ? 'Предупреждения об истечении сроков и блокировке учётных данных устройства. Выбор сохраняется на этом устройстве; разрешение системы запрашивается отдельно.'
-                  : 'Предупреждения об истечении сроков и блокировке учётных данных устройства. Выбор действует только в этом запуске.',
+                  ? 'Предупреждения об истечении сроков, блокировке учётных данных устройства и проверенных обновлениях. Выбор сохраняется на этом устройстве; разрешение системы запрашивается отдельно.'
+                  : 'Предупреждения об истечении сроков, блокировке учётных данных устройства и проверенных обновлениях. Выбор действует только в этом запуске.',
             ),
           ),
           value: delivery.enabled,
@@ -105,10 +105,22 @@ class ClientNotificationsPanel extends StatelessWidget {
               ),
             ),
           ),
+        if (delivery.updateLookupFailed)
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              text(
+                'Update notification information could not be checked. Retry explicitly.',
+                'Не удалось проверить данные для уведомления об обновлении. Повторите проверку явно.',
+              ),
+            ),
+          ),
         if (supported &&
             delivery.enabled &&
-            delivery.result != null &&
-            delivery.result != ClientNotificationDeliveryResult.delivered)
+            (delivery.updateLookupFailed ||
+                (delivery.result != null &&
+                    delivery.result !=
+                        ClientNotificationDeliveryResult.delivered)))
           TextButton(
             key: const Key('client-ui-notifications-retry'),
             onPressed: busy ? null : delivery.retry,
