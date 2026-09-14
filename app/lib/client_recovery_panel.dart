@@ -278,48 +278,51 @@ class _ClientRecoveryPanelState extends State<ClientRecoveryPanel> {
                                 ),
                               ),
                             ),
+                    operation.terminal
+                        ? TextButton(
+                            key: ValueKey('ack-${operation.value.requestId}'),
+                            onPressed: !_busy
+                                ? () {
+                                    if (current()) _run(operation);
+                                  }
+                                : null,
+                            child: Text(
+                              widget.locale.text(
+                                en: 'Acknowledge result',
+                                ru: 'Подтвердить результат',
+                              ),
+                            ),
+                          )
+                        : operation.value.userAction.kind ==
+                                  api.UserAction_Kind.KIND_OPEN_BROWSER &&
+                              widget.openBrowser != null
+                        ? TextButton(
+                            key: ValueKey(
+                              'browser-${operation.value.requestId}',
+                            ),
+                            onPressed: !_busy
+                                ? () {
+                                    if (current() &&
+                                        _results.contains(operation)) {
+                                      _openBrowser(operation);
+                                    }
+                                  }
+                                : null,
+                            child: Text(
+                              widget.locale.text(
+                                en: 'Open browser',
+                                ru: 'Открыть браузер',
+                              ),
+                            ),
+                          )
+                        : Text(
+                            widget.locale.text(
+                              en: 'Still pending',
+                              ru: 'Ещё выполняется',
+                            ),
+                          ),
                   ],
                 ),
-                trailing: operation.terminal
-                    ? TextButton(
-                        key: ValueKey('ack-${operation.value.requestId}'),
-                        onPressed: !_busy
-                            ? () {
-                                if (current()) _run(operation);
-                              }
-                            : null,
-                        child: Text(
-                          widget.locale.text(
-                            en: 'Acknowledge result',
-                            ru: 'Подтвердить результат',
-                          ),
-                        ),
-                      )
-                    : operation.value.userAction.kind ==
-                              api.UserAction_Kind.KIND_OPEN_BROWSER &&
-                          widget.openBrowser != null
-                    ? TextButton(
-                        key: ValueKey('browser-${operation.value.requestId}'),
-                        onPressed: !_busy
-                            ? () {
-                                if (current() && _results.contains(operation)) {
-                                  _openBrowser(operation);
-                                }
-                              }
-                            : null,
-                        child: Text(
-                          widget.locale.text(
-                            en: 'Open browser',
-                            ru: 'Открыть браузер',
-                          ),
-                        ),
-                      )
-                    : Text(
-                        widget.locale.text(
-                          en: 'Still pending',
-                          ru: 'Ещё выполняется',
-                        ),
-                      ),
               ),
         ],
       );

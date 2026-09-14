@@ -1,5 +1,16 @@
 # Client v0 test coverage ledger
 
+Loaded recovery layout correction (2026-09-14): eight RU/EN cases in
+`client_catalog_layout_test.dart` cover network selection and recovery
+acknowledgement/browser/pending at 360x640 with 200% text. The prior recovery
+layout threw because the trailing action consumed the entire tile width.
+Actions now follow operation details and remain reachable by scrolling; tests
+tap controls and verify the intended mock action exactly once. Network layout
+already passed and was not changed. This does not prove native browser launch,
+runtime outcomes, screen-reader behavior or complete accessibility acceptance.
+Local pinned validation: 850 Flutter tests passed, 30 skipped; analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Large-text dropdown correction (2026-09-14): two RU/EN regressions in
 `client_choice_layout_test.dart` reproduce fixed-height clipping with a loaded
 exit catalog at 360×640 and 200% text. They measure full text bounds in the open

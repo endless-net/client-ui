@@ -681,6 +681,10 @@
           "scope": "Two RU/EN short widgets at 360x640 and 200% text: loaded exit catalog menu and selected field fit complete long labels; Escape cancels, Enter reopens, arrow/Enter selects without a mutation. Actual keyboard events and rendered text measurement; not native screen-reader or full accessibility acceptance"
         },
         {
+          "path": "app/test/client_catalog_layout_test.dart",
+          "scope": "Eight short RU/EN widgets at 360x640 and 200% text: loaded network selection and recovery acknowledgement/browser/pending build without layout errors, actions are reachable by scrolling and taps invoke the intended mock exactly once. No native browser, runtime outcome or full accessibility acceptance"
+        },
+        {
           "path": "app/test/client_notifications_panel_test.dart",
           "scope": "10 RU/EN widget vectors: explicit per-run toggle, five distinct delivery outcomes, retry after failure, locale rebuild without replay, disable cleanup and unavailable toggle without adapter. No persisted setting or native permission/display acceptance"
         },

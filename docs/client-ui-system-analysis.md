@@ -20,6 +20,15 @@ producer main `60ff0eec554df0b77fdcd9a8fed7d6db933da65e` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Загруженная панель recovery при 360×640 и 200% в RU/EN падала на layout:
+`Acknowledge result` / `Подтвердить результат` занимала всю ширину trailing
+области ListTile. Действия и pending-статус перенесены под детали операции,
+поэтому могут переносить текст и прокручиваться вместе с содержимым.
+Восемь `client_catalog_layout_test.dart` проверяют достижимость и фактическое
+нажатие network select, acknowledgement, browser action и показ pending в RU/EN.
+Каталог сетей проходит ту же проверку без изменения source. Это widget/mock
+проверки, а не подтверждение внешнего браузера, runtime outcome или OS accessibility.
+
 Проверка accessibility исходного UI выявила clipping в загруженных dropdown:
 при 360×640 и 200% длинной подписи требовалось 288 px, но default itemHeight
 оставлял 48 px без RenderFlex exception. Поля выходного узла, address family,
