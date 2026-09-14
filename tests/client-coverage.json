@@ -593,6 +593,10 @@
           "scope": "18 short RU/EN profile widget vectors: exact catalog and seven command-notice texts, removal security warning, active/empty catalog, locale changes without command replay or optimistic active state. Local component evidence only; full-app language selection and UI-AC-13 remain incomplete"
         },
         {
+          "path": "app/test/client_profile_context_test.dart",
+          "scope": "Seven short tests: all ProfileState RU/EN labels, same-name profiles distinguished by account identity/ID, control origin and selected network ID, explicit absent fields, policy denial and access-administrator role, actual selection by ID and observer cleanup at 360x640/200%. Consumer/mock evidence, not native multi-profile or tunnel acceptance"
+        },
+        {
           "path": "app/test/client_create_profile_activation_test.dart",
           "scope": "12 short create-profile widget vectors: stale displayed input/snapshot/controller rejection, late response/error suppression, exact RU/EN form and typed notices with locale changes without replay. Component evidence only, not producer ownership enforcement, full-app switching or OS acceptance"
         },

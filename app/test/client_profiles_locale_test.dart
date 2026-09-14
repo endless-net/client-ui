@@ -235,6 +235,21 @@ void main() {
           for (final id in ['a', 'b']) ...[
             'Profile $id',
             id,
+            russian
+                ? 'Идентичность аккаунта: Нет данных'
+                : 'Account identity: Not reported',
+            russian ? 'ID аккаунта: Нет данных' : 'Account ID: Not reported',
+            russian
+                ? 'Адрес сервера управления: Нет данных'
+                : 'Control origin: Not reported',
+            russian
+                ? 'ID выбранной сети: Нет данных'
+                : 'Selected network ID: Not reported',
+            russian ? 'Состояние профиля: Пустой' : 'Profile state: Empty',
+            russian ? 'Выбор: Доступно' : 'Selection: Available',
+            russian
+                ? 'Ответственный за действие: Неизвестно'
+                : 'Action owner: Unknown',
             russian ? 'Переименовать' : 'Rename',
             russian ? 'Выбрать' : 'Select',
             russian ? 'Удалить' : 'Remove',

@@ -1,5 +1,16 @@
 # Client v0 test coverage ledger
 
+Profile context addition (2026-09-14): `client_profile_context_test.dart` adds
+seven short tests for all ProfileState labels and RU/EN catalogs containing
+same-name profiles with distinct account identity/ID, control origin and network
+ID; explicit missing data; policy-blocked selection with access-administrator
+role; selection by ID and observer cleanup. Widget cases use 360x640/200% and
+scroll to real buttons. Existing complete locale assertions now include the new
+fields; the mutation test uses the same scrollable composition as production.
+No native multi-profile/tunnel acceptance is claimed.
+Final pinned validation: 857 Flutter tests passed, 30 skipped; analyze, Go full,
+13 Node checks and the 104-requirement ledger checker passed.
+
 Loaded recovery layout correction (2026-09-14): eight RU/EN cases in
 `client_catalog_layout_test.dart` cover network selection and recovery
 acknowledgement/browser/pending at 360x640 with 200% text. The prior recovery

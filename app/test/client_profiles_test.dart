@@ -1812,52 +1812,54 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: ContractTestScaffold(
-            body: ClientProfilesPanel(
-              state: state,
-              remove: (id) async {
-                removed.add(id);
-                return ClientOperation.fromProto(
-                  api.Operation(
-                    id: 'removal',
-                    kind: api.OperationKind.OPERATION_KIND_REMOVE_PROFILE,
-                    state: api.OperationState.OPERATION_STATE_PENDING,
-                  ),
-                );
-              },
-              rename: (id, name) async {
-                renamed.add((id, name));
-                return ClientOperation.fromProto(
-                  api.Operation(
-                    id: 'rename',
-                    kind: api.OperationKind.OPERATION_KIND_RENAME_PROFILE,
-                    state: api.OperationState.OPERATION_STATE_PENDING,
-                  ),
-                );
-              },
-              load: () => readClientProfiles((_) async {
-                final response = page('a');
-                response.profiles.add(
-                  api.Profile(
-                    id: 'b',
-                    displayName: 'Profile b',
-                    state: api.ProfileState.PROFILE_STATE_EMPTY,
-                    selection: api.Restriction(
-                      availability: api.Availability.AVAILABILITY_AVAILABLE,
+            body: SingleChildScrollView(
+              child: ClientProfilesPanel(
+                state: state,
+                remove: (id) async {
+                  removed.add(id);
+                  return ClientOperation.fromProto(
+                    api.Operation(
+                      id: 'removal',
+                      kind: api.OperationKind.OPERATION_KIND_REMOVE_PROFILE,
+                      state: api.OperationState.OPERATION_STATE_PENDING,
                     ),
-                  ),
-                );
-                return response;
-              }, instanceId: 'runtime-a'),
-              select: (id) async {
-                selected.add(id);
-                return ClientOperation.fromProto(
-                  api.Operation(
-                    id: 'selection',
-                    kind: api.OperationKind.OPERATION_KIND_SELECT_PROFILE,
-                    state: api.OperationState.OPERATION_STATE_PENDING,
-                  ),
-                );
-              },
+                  );
+                },
+                rename: (id, name) async {
+                  renamed.add((id, name));
+                  return ClientOperation.fromProto(
+                    api.Operation(
+                      id: 'rename',
+                      kind: api.OperationKind.OPERATION_KIND_RENAME_PROFILE,
+                      state: api.OperationState.OPERATION_STATE_PENDING,
+                    ),
+                  );
+                },
+                load: () => readClientProfiles((_) async {
+                  final response = page('a');
+                  response.profiles.add(
+                    api.Profile(
+                      id: 'b',
+                      displayName: 'Profile b',
+                      state: api.ProfileState.PROFILE_STATE_EMPTY,
+                      selection: api.Restriction(
+                        availability: api.Availability.AVAILABILITY_AVAILABLE,
+                      ),
+                    ),
+                  );
+                  return response;
+                }, instanceId: 'runtime-a'),
+                select: (id) async {
+                  selected.add(id);
+                  return ClientOperation.fromProto(
+                    api.Operation(
+                      id: 'selection',
+                      kind: api.OperationKind.OPERATION_KIND_SELECT_PROFILE,
+                      state: api.OperationState.OPERATION_STATE_PENDING,
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -1881,6 +1883,7 @@ void main() {
         });
       events.add(snapshot);
       await tester.pump();
+      await tester.ensureVisible(find.byKey(const Key('client-load-profiles')));
       await tester.tap(find.byKey(const Key('client-load-profiles')));
       await tester.pump();
       expect(find.text('Profile b'), findsOneWidget);
@@ -1890,19 +1893,28 @@ void main() {
             .onPressed,
         isNull,
       );
+      await tester.ensureVisible(find.byKey(const Key('remove-profile-b')));
       await tester.tap(find.byKey(const Key('remove-profile-b')));
       await tester.pump();
       expect(removed, isEmpty);
+      await tester.ensureVisible(
+        find.byKey(const Key('cancel-profile-removal')),
+      );
       await tester.tap(find.byKey(const Key('cancel-profile-removal')));
       await tester.pump();
       expect(removed, isEmpty);
+      await tester.ensureVisible(find.byKey(const Key('remove-profile-b')));
       await tester.tap(find.byKey(const Key('remove-profile-b')));
       await tester.pump();
+      await tester.ensureVisible(
+        find.byKey(const Key('confirm-profile-removal')),
+      );
       await tester.tap(find.byKey(const Key('confirm-profile-removal')));
       await tester.pump();
       expect(removed, ['b']);
       expect(find.text('Profile b'), findsNothing);
       expect(state.snapshot!.status.activeProfileId, 'a');
+      await tester.ensureVisible(find.byKey(const Key('client-load-profiles')));
       await tester.tap(find.byKey(const Key('client-load-profiles')));
       await tester.pump();
       final renameButton = find.byKey(const Key('rename-profile-b'));
@@ -1924,14 +1936,17 @@ void main() {
         'Новое имя',
       );
       await tester.pump();
+      await tester.ensureVisible(renameButton);
       await tester.tap(renameButton);
       await tester.pump();
       expect(renamed, [('b', 'Новое имя')]);
       expect(find.text('Новое имя'), findsNothing);
       expect(find.text('Profile b'), findsNothing);
+      await tester.ensureVisible(find.byKey(const Key('client-load-profiles')));
       await tester.tap(find.byKey(const Key('client-load-profiles')));
       await tester.pump();
       for (var repeat = 0; repeat < 2; repeat++) {
+        await tester.ensureVisible(find.byKey(const Key('remove-profile-b')));
         await tester.tap(find.byKey(const Key('remove-profile-b')));
         await tester.pump();
         expect(
@@ -1951,10 +1966,14 @@ void main() {
         expect(find.byKey(const Key('confirm-profile-removal')), findsNothing);
         expect(removed, ['b']);
         expect(find.byKey(const Key('select-profile-b')), findsNothing);
+        await tester.ensureVisible(
+          find.byKey(const Key('client-load-profiles')),
+        );
         await tester.tap(find.byKey(const Key('client-load-profiles')));
         await tester.pump();
         expect(find.text('Profile b'), findsOneWidget);
       }
+      await tester.ensureVisible(find.byKey(const Key('select-profile-b')));
       await tester.tap(find.byKey(const Key('select-profile-b')));
       await tester.pump();
       expect(selected, ['b']);

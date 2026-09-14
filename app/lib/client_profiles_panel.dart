@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import 'client_operation.dart';
 import 'client_locale.dart';
 import 'client_profiles.dart';
+import 'client_profile_labels.dart';
+import 'client_operation_labels.dart';
+import 'client_update_labels.dart';
 import 'client_state_controller.dart';
 
 enum _ProfileNotice {
@@ -62,6 +65,8 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
   bool _busy = false;
   _ProfileNotice? _notice;
   String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
+  String _reported(String value) =>
+      value.isEmpty ? _text('Not reported', 'Нет данных') : value;
   String _noticeText(_ProfileNotice notice) => switch (notice) {
     _ProfileNotice.selectionPending => _text(
       'Selection accepted. Recover the operation to see its result.',
@@ -257,6 +262,29 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(profile.id),
+                    Text(
+                      '${_text('Account identity', 'Идентичность аккаунта')}: ${_reported(profile.identityDisplayName)}',
+                    ),
+                    Text(
+                      '${_text('Account ID', 'ID аккаунта')}: ${_reported(profile.accountId)}',
+                    ),
+                    Text(
+                      '${_text('Control origin', 'Адрес сервера управления')}: ${_reported(profile.controlOrigin)}',
+                    ),
+                    Text(
+                      '${_text('Selected network ID', 'ID выбранной сети')}: ${_reported(profile.selectedNetworkId)}',
+                    ),
+                    Text(
+                      '${_text('Profile state', 'Состояние профиля')}: ${clientProfileStateLabel(profile.state, widget.locale)}',
+                    ),
+                    if (!profile.active) ...[
+                      Text(
+                        '${_text('Selection', 'Выбор')}: ${updateAvailabilityLabel(profile.selection.availability, widget.locale)}',
+                      ),
+                      Text(
+                        '${_text('Action owner', 'Ответственный за действие')}: ${clientActionOwnerLabel(profile.selection.actionOwner, locale: widget.locale)}',
+                      ),
+                    ],
                     Wrap(
                       children: [
                         TextButton(
