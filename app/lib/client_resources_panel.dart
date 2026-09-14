@@ -42,8 +42,8 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
       value ? _text('Yes', 'Да') : _text('No', 'Нет');
   String _noticeText(_ResourceNotice notice) => switch (notice) {
     _ResourceNotice.opened => _text(
-      'Resource opened in the browser.',
-      'Ресурс открыт в браузере.',
+      'Resource address handed to the browser. Reachability has not been verified.',
+      'Адрес ресурса передан браузеру. Доступность назначения не проверена.',
     ),
     _ResourceNotice.notOpened => _text(
       'Browser could not open the resource.',
@@ -337,6 +337,10 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(resource.displayName),
+                  Text('${_text('Resource ID', 'ID ресурса')}: ${resource.id}'),
+                  Text(
+                    '${_text('Network ID', 'ID сети')}: ${resource.networkId}',
+                  ),
                   if (widget.openBrowser != null &&
                       browserUri(resource) != null)
                     TextButton(

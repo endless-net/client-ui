@@ -1,5 +1,15 @@
 # Client v0 test coverage ledger
 
+Resource identity/handoff correction (2026-09-14): the catalog displays resource
+and network IDs so same-name resources and disclosed overlap IDs are distinguishable.
+Two RU/EN short tests in `client_resource_context_test.dart` use 360x640/200%,
+scroll to the intended action and verify its profile/resource ID without asserting
+effective route changes. The 16 existing resource locale checks now assert both
+IDs and a browser-handoff notice that explicitly leaves reachability unverified.
+Mock browser success is not resource/traffic acceptance.
+Final pinned validation: 865 Flutter tests passed, 30 skipped; analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Network context addition (2026-09-14): six short RU/EN tests in
 `client_network_context_test.dart` distinguish same-name networks by Account ID
 and separate IPv4/IPv6 ranges; check explicit missing data, permission-required

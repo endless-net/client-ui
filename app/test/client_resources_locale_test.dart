@@ -53,7 +53,11 @@ void main() {
     );
   });
   final cases = [
-    ('opened', 'Resource opened in the browser.', 'Ресурс открыт в браузере.'),
+    (
+      'opened',
+      'Resource address handed to the browser. Reachability has not been verified.',
+      'Адрес ресурса передан браузеру. Доступность назначения не проверена.',
+    ),
     (
       'notOpened',
       'Browser could not open the resource.',
@@ -234,6 +238,8 @@ void main() {
                 ru ? 'Подходящих ресурсов нет' : 'No matching resources',
               if (['catalog', 'opened', 'notOpened'].contains(scenario.$1)) ...[
                 'Example',
+                ru ? 'ID ресурса: app' : 'Resource ID: app',
+                ru ? 'ID сети: network' : 'Network ID: network',
                 ru ? 'Открыть ресурс в браузере' : 'Open resource in browser',
                 ru
                     ? 'Приложение: application.example'

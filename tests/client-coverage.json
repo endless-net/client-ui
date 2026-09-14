@@ -641,6 +641,10 @@
           "scope": "15 short tests: all five connection-phase labels, full RU/EN summary/empty-log and five notice texts, no private browser-action projection, no read/create replay on locale switch and no reuse of stale archive consent. Component evidence only, not complete detailed diagnostics, native export or full UI-AC-13"
         },
         {
+          "path": "app/test/client_resource_context_test.dart",
+          "scope": "Two short RU/EN widgets at 360x640/200%: same-name overlapping resources expose resource/network IDs and send the exact profile/resource ID when enabled. No effective-route or resource reachability acceptance"
+        },
+        {
           "path": "app/test/client_resources_locale_test.dart",
           "scope": "16 short tests: all 11 resource-kind/setting-source labels and full RU/EN application catalog, empty results and five notices; effective/requested remain distinct, browser opening requires re-read, locale rebuild repeats no read/open/mutation. Component evidence only, not actual resource access or full UI-AC-13"
         },
