@@ -31,6 +31,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
+  // COM may append its standard server marker to the fixed MSI command line.
+  // Dart receives only the ordinary --show-window launch; no toast arguments.
+  command_line_arguments.erase(
+      std::remove(command_line_arguments.begin(), command_line_arguments.end(),
+                  "-Embedding"), command_line_arguments.end());
   const bool elevated_worker =
       std::find(command_line_arguments.begin(), command_line_arguments.end(),
                 "--elevated-enroll") != command_line_arguments.end();

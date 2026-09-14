@@ -5,6 +5,12 @@
 Все 104 требования остаются в [матрице](../tests/client-coverage.json);
 полностью принятых US: 0 из 14.
 
+Последующее дополнение: Windows native permission, toast delivery и COM activation
+source добавлены после этого snapshot; см. актуальные evidence/ограничения в
+[SA](client-ui-system-analysis.md) и [ledger](client-ui-test-coverage.md).
+Первый пункт следующего порядка ниже теперь реализован на уровне source/unit;
+его installed/native acceptance остаётся открытым.
+
 ## Producer и принятые решения
 
 `git ls-remote` для client/main и локальный client/origin/main совпали:

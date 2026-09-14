@@ -270,6 +270,9 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       <Component Id="AppIcon" Guid="*" Bitness="always64">
         <File Id="AppIconFile" Source="$(var.IconFile)" Name="endlessnet.ico" KeyPath="yes" />
       </Component>
+      <Component Id="AppNotificationActivator" Guid="*" Bitness="always64">
+        <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{9627bf5f-5cfd-4c27-9822-3f86b95e4884}\LocalServer32" Value="&quot;[#AppExeFile]&quot; --show-window" Type="string" KeyPath="yes" />
+      </Component>
       <Component Id="EventLogSource" Guid="*" Bitness="always64">
         <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\EventLog\Application\%s">
           <RegistryValue Name="EventMessageFile" Type="expandable" Value="[System64Folder]EventCreate.exe" KeyPath="yes" />
@@ -298,6 +301,7 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       <Component Id="ApplicationShortcut" Guid="*">
         <Shortcut Id="EndlessNetShortcut" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet.exe" Arguments="--show-window --debug --debug-log-dir %s" WorkingDirectory="INSTALLFOLDER" Icon="EndlessNetIcon">
           <ShortcutProperty Key="System.AppUserModel.ID" Value="EndlessNet.Client" />
+          <ShortcutProperty Key="System.AppUserModel.ToastActivatorCLSID" Value="{9627bf5f-5cfd-4c27-9822-3f86b95e4884}" />
         </Shortcut>
         <RemoveFolder Id="RemoveEndlessNetProgramMenuFolder" On="uninstall" />
         <RegistryValue Root="HKCU" Key="Software\EndlessNet\Client" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />

@@ -686,7 +686,7 @@
         },
         {
           "path": "app/windows/runner/ui_notifications_test.cpp",
-          "scope": "Executed native permission handler with injected settings reader: all five WinRT NotificationSetting values, unknown enum, private API exception, invalid arguments and unsupported delivery/method rejection; one completion per call. Does not invoke OS permission or toast delivery"
+          "scope": "Executed native permission and delivery handlers with injected platform boundaries: settings values, errors, exact payload, UTF8/NUL/size/title/extra-key rejection, activation readiness, single completion; real local WinRT DOM proves escaped text and fixed open-ui launch. WRL factory/activation tests reject wrong AUMID, arbitrary arguments/inputs and post-close callbacks. Does not submit OS toasts or prove installed MSI activation"
         },
         {
           "path": "app/test/client_native_notifications_test.dart",

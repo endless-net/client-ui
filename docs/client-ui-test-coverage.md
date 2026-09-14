@@ -1,5 +1,17 @@
 # Client v0 test coverage ledger
 
+Windows toast/COM source addition (2026-09-14): real Show adapter, strict payload
+and fixed launch action, WRL activator/factory with closed-host rejection, and MSI
+LocalServer32/shortcut property are implemented. Expanded native unit target
+executes payload/exception/readiness checks with fake delivery, local WinRT DOM
+escaping without sending a toast, and COM callback validation/lifetime without
+registering a server. Installer render tests assert the fixed CLSID/command.
+Go full, Flutter analyze, 816 Flutter tests (30 skipped), 13 Node tests,
+`ui_notifications_test` and Windows Debug compilation passed locally.
+Real Show/Failed events, installed COM activation, cold/warm launch, single-instance
+races, OS foreground policy and uninstall remain unverified. No integration run
+or full UF-15/US-14 acceptance is claimed.
+
 Windows notification permission addition (2026-09-14): native WinRT reader and
 channel are connected; all NotificationSetting values, unknown enum/API exception,
 no-argument admission and unsupported delivery are covered by the executed

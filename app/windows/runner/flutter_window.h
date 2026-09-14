@@ -10,6 +10,8 @@
 
 #include "win32_window.h"
 
+class UiNotificationActivationHost;
+
 // A window that does nothing but host a Flutter view.
 class FlutterWindow : public Win32Window {
  public:
@@ -34,6 +36,7 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> destination_channel_;
   bool destination_picker_open_ = false;
+  std::unique_ptr<UiNotificationActivationHost> notification_activation_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> autostart_channel_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> notification_channel_;
 };

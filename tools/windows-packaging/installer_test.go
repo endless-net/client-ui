@@ -65,6 +65,8 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`Component Id="ApplicationShortcut" Guid="*"`,
 		`Shortcut Id="EndlessNetShortcut"`,
 		`ShortcutProperty Key="System.AppUserModel.ID" Value="EndlessNet.Client"`,
+		`ShortcutProperty Key="System.AppUserModel.ToastActivatorCLSID" Value="{9627bf5f-5cfd-4c27-9822-3f86b95e4884}"`,
+		`Key="Software\Classes\CLSID\{9627bf5f-5cfd-4c27-9822-3f86b95e4884}\LocalServer32" Value="&quot;[#AppExeFile]&quot; --show-window"`,
 		`Arguments="--show-window --debug --debug-log-dir ~\.endlessnet\logs"`,
 		`Icon="EndlessNetIcon"`,
 		`RemoveFolder Id="RemoveEndlessNetProgramMenuFolder"`,

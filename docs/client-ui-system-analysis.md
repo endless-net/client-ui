@@ -20,6 +20,28 @@ producer main `60ff0eec554df0b77fdcd9a8fed7d6db933da65e` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Windows notification delivery source теперь реализована: строгий title/body
+payload → WinRT XML text nodes → `ToastGeneric`/`ToastNotifier.Show`.
+Повторно проверяется OS setting; неготовый COM activator даёт unavailable.
+Успех означает передачу системе, как уже говорит RU/EN panel, а не факт баннера.
+Async OS Failed/Focus Assist, показ и нажатие требуют отдельного evidence.
+
+MSI регистрирует LocalServer32 для CLSID
+`9627bf5f-5cfd-4c27-9822-3f86b95e4884` с фиксированным `--show-window` и связывает
+его с Start Menu shortcut. Package/update identity и версии не меняются.
+Обычный UI регистрирует WRL factory; native worker без первого показа не
+регистрирует её. COM marker `-Embedding` не передаётся Dart CLI.
+Activator принимает только AUMID `EndlessNet.Client`, строку `open-ui` и отсутствие
+input; он post-ит сигнал показа текущего окна, не URL/profile/runtime command.
+При закрытии host callback отключается и class registration отзывается.
+
+Native unit executable проверяет factory/activation lifetime, payload admission
+и реальное локальное DOM escaping без отправки toast. Windows Debug source
+скомпилирован. Холодный старт/уже работающий UI, single-instance races,
+foreground restrictions, COM registration/repair/uninstall и notification-center
+поведение после выхода пока не приняты на установленном продукте.
+Это заменяет прежнее состояние «delivery NotImplemented» ниже.
+
 Windows notifications permission source: новый native channel читает
 `ToastNotifier.Setting` для утверждённого `EndlessNet.Client`. Enabled → granted;
 DisabledForApplication/User → denied; DisabledByGroupPolicy → managedDenied

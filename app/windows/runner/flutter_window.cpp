@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "ui_autostart.h"
 #include "ui_notifications.h"
+#include "ui_notification_activation.h"
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -67,6 +68,9 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  if (show_on_first_frame_) {
+    notification_activation_ = std::make_unique<UiNotificationActivationHost>(GetHandle());
+  }
 
   autostart_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
@@ -78,8 +82,13 @@ bool FlutterWindow::OnCreate() {
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(), "endlessnet/ui-notifications",
           &flutter::StandardMethodCodec::GetInstance());
-  notification_channel_->SetMethodCallHandler([](const auto& call, auto result) {
-    HandleUiNotificationPermission(call, std::move(result));
+  notification_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
+    if (call.method_name() == "deliver") {
+      HandleUiNotificationDelivery(call, std::move(result),
+          notification_activation_ && notification_activation_->ready());
+    } else {
+      HandleUiNotificationPermission(call, std::move(result));
+    }
   });
 
   destination_channel_ =
@@ -117,6 +126,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  notification_activation_.reset();
   notification_channel_.reset();
   autostart_channel_.reset();
   destination_channel_.reset();
@@ -142,6 +152,11 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   switch (message) {
+    case kUiNotificationActivated:
+      if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+      else ShowWindow(hwnd, SW_SHOW);
+      SetForegroundWindow(hwnd);
+      return 0;
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
