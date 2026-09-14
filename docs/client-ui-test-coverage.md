@@ -1,5 +1,16 @@
 # Client v0 test coverage ledger
 
+Identity confirmation keyboard/layout audit (2026-09-14): existing owner trust
+coverage now runs in RU/EN at 360x640 and 200% text. Inspection, explicit comparison
+checkbox and final trust use Tab/Space/Enter. Origin and 64-character announcement
+text are measured against rendered height. The test asserts disabled trust before
+comparison, no command when merely checking the box, and one command only after a
+second identity read. Production code needed no change. Two existing cleanup
+owner/observer cases remain. This is injected read/command evidence, not OS
+authorization, actual trust replacement or native screen-reader acceptance.
+Validation: 888 Flutter tests passed, 30 skipped; pinned analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Desktop shell large-text correction (2026-09-14): a narrow 200% reproduction put
 Quit outside the right edge of AppBar; RU runtime error text also overflowed the
 body vertically by 72 pixels. Reconnect/Quit now use a wrapping row in a bounded

@@ -625,6 +625,10 @@
           "scope": "Four RU/EN composed desktop widgets at 360x640 and 620x460 with 200% text: runtime unavailable, visible Quit and dialog actions, no layout overflow, keyboard Stay retains the UI without exit. Desktop plugins disabled; no native window sizing, OS keyboard or lifecycle acceptance"
         },
         {
+          "path": "app/test/client_elevation_panel_test.dart",
+          "scope": "Four short widgets: RU/EN owner identity inspection, explicit checkbox and trust activation through Tab/Space/Enter at 360x640/200%; full origin/announcement text bounds; no trust before confirmation and a fresh identity read before one command. Owner/observer cleanup confirmation cases retained. No actual OS authorization or native accessibility acceptance"
+        },
+        {
           "path": "app/test/client_identity_locale_test.dart",
           "scope": "Ten short RU/EN identity vectors compare complete displayed identity and four notices, reject trust after changed announcement and stale callback after reconfirmation, and switch locale without repeat reads/commands. Unit/component evidence only, not native elevation, established trust or full UI-AC-13"
         },
