@@ -59,6 +59,15 @@ outcomes still require separate integration and platform acceptance evidence.
 
 ## Dependencies before adding non-Windows launchers
 
+Architecture clarification (2026-09-14):
+[local runtime boundary](https://github.com/endless-net/architecture/blob/main/docs/ru/client-ui-local-runtime.md)
+assigns mobile embedding/native binding to Client and consumer/plugin to Client UI.
+Linux systemd and macOS launchd are the desktop runtime placement. Fixed-helper
+GUI/package integration and non-Windows distribution ownership remain open.
+The proposed Android Binder/iOS provider-message designs are not published
+bindings; iOS bootstrap, event streaming and permission continuation remain gates.
+This clarifies ownership without changing the dated source/build evidence above.
+
 The reviewed producer main is `f77191cfdf60a56889bc8d73c4f48cbaad2840c8`.
 Its `proto/client/v0` and `packages/client_api` trees are identical to UI pin
 `cd05fcddb858877b10ecefe7b0b4a3819d2c6f3b`. No pin or version change is required.

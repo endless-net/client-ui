@@ -3,6 +3,11 @@
 Проверенный UI commit: `853c42d` (main),
 чистое рабочее дерево до аудита.
 Это проверка source gate первой стадии цели, не platform acceptance.
+Уточнение требований по architecture от 2026-09-14: обязательный callback в UI
+снят; browser completion подтверждает client через v0. Mobile runtime owner —
+client; конкретный binding ещё требуется. См.
+[сверку BA ↔ SA](https://github.com/endless-net/architecture/blob/main/docs/ru/client-ui-design-alignment.md).
+Это обновление требований, не новая проверка исходного snapshot или OS acceptance.
 Все 104 требования остаются в [матрице](../tests/client-coverage.json);
 полностью принятых US: 0 из 14.
 
@@ -31,15 +36,16 @@ Native tray state unit и Windows release build прошли на `622466e`; о�
 
 Повторно прочитаны разрешённый BA и producer SDK README/service.proto.
 SDK явно не предоставляет mobile bridge. Enroll принимает `browser_login`
-или `enrollment_token`; это не контракт верифицируемого одноразового callback
-в UI. Нельзя вводить собственные credentials/deep-link поля вместо него.
+или `enrollment_token`; результат подтверждает client через operation/status/events.
+Callback в UI не требуется. Конкретный browser completion mechanism и его
+безопасность остаются у producer; UI не вводит credential/deep-link поля.
 NotifyLifecycle предоставляет только UI_QUIT; runtime preferences определяют
 его effective поведение, а logoff/suspend/resume не отправляются из UI.
 
 Шесть решений пользователя приняты и записаны в [SA](client-ui-system-analysis.md):
-Windows AppUserModelID, OS matrix, граница mobile bridge, browser/callback approach,
+Windows AppUserModelID, OS matrix, граница mobile bridge, browser enrollment,
 desktop close и opt-in, accessibility. Их больше не следует запрашивать повторно.
-Минимальные версии Android/iOS и конкретный callback/bridge контракт этим не заданы.
+Минимальные версии Android/iOS и конкретный mobile binding этим не заданы.
 
 ## Сверка функционального scope
 
@@ -50,7 +56,7 @@ desktop close и opt-in, accessibility. Их больше не следует з
 |---|---|---|
 | 01 | Desktop hosts Windows/Linux/macOS, metadata target и protected local transport | Продуктовые Android/iOS hosts и bridge; distribution/совместимая установка пяти платформ |
 | 02 | Window/tray, Windows Shell/icon bounds, Linux watcher и macOS status-item bounds, явное восстановление, desktop autostart opt-in | Реальная доступность tray, quick surfaces mobile, login и cleanup при distribution lifecycle |
-| 03 | Typed enrollment, browser action, journal/recovery | Одноразовый проверяемый callback по producer contract; native permission и реальные enrollment/approval |
+| 03 | Typed enrollment, browser action, journal/recovery; результат приходит от client через v0 | Producer browser completion, native permission и реальные enrollment/approval; UI callback не является обязательным шагом |
 | 04 | Snapshot/revision, отдельные link/phase/reason, next action | Полный набор состояний на реальных hosts без ложного вывода об установке службы |
 | 05 | Connect/Disconnect, tray, durable request ID | Реальные tunnel outcomes, restart/resume и согласованность quick surfaces |
 | 06 | Peers, search, paths/health | Реальные direct/relay переходы и accessibility больших списков |
@@ -112,8 +118,10 @@ desktop close и opt-in, accessibility. Их больше не следует з
 2. Distribution lifecycle новых платформ:
    package identity, install/repair/upgrade/uninstall, cleanup autostart. Существующие
    `app/linux`/`app/macos` hosts и compile jobs не заменяют distribution artifacts.
-3. Mobile hosts/bridge, callback и non-Windows privileged/export flows после получения
+3. Mobile hosts/bridge и non-Windows privileged/export flows после получения
    конкретного внешнего контракта. Не создавать runtime или TCP fallback в UI.
+   Browser enrollment использует operation/status/events от client; отдельный
+   callback в UI не является условием реализации этого consumer flow.
 4. Повторить full implementation gate по BA/SA и всей матрице, включая источники
    update/support и точные distribution outcomes. Отсутствие TODO и зелёный
    coverage checker не подтверждают полноту: checker проверяет трассировку 104 ID,

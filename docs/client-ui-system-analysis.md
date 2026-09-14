@@ -1,5 +1,17 @@
 # Системный анализ мультиплатформенного Client UI: Protobuf v0
 
+Сверка с architecture от 2026-09-14:
+[связь с локальным runtime](https://github.com/endless-net/architecture/blob/main/docs/ru/client-ui-local-runtime.md)
+и [реестр BA ↔ SA](https://github.com/endless-net/architecture/blob/main/docs/ru/client-ui-design-alignment.md).
+Результат browser enrollment подтверждает client через operation/status/events;
+обязательный callback в UI снят более поздним уточнением пользователя. Получатель
+и безопасность browser completion остаются у producer, URL/deep link не является
+доказательством входа. Mobile core/embedding/binding принадлежат client, UI plugin
+и presentation — client-ui. Предложенные Android Binder и iOS provider-message
+варианты не являются готовым или утверждённым binding: нужны calls/events/errors,
+authorization, permission continuation, iOS bootstrap и WatchEvents delivery.
+Текст архитектуры не подтверждает runtime, distribution или platform acceptance.
+
 Навигация по разделам (2026-09-14): общая session panel получила локализованные
 семантические заголовки. Существующие названия peers, enrollment и операций
 помечены на месте без дублирования. Две RU/EN widget-проверки подтверждают
@@ -11,7 +23,7 @@ heading semantics и доступность 15 начальных раздело
 профиля пересоздают форму при замене контроллера. Четыре регрессии A-B-A
 подтверждают сброс черновика/token и изоляцию позднего успеха/ошибки от новой
 незавершённой команды. Это widget-проверки с подставленными callbacks;
-producer enrollment и browser callback acceptance ими не подтверждаются.
+producer enrollment и browser completion acceptance ими не подтверждаются.
 
 - Status: `target design`.
 - Owner: `client-ui`.
@@ -29,7 +41,7 @@ producer enrollment и browser callback acceptance ими не подтверж�
 [сводка реализации](client-ui-current-implementation.md). Проверенный актуальный
 producer main `09a7dd4f12f929ed3b175060f0a3afc7bf015b90` не меняет proto/Dart SDK
 относительно UI pin; смена pin/версий не требуется. Основные конкретные UI-owned
-пробелы и внешние mobile/callback зависимости разделены в сводке.
+пробелы и внешние mobile/browser-completion зависимости разделены в сводке.
 
 ### Принятые продуктовые решения — 2026-09-14
 
@@ -312,9 +324,10 @@ Startup apps settings. `notConfigured` означает отсутствие з�
   получения bridge/SDK; неизвестные значения не считаются утверждёнными.
 - Mobile bridge использует только предоставленный `client` контракт.
   Отсутствующий bridge — внешняя зависимость; runtime в UI не переносится.
-- Enrollment использует системный браузер и проверяемый одноразовый callback,
-  привязанный к попытке входа, без долговременных токенов в URL. Подход принят;
-  точная схема callback требует producer контракта.
+- Enrollment использует системный браузер; client подтверждает результат через
+  operation/status/events. Callback в UI не обязателен. Открытие браузера или
+  deep link для фокусировки UI не означает успешную авторизацию. Конкретный
+  browser completion mechanism и его привязка к попытке принадлежат producer.
 - Закрытие desktop окна скрывает его в доступный трей, иначе завершает UI.
   Выход UI сам не отключает VPN. Autostart и notifications — opt-in.
 - Accessibility: клавиатура, видимый фокус, семантические названия,
@@ -792,7 +805,7 @@ MaterialApp использует штатные GlobalMaterialLocalizations.dele
 Cupertino при переключении в обе стороны, с сохранением формы и без RPC replay.
 Нативные clipboard/OS dialogs и screen-reader execution не квалифицированы.
 
-Сверка BA от 2026-09-13: функциональная карта UF-01–23, требования UBR-01–40
+Сверка BA от 2026-09-13 (историческая запись): функциональная карта UF-01–23, требования UBR-01–40
 и UI-AC-01–27 сохраняются целиком. BA имеет статус draft; UI-Q01/07/16/20/21
 оставляют открытыми версии ОС, принятые assistive technologies, lifecycle
 defaults, platform variants и distribution ownership. Цель этой задачи сохраняет
@@ -800,6 +813,12 @@ defaults, platform variants и distribution ownership. Цель этой зад�
 UI-AC-01/11/17 требуют реального ресурса/transport/traffic, UI-AC-10 — distribution,
 UI-AC-12/13 — принятых accessibility mechanisms/локалей. Mock-прохождение не
 закрывает эти критерии. Эта сверка не меняет BA и не утверждает product решения.
+
+Уточнение BA от 2026-09-14: desktop targets, ru/en, accessibility mechanisms,
+Close/tray/Quit и opt-in уже приняты. Открыты minimum Android/iOS, release order,
+runtime effective defaults, capability variants и non-Windows distribution
+ownership, а также фактическая acceptance. Mobile runtime owner уже client;
+назначение владельца не заменяет реализацию mobile embedding/native binding.
 
 Общая Flutter presentation использует application layer с типизированными моделями
 и командами. Транспорт скрыт за platform adapter. Runtime единолично управляет
@@ -819,8 +838,8 @@ Handwritten HTTP v2 DTO/routes и OpenAPI vendor copy не являются це
 | Windows | Прямой protected named pipe; проверенный SID/owner/admin | Flutter window/tray, fixed helper, MSI/WinGet | Проверить Dart gRPC channel ↔ Go handler на pipe, не запускать core-адаптер |
 | Linux | Unix socket и peer UID; privileged helper отдельно | Window/tray variant и distro packages | Проверить local credentials, desktop authorization и lifecycle |
 | macOS | gRPC over local HTTP/2, protected Unix socket и peer identity | Menu bar, подписанные app/helper | Проверить sandbox/helper integration и signing owner |
-| Android | Native bridge ↔ VPN runtime, app identity и OS permission | Mobile navigation, foreground/background policy, store | Назначить runtime owner и проверить bridge |
-| iOS | Native bridge ↔ Network Extension, проверенная app identity | Mobile navigation, extension lifecycle, store | Назначить runtime owner и проверить extension boundary |
+| Android | Client-owned native bridge ↔ VPN runtime, app identity и OS permission | Mobile navigation, foreground/background policy, store | Client предоставляет binding; UI реализует consumer/plugin после определения интерфейса |
+| iOS | Client-owned native bridge ↔ Network Extension, проверенная app identity | Mobile navigation, extension lifecycle, store | Client определяет bootstrap/events/permission continuation; UI реализует соответствующий consumer |
 
 Generated gRPC SDK не является готовым named-pipe/mobile adapter. Connect Go
 поддерживает gRPC, но local channel и caller identity требуют отдельного
@@ -1784,7 +1803,8 @@ synthetic snapshot → typed controller → widget и очистку после 
 1. client реализует новый snapshot, credential projection, operations и RPC
    authorization; backend owners предоставляют authoritative deadline/policy.
 2. client/client-ui проверяют local transport binding; Windows сохраняет прямой
-   named pipe. Для mobile назначается owner и проверяется native boundary.
+   named pipe. Для mobile client предоставляет embedding/binding, client-ui
+   реализует consumer/plugin; native boundary требует отдельной проверки.
 3. client-ui закрепляет generated package, реализует state/application layer,
    US-01–14 и UI-only функции; использует producer-owned scenario host вместо
    удалённого HTTP emulator. Source cutover не закрывает весь functional scope.
@@ -1792,7 +1812,7 @@ synthetic snapshot → typed controller → widget и очистку после 
    outcome; UI не запускает updater через daemon.
 5. system-tests подтверждает UI-AC по принятому platform/release scope.
 
-Не закрыты реализацией/приёмкой: mobile transport adapter и ownership, реальные defaults
+Не закрыты реализацией/приёмкой: mobile transport adapter, non-Windows package/store ownership, реальные defaults
 managed/lifecycle, signed update source и platform release order. Принятые
 контрактом semantics (один active context, fail-closed, operation replay,
 deadline separation и observer redaction) не являются открытыми вопросами.
