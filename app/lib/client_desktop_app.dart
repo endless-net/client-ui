@@ -59,6 +59,7 @@ class ClientDesktopApp extends StatefulWidget {
     this.openWindowsAutostartSettings,
     this.openAutostartSettings,
     this.readTrayAvailability,
+    this.prepareTrayRegistration,
   });
   final ClientSession session;
   final Future<ClientAutostartSetting> Function()? readAutostart;
@@ -66,6 +67,7 @@ class ClientDesktopApp extends StatefulWidget {
   final Future<bool> Function()? openWindowsAutostartSettings;
   final Future<bool> Function()? openAutostartSettings;
   final Future<bool> Function()? readTrayAvailability;
+  final Future<bool> Function()? prepareTrayRegistration;
   final DeliverClientNotification? deliverNotification;
   final bool initialNotifications;
   final bool notificationReadFailed;
@@ -190,6 +192,8 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   late final ClientTray _tray;
   late final ClientNotificationDelivery _notifications;
   bool _trayReady = false;
+  bool _trayRegistering = false;
+  bool _trayRegistrationAttempted = false;
   bool _trayAvailabilityChecking = false;
   Future<bool> _readTrayAvailability() =>
       widget.readTrayAvailability?.call() ??
@@ -387,31 +391,9 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
 
   Future<void> _initialize() async {
     if (widget.desktopIntegration) {
-      try {
-        windowManager.addListener(this);
-        trayManager.addListener(this);
-        await trayManager.setIcon(
-          Platform.isWindows
-              ? 'assets/icons/endlessnet.ico'
-              : 'assets/icons/endlessnet.png',
-        );
-        if (!mounted) return;
-        _trayReady = true;
-        await _refreshTray();
-        if (_trayReady && !await _readTrayAvailability()) {
-          if (!mounted) return;
-          setState(() {
-            _trayReady = false;
-            _notice = _DesktopNotice.tray;
-          });
-        }
-      } catch (_) {
-        if (!mounted) return;
-        setState(() {
-          _trayReady = false;
-          _notice = _DesktopNotice.tray;
-        });
-      }
+      windowManager.addListener(this);
+      trayManager.addListener(this);
+      await _registerTray();
       if (!mounted) return;
       try {
         await windowManager.waitUntilReadyToShow(
@@ -443,6 +425,61 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     if (mounted) await _connect();
   }
 
+  Future<void> _registerTray() async {
+    if (!mounted ||
+        !widget.desktopIntegration ||
+        _exiting ||
+        _busy ||
+        _trayRegistering ||
+        _trayUpdating) {
+      return;
+    }
+    setState(() {
+      _trayRegistering = true;
+      _trayReady = false;
+    });
+    try {
+      // The plugin otherwise modifies its old icon instead of adding a new one.
+      if (_trayRegistrationAttempted) {
+        await trayManager.destroy();
+        if (!mounted || _exiting) return;
+      }
+      final prepared =
+          await (widget.prepareTrayRegistration?.call() ??
+              prepareClientTrayRegistration(Platform.operatingSystem));
+      if (!mounted || _exiting) return;
+      if (!prepared) throw StateError('Tray registration unavailable');
+      _trayRegistrationAttempted = true;
+      await trayManager.setIcon(
+        Platform.isWindows
+            ? 'assets/icons/endlessnet.ico'
+            : 'assets/icons/endlessnet.png',
+      );
+      if (!mounted || _exiting) return;
+      _trayReady = true;
+      await _refreshTray();
+      final available = _trayReady && await _readTrayAvailability();
+      if (!mounted || _exiting) return;
+      setState(() {
+        _trayReady = available;
+        if (!available) {
+          _notice = _DesktopNotice.tray;
+        } else if (_notice == _DesktopNotice.tray) {
+          _notice = null;
+        }
+      });
+    } catch (_) {
+      if (mounted && !_exiting) {
+        setState(() {
+          _trayReady = false;
+          _notice = _DesktopNotice.tray;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _trayRegistering = false);
+    }
+  }
+
   Future<void> _checkSignal() async {
     final next = await widget.showSignal?.call();
     if (!mounted || next == null) return;
@@ -462,7 +499,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   }
 
   Future<void> _closeWindow() async {
-    if (!mounted || _exiting || _busy) return;
+    if (!mounted || _exiting || _busy || _trayRegistering) return;
     if (_trayReady) {
       try {
         final available = await _readTrayAvailability();
@@ -691,6 +728,16 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
           ),
           if (_notice != null)
             Semantics(liveRegion: true, child: Text(_noticeText)),
+          if (widget.desktopIntegration && !_trayReady)
+            TextButton(
+              key: const Key('client-restore-tray'),
+              onPressed: _busy || _exiting || _trayRegistering
+                  ? null
+                  : _registerTray,
+              child: Text(
+                _text('Restore tray icon', 'Восстановить значок в трее'),
+              ),
+            ),
           if (_localeStorageFailed)
             Semantics(
               liveRegion: true,

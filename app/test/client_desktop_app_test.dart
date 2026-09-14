@@ -50,6 +50,9 @@ void main() {
     'hostAbsent',
     'hostLost',
     'hostLostWhileHiding',
+    'restore',
+    'restoreRace',
+    'restoreCleanupFailure',
   ]) {
     testWidgets('window close follows tray readiness: $failure', (
       tester,
@@ -85,7 +88,15 @@ void main() {
         call,
       ) async {
         trayCalls.add(call.method);
-        if (call.method == failure || call.method == 'destroy') {
+        if (failure == 'restoreRace' &&
+            call.method == 'setIcon' &&
+            trayCalls.where((c) => c == 'setIcon').length == 2) {
+          hostAvailable = false;
+        }
+        if (call.method == failure ||
+            (call.method == 'destroy' &&
+                (closeRequested ||
+                    (failure != 'restore' && failure != 'restoreRace')))) {
           throw PlatformException(code: 'unavailable');
         }
         return null;
@@ -131,6 +142,7 @@ void main() {
           session: session,
           showWindow: false,
           readTrayAvailability: () async => hostAvailable,
+          prepareTrayRegistration: () async => true,
           onExit: () async {
             exits++;
           },
@@ -158,6 +170,33 @@ void main() {
         expect(windowCalls, isNot(contains('hide')));
       }
       windowCalls.clear();
+      if (failure.startsWith('restore')) {
+        hostAvailable = false;
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pumpAndSettle();
+        expect(windowCalls, contains('show'));
+        hostAvailable = true;
+        await tester.tap(find.byKey(const Key('client-restore-tray')));
+        await tester.pumpAndSettle();
+        expect(
+          trayCalls.where((c) => c == 'setIcon').length,
+          failure == 'restoreCleanupFailure' ? 1 : 2,
+        );
+        expect(trayCalls.where((c) => c == 'destroy').length, 1);
+        if (failure != 'restoreCleanupFailure') {
+          expect(
+            trayCalls.indexOf('destroy'),
+            lessThan(trayCalls.lastIndexOf('setIcon')),
+          );
+        }
+        expect(windowCalls, isNot(contains('hide')));
+        expect(
+          find.byKey(const Key('client-restore-tray')),
+          failure == 'restore' ? findsNothing : findsOneWidget,
+        );
+        expect(exits, 0);
+        windowCalls.clear();
+      }
       if (failure == 'hostLost') {
         hostAvailable = false;
         await tester.pump(const Duration(seconds: 2));
@@ -189,7 +228,9 @@ void main() {
         });
       }
       await tester.pumpAndSettle();
-      if (failure == 'none' || failure == 'hostLostWhileHiding') {
+      if (failure == 'none' ||
+          failure == 'hostLostWhileHiding' ||
+          failure == 'restore') {
         expect(windowCalls, contains('hide'));
         expect(exits, 0);
         expect(connection.closed, isFalse);

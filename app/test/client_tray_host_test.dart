@@ -13,6 +13,24 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  test(
+    'Windows registration preparation requires native true with no arguments',
+    () async {
+      for (final value in [true, false, null, 'true']) {
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'prepareRegistration');
+          expect(call.arguments, isNull);
+          return value;
+        });
+        expect(await prepareClientTrayRegistration('windows'), value == true);
+      }
+      messenger.setMockMethodCallHandler(channel, null);
+      expect(await prepareClientTrayRegistration('windows'), isFalse);
+      expect(await prepareClientTrayRegistration('linux'), isTrue);
+      expect(await prepareClientTrayRegistration('macos'), isTrue);
+      expect(await prepareClientTrayRegistration('android'), isFalse);
+    },
+  );
   for (final platform in ['linux', 'windows']) {
     test(
       '$platform tray availability requires an explicit native true',

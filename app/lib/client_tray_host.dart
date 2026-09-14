@@ -14,6 +14,19 @@ Future<bool> readClientTrayHostAvailability(String platform) async {
   }
 }
 
+Future<bool> prepareClientTrayRegistration(String platform) async {
+  if (platform == 'linux' || platform == 'macos') return true;
+  if (platform != 'windows') return false;
+  try {
+    return await const MethodChannel(
+          'endlessnet/ui-tray-host',
+        ).invokeMethod<Object?>('prepareRegistration') ==
+        true;
+  } catch (_) {
+    return false;
+  }
+}
+
 bool _usesExplicitPopup(String platform) => switch (platform) {
   'windows' || 'macos' => true,
   'linux' => false,

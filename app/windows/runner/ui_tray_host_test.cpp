@@ -22,6 +22,11 @@ int main() {
   Check(!host.Available(false));
   host.OnMessage(0x42);
   Check(!host.Available(true));
+  // Prepare before registration; a restart during registration still wins.
+  host.PrepareRegistration();
+  Check(host.Available(true));
+  host.OnMessage(0xc123);
+  Check(!host.Available(true));
   // A new native UI lifetime can establish its own readiness.
   UiTrayHostState replacement;
   replacement.Initialize(0xc123);

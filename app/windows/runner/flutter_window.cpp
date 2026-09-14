@@ -75,7 +75,8 @@ bool FlutterWindow::OnCreate() {
           flutter_controller_->engine()->messenger(), "endlessnet/ui-tray-host",
           &flutter::StandardMethodCodec::GetInstance());
   tray_host_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
-    if (call.method_name() != "isAvailable") {
+    if (call.method_name() != "isAvailable" &&
+        call.method_name() != "prepareRegistration") {
       result->NotImplemented();
       return;
     }
@@ -83,6 +84,9 @@ bool FlutterWindow::OnCreate() {
         !std::holds_alternative<std::monostate>(*call.arguments())) {
       result->Error("invalid_arguments", "Tray host query takes no arguments");
       return;
+    }
+    if (call.method_name() == "prepareRegistration") {
+      tray_host_.PrepareRegistration();
     }
     result->Success(flutter::EncodableValue(
         tray_host_.Available(GetShellWindow() != nullptr)));

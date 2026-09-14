@@ -1,5 +1,20 @@
 # Client v0 test coverage ledger
 
+Explicit tray restoration (2026-09-14): the visible desktop shell offers a retry
+after loss or failed initialization. Windows preparation happens before plugin
+registration; a subsequent TaskbarCreated still invalidates readiness. Three new
+composed tests verify restored close-to-tray behavior and a second host loss
+during registration, which keeps the window available and close-to-quit behavior,
+plus failed cleanup. Retry destroys the old plugin registration before setIcon:
+the inspected pinned tray_manager 0.5.3 otherwise uses NIM_MODIFY, not NIM_ADD.
+The tests assert cleanup order and that restoration itself never hides the window.
+A channel test requires native true with no arguments and rejects missing or
+malformed responses. The native state unit also covers preparation/restart order.
+These are local mock/state checks; actual OS icon restoration remains unverified.
+Final pinned validation: 878 Flutter tests passed, 30 skipped; analyze, Go full,
+13 Node checks, native state unit, Windows release compilation and the
+104-requirement coverage checker passed.
+
 Windows tray lifetime correction (2026-09-14): native state invalidates readiness
 after TaskbarCreated, rejects failed message registration and requires a present
 Shell. The broadcast is observed before plugin dispatch. The existing desktop

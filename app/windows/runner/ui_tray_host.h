@@ -23,6 +23,10 @@ class UiTrayHostState {
     return restart_message_ != 0 && shell_present && !invalidated_;
   }
 
+  // Called before plugin registration, never after it. A restart during the
+  // subsequent asynchronous setIcon remains invalidated by OnMessage.
+  void PrepareRegistration() { invalidated_ = false; }
+
  private:
   std::uint32_t restart_message_ = 0;
   bool invalidated_ = false;
