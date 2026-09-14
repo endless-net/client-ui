@@ -1,5 +1,10 @@
 # Проверка полноты реализации Client UI — 2026-09-14
 
+Актуальная сводка на `97fec77`: [текущая реализация](client-ui-current-implementation.md).
+Она заменяет устаревшие утверждения этой исторической таблицы об отсутствии
+desktop autostart, macOS/Linux export и notification settings. Ни одна из сводок
+не закрывает source gate или platform acceptance.
+
 Проверяемый commit: `ce98fa4` (main). Это source/unit audit, не повторная
 platform acceptance и не закрытие цели. Источники: [SA](client-ui-system-analysis.md),
 [матрица 104 требований](../tests/client-coverage.json) и
