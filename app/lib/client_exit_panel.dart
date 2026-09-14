@@ -287,6 +287,7 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
               '${_text('Exit control', 'Управление выходным узлом')}: ${updateAvailabilityLabel(view.status.control.mutation.availability, widget.locale)}; ${_text('locked', 'заблокировано')}: ${_boolean(view.status.control.locked)}; ${_text('reason', 'причина')}: ${view.status.control.mutation.reasonKey}; ${_text('owner', 'исполнитель')}: ${clientActionOwnerLabel(view.status.control.mutation.actionOwner, locale: widget.locale)}',
             ),
             DropdownButton<String>(
+              itemHeight: null,
               key: const Key('client-exit-node'),
               isExpanded: true,
               value: _node,
@@ -326,6 +327,7 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
             ),
             if (node != null) ...[
               DropdownButton<api.ExitFamilyMode>(
+                itemHeight: null,
                 key: const Key('client-exit-mode'),
                 isExpanded: true,
                 value: _mode,
@@ -357,6 +359,7 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
                     : null,
               ),
               DropdownButton<api.LanAccess>(
+                itemHeight: null,
                 key: const Key('client-exit-lan'),
                 isExpanded: true,
                 value: _lan,

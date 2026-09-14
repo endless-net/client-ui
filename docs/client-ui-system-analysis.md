@@ -20,6 +20,16 @@ producer main `60ff0eec554df0b77fdcd9a8fed7d6db933da65e` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Проверка accessibility исходного UI выявила clipping в загруженных dropdown:
+при 360×640 и 200% длинной подписи требовалось 288 px, но default itemHeight
+оставлял 48 px без RenderFlex exception. Поля выходного узла, address family,
+LAN, enrollment mode и preferences теперь используют естественную высоту текста.
+Два RU/EN widget regression в `client_choice_layout_test.dart` измеряют полную
+высоту названий в реальном меню и выбранном поле; Escape отменяет выбор,
+Enter повторно открывает меню, стрелка/Enter выбирают узел без отправки mutation.
+Это проверка Flutter layout/keyboard events, не ручная OS screen-reader acceptance
+и не завершение accessibility-аудита остальных загруженных панелей.
+
 Verified update notice planner добавлен в `client_update_notifications.dart`.
 Общая `validateClientUpdateInfo` используется и прежним reader, и planner:
 подпись проверяет producer; UI проверяет pairing/context/срок/формат projection.

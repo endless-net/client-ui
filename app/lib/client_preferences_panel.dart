@@ -262,6 +262,7 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
                       '${_text('reason', 'Код причины')}: ${control.mutation.reasonKey}; ${_text('owner', 'Ответственный')}: ${clientActionOwnerLabel(control.mutation.actionOwner, locale: widget.locale)}',
                     ),
                   DropdownButton<Object>(
+                    itemHeight: null,
                     key: ValueKey('preference-${entry.key.value}'),
                     isExpanded: true,
                     value: _draft[entry.key],

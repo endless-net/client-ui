@@ -1,5 +1,16 @@
 # Client v0 test coverage ledger
 
+Large-text dropdown correction (2026-09-14): two RU/EN regressions in
+`client_choice_layout_test.dart` reproduce fixed-height clipping with a loaded
+exit catalog at 360×640 and 200% text. They measure full text bounds in the open
+menu and selected field, dismiss/reopen/select through real keyboard events,
+and assert that draft selection sends no command. Exit, enrollment and preference
+dropdowns now size to their content. The measured failure was 48 px available
+versus 288 px required. This is widget evidence, not complete accessibility or
+native screen-reader acceptance.
+Local pinned Flutter validation: 842 passed, 30 skipped; analyze, Go full,
+13 Node policy checks and the 104-requirement ledger check passed.
+
 Verified update discovery/delivery addition (2026-09-14): seven short tests in
 `client_update_notification_delivery_test.dart` cover opt-in discovery, the shared
 serial queue, latest invalidation during an outstanding read, observer/disabled

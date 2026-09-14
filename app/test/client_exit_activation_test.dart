@@ -24,7 +24,7 @@ api.WatchEventsResponse snapshot(int sequence) {
   return value;
 }
 
-Future<ClientExitNodes> catalog() => readClientExitNodes(
+Future<ClientExitNodes> catalog({String? displayName}) => readClientExitNodes(
   instanceId: 'runtime-a',
   profileId: 'profile-a',
   checkContext: () {},
@@ -37,7 +37,9 @@ Future<ClientExitNodes> catalog() => readClientExitNodes(
         for (final id in ['a', 'b'])
           {
             'id': id,
-            'displayName': 'Candidate $id',
+            'displayName': displayName == null
+                ? 'Candidate $id'
+                : '$displayName $id',
             'peerId': 'peer-$id',
             'selection': {'availability': 'AVAILABILITY_AVAILABLE'},
             'allowedFamilyModes': [

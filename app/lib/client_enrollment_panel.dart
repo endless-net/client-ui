@@ -189,6 +189,7 @@ class _EnrollmentFormState extends State<_EnrollmentForm> {
           ),
         ),
         DropdownButton<api.EnrollmentMode>(
+          itemHeight: null,
           isExpanded: true,
           key: const Key('enroll-mode'),
           value: _mode,
