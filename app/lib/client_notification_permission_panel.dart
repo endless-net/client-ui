@@ -66,6 +66,10 @@ class _PermissionState extends State<ClientNotificationPermissionPanel> {
               'Permission denied. Review system notification settings.',
               'В разрешении отказано. Проверьте настройки уведомлений системы.',
             ),
+            ClientNotificationPermission.managedDenied => text(
+              'Notifications are disabled by system policy. Contact your administrator.',
+              'Уведомления запрещены системной политикой. Обратитесь к администратору.',
+            ),
             ClientNotificationPermission.unsupported => text(
               'This host cannot request notification permission.',
               'Эта сборка не поддерживает запрос разрешения на уведомления.',

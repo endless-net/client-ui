@@ -1,5 +1,19 @@
 # Client v0 test coverage ledger
 
+Windows notification permission addition (2026-09-14): native WinRT reader and
+channel are connected; all NotificationSetting values, unknown enum/API exception,
+no-argument admission and unsupported delivery are covered by the executed
+`ui_notifications_test` target. It injects the settings reader and never contacts
+the OS notification service. Two extra short tests distinguish managed denial in
+the Dart channel and exact RU/EN panel text. Local Go full, Flutter analyze,
+Flutter full (816 passed, 30 skipped), 13 Node checks and Windows Debug build
+passed. Real policy/registration, COM activation and toast delivery remain open.
+
+```powershell
+cmake --build app/build/windows/x64 --config Debug --target ui_notifications_test
+.\app\build\windows\x64\runner\Debug\ui_notifications_test.exe
+```
+
 Desktop close correction (2026-09-14): four short widget cases exercise actual
 shell wiring against mocked window/tray/display channels. A working tray hides;
 icon/menu failure forces visible startup then follows Quit; hide failure exits;

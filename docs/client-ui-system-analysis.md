@@ -20,6 +20,18 @@ producer main `60ff0eec554df0b77fdcd9a8fed7d6db933da65e` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Windows notifications permission source: новый native channel читает
+`ToastNotifier.Setting` для утверждённого `EndlessNet.Client`. Enabled → granted;
+DisabledForApplication/User → denied; DisabledByGroupPolicy → managedDenied
+с отдельным RU/EN текстом; DisabledByManifest → unsupported; неизвестное значение
+или exception → unavailable. API apartment сбалансирован; настройки ОС не
+изменяются. Windows не показывает grant-dialog этим методом: проверяется текущая
+policy, согласно [ToastNotifier.Setting](https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.toastnotifier.setting).
+Доставка пока отвечает NotImplemented: permission success не выдаётся за Show.
+Следующий шаг — COM activator, его MSI shortcut/registration и native toast
+delivery/click по [desktop C++ notification contract](https://learn.microsoft.com/en-us/windows/apps/design/shell/tiles-and-notifications/send-local-toast-desktop-cpp-wrl).
+Существующий AppUserModelID сам по себе эту часть не закрывает.
+
 Desktop close correction: ошибка создания icon/menu сбрасывает tray readiness;
 window initialization продолжается, и UI показывается даже при `showWindow=false`.
 Ошибка обновления меню показывает окно и запрещает последующее скрытие в этот

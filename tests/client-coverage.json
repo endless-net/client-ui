@@ -682,7 +682,11 @@
         },
         {
           "path": "app/test/client_notification_permission_test.dart",
-          "scope": "10 short tests: no-argument explicit permission channel, distinct granted/denied/unsupported/unavailable, missing/failed/malformed host never grants, no request on build, single-flight and stale disabled click guards, exact RU/EN outcomes and disposal suppression. macOS native source added but OS authorization prompt/grant, native Swift build and click behavior not verified"
+          "scope": "12 short tests: no-argument explicit permission channel, distinct granted/denied/managedDenied/unsupported/unavailable, missing/failed/malformed host never grants, no request on build, single-flight and stale disabled click guards, exact RU/EN outcomes and disposal suppression. Windows native permission query compiled; actual OS policy/authorization and click behavior unverified"
+        },
+        {
+          "path": "app/windows/runner/ui_notifications_test.cpp",
+          "scope": "Executed native permission handler with injected settings reader: all five WinRT NotificationSetting values, unknown enum, private API exception, invalid arguments and unsupported delivery/method rejection; one completion per call. Does not invoke OS permission or toast delivery"
         },
         {
           "path": "app/test/client_native_notifications_test.dart",

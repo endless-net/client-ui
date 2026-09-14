@@ -7,6 +7,7 @@
 
 #include "utils.h"
 #include "ui_autostart.h"
+#include "ui_notifications.h"
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -73,6 +74,14 @@ bool FlutterWindow::OnCreate() {
           &flutter::StandardMethodCodec::GetInstance());
   autostart_channel_->SetMethodCallHandler(HandleUiAutostart);
 
+  notification_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "endlessnet/ui-notifications",
+          &flutter::StandardMethodCodec::GetInstance());
+  notification_channel_->SetMethodCallHandler([](const auto& call, auto result) {
+    HandleUiNotificationPermission(call, std::move(result));
+  });
+
   destination_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(),
@@ -108,6 +117,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  notification_channel_.reset();
   autostart_channel_.reset();
   destination_channel_.reset();
   if (flutter_controller_) {

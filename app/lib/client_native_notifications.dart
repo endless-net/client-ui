@@ -4,7 +4,13 @@ import 'client_notification_delivery.dart';
 
 const _channel = MethodChannel('endlessnet/ui-notifications');
 
-enum ClientNotificationPermission { granted, denied, unsupported, unavailable }
+enum ClientNotificationPermission {
+  granted,
+  denied,
+  managedDenied,
+  unsupported,
+  unavailable,
+}
 
 Future<ClientNotificationPermission>
 requestNativeClientNotificationPermission() async {
@@ -12,6 +18,7 @@ requestNativeClientNotificationPermission() async {
     return switch (await _channel.invokeMethod<String>('requestPermission')) {
       'granted' => ClientNotificationPermission.granted,
       'denied' => ClientNotificationPermission.denied,
+      'managedDenied' => ClientNotificationPermission.managedDenied,
       'unsupported' => ClientNotificationPermission.unsupported,
       _ => ClientNotificationPermission.unavailable,
     };

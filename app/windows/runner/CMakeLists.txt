@@ -35,6 +35,7 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_link_libraries(${BINARY_NAME} PRIVATE "advapi32.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE "windowsapp.lib")
 target_link_libraries(${BINARY_NAME} PRIVATE "ole32.lib" "shell32.lib" "uuid.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
@@ -45,3 +46,10 @@ add_executable(ui_autostart_test EXCLUDE_FROM_ALL "ui_autostart_test.cpp")
 apply_standard_settings(ui_autostart_test)
 target_include_directories(ui_autostart_test PRIVATE
   "${FLUTTER_MANAGED_DIR}/ephemeral/cpp_client_wrapper/include")
+
+add_executable(ui_notifications_test EXCLUDE_FROM_ALL "ui_notifications_test.cpp")
+apply_standard_settings(ui_notifications_test)
+target_compile_definitions(ui_notifications_test PRIVATE "NOMINMAX")
+target_include_directories(ui_notifications_test PRIVATE
+  "${FLUTTER_MANAGED_DIR}/ephemeral/cpp_client_wrapper/include")
+target_link_libraries(ui_notifications_test PRIVATE "windowsapp.lib")

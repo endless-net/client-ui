@@ -82,6 +82,7 @@ void main() {
       const ru = [
         'Разрешение получено. Включите уведомления или явно повторите доставку.',
         'В разрешении отказано. Проверьте настройки уведомлений системы.',
+        'Уведомления запрещены системной политикой. Обратитесь к администратору.',
         'Эта сборка не поддерживает запрос разрешения на уведомления.',
         'Запрос разрешения на уведомления недоступен.',
       ];
@@ -90,6 +91,7 @@ void main() {
       const en = [
         'Permission granted. Enable notifications or retry delivery explicitly.',
         'Permission denied. Review system notification settings.',
+        'Notifications are disabled by system policy. Contact your administrator.',
         'This host cannot request notification permission.',
         'Notification permission request is unavailable.',
       ];

@@ -35,6 +35,7 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> destination_channel_;
   bool destination_picker_open_ = false;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> autostart_channel_;
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> notification_channel_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_
