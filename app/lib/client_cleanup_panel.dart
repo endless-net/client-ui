@@ -30,6 +30,21 @@ class _ClientCleanupPanelState extends State<ClientCleanupPanel> {
   bool Function()? _contextCurrent;
   int _confirmationSerial = 0;
   bool _busy = false;
+  Object _binding = Object();
+
+  @override
+  void didUpdateWidget(covariant ClientCleanupPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.state, widget.state)) {
+      _binding = Object();
+      _forget = null;
+      _contextCurrent = null;
+      _confirmationSerial++;
+      _busy = false;
+      _notice = null;
+    }
+  }
+
   _CleanupNotice? _notice;
   String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
   String _noticeText(_CleanupNotice notice) => switch (notice) {
@@ -87,6 +102,7 @@ class _ClientCleanupPanelState extends State<ClientCleanupPanel> {
       return;
     }
     final profileId = widget.state.snapshot!.status.activeProfileId;
+    final binding = _binding;
     setState(() {
       _busy = true;
       _forget = null;
@@ -106,7 +122,9 @@ class _ClientCleanupPanelState extends State<ClientCleanupPanel> {
       if (!mounted || !contextCurrent()) return;
       setState(() => _notice = _CleanupNotice.unknown);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(binding, _binding)) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -121,8 +139,10 @@ class _ClientCleanupPanelState extends State<ClientCleanupPanel> {
       final profiles = state.domainEpoch(api.Domain.DOMAIN_PROFILES);
       final session = state.domainEpoch(api.Domain.DOMAIN_SESSION);
       final serial = _confirmationSerial;
+      final binding = _binding;
       bool contextCurrent() =>
           mounted &&
+          identical(binding, _binding) &&
           identical(widget.state, state) &&
           identical(state.snapshot, snapshot) &&
           state.cacheEpoch == epoch &&

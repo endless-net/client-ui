@@ -633,6 +633,10 @@
           "scope": "Ten short RU/EN identity vectors compare complete displayed identity and four notices, reject trust after changed announcement and stale callback after reconfirmation, and switch locale without repeat reads/commands. Unit/component evidence only, not native elevation, established trust or full UI-AC-13"
         },
         {
+          "path": "app/test/client_cleanup_binding_test.dart",
+          "scope": "Six short Logout/Local Forget controller A-B-A tests: queued confirmation revoked; old accepted/error result cannot show a notice or release a newer command; fresh confirmation required. Equal controller epochs, injected operations only; no remote cleanup, native authorization or real local removal"
+        },
+        {
           "path": "app/test/client_cleanup_locale_test.dart",
           "scope": "16 short vectors: exact RU/EN logout/local-forget warnings and accepted/result/unknown notices without replay on locale change; stale confirm/cancel cannot retarget, reuse renewed consent or cross snapshot/controller replacement. Component evidence, not actual remote cleanup or full UI-AC-13"
         },

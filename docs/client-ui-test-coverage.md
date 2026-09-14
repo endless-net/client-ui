@@ -1,5 +1,15 @@
 # Client v0 test coverage ledger
 
+Cleanup controller binding (2026-09-14): replacing the controller clears pending
+confirmation, notice and busy state, increments confirmation invalidation and
+revokes the old binding. The context closure and finally block both check it.
+Six Logout/Local Forget tests cover queued unsubmitted confirmation and old
+accepted/error completion after A-B-A replacement with equal epochs. Only a new
+explicit confirmation can submit; old work cannot announce or release new work.
+No cleanup RPC is canceled/replayed, and no actual local/remote removal is tested.
+Validation: 908 Flutter tests passed, 30 skipped; pinned analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Update/support request isolation (2026-09-14): context reset now invalidates the
 request token and releases stale busy state immediately. Reads, support browser
 context checks, error handlers and finally blocks require their original token.
