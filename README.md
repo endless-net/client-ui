@@ -33,7 +33,14 @@ The strict producer fixture uses Protobuf v0 over a local pipe/socket. The old
 HTTP emulator is removed. See [`docs/native-scenario-host.md`](docs/native-scenario-host.md)
 for fixture ownership, verification and explicit scenario coverage gaps.
 
-## Client core v0.4.1 integration
+## Client core release pin
+
+`client-core.lock.json` pins the latest published client release, v0.5.0, with
+its immutable commit and release asset SHA-256 digests. Its Windows manifest
+still identifies IPC v2, so the native IPC v0 resolver rejects this release.
+A compatible producer release is still required before building a working MSI.
+
+### Historical v0.4.1 integration
 
 The packaged v0.4.1 service runs WireGuard Go as its only tunnel engine. The
 MSI does not pass a backend-selection flag or fix the UDP listen port. Wintun
@@ -66,13 +73,14 @@ dedicated UAC action that launches the installed, signed
 confirmed origin/key ID. The UI then re-reads service status and identity so a
 key change during UAC cannot silently trust a different identity.
 
-Resolve the reviewed public core input and build an unsigned validation MSI:
+Once a compatible native core release is pinned, resolve the public core input
+and build an unsigned validation MSI (the current v0.5.0 pin fails IPC validation):
 
 ```powershell
 .\scripts\resolve-client-core.ps1 -OutputDir .\.artifacts\client-core
 .\scripts\build-windows-client-msi.ps1 `
   -UIVersion 1.0.4 `
-  -CoreVersion 0.4.1 `
+  -CoreVersion 0.5.0 `
   -ClientExe .\.artifacts\client-core\endlessnet-client_windows_amd64.exe `
   -RecoveryHelperExe .\.artifacts\client-core\endlessnet-client-recovery-helper_windows_amd64.exe `
   -CoreMetadataDir .\.artifacts\client-core `

@@ -3,11 +3,12 @@
 The application, packaging tools, tests, and documentation in this repository
 are maintained by EndlessNet and licensed under Apache-2.0.
 
-`contracts/upstream/client-ipc-v2.openapi.yaml` is an exact checked-in copy of
-the protected local IPC contract published by
-`endless-net/client` release `v0.4.1` at commit
-`517780f5d748a241ca9975fe75d02de2cd074182`. The release resolver requires the
-reviewed immutable pin in `client-core.lock.json` and verifies its digest.
+`contracts/client-v0.json` records the native IPC descriptor identity consumed
+by the generated Dart SDK. The retired OpenAPI contract is no longer vendored.
+`client-core.lock.json` pins `endless-net/client` release `v0.5.0` at commit
+`e1c18c463b65b460faa94c0f2fce431c2ed79259`, with release asset SHA-256 digests.
+That release still exposes IPC v2; the native resolver rejects it as incompatible.
+For compatible releases, the resolver verifies the pinned asset digests.
 It also verifies SLSA build attestations for the service and recovery helper
 against the producer workflow, immutable tag/commit, and GitHub-hosted runner.
 
