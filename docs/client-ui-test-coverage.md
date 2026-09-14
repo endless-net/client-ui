@@ -1,5 +1,15 @@
 # Client v0 test coverage ledger
 
+Desktop shell large-text correction (2026-09-14): a narrow 200% reproduction put
+Quit outside the right edge of AppBar; RU runtime error text also overflowed the
+body vertically by 72 pixels. Reconnect/Quit now use a wrapping row in a bounded
+scrollable header, preserving space for the session panel. The unconfirmed-quit
+dialog scrolls its title/content while keeping actions available. Four composed
+RU/EN cases cover 360x640 and the desktop minimum 620x460 at 200%, action hit tests,
+keyboard Stay and no exit. Plugins are disabled; this is not native OS acceptance.
+Validation: 887 Flutter tests passed, 30 skipped; pinned analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 macOS tray window presence (2026-09-14): availability no longer returns a constant
 true. The inspected pinned tray_manager 0.5.3 getBounds implementation queries
 its current statusItem.button.window.frame and returns null when absent. The

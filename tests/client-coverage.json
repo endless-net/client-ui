@@ -621,6 +621,10 @@
           "scope": "Two RU/EN short widgets at 360x640 and 200% text: keyboard activation of search refresh and expand/collapse of two same-name peers, exact search request and one read, scrollable path details, full rendered text bounds including long hostnames. No native screen-reader or large-catalog performance acceptance"
         },
         {
+          "path": "app/test/client_quit_layout_test.dart",
+          "scope": "Four RU/EN composed desktop widgets at 360x640 and 620x460 with 200% text: runtime unavailable, visible Quit and dialog actions, no layout overflow, keyboard Stay retains the UI without exit. Desktop plugins disabled; no native window sizing, OS keyboard or lifecycle acceptance"
+        },
+        {
           "path": "app/test/client_identity_locale_test.dart",
           "scope": "Ten short RU/EN identity vectors compare complete displayed identity and four notices, reject trust after changed announcement and stale callback after reconfirmation, and switch locale without repeat reads/commands. Unit/component evidence only, not native elevation, established trust or full UI-AC-13"
         },
