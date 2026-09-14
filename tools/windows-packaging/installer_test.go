@@ -64,6 +64,7 @@ func TestRenderWindowsInstallerArtifacts(t *testing.T) {
 		`ComponentGroup Id="EndlessNetShortcutComponents" Directory="ApplicationProgramsFolder"`,
 		`Component Id="ApplicationShortcut" Guid="*"`,
 		`Shortcut Id="EndlessNetShortcut"`,
+		`ShortcutProperty Key="System.AppUserModel.ID" Value="EndlessNet.Client"`,
 		`Arguments="--show-window --debug --debug-log-dir ~\.endlessnet\logs"`,
 		`Icon="EndlessNetIcon"`,
 		`RemoveFolder Id="RemoveEndlessNetProgramMenuFolder"`,

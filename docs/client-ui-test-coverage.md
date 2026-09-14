@@ -1,5 +1,16 @@
 # Client v0 test coverage ledger
 
+Windows shell identity addition (2026-09-14): the UI sets the approved
+`EndlessNet.Client` AppUserModelID before creating Flutter windows, and the MSI
+Start Menu shortcut carries the matching `System.AppUserModel.ID`. The existing
+installer rendering test checks that property together with the unchanged
+UpgradeCode. Local `go test ./...`, pinned Flutter 3.38.1 analysis and full local
+Flutter suite (806 passed, 30 skipped), 13 Node policy/trace tests and Windows x64
+Debug compilation passed. These checks do not prove installed shortcut properties,
+taskbar grouping, native notifications or platform acceptance. The six approved
+product decisions are recorded in SA; the MSI's unconditional autostart registration
+still needs replacement to satisfy the approved opt-in policy.
+
 US-14 command-announcement addition: `ClientConnectionPanel` exposes its fixed
 command-result notice as a separate semantic live region. The shared typed-snapshot
 widget regression checks the pending notice's exact accessible label and live-region

@@ -12,6 +12,38 @@
   [Windows HTTP v2 as-is](architecture-and-future.md)
   сохраняет дату своей проверки и не является целевым дизайном.
 
+### Принятые продуктовые решения — 2026-09-14
+
+Пользователь утвердил следующие решения при переносе цели в новую задачу:
+
+- Windows AppUserModelID процесса UI и MSI shortcut: `EndlessNet.Client`.
+  Существующие package/update identity и UpgradeCode сохраняются.
+- Целевая матрица: Windows 11 x64; macOS 13+ ARM64/x64;
+  Ubuntu 24.04 x64 GNOME. Минимальные Android/iOS определяются после
+  получения bridge/SDK; неизвестные значения не считаются утверждёнными.
+- Mobile bridge использует только предоставленный `client` контракт.
+  Отсутствующий bridge — внешняя зависимость; runtime в UI не переносится.
+- Enrollment использует системный браузер и проверяемый одноразовый callback,
+  привязанный к попытке входа, без долговременных токенов в URL. Подход принят;
+  точная схема callback требует producer контракта.
+- Закрытие desktop окна скрывает его в доступный трей, иначе завершает UI.
+  Выход UI сам не отключает VPN. Autostart и notifications — opt-in.
+- Accessibility: клавиатура, видимый фокус, семантические названия,
+  информация не только цветом, текст 200%; ручная проверка NVDA, VoiceOver,
+  TalkBack и Orca остаётся обязательной частью acceptance.
+
+Это решения целевого дизайна, не доказательство реализации или acceptance.
+Они заменяют прежние формулировки о неутверждённой policy. Локали RU/EN и
+`endlessnet.app` для новых macOS/Android/iOS hosts остаются требованиями.
+
+Windows AppUserModelID теперь устанавливается до создания Flutter window;
+ошибка установки завершает запуск. MSI shortcut получает тот же
+`System.AppUserModel.ID`. Используются
+[Windows process API](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-setcurrentprocessexplicitappusermodelid)
+и [WiX ShortcutProperty](https://docs.firegiant.com/wix/schema/wxs/shortcutproperty/).
+Это основа shell identity; native Windows notifications и проверка установленного
+ярлыка/группировки taskbar ещё не выполнены.
+
 ### Актуализация source cutover — 2026-09-13
 
 [Проверка полноты реализации от 2026-09-14](client-ui-implementation-audit.md)

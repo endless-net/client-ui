@@ -1,6 +1,7 @@
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
+#include <shobjidl.h>
 
 #include <algorithm>
 
@@ -18,6 +19,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+
+  // Keep process/taskbar identity aligned with the installed Start Menu link.
+  // Set it before Flutter or any application window is created.
+  if (FAILED(::SetCurrentProcessExplicitAppUserModelID(L"EndlessNet.Client"))) {
+    ::CoUninitialize();
+    return EXIT_FAILURE;
+  }
 
   flutter::DartProject project(L"data");
 

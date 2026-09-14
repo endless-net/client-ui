@@ -300,7 +300,9 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
     </ComponentGroup>
     <ComponentGroup Id="EndlessNetShortcutComponents" Directory="ApplicationProgramsFolder">
       <Component Id="ApplicationShortcut" Guid="*">
-        <Shortcut Id="EndlessNetShortcut" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet.exe" Arguments="--show-window --debug --debug-log-dir %s" WorkingDirectory="INSTALLFOLDER" Icon="EndlessNetIcon" />
+        <Shortcut Id="EndlessNetShortcut" Name="EndlessNet" Description="Open EndlessNet" Target="[INSTALLFOLDER]endlessnet.exe" Arguments="--show-window --debug --debug-log-dir %s" WorkingDirectory="INSTALLFOLDER" Icon="EndlessNetIcon">
+          <ShortcutProperty Key="System.AppUserModel.ID" Value="EndlessNet.Client" />
+        </Shortcut>
         <RemoveFolder Id="RemoveEndlessNetProgramMenuFolder" On="uninstall" />
         <RegistryValue Root="HKCU" Key="Software\EndlessNet\Client" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
       </Component>
