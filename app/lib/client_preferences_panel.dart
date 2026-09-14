@@ -49,6 +49,7 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
   String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
   String _value(Object? value) => preferenceValueLabel(value, widget.locale);
   bool _busy = false;
+  Object _binding = Object();
   String get contextId =>
       '${widget.state.cacheEpoch}:'
       '${[api.Domain.DOMAIN_PROFILES, api.Domain.DOMAIN_PREFERENCES, api.Domain.DOMAIN_MANAGED_SETTINGS].map(widget.state.domainEpoch).join(',')}';
@@ -65,6 +66,8 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
       );
   bool get current => allowed && _context == contextId;
   void _clear() {
+    _binding = Object();
+    _busy = false;
     _projection = null;
     _draft.clear();
     _draftSerial++;
@@ -149,9 +152,14 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
     }
     patch.freeze();
     final context = contextId;
+    final binding = _binding;
     final profile = widget.state.snapshot!.status.activeProfileId;
     void checkContext() {
-      if (!mounted || !current || context != contextId || _context != context) {
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          !current ||
+          context != contextId ||
+          _context != context) {
         throw StateError('Preferences changed before command completion');
       }
     }
@@ -198,7 +206,12 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
         setState(() => _projection = loaded);
       }
     } catch (_) {
-      if (!mounted || !current || context != _context) return;
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          !current ||
+          context != _context) {
+        return;
+      }
       setState(() {
         _projection = null;
         _draft.clear();
@@ -206,7 +219,9 @@ class _ClientPreferencesPanelState extends State<ClientPreferencesPanel> {
         _notice = _PreferenceNotice.unknown;
       });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(binding, _binding)) {
+        setState(() => _busy = false);
+      }
     }
   }
 

@@ -78,6 +78,7 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
       widget.state.snapshot!.supports(api.Capability.CAPABILITY_RESOURCES);
   bool get current => allowed && _context == contextId;
   void _clear() {
+    _busy = false;
     _catalog = null;
     _notice = null;
     _context = null;
@@ -206,7 +207,7 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
         _notice = _ResourceNotice.destination;
       });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && query == _query) setState(() => _busy = false);
     }
   }
 
@@ -268,7 +269,7 @@ class _ClientResourcesPanelState extends State<ClientResourcesPanel> {
         _notice = _ResourceNotice.unknown;
       });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && query == _query) setState(() => _busy = false);
     }
   }
 

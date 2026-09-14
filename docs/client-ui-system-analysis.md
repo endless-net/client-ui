@@ -20,6 +20,13 @@ producer main `712a0155de7180007e248fdeada3c22675c968f4` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Diagnostics/exit/preferences при сбросе контекста отзывают binding и освобождают
+busy; callbacks после await и finally требуют исходную привязку. Resources
+использует существующий query serial также в finally и освобождает busy при reset.
+Это позволяет читать новый контекст, не ожидая старый запрос, без переноса старой
+ошибки или снятия блокировки нового действия. Проверены A→B→A и новый snapshot
+для пяти read-путей, включая журнал; полнота native/runtime acceptance не заявлена.
+
 Profiles/networks panels при замене контроллера очищают каталог, notice и busy;
 profiles также удаляет черновик имени и подтверждение удаления. Binding проверяют
 async continuations, finally и callbacks старого кадра. A→B→A с повторно

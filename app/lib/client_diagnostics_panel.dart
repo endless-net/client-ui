@@ -78,6 +78,7 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
     ),
   };
   bool _busy = false;
+  Object _binding = Object();
   bool _confirmBundle = false;
   @override
   void initState() {
@@ -96,6 +97,8 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
   }
 
   void _clearPreview() {
+    _binding = Object();
+    _busy = false;
     _preview = null;
     _logs = null;
     _notice = null;
@@ -133,6 +136,7 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
   Future<void> _loadLogs() async {
     if (!allowed || _busy || widget.loadLogs == null) return;
     final context = contextId;
+    final binding = _binding;
     setState(() {
       _context = context;
       _logs = null;
@@ -141,22 +145,33 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
     });
     try {
       final logs = await widget.loadLogs!();
-      if (!mounted || _context != context || contextId != context || !allowed) {
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          _context != context ||
+          contextId != context ||
+          !allowed) {
         return;
       }
       setState(() => _logs = logs);
     } catch (_) {
-      if (mounted && _context == context && contextId == context && allowed) {
+      if (mounted &&
+          identical(binding, _binding) &&
+          _context == context &&
+          contextId == context &&
+          allowed) {
         setState(() => _notice = _DiagnosticsNotice.logs);
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(binding, _binding)) {
+        setState(() => _busy = false);
+      }
     }
   }
 
   Future<void> _load() async {
     if (!allowed || _busy) return;
     final context = contextId;
+    final binding = _binding;
     setState(() {
       _context = context;
       _busy = true;
@@ -167,7 +182,11 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
     });
     try {
       final preview = await widget.load();
-      if (!mounted || context != _context || context != contextId || !allowed) {
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          context != _context ||
+          context != contextId ||
+          !allowed) {
         return;
       }
       final snapshot = widget.state.snapshot!;
@@ -182,11 +201,16 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
               ..freeze(),
       );
     } catch (_) {
-      if (mounted && context == _context && context == contextId) {
+      if (mounted &&
+          identical(binding, _binding) &&
+          context == _context &&
+          context == contextId) {
         setState(() => _notice = _DiagnosticsNotice.preview);
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(binding, _binding)) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -199,6 +223,7 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
       return;
     }
     final context = contextId;
+    final binding = _binding;
     final profileId = widget.state.snapshot!.status.activeProfileId;
     setState(() {
       _busy = true;
@@ -208,7 +233,11 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
     });
     try {
       final operation = await widget.createBundle(profileId);
-      if (!mounted || context != _context || context != contextId || !allowed) {
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          context != _context ||
+          context != contextId ||
+          !allowed) {
         return;
       }
       setState(
@@ -217,11 +246,16 @@ class _ClientDiagnosticsPanelState extends State<ClientDiagnosticsPanel> {
             : _DiagnosticsNotice.received,
       );
     } catch (_) {
-      if (mounted && context == _context && context == contextId) {
+      if (mounted &&
+          identical(binding, _binding) &&
+          context == _context &&
+          context == contextId) {
         setState(() => _notice = _DiagnosticsNotice.unknown);
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(binding, _binding)) {
+        setState(() => _busy = false);
+      }
     }
   }
 

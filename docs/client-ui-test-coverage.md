@@ -1,5 +1,15 @@
 # Client v0 test coverage ledger
 
+Remaining panel request invalidation (2026-09-14): diagnostics, exit and preferences
+reset now revoke a binding and release busy; their continuations and finally blocks
+require it. Resource reset releases busy and its existing query serial also guards
+finally. Ten delayed-error tests cover diagnostics, logs, exit, preferences and
+resources under A-B-A controller replacement and new snapshot: old failures never
+show or release a newer request, while the fresh error is visible and sanitized.
+These are read/callback regressions, not archive, route, OS or producer acceptance.
+Validation: 922 Flutter tests passed, 30 skipped; pinned analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Profile/network controller binding (2026-09-14): replacing a controller resets
 catalog, notice and busy state; profiles additionally clear the name draft and
 removal confirmation. Async continuations/finally and rendered callbacks require

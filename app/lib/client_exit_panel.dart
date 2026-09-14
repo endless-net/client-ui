@@ -87,6 +87,8 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
       selected!.allowedFamilyModes.contains(_mode) &&
       selected!.allowedLanAccess.contains(_lan);
   void _discard() {
+    _binding = Object();
+    _busy = false;
     _draftSerial++;
     _contextCurrent = null;
     _view = null;
@@ -125,6 +127,8 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
     super.dispose();
   }
 
+  Object _binding = Object();
+
   Future<void> _run({bool select = false, bool clear = false}) async {
     if (!allowed ||
         _busy ||
@@ -133,6 +137,7 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
       return;
     }
     final context = contextId;
+    final binding = _binding;
     final state = widget.state;
     final snapshot = state.snapshot;
     final profile = widget.state.snapshot!.status.activeProfileId;
@@ -140,7 +145,10 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
     final mode = _mode;
     final lan = _lan;
     void check() {
-      if (!mounted || !current || context != _context) {
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          !current ||
+          context != _context) {
         throw StateError('Exit context changed');
       }
     }
@@ -189,7 +197,12 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
         setState(() => _view = view);
       }
     } catch (_) {
-      if (!mounted || !current || context != _context) return;
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          !current ||
+          context != _context) {
+        return;
+      }
       setState(() {
         _view = null;
         _node = null;
@@ -198,7 +211,9 @@ class _ClientExitPanelState extends State<ClientExitPanel> {
         _notice = _ExitNotice.unknown;
       });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(binding, _binding)) {
+        setState(() => _busy = false);
+      }
     }
   }
 
