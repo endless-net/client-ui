@@ -1,5 +1,15 @@
 # Client v0 test coverage ledger
 
+Update/support request isolation (2026-09-14): context reset now invalidates the
+request token and releases stale busy state immediately. Reads, support browser
+context checks, error handlers and finally blocks require their original token.
+Four tests exercise A-B-A controller replacement with equal epochs and delayed
+success/error for both panels: a new request can start without awaiting old work,
+and old completion neither renders data/error nor releases the new request.
+Injected results only; no network discovery or browser acceptance is claimed.
+Validation: 902 Flutter tests passed, 30 skipped; pinned analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Connection controller replacement correction (2026-09-14): Connect, Disconnect
 and Renew now clear panel pending/notice state when the controller changes and
 bind every completion/error/finally to the original panel binding. Six tests cover

@@ -20,6 +20,11 @@ producer main `712a0155de7180007e248fdeada3c22675c968f4` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Update/support panels отзывают текущий request token при сбросе контекста,
+освобождая busy для нового запроса. Старые ответы, ошибки и finally не меняют
+новый экран, даже при возврате к прежнему экземпляру контроллера. Support browser
+check также требует исходный token. Locale rebuild сам по себе не отзывает запрос.
+
 Connection panel сбрасывает локальные pending/notice при замене контроллера и
 проверяет binding при завершении Connect/Disconnect/Renew, включая finally.
 Возврат A→B→A не восстанавливает полномочия старого callback: он не показывает

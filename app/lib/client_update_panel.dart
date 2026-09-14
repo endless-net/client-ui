@@ -31,6 +31,7 @@ class _ClientUpdatePanelState extends State<ClientUpdatePanel> {
   String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
   String get _unknown => _text('Unknown', 'Неизвестно');
   bool _busy = false;
+  Object? _request;
   Timer? _expiry;
   String get contextId =>
       '${widget.state.cacheEpoch}:${widget.state.domainEpoch(api.Domain.DOMAIN_UPDATES)}';
@@ -40,6 +41,8 @@ class _ClientUpdatePanelState extends State<ClientUpdatePanel> {
       widget.state.snapshot!.runtime.callerAccess != api.Access.ACCESS_OBSERVER;
   bool get current => allowed && _context == contextId;
   void _reset() {
+    _request = null;
+    _busy = false;
     _expiry?.cancel();
     _expiry = null;
     _info = null;
@@ -78,17 +81,20 @@ class _ClientUpdatePanelState extends State<ClientUpdatePanel> {
   Future<void> _load() async {
     if (!mounted || !allowed || _busy) return;
     final context = contextId;
+    final request = Object();
     final originalState = widget.state;
     final ui = api.BuildIdentity.fromBuffer(widget.uiBuild.writeToBuffer())
       ..freeze();
     setState(() {
       _reset();
+      _request = request;
       _context = context;
       _busy = true;
     });
     try {
       final result = await widget.load(ui);
       if (!mounted ||
+          !identical(request, _request) ||
           !identical(originalState, widget.state) ||
           !current ||
           context != _context ||
@@ -122,13 +128,16 @@ class _ClientUpdatePanelState extends State<ClientUpdatePanel> {
       setState(() => _info = info);
     } catch (_) {
       if (mounted &&
+          identical(request, _request) &&
           identical(originalState, widget.state) &&
           current &&
           context == _context) {
         setState(() => _notice = _UpdateNotice.unknown);
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(request, _request)) {
+        setState(() => _busy = false);
+      }
     }
   }
 

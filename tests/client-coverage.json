@@ -649,6 +649,10 @@
           "scope": "Five short tests: twelve UI-owned RU/EN task topics, critical recovery/cleanup/privacy meaning checks, all topics expanded at 360x640/text scale 2 with locale-switch retention, zero RPC/browser and no overflow. RU/EN keyboard disclosure tests assert one semantic button with expanded state, retained focus and Enter open/close without RPC/browser. Producer key mapping, native accessibility and product approval remain unverified"
         },
         {
+          "path": "app/test/client_information_binding_test.dart",
+          "scope": "Four short update/support A-B-A controller replacement tests with equal epochs and delayed success/error. Replacement releases stale busy state immediately; old completion cannot publish data/error or clear a fresh request; only the new result renders. No actual update discovery or browser acceptance"
+        },
+        {
           "path": "app/test/client_update_locale_test.dart",
           "scope": "Six unit tests cover all 32 update/compatibility/classification/channel/platform/availability enum labels in RU/EN; four widget vectors compare full source-unavailable/incompatible-pair and error text without repeated lookup during locale switching. Not verified distribution installation or full-app UI-AC-13"
         },

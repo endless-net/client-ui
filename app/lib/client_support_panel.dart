@@ -34,6 +34,7 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
     _ => throw StateError('Unknown support link'),
   };
   bool _busy = false;
+  Object? _request;
   bool _help = false;
   String get contextId =>
       '${widget.state.cacheEpoch}:${widget.state.domainEpoch(api.Domain.DOMAIN_SUPPORT)}';
@@ -43,6 +44,8 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
       widget.state.snapshot != null;
   bool get current => allowed && _context == contextId;
   void _reset() {
+    _request = null;
+    _busy = false;
     _info = null;
     _context = null;
     _failed = false;
@@ -89,10 +92,12 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
     final original = key == null ? null : link(_info!, key);
     if (original == '') return;
     final context = contextId;
+    final request = Object();
     final originalState = widget.state;
     final build = widget.state.snapshot!.runtime.build;
     void check() {
       if (!mounted ||
+          !identical(request, _request) ||
           !identical(widget.state, originalState) ||
           !current ||
           context != _context) {
@@ -101,6 +106,7 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
     }
 
     setState(() {
+      _request = request;
       _context = context;
       _busy = true;
       _failed = false;
@@ -128,6 +134,7 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
       setState(() => _info = info);
     } catch (_) {
       if (mounted &&
+          identical(request, _request) &&
           identical(widget.state, originalState) &&
           current &&
           context == _context) {
@@ -137,7 +144,9 @@ class _ClientSupportPanelState extends State<ClientSupportPanel> {
         });
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(request, _request)) {
+        setState(() => _busy = false);
+      }
     }
   }
 
