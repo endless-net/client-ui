@@ -20,6 +20,11 @@ producer main `712a0155de7180007e248fdeada3c22675c968f4` не меняет proto
 
 ### Принятые продуктовые решения — 2026-09-14
 
+Profiles/networks panels при замене контроллера очищают каталог, notice и busy;
+profiles также удаляет черновик имени и подтверждение удаления. Binding проверяют
+async continuations, finally и callbacks старого кадра. A→B→A с повторно
+использованным объектом каталога не восстанавливает полномочия старого выбора.
+
 Logout/Local Forget confirmation привязано к controller lifetime. Замена
 контроллера отзывает сохранённое подтверждение и queued callback, очищает notice
 и busy; возврат A→B→A требует нового явного подтверждения. Поздний ответ старой

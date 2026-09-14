@@ -35,6 +35,24 @@ class _ClientNetworksPanelState extends State<ClientNetworksPanel> {
   int? _epoch;
   int? _domain;
   bool _busy = false;
+  Object _binding = Object();
+
+  @override
+  void didUpdateWidget(covariant ClientNetworksPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.state, widget.state)) {
+      _binding = Object();
+      _catalog = null;
+      _catalogState = null;
+      _profileId = null;
+      _profilesDomain = null;
+      _epoch = null;
+      _domain = null;
+      _busy = false;
+      _notice = null;
+    }
+  }
+
   _NetworkNotice? _notice;
   String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
   String _reported(String value) =>
@@ -83,6 +101,7 @@ class _ClientNetworksPanelState extends State<ClientNetworksPanel> {
       return;
     }
     final profileId = widget.state.snapshot!.status.activeProfileId;
+    final binding = _binding;
     setState(() {
       _catalogState = widget.state;
       _profileId = profileId;
@@ -96,11 +115,16 @@ class _ClientNetworksPanelState extends State<ClientNetworksPanel> {
     try {
       if (id == null) {
         final catalog = await widget.load();
-        if (!mounted || !_current || catalog.profileId != profileId) return;
+        if (!mounted ||
+            !identical(binding, _binding) ||
+            !_current ||
+            catalog.profileId != profileId) {
+          return;
+        }
         setState(() => _catalog = catalog);
       } else {
         final operation = await widget.select(profileId, id);
-        if (!mounted || !_current) return;
+        if (!mounted || !identical(binding, _binding) || !_current) return;
         setState(
           () => _notice = operation.terminal
               ? _NetworkNotice.result
@@ -108,10 +132,12 @@ class _ClientNetworksPanelState extends State<ClientNetworksPanel> {
         );
       }
     } catch (_) {
-      if (!mounted || !_current) return;
+      if (!mounted || !identical(binding, _binding) || !_current) return;
       setState(() => _notice = _NetworkNotice.unknown);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(binding, _binding)) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -125,8 +151,10 @@ class _ClientNetworksPanelState extends State<ClientNetworksPanel> {
       final epoch = widget.state.cacheEpoch;
       final networks = widget.state.domainEpoch(api.Domain.DOMAIN_NETWORKS);
       final profiles = widget.state.domainEpoch(api.Domain.DOMAIN_PROFILES);
+      final binding = _binding;
       bool current() =>
           mounted &&
+          identical(binding, _binding) &&
           identical(widget.state, renderedState) &&
           identical(widget.state.snapshot, renderedSnapshot) &&
           identical(_catalog, renderedCatalog) &&

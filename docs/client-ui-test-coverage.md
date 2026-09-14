@@ -1,5 +1,15 @@
 # Client v0 test coverage ledger
 
+Profile/network controller binding (2026-09-14): replacing a controller resets
+catalog, notice and busy state; profiles additionally clear the name draft and
+removal confirmation. Async continuations/finally and rendered callbacks require
+their original binding. Four tests cover pending catalog/selection after A-B-A,
+new lookup progress and queued selection with the exact same reused catalog object.
+Old work cannot refill or unlock the new view. Injected callbacks only; no actual
+profile switch, network enforcement or native acceptance is claimed.
+Validation: 912 Flutter tests passed, 30 skipped; pinned analyze, Go full,
+13 Node checks and the 104-requirement coverage checker passed.
+
 Cleanup controller binding (2026-09-14): replacing the controller clears pending
 confirmation, notice and busy state, increments confirmation invalidation and
 revokes the old binding. The context closure and finally block both check it.

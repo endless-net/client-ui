@@ -63,6 +63,26 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
       _epoch == widget.state.cacheEpoch &&
       _domainEpoch == widget.state.domainEpoch(api.Domain.DOMAIN_PROFILES);
   bool _busy = false;
+  Object _binding = Object();
+
+  @override
+  void didUpdateWidget(covariant ClientProfilesPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.state, widget.state)) {
+      _binding = Object();
+      _catalog = null;
+      _catalogState = null;
+      _epoch = null;
+      _domainEpoch = null;
+      _busy = false;
+      _notice = null;
+      _pendingRemoval = null;
+      _pendingRemovalSnapshot = null;
+      _confirmationEpoch++;
+      _name.clear();
+    }
+  }
+
   _ProfileNotice? _notice;
   String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
   String _reported(String value) =>
@@ -147,6 +167,7 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
       return;
     }
     final epoch = widget.state.cacheEpoch;
+    final binding = _binding;
     final domainEpoch = widget.state.domainEpoch(api.Domain.DOMAIN_PROFILES);
     setState(() {
       _busy = true;
@@ -163,7 +184,12 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
     try {
       if (profileId == null) {
         final catalog = await widget.load();
-        if (!mounted || !_owner || !_catalogCurrent) return;
+        if (!mounted ||
+            !identical(binding, _binding) ||
+            !_owner ||
+            !_catalogCurrent) {
+          return;
+        }
         setState(() => _catalog = catalog);
       } else {
         final operation = remove
@@ -171,7 +197,12 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
             : name == null
             ? await widget.select(profileId)
             : await widget.rename(profileId, name);
-        if (!mounted || !_owner || !_catalogCurrent) return;
+        if (!mounted ||
+            !identical(binding, _binding) ||
+            !_owner ||
+            !_catalogCurrent) {
+          return;
+        }
         setState(() {
           // Neither acceptance nor success is a replacement runtime snapshot.
           _catalog = null;
@@ -189,13 +220,20 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
         });
       }
     } catch (_) {
-      if (!mounted || !_owner || !_catalogCurrent) return;
+      if (!mounted ||
+          !identical(binding, _binding) ||
+          !_owner ||
+          !_catalogCurrent) {
+        return;
+      }
       setState(() {
         _catalog = null;
         _notice = _ProfileNotice.failed;
       });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && identical(binding, _binding)) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -216,8 +254,10 @@ class _ClientProfilesPanelState extends State<ClientProfilesPanel> {
           ? _pendingRemoval
           : null;
       final confirmationEpoch = _confirmationEpoch;
+      final binding = _binding;
       bool current() =>
           mounted &&
+          identical(binding, _binding) &&
           identical(widget.state, renderedState) &&
           identical(widget.state.snapshot, renderedSnapshot) &&
           identical(_catalog, renderedCatalog) &&
