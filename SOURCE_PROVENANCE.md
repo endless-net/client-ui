@@ -5,10 +5,10 @@ are maintained by EndlessNet and licensed under Apache-2.0.
 
 `contracts/client-v0.json` records the native IPC descriptor identity consumed
 by the generated Dart SDK. The retired OpenAPI contract is no longer vendored.
-`client-core.lock.json` pins `endless-net/client` release `v0.5.0` at commit
-`e1c18c463b65b460faa94c0f2fce431c2ed79259`, with release asset SHA-256 digests.
-That release still exposes IPC v2; the native resolver rejects it as incompatible.
-For compatible releases, the resolver verifies the pinned asset digests.
+`client-core.lock.json` pins `endless-net/client` release `v0.6.0` at commit
+`95bd83cdb2f265713e7489a055689392a86b2ce7`, with release asset SHA-256 digests.
+The release exposes IPC v0 and its binary descriptor matches the consumer identity.
+The resolver verifies the pinned asset digests.
 It also verifies SLSA build attestations for the service and recovery helper
 against the producer workflow, immutable tag/commit, and GitHub-hosted runner.
 

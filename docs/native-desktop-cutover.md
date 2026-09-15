@@ -132,3 +132,12 @@ was created. `client-core.lock.json` still pins v0.4.1 and must fail native
 packaging until a reviewed compatible release is explicitly selected. Completing
 that pairing and real platform acceptance remains required; this is not a
 successful distribution build. Linux/other consumers need their own review.
+
+## Native Windows release pairing — 2026-09-15
+
+The core lock now pins the published v0.6.0 release at
+`95bd83cdb2f265713e7489a055689392a86b2ce7`. The production resolver successfully
+verified the immutable release/tag/commit, manifest and asset hashes, service
+and recovery-helper SLSA attestations, and exact native v0 binary descriptor.
+This resolves the earlier release-pairing blocker. MSI build, installation and
+real-device acceptance remain separate checks; no UI version was increased.

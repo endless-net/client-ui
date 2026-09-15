@@ -113,8 +113,8 @@ func TestNativePairingKeepsReviewedReleaseUnmodified(t *testing.T) {
 	}
 	for _, required := range []string{
 		`"repository": "endless-net/client"`,
-		`"version": "0.5.0"`,
-		`"commit": "e1c18c463b65b460faa94c0f2fce431c2ed79259"`,
+		`"version": "0.6.0"`,
+		`"commit": "95bd83cdb2f265713e7489a055689392a86b2ce7"`,
 	} {
 		if !strings.Contains(lock, required) {
 			t.Errorf("reviewed client core lock is missing %q", required)

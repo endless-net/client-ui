@@ -11,8 +11,7 @@ validates immutable release/tag/commit and asset provenance as before, and
 compares the raw `client-v0.binpb` SHA-256 with this identity. Binary descriptors
 must not undergo text decoding or newline normalization. No OpenAPI fallback.
 
-The core lock names the latest published release v0.5.0, selected at the user's
-request. Its verified Windows manifest still identifies IPC v2 and publishes
-OpenAPI instead of `client-v0.binpb`, so native packaging rejects it.
-A compatible immutable native core release remains required. The consumer
-protocol and descriptor identity are unchanged.
+The core lock names release v0.6.0, selected at the user's request. Its Windows
+manifest identifies IPC v0 and the published `client-v0.binpb` SHA-256 matches
+this consumer identity. The consumer protocol and descriptor identity are
+unchanged. Release pairing does not establish installer or real-device acceptance.
