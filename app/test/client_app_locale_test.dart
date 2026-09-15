@@ -62,6 +62,13 @@ void main() {
         if (!failure) {
           connection.events.add(fixtures.snapshot());
           await tester.pumpAndSettle();
+          final setup = find.descendant(
+            of: find.byKey(const ValueKey('setup-ClientCreateProfilePanel')),
+            matching: find.byType(ListTile),
+          );
+          await tester.ensureVisible(setup);
+          await tester.tap(setup);
+          await tester.pumpAndSettle();
           final name = find.byKey(const Key('create-profile-name'));
           await tester.ensureVisible(name);
           await tester.enterText(name, 'My profile');
@@ -70,7 +77,10 @@ void main() {
         final controller = session.state;
         final snapshot = controller.snapshot;
         final formState = tester.state(
-          find.byKey(ValueKey((controller, controller.cacheEpoch))),
+          find.byKey(
+            ValueKey((controller, controller.cacheEpoch)),
+            skipOffstage: false,
+          ),
         );
         for (final locale in [
           initial,
@@ -164,7 +174,7 @@ void main() {
                 .locale,
             tester
                 .widget<ClientPeersPanel>(
-                  find.byType(ClientPeersPanel, skipOffstage: false),
+                  find.byType(ClientPeersPanel, skipOffstage: false).first,
                 )
                 .locale,
             tester
@@ -212,7 +222,10 @@ void main() {
           expect(
             identical(
               tester.state(
-                find.byKey(ValueKey((controller, controller.cacheEpoch))),
+                find.byKey(
+                  ValueKey((controller, controller.cacheEpoch)),
+                  skipOffstage: false,
+                ),
               ),
               formState,
             ),

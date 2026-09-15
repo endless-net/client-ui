@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'client_theme_store.dart';
+
 import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:win32/win32.dart';
@@ -84,6 +86,14 @@ Future<void> main(List<String> args) async {
     endpoint: endpoint,
     journal: ClientIntentJournal(clientJournalDirectory(endpoint)),
   );
+  ClientThemeStore? themeStore;
+  var themeMode = ThemeMode.dark;
+  try {
+    themeStore = ClientThemeStore(clientLocaleDirectory());
+    themeMode = await themeStore.read() ?? ThemeMode.dark;
+  } catch (_) {
+    // A missing or unreadable UI preference must not block the client.
+  }
   ClientLocaleStore? localeStore;
   var locale = ClientLocale.en;
   var localeReadFailed = false;
@@ -116,6 +126,10 @@ Future<void> main(List<String> args) async {
   runApp(
     ClientDesktopApp(
       initialLocale: locale,
+      initialTheme: themeMode,
+      saveTheme: themeStore == null
+          ? (_) async => throw StateError('UI settings unavailable')
+          : themeStore.write,
       openAutostartSettings: Platform.isMacOS
           ? openNativeClientAutostartSettings
           : null,

@@ -10,6 +10,7 @@ import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'client_session.dart';
+import 'client_theme.dart';
 import 'client_adaptive_shell.dart';
 import 'client_state_controller.dart';
 import 'client_locale.dart';
@@ -47,6 +48,8 @@ class ClientDesktopApp extends StatefulWidget {
     this.onExit,
     this.uiBuild,
     this.initialLocale = ClientLocale.en,
+    this.initialTheme = ThemeMode.dark,
+    this.saveTheme,
     this.localeReadFailed = false,
     this.saveLocale,
     this.deliverNotification,
@@ -75,6 +78,8 @@ class ClientDesktopApp extends StatefulWidget {
   final Future<ClientNotificationPermission> Function()?
   requestNotificationPermission;
   final ClientLocale initialLocale;
+  final ThemeMode initialTheme;
+  final Future<void> Function(ThemeMode)? saveTheme;
   final bool localeReadFailed;
   final Future<void> Function(ClientLocale)? saveLocale;
   final api.BuildIdentity? uiBuild;
@@ -95,6 +100,31 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   DateTime? _lastSignal;
   bool _busy = false;
   ClientPage _page = ClientPage.connection;
+  late ThemeMode _themeMode;
+  Future<void>? _themeWrite;
+  bool _themeSaveFailed = false;
+  Future<void> _chooseTheme(ThemeMode? mode) async {
+    if (mode == null || _busy || _themeWrite != null) return;
+    setState(() {
+      _themeMode = mode;
+      _themeSaveFailed = false;
+    });
+    final save = widget.saveTheme;
+    if (save == null) return;
+    final writing = () async {
+      try {
+        await save(mode);
+      } catch (_) {
+        if (mounted) setState(() => _themeSaveFailed = true);
+      }
+    }();
+    setState(() {
+      _themeWrite = writing;
+    });
+    await writing;
+    if (mounted) setState(() => _themeWrite = null);
+  }
+
   bool _wasHidden = false;
   bool _resumePending = false;
   bool _exiting = false;
@@ -275,6 +305,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _locale = widget.initialLocale;
+    _themeMode = widget.initialTheme;
     _localeStorageFailed = widget.localeReadFailed;
     _notificationStorageFailed = widget.notificationReadFailed;
     _notifications = ClientNotificationDelivery(
@@ -648,6 +679,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     final savingLocale = _localeWrites;
     final savingNotifications = _notificationWrites;
     _notifications.enabled = false;
+    if (_themeWrite case final savingTheme?) await savingTheme;
     if (savingLocale != null) await savingLocale;
     if (savingNotifications != null) await savingNotifications;
     await session.close();
@@ -685,31 +717,10 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     navigatorKey: _navigator,
     title: 'EndlessNet',
-    theme: ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF2463EB),
-        primary: const Color(0xFF1864F2),
-        secondaryContainer: const Color(0xFFE3EDFF),
-        surface: Colors.white,
-      ),
-      scaffoldBackgroundColor: const Color(0xFFF4F7FB),
-      cardTheme: const CardThemeData(
-        color: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
-          side: BorderSide(color: Color(0xFFE1E7F0)),
-        ),
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-        filled: true,
-        fillColor: Colors.white,
-      ),
-    ),
+    debugShowCheckedModeBanner: false,
+    theme: clientTheme(Brightness.light),
+    darkTheme: clientTheme(Brightness.dark),
+    themeMode: _themeMode,
     home: ClientAdaptiveShell(
       locale: _locale,
       page: _page,
@@ -768,6 +779,40 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: DropdownButtonFormField<ThemeMode>(
+                key: ValueKey(('client-theme', _themeMode)),
+                isExpanded: true,
+                initialValue: _themeMode,
+                decoration: InputDecoration(
+                  labelText: _text('Appearance', 'Оформление'),
+                ),
+                items: [
+                  DropdownMenuItem(
+                    value: ThemeMode.dark,
+                    child: Text(_text('Dark', 'Тёмное')),
+                  ),
+                  DropdownMenuItem(
+                    value: ThemeMode.light,
+                    child: Text(_text('Light', 'Светлое')),
+                  ),
+                  DropdownMenuItem(
+                    value: ThemeMode.system,
+                    child: Text(_text('System', 'Как в системе')),
+                  ),
+                ],
+                onChanged: _busy || _themeWrite != null ? null : _chooseTheme,
+              ),
+            ),
+
+            if (_themeSaveFailed)
+              Text(
+                _text(
+                  'Appearance could not be saved.',
+                  'Не удалось сохранить оформление.',
+                ),
+              ),
             Wrap(
               spacing: 12,
               runSpacing: 8,

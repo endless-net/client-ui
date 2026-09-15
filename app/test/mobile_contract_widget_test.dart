@@ -1626,7 +1626,7 @@ void main() {
             },
           });
         source.add(snapshot);
-        await tester.pump();
+        await tester.pumpAndSettle();
         expect(
           find.text('Profile: synthetic-profile', skipOffstage: false),
           findsOneWidget,
@@ -1658,7 +1658,7 @@ void main() {
           ..nodeId = 'node-a'
           ..network = api.Network(id: 'network-a', name: 'Network A');
         source.add(snapshot);
-        await tester.pump();
+        await tester.pumpAndSettle();
         expect(
           find.text('Account: account-a', skipOffstage: false),
           findsOneWidget,
@@ -1685,7 +1685,7 @@ void main() {
           name: 'Network B',
         );
         source.add(snapshot);
-        await tester.pump();
+        await tester.pumpAndSettle();
         expect(
           find.text('Network: Network A', skipOffstage: false),
           findsNothing,
@@ -1705,7 +1705,10 @@ void main() {
         expect(
           tester
               .widget<OutlinedButton>(
-                find.byKey(const Key('client-renew-session')),
+                find.byKey(
+                  const Key('client-renew-session'),
+                  skipOffstage: false,
+                ),
               )
               .onPressed,
           isNull,
@@ -1727,7 +1730,15 @@ void main() {
           'expiresAt': '2031-02-03T04:05:06Z',
         });
         source.add(snapshot);
-        await tester.pump();
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('client-session-actions')),
+        );
+        await tester.tap(find.text('Session actions'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('client-renew-session')),
+        );
         await tester.tap(find.byKey(const Key('client-renew-session')));
         await tester.pump();
         expect(renewalCalls, 1);
@@ -1735,11 +1746,14 @@ void main() {
         snapshot.snapshot.status.session.state =
             api.SessionState.SESSION_STATE_RENEWING;
         source.add(snapshot);
-        await tester.pump();
+        await tester.pumpAndSettle();
         expect(
           tester
               .widget<OutlinedButton>(
-                find.byKey(const Key('client-renew-session')),
+                find.byKey(
+                  const Key('client-renew-session'),
+                  skipOffstage: false,
+                ),
               )
               .onPressed,
           isNull,
@@ -1761,7 +1775,7 @@ void main() {
         snapshot.sequence += 1;
         snapshot.snapshot.status.session.clearExpiresAt();
         source.add(snapshot);
-        await tester.pump();
+        await tester.pumpAndSettle();
         expect(
           find.text('Session expiry: Unknown', skipOffstage: false),
           findsOneWidget,
@@ -1781,7 +1795,9 @@ void main() {
         await tester.pump();
         expect(connectCalls, 1);
         // Pending Connect must not prevent an explicit Disconnect.
-        await tester.tap(find.byKey(const Key('client-disconnect')));
+        await tester.tap(
+          find.byKey(const Key('client-disconnect'), skipOffstage: false),
+        );
         await tester.pump();
         expect(disconnectCalls, 1);
         connectResult.complete(
@@ -1816,7 +1832,7 @@ void main() {
         snapshot.snapshot.status.clearSession();
         snapshot.snapshot.status.clearCredential();
         source.add(snapshot);
-        await tester.pump();
+        await tester.pumpAndSettle();
         expect(
           find.text('Profile: synthetic-profile', skipOffstage: false),
           findsNothing,
@@ -1833,7 +1849,10 @@ void main() {
         expect(
           tester
               .widget<OutlinedButton>(
-                find.byKey(const Key('client-renew-session')),
+                find.byKey(
+                  const Key('client-renew-session'),
+                  skipOffstage: false,
+                ),
               )
               .onPressed,
           isNull,
@@ -1846,8 +1865,8 @@ void main() {
         );
         expect(
           tester
-              .widget<OutlinedButton>(
-                find.byKey(const Key('client-disconnect')),
+              .widget<ButtonStyleButton>(
+                find.byKey(const Key('client-disconnect'), skipOffstage: false),
               )
               .onPressed,
           isNull,

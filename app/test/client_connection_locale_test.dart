@@ -126,6 +126,8 @@ void main() {
             final expected = locale == ClientLocale.en
                 ? [
                     'Disconnected',
+                    'Session actions',
+                    'No network selected',
                     'Connection details',
                     'Profile: profile-a',
                     'Account: Unknown',
@@ -147,6 +149,8 @@ void main() {
                   ]
                 : [
                     'Отключено',
+                    'Действия с сессией',
+                    'Сеть не выбрана',
                     'Сведения о подключении',
                     'Профиль: profile-a',
                     'Учётная запись: Неизвестно',

@@ -144,6 +144,50 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
               api.Availability.AVAILABILITY_AVAILABLE &&
           snapshot.status.session.state !=
               api.SessionState.SESSION_STATE_RENEWING;
+      final connectedColor = Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF36DC8C)
+          : const Color(0xFF087F46);
+      final connected =
+          ready &&
+          !blocked &&
+          snapshot.status.connectionPhase ==
+              api.ConnectionPhase.CONNECTION_PHASE_CONNECTED;
+      final showDisconnect =
+          _connecting ||
+          _disconnecting ||
+          (ready &&
+              {
+                api.ConnectionPhase.CONNECTION_PHASE_CONNECTED,
+                api.ConnectionPhase.CONNECTION_PHASE_CONNECTING,
+                api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTING,
+              }.contains(snapshot.status.connectionPhase));
+      final actions = <Widget>[
+        FilledButton(
+          key: const Key('client-connect'),
+          onPressed: canConnect
+              ? () => _run(_ClientAction.connect, snapshot)
+              : null,
+          child: Text(widget.locale.text(en: 'Connect', ru: 'Подключить')),
+        ),
+        FilledButton(
+          key: const Key('client-disconnect'),
+          // Disconnect stays available during connect, blocked recovery
+          // and stale intent. The producer owns authorization/policy.
+          onPressed: owner && profile && !_disconnecting
+              ? () => _run(_ClientAction.disconnect, snapshot)
+              : null,
+          child: Text(widget.locale.text(en: 'Disconnect', ru: 'Отключить')),
+        ),
+        OutlinedButton(
+          key: const Key('client-renew-session'),
+          onPressed: canRenew
+              ? () => _run(_ClientAction.renewSession, snapshot)
+              : null,
+          child: Text(
+            widget.locale.text(en: 'Renew session', ru: 'Продлить сессию'),
+          ),
+        ),
+      ];
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -151,57 +195,80 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Icon(
+                connected ? Icons.check_circle : Icons.power_settings_new,
+                color: connected
+                    ? connectedColor
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                size: 32,
+              ),
+              const SizedBox(height: 12),
               Semantics(
                 liveRegion: true,
                 child: Text(
                   _statusLabel(widget.state),
                   key: const Key('client-runtime-state'),
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: connected
+                        ? connectedColor
+                        : Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  FilledButton(
-                    key: const Key('client-connect'),
-                    onPressed: canConnect
-                        ? () => _run(_ClientAction.connect, snapshot)
-                        : null,
-                    child: Text(
-                      _connecting
-                          ? widget.locale.text(
-                              en: 'Submitting…',
-                              ru: 'Отправка…',
-                            )
-                          : widget.locale.text(en: 'Connect', ru: 'Подключить'),
-                    ),
+              if (profile) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  OutlinedButton(
-                    key: const Key('client-disconnect'),
-                    // Disconnect stays available during connect, blocked recovery
-                    // and stale intent. The producer owns authorization/policy.
-                    onPressed: owner && profile && !_disconnecting
-                        ? () => _run(_ClientAction.disconnect, snapshot)
-                        : null,
-                    child: Text(
-                      widget.locale.text(en: 'Disconnect', ru: 'Отключить'),
-                    ),
-                  ),
-                  OutlinedButton(
-                    key: const Key('client-renew-session'),
-                    onPressed: canRenew
-                        ? () => _run(_ClientAction.renewSession, snapshot)
-                        : null,
-                    child: Text(
-                      widget.locale.text(
-                        en: 'Renew session',
-                        ru: 'Продлить сессию',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.hub_outlined,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          snapshot.status.network.name.isNotEmpty
+                              ? snapshot.status.network.name
+                              : widget.locale.text(
+                                  en: 'No network selected',
+                                  ru: 'Сеть не выбрана',
+                                ),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              if (_connecting)
+                Text(widget.locale.text(en: 'Submitting…', ru: 'Отправка…')),
+              SizedBox(
+                width: double.infinity,
+                child: actions[showDisconnect ? 1 : 0],
+              ),
+              ExpansionTile(
+                key: const Key('client-session-actions'),
+                maintainState: true,
+                tilePadding: EdgeInsets.zero,
+                title: Text(
+                  widget.locale.text(
+                    en: 'Session actions',
+                    ru: 'Действия с сессией',
+                  ),
+                ),
+                children: [
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [actions[showDisconnect ? 0 : 1], actions[2]],
                   ),
                 ],
               ),

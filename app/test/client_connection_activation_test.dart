@@ -54,6 +54,13 @@ void main() {
           );
           final button = find.byKey(Key('client-$action'));
           await render(0);
+          if (button.evaluate().isEmpty) {
+            await tester.ensureVisible(
+              find.byKey(const Key('client-session-actions')),
+            );
+            await tester.tap(find.text('Session actions'));
+            await tester.pumpAndSettle();
+          }
           await tester.ensureVisible(button);
           await tester.tap(button);
           await tester.pump();
@@ -61,7 +68,21 @@ void main() {
           await render(1);
           // Returning to the original instance must not revive its old request.
           await render(0);
-          expect(tester.widget<ButtonStyleButton>(button).onPressed, isNotNull);
+          expect(
+            tester
+                .widget<ButtonStyleButton>(
+                  find.byKey(Key('client-$action'), skipOffstage: false),
+                )
+                .onPressed,
+            isNotNull,
+          );
+          if (button.evaluate().isEmpty) {
+            await tester.ensureVisible(
+              find.byKey(const Key('client-session-actions')),
+            );
+            await tester.tap(find.text('Session actions'));
+            await tester.pumpAndSettle();
+          }
           await tester.ensureVisible(button);
           await tester.tap(button);
           await tester.pump();
@@ -88,14 +109,28 @@ void main() {
             find.byKey(const Key('client-command-announcement')),
             findsNothing,
           );
-          expect(tester.widget<ButtonStyleButton>(button).onPressed, isNull);
+          expect(
+            tester
+                .widget<ButtonStyleButton>(
+                  find.byKey(Key('client-$action'), skipOffstage: false),
+                )
+                .onPressed,
+            isNull,
+          );
           fresh.complete(result);
           await tester.pumpAndSettle();
           expect(
             find.byKey(const Key('client-command-announcement')),
             findsOneWidget,
           );
-          expect(tester.widget<ButtonStyleButton>(button).onPressed, isNotNull);
+          expect(
+            tester
+                .widget<ButtonStyleButton>(
+                  find.byKey(Key('client-$action'), skipOffstage: false),
+                )
+                .onPressed,
+            isNotNull,
+          );
           await tester.pumpWidget(const SizedBox());
           await tester.runAsync(() async {
             for (var i = 0; i < 2; i++) {
@@ -312,7 +347,10 @@ void main() {
         expect(
           tester
                   .widget<OutlinedButton>(
-                    find.byKey(const Key('client-renew-session')),
+                    find.byKey(
+                      const Key('client-renew-session'),
+                      skipOffstage: false,
+                    ),
                   )
                   .onPressed !=
               null,
@@ -377,7 +415,9 @@ void main() {
           expect(state.link, ClientLinkState.ready);
 
           final queued = tester
-              .widget<ButtonStyleButton>(find.byKey(Key('client-$action')))
+              .widget<ButtonStyleButton>(
+                find.byKey(Key('client-$action'), skipOffstage: false),
+              )
               .onPressed!;
 
           if (change == 'duplicate') {

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'client_connection_panel.dart';
+import 'client_device_card.dart';
 import 'client_locale.dart';
 import 'client_session.dart';
 import 'client_recovery_panel.dart';
@@ -86,10 +87,6 @@ class ClientSessionPanel extends StatelessWidget {
         en: 'New profile',
         ru: 'Новый профиль',
       ),
-      ClientConnectionPanel() => locale.text(
-        en: 'Connection and session',
-        ru: 'Подключение и сессия',
-      ),
       ClientRecoveryPanel() => locale.text(
         en: 'Saved intentions',
         ru: 'Сохранённые намерения',
@@ -98,6 +95,23 @@ class ClientSessionPanel extends StatelessWidget {
       // These panels own their headings; notifications are supplied by the host.
       _ => null,
     };
+    if (panel is ClientCreateProfilePanel || panel is ClientEnrollmentPanel) {
+      final heading =
+          title ??
+          locale.text(en: 'Add this device', ru: 'Добавить устройство');
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Card(
+          child: ExpansionTile(
+            key: ValueKey('setup-${panel.runtimeType}'),
+            maintainState: true,
+            title: Semantics(header: true, child: Text(heading)),
+            childrenPadding: const EdgeInsets.all(20),
+            children: [panel],
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
       child: Column(
@@ -138,6 +152,73 @@ class ClientSessionPanel extends StatelessWidget {
     _ => ClientPage.settings,
   };
 
+  Widget _home(BuildContext context, List<Widget> panels) {
+    final connection = panels.whereType<ClientConnectionPanel>().single;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            locale.text(en: 'Connection', ru: 'Подключение'),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          locale.text(
+            en: 'Your private network, wherever you are',
+            ru: 'Ваша частная сеть всегда рядом',
+          ),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 24),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final left = Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _section(context, connection),
+                ClientDeviceCard(state: session.state, locale: locale),
+              ],
+            );
+            final right = ClientPeersPanel(
+              key: const ValueKey('home-peer-summary'),
+              compact: true,
+              locale: locale,
+              state: session.state,
+              load: (search) => session.listPeers(search: search),
+            );
+            // Wrap keeps both children mounted while adapting the column widths.
+            final twoColumns = constraints.maxWidth >= 840;
+            final width = twoColumns
+                ? (constraints.maxWidth - 24) / 2
+                : constraints.maxWidth;
+            return Wrap(
+              spacing: 24,
+              runSpacing: 20,
+              children: [
+                SizedBox(width: width, child: left),
+                SizedBox(width: width, child: right),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 24),
+        for (final panel in panels.where(
+          (panel) =>
+              _page(panel) == ClientPage.connection &&
+              panel is! ClientConnectionPanel,
+        ))
+          _section(context, panel),
+      ],
+    );
+  }
+
   int _order(Widget panel) => switch (panel) {
     ClientConnectionPanel() || ClientProfilesPanel() => 0,
     ClientCreateProfilePanel() || ClientNetworksPanel() => 1,
@@ -159,16 +240,20 @@ class ClientSessionPanel extends StatelessWidget {
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 960),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children:
-                    (panels
-                            .where((panel) => _page(panel) == destination)
-                            .toList()
-                          ..sort((a, b) => _order(a).compareTo(_order(b))))
-                        .map((panel) => _section(context, panel))
-                        .toList(),
-              ),
+              child: destination == ClientPage.connection
+                  ? _home(context, panels)
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children:
+                          (panels
+                                  .where((panel) => _page(panel) == destination)
+                                  .toList()
+                                ..sort(
+                                  (a, b) => _order(a).compareTo(_order(b)),
+                                ))
+                              .map((panel) => _section(context, panel))
+                              .toList(),
+                    ),
             ),
           ),
         ),

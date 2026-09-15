@@ -43,3 +43,22 @@ establish an Android/iOS VPN client: the mobile native runtime adapter, VPN
 permission/lifecycle integration, and device acceptance remain separate work.
 The existing Windows named-pipe transport and IPC v0 identity are unchanged.
 No Flutter SDK, dependency, application or protocol version is increased.
+
+
+## Appearance and home dashboard
+
+The default appearance is dark navy, with light and system modes available in
+Settings → Appearance. The choice is stored independently in the UI settings
+`theme` file and does not reconnect the runtime or change profiles.
+
+The home dashboard contains the authoritative connection state and primary
+Connect/Disconnect action, a device card, and a compact peer summary. At 840
+logical pixels of content width, the summary moves to a second column; smaller
+widths stack the cards. Registration forms, additional session actions and
+connection details are expandable. Expanded forms retain their state.
+
+The compact peer summary reads the native peer catalog when an authorized active
+profile becomes available and refreshes after relevant invalidations. Results
+from a previous profile, network or caller context are discarded. Peer path
+labels describe runtime observations, and are not fabricated online indicators.
+No sample devices or addresses are included in the application.

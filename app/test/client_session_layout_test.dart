@@ -109,7 +109,7 @@ void main() {
               'Enrollment cleanup',
               'Enroll the selected profile',
               'New profile',
-              'Connection and session',
+              'Connection',
               'Saved intentions',
               'Profiles',
             ]
@@ -126,7 +126,7 @@ void main() {
               'Удаление регистрации',
               'Зарегистрировать выбранный профиль',
               'Новый профиль',
-              'Подключение и сессия',
+              'Подключение',
               'Сохранённые намерения',
               'Профили',
             ];
@@ -151,6 +151,16 @@ void main() {
         final heading = headings[i];
         page.value = destinations[i];
         await tester.pumpAndSettle();
+        if (i == 10) {
+          final setup = find.byKey(
+            const ValueKey('setup-ClientEnrollmentPanel'),
+          );
+          await tester.ensureVisible(setup);
+          await tester.tap(
+            find.descendant(of: setup, matching: find.byType(ListTile)).first,
+          );
+          await tester.pumpAndSettle();
+        }
         final target = find.text(heading);
         expect(target, findsOneWidget);
         await tester.ensureVisible(target);
@@ -170,6 +180,15 @@ void main() {
         find.byKey(const Key('client-connection-details')),
       );
       await tester.tap(find.byKey(const Key('client-connection-details')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('client-session-actions')),
+      );
+      await tester.tap(
+        find.text(
+          locale == ClientLocale.en ? 'Session actions' : 'Действия с сессией',
+        ),
+      );
       await tester.pumpAndSettle();
       for (final key in [
         'client-session-state',
