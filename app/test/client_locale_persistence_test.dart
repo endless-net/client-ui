@@ -107,6 +107,8 @@ void main() {
         expect(writes, [ClientLocale.ru, ClientLocale.en]);
         expect(find.textContaining('could not be read or saved'), findsNothing);
       } else if (scenario.startsWith('quit ')) {
+        await tester.tap(find.byKey(const ValueKey('page-settings')));
+        await tester.pumpAndSettle();
         final oldChoice = tester
             .widget<DropdownButton<ClientLocale>>(
               find.byKey(const Key('client-ui-language')),

@@ -10,10 +10,11 @@ import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'client_session.dart';
+import 'client_adaptive_shell.dart';
+import 'client_state_controller.dart';
 import 'client_locale.dart';
 import 'client_bundle_destination.dart';
 import 'client_session_panel.dart';
-import 'client_state_controller.dart';
 import 'client_tray.dart';
 import 'client_tray_host.dart';
 import 'client_notification_delivery.dart';
@@ -22,7 +23,6 @@ import 'client_notification_permission_panel.dart';
 import 'client_native_notifications.dart';
 import 'client_autostart_panel.dart';
 import 'client_autostart_setting.dart';
-import 'client_windows_autostart.dart';
 
 Directory clientJournalDirectory(String endpoint) {
   final home =
@@ -94,6 +94,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   Timer? _signals;
   DateTime? _lastSignal;
   bool _busy = false;
+  ClientPage _page = ClientPage.connection;
   bool _wasHidden = false;
   bool _resumePending = false;
   bool _exiting = false;
@@ -684,153 +685,137 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     navigatorKey: _navigator,
     title: 'EndlessNet',
-    theme: ThemeData(useMaterial3: true),
-    home: Scaffold(
-      appBar: AppBar(title: const Text('EndlessNet')),
-      body: Column(
+    theme: ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF2463EB),
+        primary: const Color(0xFF1864F2),
+        secondaryContainer: const Color(0xFFE3EDFF),
+        surface: Colors.white,
+      ),
+      scaffoldBackgroundColor: const Color(0xFFF4F7FB),
+      cardTheme: const CardThemeData(
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+          side: BorderSide(color: Color(0xFFE1E7F0)),
+        ),
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        border: OutlineInputBorder(),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+    ),
+    home: ClientAdaptiveShell(
+      locale: _locale,
+      page: _page,
+      onPageChanged: (page) => setState(() => _page = page),
+      languageSelector: DropdownButtonHideUnderline(
+        child: DropdownButton<ClientLocale>(
+          key: const Key('client-ui-language'),
+          value: _locale,
+          items: const [
+            DropdownMenuItem(value: ClientLocale.en, child: Text('English')),
+            DropdownMenuItem(value: ClientLocale.ru, child: Text('Русский')),
+          ],
+          onChanged: _busy
+              ? null
+              : (value) {
+                  if (value != null) _chooseLocale(value);
+                },
+        ),
+      ),
+      notices: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Flexible(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  Wrap(
-                    children: [
-                      TextButton(
-                        onPressed: _busy ? null : _connect,
-                        child: Text(
-                          _text(
-                            'Reconnect runtime',
-                            'Переподключиться к службе',
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _busy ? null : _quit,
-                        child: Text(_text('Quit', 'Выход')),
-                      ),
-                    ],
-                  ),
-                  Semantics(
-                    label: _text('Interface language', 'Язык интерфейса'),
-                    child: DropdownButton<ClientLocale>(
-                      key: const Key('client-ui-language'),
-                      value: _locale,
-                      items: const [
-                        DropdownMenuItem(
-                          value: ClientLocale.en,
-                          child: Text('English'),
-                        ),
-                        DropdownMenuItem(
-                          value: ClientLocale.ru,
-                          child: Text('Русский'),
-                        ),
-                      ],
-                      onChanged: _busy
-                          ? null
-                          : (value) {
-                              if (value != null && value != _locale) {
-                                _chooseLocale(value);
-                              }
-                            },
-                    ),
-                  ),
-                  if (_notice != null)
-                    Semantics(liveRegion: true, child: Text(_noticeText)),
-                  if (widget.desktopIntegration && !_trayReady)
-                    TextButton(
-                      key: const Key('client-restore-tray'),
-                      onPressed: _busy || _exiting || _trayRegistering
-                          ? null
-                          : _registerTray,
-                      child: Text(
-                        _text(
-                          'Restore tray icon',
-                          'Восстановить значок в трее',
-                        ),
-                      ),
-                    ),
-                  if (_localeStorageFailed)
-                    Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        _text(
-                          'The language setting could not be read or saved. Your current choice applies to this session.',
-                          'Не удалось прочитать или сохранить язык. Текущий выбор действует в этом запуске.',
-                        ),
-                      ),
-                    ),
-                  AnimatedBuilder(
-                    animation: _tray,
-                    builder: (context, _) => _tray.notice == null
-                        ? const SizedBox.shrink()
-                        : Text(_tray.notice!),
-                  ),
-                  AnimatedBuilder(
-                    animation: session.state,
-                    builder: (context, _) => Text(
-                      _text(
-                        'Runtime: ${session.state.link.name}',
-                        'Служба: ${switch (session.state.link) {
-                          ClientLinkState.disconnected => 'отключена',
-                          ClientLinkState.awaitingSnapshot => 'ожидание состояния',
-                          ClientLinkState.ready => 'готова',
-                          ClientLinkState.unavailable => 'недоступна',
-                        }}',
-                      ),
-                    ),
-                  ),
-                ],
+          if (_notice != null)
+            Semantics(liveRegion: true, child: Text(_noticeText)),
+          if (widget.desktopIntegration && !_trayReady)
+            TextButton(
+              key: const Key('client-restore-tray'),
+              onPressed: _busy || _exiting || _trayRegistering
+                  ? null
+                  : _registerTray,
+              child: Text(
+                _text('Restore tray icon', 'Восстановить значок в трее'),
               ),
             ),
-          ),
-          Expanded(
-            child: ClientSessionPanel(
-              locale: _locale,
-              session: session,
-              uiBuild: widget.uiBuild,
-              notifications: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (widget.openWindowsAutostartSettings != null)
-                    ClientWindowsAutostartPanel(
-                      openSettings: widget.openWindowsAutostartSettings!,
-                      locale: _locale,
-                      enabled: !_busy,
-                    ),
-                  if (widget.readAutostart != null &&
-                      widget.writeAutostart != null)
-                    ClientAutostartPanel(
-                      read: widget.readAutostart!,
-                      openSettings: widget.openAutostartSettings,
-                      write: _writeAutostart,
-                      locale: _locale,
-                      enabled: !_busy,
-                    ),
-                  if (widget.requestNotificationPermission != null)
-                    ClientNotificationPermissionPanel(
-                      request: widget.requestNotificationPermission!,
-                      locale: _locale,
-                      enabled: !_busy,
-                    ),
-                  ClientNotificationsPanel(
-                    delivery: _notifications,
-                    supported: widget.deliverNotification != null,
-                    locale: _locale,
-                    busy: _busy,
-                    onChanged: _chooseNotifications,
-                    persistent: widget.saveNotifications != null,
-                    storageFailed: _notificationStorageFailed,
-                  ),
-                ],
+          if (_localeStorageFailed)
+            Text(
+              _text(
+                'The language setting could not be read or saved. Your current choice applies to this session.',
+                'Не удалось прочитать или сохранить язык. Текущий выбор действует в этом запуске.',
               ),
-              exportBundle:
-                  widget.desktopIntegration &&
-                      supportsClientBundleDestination(Platform.operatingSystem)
-                  ? _exportBundle
-                  : null,
             ),
+          AnimatedBuilder(
+            animation: _tray,
+            builder: (context, _) => _tray.notice == null
+                ? const SizedBox.shrink()
+                : Text(_tray.notice!),
           ),
         ],
+      ),
+      body: ClientSessionPanel(
+        page: _page,
+        locale: _locale,
+        session: session,
+        uiBuild: widget.uiBuild,
+        notifications: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                TextButton(
+                  onPressed: _busy ? null : _connect,
+                  child: Text(
+                    _text('Reconnect runtime', 'Переподключиться к службе'),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _busy ? null : _quit,
+                  child: Text(_text('Quit', 'Выход')),
+                ),
+              ],
+            ),
+            if (widget.readAutostart != null && widget.writeAutostart != null)
+              ClientAutostartPanel(
+                read: widget.readAutostart!,
+                openSettings:
+                    widget.openAutostartSettings ??
+                    widget.openWindowsAutostartSettings,
+                write: _writeAutostart,
+                locale: _locale,
+                enabled: !_busy,
+              ),
+            if (widget.requestNotificationPermission != null)
+              ClientNotificationPermissionPanel(
+                request: widget.requestNotificationPermission!,
+                locale: _locale,
+                enabled: !_busy,
+              ),
+            ClientNotificationsPanel(
+              delivery: _notifications,
+              supported: widget.deliverNotification != null,
+              locale: _locale,
+              busy: _busy,
+              onChanged: _chooseNotifications,
+              persistent: widget.saveNotifications != null,
+              storageFailed: _notificationStorageFailed,
+            ),
+          ],
+        ),
+        exportBundle:
+            widget.desktopIntegration &&
+                supportsClientBundleDestination(Platform.operatingSystem)
+            ? _exportBundle
+            : null,
       ),
     ),
   );

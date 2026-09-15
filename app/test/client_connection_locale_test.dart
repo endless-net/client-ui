@@ -76,8 +76,12 @@ void main() {
           await render(initialLocale);
           source.add(_snapshot(1));
           await tester.pumpAndSettle();
-          await tester.ensureVisible(find.byKey(const Key('client-connect')));
-          await tester.tap(find.byKey(const Key('client-connect')));
+          await tester.ensureVisible(
+            find.byKey(const Key('client-connect'), skipOffstage: false),
+          );
+          await tester.tap(
+            find.byKey(const Key('client-connect'), skipOffstage: false),
+          );
           await tester.pump();
           expect(calls, 1);
           expect(
@@ -122,6 +126,7 @@ void main() {
             final expected = locale == ClientLocale.en
                 ? [
                     'Disconnected',
+                    'Connection details',
                     'Profile: profile-a',
                     'Account: Unknown',
                     'Network: Unknown',
@@ -142,6 +147,7 @@ void main() {
                   ]
                 : [
                     'Отключено',
+                    'Сведения о подключении',
                     'Профиль: profile-a',
                     'Учётная запись: Неизвестно',
                     'Сеть: Неизвестно',
@@ -164,7 +170,8 @@ void main() {
                 .widgetList<Text>(
                   find.descendant(
                     of: find.byType(ClientConnectionPanel),
-                    matching: find.byType(Text),
+                    matching: find.byType(Text, skipOffstage: false),
+                    skipOffstage: false,
                   ),
                 )
                 .map((text) => text.data);
@@ -172,7 +179,10 @@ void main() {
             expect(
               tester
                   .widget<Semantics>(
-                    find.byKey(const Key('client-command-announcement')),
+                    find.byKey(
+                      const Key('client-command-announcement'),
+                      skipOffstage: false,
+                    ),
                   )
                   .properties
                   .liveRegion,
@@ -253,7 +263,11 @@ void _projectionTests() {
         source.add(event);
         await tester.pumpAndSettle();
         expect(
-          tester.widget<Text>(find.byKey(Key(data['key'] as String))).data,
+          tester
+              .widget<Text>(
+                find.byKey(Key(data['key'] as String), skipOffstage: false),
+              )
+              .data,
           data[locale.name],
         );
         expect(tester.takeException(), isNull);

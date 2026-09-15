@@ -41,6 +41,8 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('page-settings')));
+          await tester.pumpAndSettle();
           final quit = find.text(locale == ClientLocale.ru ? 'Выход' : 'Quit');
           await tester.ensureVisible(quit);
           await tester.tap(quit);

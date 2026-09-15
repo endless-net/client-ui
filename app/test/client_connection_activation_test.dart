@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 // Deliberately retain a callback to simulate queued activation from an older
 // frame. This does not replace platform keyboard/hit-test acceptance.
 void main() {
+  Finder detail(String text) => find.text(text, skipOffstage: false);
   for (final action in ['connect', 'disconnect', 'renew-session']) {
     for (final failed in [false, true]) {
       testWidgets(
@@ -157,18 +158,15 @@ void main() {
     });
     source.add(event);
     await tester.pump();
+    expect(detail('Required action: Continue in your browser'), findsOneWidget);
     expect(
-      find.text('Required action: Continue in your browser'),
-      findsOneWidget,
-    );
-    expect(
-      find.text(
+      detail(
         'Recovery: Permission required. Action owner: Device administrator.',
       ),
       findsOneWidget,
     );
     expect(
-      find.text(
+      detail(
         'Runtime issue: Blocked by policy. Action owner: Access administrator.',
       ),
       findsOneWidget,
@@ -280,26 +278,27 @@ void main() {
           });
         }
         source.add(event);
-        await tester.pump();
+        await tester.pumpAndSettle();
         expect(state.link, ClientLinkState.ready);
+
         expect(
-          find.text('Session state: ${sessionLabels[session]}'),
+          detail('Session state: ${sessionLabels[session]}'),
           findsOneWidget,
         );
         expect(
-          find.text('Credential state: ${credentialLabels[credential]}'),
+          detail('Credential state: ${credentialLabels[credential]}'),
           findsOneWidget,
         );
-        expect(find.text('Session expiry: Unknown'), findsOneWidget);
-        expect(find.text('Credential expiry: Unknown'), findsOneWidget);
+        expect(detail('Session expiry: Unknown'), findsOneWidget);
+        expect(detail('Credential expiry: Unknown'), findsOneWidget);
         expect(
-          find.text(
+          detail(
             'Session warning: ${credential == 0 ? 'Unknown' : '2000-01-01T00:00:00.000Z'}',
           ),
           findsOneWidget,
         );
         expect(
-          find.text(
+          detail(
             'Credential warning: ${credential == 0 ? 'Unknown' : '2031-02-03T04:05:06.000Z'}',
           ),
           findsOneWidget,
@@ -309,7 +308,7 @@ void main() {
             : session == 5
             ? 'In progress'
             : renewalLabels[credential];
-        expect(find.text('Session renewal: $renewal'), findsOneWidget);
+        expect(detail('Session renewal: $renewal'), findsOneWidget);
         expect(
           tester
                   .widget<OutlinedButton>(
@@ -376,6 +375,7 @@ void main() {
           source.add(snapshot);
           await tester.pump();
           expect(state.link, ClientLinkState.ready);
+
           final queued = tester
               .widget<ButtonStyleButton>(find.byKey(Key('client-$action')))
               .onPressed!;

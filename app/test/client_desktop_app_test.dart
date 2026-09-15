@@ -282,6 +282,8 @@ void main() {
           client.requests,
           isEmpty,
         ); // Launch is not quit or runtime start.
+        await tester.tap(find.byKey(const ValueKey('page-settings')));
+        await tester.pumpAndSettle();
         final quit = tester
             .widget<TextButton>(find.widgetWithText(TextButton, 'Quit'))
             .onPressed!;
@@ -335,10 +337,26 @@ void main() {
     );
     await tester.pump();
     expect(find.byType(ClientSessionPanel), findsOneWidget);
-    expect(find.text('Runtime: awaitingSnapshot'), findsOneWidget);
+    expect(find.text('Waiting for runtime snapshot…'), findsOneWidget);
     connection.events.add(fixtures.snapshot());
     await tester.pump();
-    expect(find.text('Runtime: ready'), findsOneWidget);
+    expect(find.text('Waiting for runtime snapshot…'), findsNothing);
+    expect(find.byKey(const Key('client-runtime-state')), findsOneWidget);
+    expect(
+      find.byKey(const Key('client-connect')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('client-ui-notifications')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('page-settings')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('client-ui-notifications')), findsOneWidget);
+    expect(find.byKey(const Key('client-connect')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('page-connection')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('client-connect')).hitTestable(),
+      findsOneWidget,
+    );
     await connection.events.close();
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(session.close);
@@ -365,6 +383,8 @@ void main() {
     await tester.pump();
     expect(find.textContaining('No fallback was used'), findsOneWidget);
     expect(find.textContaining('private endpoint'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('page-settings')));
+    await tester.pumpAndSettle();
     expect(attempts, 1);
     await tester.pumpAndSettle();
     expect(

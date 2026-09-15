@@ -86,11 +86,11 @@ void main() {
           );
           await tester.pumpAndSettle();
           final localizedContext = tester.element(
-            find.byType(ClientSessionPanel),
+            find.byType(ClientSessionPanel, skipOffstage: false),
           );
           expect(Localizations.localeOf(localizedContext), Locale(locale.name));
           final notifications = tester.widget<ClientNotificationsPanel>(
-            find.byType(ClientNotificationsPanel),
+            find.byType(ClientNotificationsPanel, skipOffstage: false),
           );
           expect(notifications.locale, locale);
           expect(notifications.supported, isFalse);
@@ -115,68 +115,95 @@ void main() {
           );
           expect(
             tester
-                .widget<ClientSessionPanel>(find.byType(ClientSessionPanel))
+                .widget<ClientSessionPanel>(
+                  find.byType(ClientSessionPanel, skipOffstage: false),
+                )
                 .locale,
             locale,
           );
           final locales = [
             tester
-                .widget<ClientSupportPanel>(find.byType(ClientSupportPanel))
+                .widget<ClientSupportPanel>(
+                  find.byType(ClientSupportPanel, skipOffstage: false),
+                )
                 .locale,
             tester
-                .widget<ClientUpdatePanel>(find.byType(ClientUpdatePanel))
+                .widget<ClientUpdatePanel>(
+                  find.byType(ClientUpdatePanel, skipOffstage: false),
+                )
                 .locale,
-            tester.widget<ClientExitPanel>(find.byType(ClientExitPanel)).locale,
             tester
-                .widget<ClientResourcesPanel>(find.byType(ClientResourcesPanel))
+                .widget<ClientExitPanel>(
+                  find.byType(ClientExitPanel, skipOffstage: false),
+                )
+                .locale,
+            tester
+                .widget<ClientResourcesPanel>(
+                  find.byType(ClientResourcesPanel, skipOffstage: false),
+                )
                 .locale,
             tester
                 .widget<ClientPreferencesPanel>(
-                  find.byType(ClientPreferencesPanel),
+                  find.byType(ClientPreferencesPanel, skipOffstage: false),
                 )
                 .locale,
             tester
                 .widget<ClientDiagnosticsPanel>(
-                  find.byType(ClientDiagnosticsPanel),
+                  find.byType(ClientDiagnosticsPanel, skipOffstage: false),
                 )
                 .locale,
             tester
-                .widget<ClientIdentityPanel>(find.byType(ClientIdentityPanel))
+                .widget<ClientIdentityPanel>(
+                  find.byType(ClientIdentityPanel, skipOffstage: false),
+                )
                 .locale,
             tester
-                .widget<ClientNetworksPanel>(find.byType(ClientNetworksPanel))
+                .widget<ClientNetworksPanel>(
+                  find.byType(ClientNetworksPanel, skipOffstage: false),
+                )
                 .locale,
             tester
-                .widget<ClientPeersPanel>(find.byType(ClientPeersPanel))
+                .widget<ClientPeersPanel>(
+                  find.byType(ClientPeersPanel, skipOffstage: false),
+                )
                 .locale,
             tester
-                .widget<ClientCleanupPanel>(find.byType(ClientCleanupPanel))
+                .widget<ClientCleanupPanel>(
+                  find.byType(ClientCleanupPanel, skipOffstage: false),
+                )
                 .locale,
             tester
                 .widget<ClientEnrollmentPanel>(
-                  find.byType(ClientEnrollmentPanel),
+                  find.byType(ClientEnrollmentPanel, skipOffstage: false),
                 )
                 .locale,
             tester
                 .widget<ClientCreateProfilePanel>(
-                  find.byType(ClientCreateProfilePanel),
+                  find.byType(ClientCreateProfilePanel, skipOffstage: false),
                 )
                 .locale,
             tester
                 .widget<ClientConnectionPanel>(
-                  find.byType(ClientConnectionPanel),
+                  find.byType(ClientConnectionPanel, skipOffstage: false),
                 )
                 .locale,
             tester
                 .widget<ClientRuntimeOperationsPanel>(
-                  find.byType(ClientRuntimeOperationsPanel),
+                  find.byType(
+                    ClientRuntimeOperationsPanel,
+                    skipOffstage: false,
+                  ),
                 )
                 .locale,
             tester
-                .widget<ClientRecoveryPanel>(find.byType(ClientRecoveryPanel))
+                .widget<ClientRecoveryPanel>(
+                  find.byType(ClientRecoveryPanel, skipOffstage: false),
+                )
                 .locale,
             tester
-                .widget<ClientProfilesPanel>(find.byType(ClientProfilesPanel))
+                .widget<ClientProfilesPanel>(
+                  find.byType(ClientProfilesPanel, skipOffstage: false),
+                )
                 .locale,
           ];
           expect(locales, List.filled(16, locale));
@@ -216,11 +243,15 @@ void main() {
               locale == ClientLocale.ru
                   ? 'Переподключиться к службе'
                   : 'Reconnect runtime',
+              skipOffstage: false,
             ),
             findsOneWidget,
           );
           expect(
-            find.text(locale == ClientLocale.ru ? 'Выход' : 'Quit'),
+            find.text(
+              locale == ClientLocale.ru ? 'Выход' : 'Quit',
+              skipOffstage: false,
+            ),
             findsOneWidget,
           );
           expect(find.textContaining('private endpoint'), findsNothing);
@@ -261,6 +292,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       final ru = initial == ClientLocale.ru;
+      await tester.tap(find.byKey(const ValueKey('page-settings')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text(ru ? 'Выход' : 'Quit'));
       await tester.pumpAndSettle();
       final texts = tester

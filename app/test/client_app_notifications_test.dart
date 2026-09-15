@@ -47,6 +47,8 @@ void main() {
       snapshot.snapshot.runtime.callerAccess = api.Access.ACCESS_OBSERVER;
       connection.events.add(snapshot);
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('page-settings')));
+      await tester.pumpAndSettle();
       final toggle = find.byKey(const Key('client-ui-notifications'));
       final oldChoice = tester.widget<SwitchListTile>(toggle).onChanged!;
       oldChoice(true);
@@ -123,12 +125,16 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('page-settings')));
+      await tester.pumpAndSettle();
       expect(saved, isEmpty);
       ClientNotificationsPanel panel() =>
           tester.widget(find.byType(ClientNotificationsPanel));
       expect(panel().delivery.enabled, isTrue);
       expect(panel().persistent, isTrue);
       expect(panel().storageFailed, fail);
+      await tester.tap(find.byKey(const ValueKey('page-settings')));
+      await tester.pumpAndSettle();
       final toggle = find.byKey(const Key('client-ui-notifications'));
       await tester.tap(toggle);
       await tester.pumpAndSettle();
@@ -182,6 +188,8 @@ void main() {
       connection.events.add(value);
       await tester.pumpAndSettle();
       expect(deliveries, 0);
+      await tester.tap(find.byKey(const ValueKey('page-settings')));
+      await tester.pumpAndSettle();
       final toggle = find.byKey(const Key('client-ui-notifications'));
       await tester.ensureVisible(toggle);
       await tester.tap(toggle);

@@ -156,129 +156,11 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                 child: Text(
                   _statusLabel(widget.state),
                   key: const Key('client-runtime-state'),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-              if (ready && !owner)
-                Text(
-                  widget.locale.text(
-                    en: 'An installation owner is required to control this device.',
-                    ru: 'Для управления устройством требуется владелец установки.',
-                  ),
-                ),
-              if (owner && profile)
-                Text(
-                  widget.locale.text(
-                    en: 'Profile: ${snapshot.status.activeProfileId}',
-                    ru: 'Профиль: ${snapshot.status.activeProfileId}',
-                  ),
-                ),
-              if (owner && profile) ...[
-                if (snapshot.status.hasPendingAction())
-                  Text(
-                    widget.locale.text(
-                      en: 'Required action: ${clientRequiredActionLabel(snapshot.status.pendingAction.kind, locale: widget.locale)}',
-                      ru: 'Необходимое действие: ${clientRequiredActionLabel(snapshot.status.pendingAction.kind, locale: widget.locale)}',
-                    ),
-                    key: const Key('client-status-required-action'),
-                  ),
-                if (snapshot.status.recovery.hasFailure())
-                  Text(
-                    widget.locale.text(
-                      en: 'Recovery: ${clientFailureLabel(snapshot.status.recovery.failure.code, locale: widget.locale)}. Action owner: ${clientActionOwnerLabel(snapshot.status.recovery.failure.actionOwner, locale: widget.locale)}.',
-                      ru: 'Восстановление: ${clientFailureLabel(snapshot.status.recovery.failure.code, locale: widget.locale)}. Ответственный за действие: ${clientActionOwnerLabel(snapshot.status.recovery.failure.actionOwner, locale: widget.locale)}.',
-                    ),
-                    key: const Key('client-status-recovery-failure'),
-                  ),
-                for (final failure in snapshot.status.failures)
-                  Text(
-                    widget.locale.text(
-                      en: 'Runtime issue: ${clientFailureLabel(failure.code, locale: widget.locale)}. Action owner: ${clientActionOwnerLabel(failure.actionOwner, locale: widget.locale)}.',
-                      ru: 'Проблема службы: ${clientFailureLabel(failure.code, locale: widget.locale)}. Ответственный за действие: ${clientActionOwnerLabel(failure.actionOwner, locale: widget.locale)}.',
-                    ),
-                  ),
-                Text(
-                  widget.locale.text(
-                    en: 'Account: ${_contextValue(snapshot.status.accountId)}',
-                    ru: 'Учётная запись: ${_contextValue(snapshot.status.accountId)}',
-                  ),
-                  key: const Key('client-context-account'),
-                ),
-                Text(
-                  widget.locale.text(
-                    en: 'Network: ${_contextValue(snapshot.status.network.name)}',
-                    ru: 'Сеть: ${_contextValue(snapshot.status.network.name)}',
-                  ),
-                  key: const Key('client-context-network'),
-                ),
-                Text(
-                  widget.locale.text(
-                    en: 'Network ID: ${_contextValue(snapshot.status.network.id)}',
-                    ru: 'Идентификатор сети: ${_contextValue(snapshot.status.network.id)}',
-                  ),
-                ),
-                Text(
-                  widget.locale.text(
-                    en: 'Device: ${_contextValue(snapshot.status.hostname)}',
-                    ru: 'Устройство: ${_contextValue(snapshot.status.hostname)}',
-                  ),
-                  key: const Key('client-context-device'),
-                ),
-                Text(
-                  widget.locale.text(
-                    en: 'Device ID: ${_contextValue(snapshot.status.nodeId)}',
-                    ru: 'Идентификатор устройства: ${_contextValue(snapshot.status.nodeId)}',
-                  ),
-                ),
-                Text(
-                  widget.locale.text(
-                    en: 'Session state: ${_sessionState(snapshot.status.session.state)}',
-                    ru: 'Состояние сессии: ${_sessionState(snapshot.status.session.state)}',
-                  ),
-                  key: const Key('client-session-state'),
-                ),
-                Text(
-                  widget.locale.text(
-                    en: 'Session expiry: ${snapshot.status.session.hasExpiresAt() ? _deadline(snapshot.status.session.expiresAt.seconds.toInt(), snapshot.status.session.expiresAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
-                    ru: 'Срок сессии: ${snapshot.status.session.hasExpiresAt() ? _deadline(snapshot.status.session.expiresAt.seconds.toInt(), snapshot.status.session.expiresAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
-                  ),
-                  key: const Key('client-session-expiry'),
-                ),
-                Text(
-                  widget.locale.text(
-                    en: 'Session warning: ${snapshot.status.session.hasWarningAt() ? _deadline(snapshot.status.session.warningAt.seconds.toInt(), snapshot.status.session.warningAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
-                    ru: 'Предупреждение о сессии: ${snapshot.status.session.hasWarningAt() ? _deadline(snapshot.status.session.warningAt.seconds.toInt(), snapshot.status.session.warningAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
-                  ),
-                  key: const Key('client-session-warning'),
-                ),
-                Text(
-                  widget.locale.text(
-                    en: 'Session renewal: ${_renewalStatus(snapshot)}',
-                    ru: 'Продление сессии: ${_renewalStatus(snapshot)}',
-                  ),
-                  key: const Key('client-session-renewal-status'),
-                ),
-                Text(
-                  widget.locale.text(
-                    en: 'Credential state: ${_credentialState(snapshot.status.credential.state)}',
-                    ru: 'Состояние учётных данных: ${_credentialState(snapshot.status.credential.state)}',
-                  ),
-                  key: const Key('client-credential-state'),
-                ),
-                Text(
-                  widget.locale.text(
-                    en: 'Credential expiry: ${snapshot.status.credential.hasExpiresAt() ? _deadline(snapshot.status.credential.expiresAt.seconds.toInt(), snapshot.status.credential.expiresAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
-                    ru: 'Срок учётных данных: ${snapshot.status.credential.hasExpiresAt() ? _deadline(snapshot.status.credential.expiresAt.seconds.toInt(), snapshot.status.credential.expiresAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
-                  ),
-                  key: const Key('client-credential-expiry'),
-                ),
-                Text(
-                  widget.locale.text(
-                    en: 'Credential warning: ${snapshot.status.credential.hasWarningAt() ? _deadline(snapshot.status.credential.warningAt.seconds.toInt(), snapshot.status.credential.warningAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
-                    ru: 'Предупреждение об учётных данных: ${snapshot.status.credential.hasWarningAt() ? _deadline(snapshot.status.credential.warningAt.seconds.toInt(), snapshot.status.credential.warningAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
-                  ),
-                  key: const Key('client-credential-warning'),
-                ),
-              ],
               const SizedBox(height: 12),
               Wrap(
                 spacing: 12,
@@ -323,6 +205,142 @@ class _ClientConnectionPanelState extends State<ClientConnectionPanel> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              if (ready && !owner)
+                Text(
+                  widget.locale.text(
+                    en: 'An installation owner is required to control this device.',
+                    ru: 'Для управления устройством требуется владелец установки.',
+                  ),
+                ),
+              if (owner && profile) ...[
+                if (snapshot.status.hasPendingAction())
+                  Text(
+                    widget.locale.text(
+                      en: 'Required action: ${clientRequiredActionLabel(snapshot.status.pendingAction.kind, locale: widget.locale)}',
+                      ru: 'Необходимое действие: ${clientRequiredActionLabel(snapshot.status.pendingAction.kind, locale: widget.locale)}',
+                    ),
+                    key: const Key('client-status-required-action'),
+                  ),
+                if (snapshot.status.recovery.hasFailure())
+                  Text(
+                    widget.locale.text(
+                      en: 'Recovery: ${clientFailureLabel(snapshot.status.recovery.failure.code, locale: widget.locale)}. Action owner: ${clientActionOwnerLabel(snapshot.status.recovery.failure.actionOwner, locale: widget.locale)}.',
+                      ru: 'Восстановление: ${clientFailureLabel(snapshot.status.recovery.failure.code, locale: widget.locale)}. Ответственный за действие: ${clientActionOwnerLabel(snapshot.status.recovery.failure.actionOwner, locale: widget.locale)}.',
+                    ),
+                    key: const Key('client-status-recovery-failure'),
+                  ),
+                for (final failure in snapshot.status.failures)
+                  Text(
+                    widget.locale.text(
+                      en: 'Runtime issue: ${clientFailureLabel(failure.code, locale: widget.locale)}. Action owner: ${clientActionOwnerLabel(failure.actionOwner, locale: widget.locale)}.',
+                      ru: 'Проблема службы: ${clientFailureLabel(failure.code, locale: widget.locale)}. Ответственный за действие: ${clientActionOwnerLabel(failure.actionOwner, locale: widget.locale)}.',
+                    ),
+                  ),
+                ExpansionTile(
+                  key: const Key('client-connection-details'),
+                  maintainState: true,
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(bottom: 12),
+                  expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                  title: Text(
+                    widget.locale.text(
+                      en: 'Connection details',
+                      ru: 'Сведения о подключении',
+                    ),
+                  ),
+                  children: [
+                    Text(
+                      widget.locale.text(
+                        en: 'Profile: ${snapshot.status.activeProfileId}',
+                        ru: 'Профиль: ${snapshot.status.activeProfileId}',
+                      ),
+                    ),
+                    Text(
+                      widget.locale.text(
+                        en: 'Account: ${_contextValue(snapshot.status.accountId)}',
+                        ru: 'Учётная запись: ${_contextValue(snapshot.status.accountId)}',
+                      ),
+                      key: const Key('client-context-account'),
+                    ),
+                    Text(
+                      widget.locale.text(
+                        en: 'Network: ${_contextValue(snapshot.status.network.name)}',
+                        ru: 'Сеть: ${_contextValue(snapshot.status.network.name)}',
+                      ),
+                      key: const Key('client-context-network'),
+                    ),
+                    Text(
+                      widget.locale.text(
+                        en: 'Network ID: ${_contextValue(snapshot.status.network.id)}',
+                        ru: 'Идентификатор сети: ${_contextValue(snapshot.status.network.id)}',
+                      ),
+                    ),
+                    Text(
+                      widget.locale.text(
+                        en: 'Device: ${_contextValue(snapshot.status.hostname)}',
+                        ru: 'Устройство: ${_contextValue(snapshot.status.hostname)}',
+                      ),
+                      key: const Key('client-context-device'),
+                    ),
+                    Text(
+                      widget.locale.text(
+                        en: 'Device ID: ${_contextValue(snapshot.status.nodeId)}',
+                        ru: 'Идентификатор устройства: ${_contextValue(snapshot.status.nodeId)}',
+                      ),
+                    ),
+                    Text(
+                      widget.locale.text(
+                        en: 'Session state: ${_sessionState(snapshot.status.session.state)}',
+                        ru: 'Состояние сессии: ${_sessionState(snapshot.status.session.state)}',
+                      ),
+                      key: const Key('client-session-state'),
+                    ),
+                    Text(
+                      widget.locale.text(
+                        en: 'Session expiry: ${snapshot.status.session.hasExpiresAt() ? _deadline(snapshot.status.session.expiresAt.seconds.toInt(), snapshot.status.session.expiresAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                        ru: 'Срок сессии: ${snapshot.status.session.hasExpiresAt() ? _deadline(snapshot.status.session.expiresAt.seconds.toInt(), snapshot.status.session.expiresAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                      ),
+                      key: const Key('client-session-expiry'),
+                    ),
+                    Text(
+                      widget.locale.text(
+                        en: 'Session warning: ${snapshot.status.session.hasWarningAt() ? _deadline(snapshot.status.session.warningAt.seconds.toInt(), snapshot.status.session.warningAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                        ru: 'Предупреждение о сессии: ${snapshot.status.session.hasWarningAt() ? _deadline(snapshot.status.session.warningAt.seconds.toInt(), snapshot.status.session.warningAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                      ),
+                      key: const Key('client-session-warning'),
+                    ),
+                    Text(
+                      widget.locale.text(
+                        en: 'Session renewal: ${_renewalStatus(snapshot)}',
+                        ru: 'Продление сессии: ${_renewalStatus(snapshot)}',
+                      ),
+                      key: const Key('client-session-renewal-status'),
+                    ),
+                    Text(
+                      widget.locale.text(
+                        en: 'Credential state: ${_credentialState(snapshot.status.credential.state)}',
+                        ru: 'Состояние учётных данных: ${_credentialState(snapshot.status.credential.state)}',
+                      ),
+                      key: const Key('client-credential-state'),
+                    ),
+                    Text(
+                      widget.locale.text(
+                        en: 'Credential expiry: ${snapshot.status.credential.hasExpiresAt() ? _deadline(snapshot.status.credential.expiresAt.seconds.toInt(), snapshot.status.credential.expiresAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                        ru: 'Срок учётных данных: ${snapshot.status.credential.hasExpiresAt() ? _deadline(snapshot.status.credential.expiresAt.seconds.toInt(), snapshot.status.credential.expiresAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                      ),
+                      key: const Key('client-credential-expiry'),
+                    ),
+                    Text(
+                      widget.locale.text(
+                        en: 'Credential warning: ${snapshot.status.credential.hasWarningAt() ? _deadline(snapshot.status.credential.warningAt.seconds.toInt(), snapshot.status.credential.warningAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                        ru: 'Предупреждение об учётных данных: ${snapshot.status.credential.hasWarningAt() ? _deadline(snapshot.status.credential.warningAt.seconds.toInt(), snapshot.status.credential.warningAt.nanos) : widget.locale.text(en: 'Unknown', ru: 'Неизвестно')}',
+                      ),
+                      key: const Key('client-credential-warning'),
+                    ),
+                  ],
+                ),
+              ],
               if (_notice != null &&
                   ready &&
                   _noticeEpoch == widget.state.cacheEpoch)

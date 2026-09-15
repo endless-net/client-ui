@@ -61,10 +61,13 @@ void main() {
         }),
       );
       await tester.pump();
+      final page = ValueNotifier(ClientPage.connection);
+      addTearDown(page.dispose);
       await tester.pumpWidget(
         MaterialApp(
-          home: Builder(
-            builder: (context) => MediaQuery(
+          home: ValueListenableBuilder<ClientPage>(
+            valueListenable: page,
+            builder: (context, destination, _) => MediaQuery(
               // Preserve the device's real insets. Only text scaling and the panel's
               // available bounds are constrained; no native hit testing is bypassed.
               data: MediaQuery.of(
@@ -78,6 +81,7 @@ void main() {
                     height: 640,
                     child: ClientSessionPanel(
                       session: session,
+                      page: destination,
                       locale: locale,
                       uiBuild: api.BuildIdentity(),
                     ),
@@ -126,7 +130,27 @@ void main() {
               'Сохранённые намерения',
               'Профили',
             ];
-      for (final heading in headings) {
+      const destinations = [
+        ClientPage.support,
+        ClientPage.settings,
+        ClientPage.network,
+        ClientPage.network,
+        ClientPage.settings,
+        ClientPage.support,
+        ClientPage.support,
+        ClientPage.network,
+        ClientPage.network,
+        ClientPage.settings,
+        ClientPage.connection,
+        ClientPage.connection,
+        ClientPage.connection,
+        ClientPage.connection,
+        ClientPage.network,
+      ];
+      for (var i = 0; i < headings.length; i++) {
+        final heading = headings[i];
+        page.value = destinations[i];
+        await tester.pumpAndSettle();
         final target = find.text(heading);
         expect(target, findsOneWidget);
         await tester.ensureVisible(target);
@@ -140,6 +164,13 @@ void main() {
         expect(tester.takeException(), isNull, reason: heading);
       }
       semantics.dispose();
+      page.value = ClientPage.connection;
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('client-connection-details')),
+      );
+      await tester.tap(find.byKey(const Key('client-connection-details')));
+      await tester.pumpAndSettle();
       for (final key in [
         'client-session-state',
         'client-session-warning',
@@ -148,6 +179,10 @@ void main() {
         'client-renew-session',
         'client-load-profiles',
       ]) {
+        page.value = key == 'client-load-profiles'
+            ? ClientPage.network
+            : ClientPage.connection;
+        await tester.pumpAndSettle();
         final target = find.byKey(Key(key));
         await tester.ensureVisible(target);
         await tester.pumpAndSettle();

@@ -1019,7 +1019,12 @@ void main() {
               textScaler: TextScaler.linear(2),
               padding: EdgeInsets.only(top: 59, bottom: 34),
             ),
-            child: Scaffold(body: ClientSessionPanel(session: session)),
+            child: Scaffold(
+              body: ClientSessionPanel(
+                session: session,
+                page: ClientPage.network,
+              ),
+            ),
           ),
         ),
       );

@@ -1627,12 +1627,30 @@ void main() {
           });
         source.add(snapshot);
         await tester.pump();
-        expect(find.text('Profile: synthetic-profile'), findsOneWidget);
-        expect(find.text('Session expiry: Unknown'), findsOneWidget);
-        expect(find.text('Credential expiry: Unknown'), findsOneWidget);
-        expect(find.text('Account: Unknown'), findsOneWidget);
-        expect(find.text('Network ID: Unknown'), findsOneWidget);
-        expect(find.text('Device: Unknown'), findsOneWidget);
+        expect(
+          find.text('Profile: synthetic-profile', skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Session expiry: Unknown', skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Credential expiry: Unknown', skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Account: Unknown', skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Network ID: Unknown', skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Device: Unknown', skipOffstage: false),
+          findsOneWidget,
+        );
         snapshot.sequence += 1;
         snapshot.snapshot.status
           ..accountId = 'account-a'
@@ -1641,11 +1659,26 @@ void main() {
           ..network = api.Network(id: 'network-a', name: 'Network A');
         source.add(snapshot);
         await tester.pump();
-        expect(find.text('Account: account-a'), findsOneWidget);
-        expect(find.text('Network: Network A'), findsOneWidget);
-        expect(find.text('Network ID: network-a'), findsOneWidget);
-        expect(find.text('Device: device-a'), findsOneWidget);
-        expect(find.text('Device ID: node-a'), findsOneWidget);
+        expect(
+          find.text('Account: account-a', skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Network: Network A', skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Network ID: network-a', skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Device: device-a', skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Device ID: node-a', skipOffstage: false),
+          findsOneWidget,
+        );
         snapshot.sequence += 1;
         snapshot.snapshot.status.network = api.Network(
           id: 'network-b',
@@ -1653,10 +1686,22 @@ void main() {
         );
         source.add(snapshot);
         await tester.pump();
-        expect(find.text('Network: Network A'), findsNothing);
-        expect(find.text('Network ID: network-a'), findsNothing);
-        expect(find.text('Network: Network B'), findsOneWidget);
-        expect(find.text('Network ID: network-b'), findsOneWidget);
+        expect(
+          find.text('Network: Network A', skipOffstage: false),
+          findsNothing,
+        );
+        expect(
+          find.text('Network ID: network-a', skipOffstage: false),
+          findsNothing,
+        );
+        expect(
+          find.text('Network: Network B', skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Network ID: network-b', skipOffstage: false),
+          findsOneWidget,
+        );
         expect(
           tester
               .widget<OutlinedButton>(
@@ -1700,20 +1745,32 @@ void main() {
           isNull,
         );
         expect(
-          find.text('Session expiry: 2030-01-01T00:00:00.000Z'),
+          find.text(
+            'Session expiry: 2030-01-01T00:00:00.000Z',
+            skipOffstage: false,
+          ),
           findsOneWidget,
         );
         expect(
-          find.text('Credential expiry: 2031-02-03T04:05:06.000Z'),
+          find.text(
+            'Credential expiry: 2031-02-03T04:05:06.000Z',
+            skipOffstage: false,
+          ),
           findsOneWidget,
         );
         snapshot.sequence += 1;
         snapshot.snapshot.status.session.clearExpiresAt();
         source.add(snapshot);
         await tester.pump();
-        expect(find.text('Session expiry: Unknown'), findsOneWidget);
         expect(
-          find.text('Credential expiry: 2031-02-03T04:05:06.000Z'),
+          find.text('Session expiry: Unknown', skipOffstage: false),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            'Credential expiry: 2031-02-03T04:05:06.000Z',
+            skipOffstage: false,
+          ),
           findsOneWidget,
         );
         expect(
@@ -1760,7 +1817,10 @@ void main() {
         snapshot.snapshot.status.clearCredential();
         source.add(snapshot);
         await tester.pump();
-        expect(find.text('Profile: synthetic-profile'), findsNothing);
+        expect(
+          find.text('Profile: synthetic-profile', skipOffstage: false),
+          findsNothing,
+        );
         expect(find.byKey(const Key('client-session-expiry')), findsNothing);
         expect(find.byKey(const Key('client-credential-expiry')), findsNothing);
         expect(find.byKey(const Key('client-context-account')), findsNothing);
@@ -1798,7 +1858,10 @@ void main() {
         );
         await source.close();
         await tester.pump();
-        expect(find.text('Profile: synthetic-profile'), findsNothing);
+        expect(
+          find.text('Profile: synthetic-profile', skipOffstage: false),
+          findsNothing,
+        );
         expect(find.text('Runtime unavailable'), findsOneWidget);
         expect(state.link, ClientLinkState.unavailable);
         await tester.pumpWidget(const SizedBox());
