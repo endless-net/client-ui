@@ -219,7 +219,7 @@ jobs:
         if: steps.idempotency.outputs.noop != 'true'
         shell: pwsh
         run: |
-          $msi = "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:UI_VERSION.msi"
+          $msi = Join-Path (Join-Path $env:RUNNER_TEMP "release") ("EndlessNet.Client.{0}.msi" -f $env:UI_VERSION)
           $msiLog = Join-Path $env:RUNNER_TEMP "msi-install.log"
           if (-not (Test-Path -LiteralPath $msi -PathType Leaf)) { throw "MSI artifact is missing: $msi" }
           Get-Item -LiteralPath $msi | Select-Object FullName,Length,LastWriteTime | Format-List
@@ -244,7 +244,7 @@ jobs:
           ENDLESSNET_E2E_WINDOWS_PREVIOUS_MSI_PATH: ${{ steps.previous.outputs.path }}
         shell: pwsh
         run: |
-          $env:ENDLESSNET_E2E_WINDOWS_MSI_PATH = "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:UI_VERSION.msi"
+          $env:ENDLESSNET_E2E_WINDOWS_MSI_PATH = Join-Path (Join-Path $env:RUNNER_TEMP "release") ("EndlessNet.Client.{0}.msi" -f $env:UI_VERSION)
           go test -tags e2e ./tests -run TestWindowsClientMSIInstallUpgradeUninstall -count=1 -timeout 20m
 
       - name: Prepare installed distribution for SBOM
