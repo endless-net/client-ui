@@ -83,7 +83,7 @@ void main() {
     state.dispose();
   });
   String? key(String label) =>
-      tray.menu.items!.singleWhere((item) => item.label == label).key;
+      tray.menu.items.singleWhere((item) => item.label == label).key;
   Future<void> receive(api.WatchEventsResponse event) async {
     events.add(event);
     await pumpEventQueue();

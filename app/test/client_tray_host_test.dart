@@ -3,19 +3,48 @@ library;
 
 import 'dart:async';
 import 'package:flutter/services.dart';
+import 'package:endlessnet/client_tray.dart';
 import 'package:endlessnet/client_tray_host.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tray_manager/tray_manager.dart';
+
+class _BoundsHost implements ClientTrayHost {
+  _BoundsHost(this.available, {this.fail = false});
+
+  final bool available;
+  final bool fail;
+
+  @override
+  bool hasFiniteBounds() {
+    if (fail) throw StateError('unavailable');
+    return available;
+  }
+
+  @override
+  Future<void> destroy() async {}
+  @override
+  Future<void> openContextMenu() async {}
+  @override
+  Future<void> setIcon(
+    String asset, {
+    required void Function() onPrimaryClick,
+    required void Function() onSecondaryClick,
+  }) async {}
+  @override
+  Future<void> setMenu(
+    ClientTrayMenu menu,
+    void Function(String?) onActivate,
+  ) async {}
+  @override
+  Future<void> setTooltip(String tooltip) async {}
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel('endlessnet/ui-tray-host');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-  const trayChannel = MethodChannel('tray_manager');
   tearDown(() {
     messenger.setMockMethodCallHandler(channel, null);
-    messenger.setMockMethodCallHandler(trayChannel, null);
   });
   test(
     'Windows registration preparation requires native true with no arguments',
@@ -57,43 +86,36 @@ void main() {
       expect(await readClientTrayHostAvailability(platform), isFalse);
     });
   }
-  test('macOS requires live finite nonempty status item bounds', () async {
+  test('macOS uses live tray bounds availability', () async {
     messenger.setMockMethodCallHandler(
       channel,
       (_) async => throw StateError('unexpected'),
     );
-    for (final size in [24.0, 0.0, -1.0, double.nan, double.infinity]) {
-      messenger.setMockMethodCallHandler(trayChannel, (call) async {
-        expect(call.method, 'getBounds');
-        return {'x': -100.0, 'y': -200.0, 'width': size, 'height': 24.0};
-      });
-      expect(await readClientTrayHostAvailability('macos'), size == 24.0);
-    }
-    for (final value in [
-      null,
-      'invalid',
-      <String, Object?>{},
-      {'x': double.nan, 'y': 0.0, 'width': 24.0, 'height': 24.0},
-      {'x': 0.0, 'y': double.infinity, 'width': 24.0, 'height': 24.0},
-      {'x': 0.0, 'y': 0.0, 'width': 24.0, 'height': 0.0},
-    ]) {
-      messenger.setMockMethodCallHandler(trayChannel, (_) async => value);
-      expect(await readClientTrayHostAvailability('macos'), isFalse);
-    }
+    expect(
+      await readClientTrayHostAvailability('macos', host: _BoundsHost(true)),
+      isTrue,
+    );
+    expect(
+      await readClientTrayHostAvailability('macos', host: _BoundsHost(false)),
+      isFalse,
+    );
     expect(await readClientTrayHostAvailability('android'), isFalse);
   });
   test('missing or failed macOS status item query is unavailable', () async {
     expect(await readClientTrayHostAvailability('macos'), isFalse);
-    messenger.setMockMethodCallHandler(trayChannel, (_) async {
-      throw PlatformException(code: 'private native detail');
-    });
-    expect(await readClientTrayHostAvailability('macos'), isFalse);
+    expect(
+      await readClientTrayHostAvailability(
+        'macos',
+        host: _BoundsHost(false, fail: true),
+      ),
+      isFalse,
+    );
   });
   for (final platform in ['windows', 'macos', 'linux']) {
     test('$platform installs menu using only supported methods', () async {
       final calls = <String>[];
-      final menu = Menu(
-        items: [MenuItem(label: 'Runtime status', disabled: true)],
+      final menu = ClientTrayMenu(
+        items: [ClientTrayMenuItem(label: 'Runtime status', disabled: true)],
       );
       await updateClientTrayMenu(
         platform: platform,
@@ -101,7 +123,6 @@ void main() {
         menu: () => menu,
         isCurrent: () => true,
         setTooltip: (_) async {
-          if (platform == 'linux') throw StateError('Unsupported Linux method');
           calls.add('tooltip');
         },
         setMenu: (value) async {
@@ -109,7 +130,7 @@ void main() {
           calls.add('menu');
         },
       );
-      expect(calls, [if (platform != 'linux') 'tooltip', 'menu']);
+      expect(calls, ['tooltip', 'menu']);
     });
     test('$platform uses only supported popup method', () async {
       var calls = 0;
@@ -159,10 +180,10 @@ void main() {
     'menu keys are obtained after asynchronous tooltip, not before',
     () async {
       final pending = Completer<void>();
-      var currentMenu = Menu(
-        items: [MenuItem(key: 'old', label: 'Old')],
+      var currentMenu = ClientTrayMenu(
+        items: [ClientTrayMenuItem(key: 'old', label: 'Old')],
       );
-      Menu? sent;
+      ClientTrayMenu? sent;
       final result = updateClientTrayMenu(
         platform: 'macos',
         tooltip: '',
@@ -173,8 +194,8 @@ void main() {
           sent = value;
         },
       );
-      currentMenu = Menu(
-        items: [MenuItem(key: 'new', label: 'New')],
+      currentMenu = ClientTrayMenu(
+        items: [ClientTrayMenuItem(key: 'new', label: 'New')],
       );
       pending.complete();
       await result;
@@ -186,7 +207,7 @@ void main() {
       updateClientTrayMenu(
         platform: 'android',
         tooltip: '',
-        menu: () => Menu(),
+        menu: () => ClientTrayMenu(items: []),
         isCurrent: () => true,
       ),
       throwsUnsupportedError,

@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;

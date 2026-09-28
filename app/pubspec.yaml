@@ -17,7 +17,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 0.2.0+5
 
 environment:
-  sdk: ^3.10.0
+  sdk: ^3.13.0
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -40,7 +40,7 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   crypto: 3.0.7
-  tray_manager: ^0.5.3
+  tray_manager: ^0.7.0
   window_manager: ^0.5.2
   url_launcher: ^6.3.2
   app_links: ^6.4.1

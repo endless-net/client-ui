@@ -90,7 +90,7 @@ void main() {
         );
         stream.add(fixtures.snapshot(1));
         await pumpEventQueue();
-        String? key(String prefix) => tray.menu.items!
+        String? key(String prefix) => tray.menu.items
             .singleWhere((i) => i.key?.startsWith('$prefix:') == true)
             .key;
         final oldConnect = key('connect');
@@ -135,7 +135,7 @@ void main() {
           tray.locale = locale;
           final ru = locale == ClientLocale.ru;
           expect(
-            tray.menu.items!.map((i) => i.label),
+            tray.menu.items.map((i) => i.label),
             ru
                 ? [
                     'Открыть EndlessNet',

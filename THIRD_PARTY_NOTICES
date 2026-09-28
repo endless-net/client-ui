@@ -5,7 +5,8 @@ The source distribution uses the following dependency license families:
 
 - Flutter framework and Flutter plugins — BSD-3-Clause
 - Dart SDK packages — BSD-3-Clause and Apache-2.0
-- cupertino_icons, tray_manager, window_manager, screen_retriever, menu_base —
+- cupertino_icons, tray_manager, nativeapi, cnativeapi, window_manager,
+  screen_retriever —
   MIT
 - golang.org/x/sys — BSD-3-Clause
 

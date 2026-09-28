@@ -8,6 +8,8 @@ import 'package:endlessnet/client_intent_journal.dart';
 import 'package:endlessnet/client_session.dart';
 import 'package:endlessnet/client_session_panel.dart';
 import 'package:endlessnet/client_mutations.dart';
+import 'package:endlessnet/client_tray.dart';
+import 'package:endlessnet/client_tray_host.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +17,37 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:window_manager/window_manager.dart';
 import 'client_session_test.dart' as fixtures;
 import 'client_privileged_session_test.dart' show ImmediateResponse;
+
+class _RecordingTrayHost implements ClientTrayHost {
+  _RecordingTrayHost(this.call);
+
+  final void Function(String) call;
+
+  @override
+  Future<void> setIcon(
+    String asset, {
+    required void Function() onPrimaryClick,
+    required void Function() onSecondaryClick,
+  }) async => call('setIcon');
+
+  @override
+  Future<void> setTooltip(String tooltip) async => call('setToolTip');
+
+  @override
+  Future<void> setMenu(
+    ClientTrayMenu menu,
+    void Function(String?) onActivate,
+  ) async => call('setContextMenu');
+
+  @override
+  Future<void> openContextMenu() async => call('popUpContextMenu');
+
+  @override
+  bool hasFiniteBounds() => true;
+
+  @override
+  Future<void> destroy() async => call('destroy');
+}
 
 class QuitClient extends fixtures.NoCallsClient {
   final requests = <api.NotifyLifecycleRequest>[];
@@ -84,22 +117,19 @@ void main() {
       var closeRequested = false;
       final hiding = Completer<void>();
       var hostAvailable = failure != 'hostAbsent';
-      messenger.setMockMethodCallHandler(const MethodChannel('tray_manager'), (
-        call,
-      ) async {
-        trayCalls.add(call.method);
+      final trayHost = _RecordingTrayHost((method) {
+        trayCalls.add(method);
         if (failure == 'restoreRace' &&
-            call.method == 'setIcon' &&
+            method == 'setIcon' &&
             trayCalls.where((c) => c == 'setIcon').length == 2) {
           hostAvailable = false;
         }
-        if (call.method == failure ||
-            (call.method == 'destroy' &&
+        if (method == failure ||
+            (method == 'destroy' &&
                 (closeRequested ||
                     (failure != 'restore' && failure != 'restoreRace')))) {
           throw PlatformException(code: 'unavailable');
         }
-        return null;
       });
       messenger.setMockMethodCallHandler(
         const MethodChannel('window_manager'),
@@ -123,10 +153,6 @@ void main() {
       addTearDown(() {
         messenger.setMockMethodCallHandler(screens, null);
         messenger.setMockMethodCallHandler(
-          const MethodChannel('tray_manager'),
-          null,
-        );
-        messenger.setMockMethodCallHandler(
           const MethodChannel('window_manager'),
           null,
         );
@@ -141,6 +167,7 @@ void main() {
         ClientDesktopApp(
           session: session,
           showWindow: false,
+          trayHost: trayHost,
           readTrayAvailability: () async => hostAvailable,
           prepareTrayRegistration: () async => true,
           onExit: () async {

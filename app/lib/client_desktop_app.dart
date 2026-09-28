@@ -6,7 +6,6 @@ import 'package:crypto/crypto.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'client_session.dart';
@@ -66,6 +65,7 @@ class ClientDesktopApp extends StatefulWidget {
     this.openAutostartSettings,
     this.readTrayAvailability,
     this.prepareTrayRegistration,
+    this.trayHost,
   });
   final ClientSession session;
   final Future<ClientAutostartSetting> Function()? readAutostart;
@@ -74,6 +74,7 @@ class ClientDesktopApp extends StatefulWidget {
   final Future<bool> Function()? openAutostartSettings;
   final Future<bool> Function()? readTrayAvailability;
   final Future<bool> Function()? prepareTrayRegistration;
+  final ClientTrayHost? trayHost;
   final DeliverClientNotification? deliverNotification;
   final bool initialNotifications;
   final bool notificationReadFailed;
@@ -99,7 +100,7 @@ class ClientDesktopApp extends StatefulWidget {
 enum _DesktopNotice { tray, integration, runtime }
 
 class _ClientDesktopAppState extends State<ClientDesktopApp>
-    with WindowListener, TrayListener, WidgetsBindingObserver {
+    with WindowListener, WidgetsBindingObserver {
   final _navigator = GlobalKey<NavigatorState>();
   Timer? _signals;
   DateTime? _lastSignal;
@@ -228,6 +229,8 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     ),
   };
   late final ClientTray _tray;
+  late final ClientTrayHost _trayHost =
+      widget.trayHost ?? NativeClientTrayHost();
   late final ClientNotificationDelivery _notifications;
   bool _trayReady = false;
   bool _trayRegistering = false;
@@ -235,7 +238,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   bool _trayAvailabilityChecking = false;
   Future<bool> _readTrayAvailability() =>
       widget.readTrayAvailability?.call() ??
-      readClientTrayHostAvailability(Platform.operatingSystem);
+      readClientTrayHostAvailability(Platform.operatingSystem, host: _trayHost);
 
   Future<void> _checkTrayAvailability() async {
     if (!mounted || _exiting || !_trayReady || _trayAvailabilityChecking) {
@@ -381,6 +384,8 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
           tooltip: 'EndlessNet: ${_tray.status}',
           menu: () => _tray.menu,
           isCurrent: () => mounted && _trayReady,
+          host: _trayHost,
+          onActivate: _onTrayMenuItemClick,
         );
       } while (_trayDirty && mounted && _trayReady);
     } catch (_) {
@@ -439,7 +444,6 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   Future<void> _initialize() async {
     if (widget.desktopIntegration) {
       windowManager.addListener(this);
-      trayManager.addListener(this);
       await _registerTray();
       if (!mounted) return;
       try {
@@ -486,9 +490,8 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
       _trayReady = false;
     });
     try {
-      // The plugin otherwise modifies its old icon instead of adding a new one.
       if (_trayRegistrationAttempted) {
-        await trayManager.destroy();
+        await _trayHost.destroy();
         if (!mounted || _exiting) return;
       }
       final prepared =
@@ -497,10 +500,12 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
       if (!mounted || _exiting) return;
       if (!prepared) throw StateError('Tray registration unavailable');
       _trayRegistrationAttempted = true;
-      await trayManager.setIcon(
+      await _trayHost.setIcon(
         Platform.isWindows
             ? 'assets/icons/endlessnet.ico'
             : 'assets/icons/endlessnet.png',
+        onPrimaryClick: () => unawaited(_show()),
+        onSecondaryClick: () => unawaited(_popUpTray()),
       );
       if (!mounted || _exiting) return;
       _trayReady = true;
@@ -576,34 +581,24 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     }
   }
 
-  @override
-  void onTrayIconMouseDown() {
-    unawaited(_show());
-  }
-
-  @override
-  void onTrayIconRightMouseDown() {
-    unawaited(_popUpTray());
-  }
-
   Future<void> _popUpTray() async {
     try {
       await popUpClientTrayMenu(
         platform: Platform.operatingSystem,
         isCurrent: () => mounted && _trayReady,
+        host: _trayHost,
       );
     } catch (_) {
       if (mounted) setState(() => _notice = _DesktopNotice.tray);
     }
   }
 
-  @override
-  void onTrayMenuItemClick(MenuItem item) {
-    if (item.key == 'open') unawaited(_show());
-    if (item.key == 'exit') unawaited(_quit());
-    if (item.key?.startsWith('connect:') == true ||
-        item.key?.startsWith('disconnect:') == true) {
-      unawaited(_tray.activate(item.key));
+  void _onTrayMenuItemClick(String? key) {
+    if (key == 'open') unawaited(_show());
+    if (key == 'exit') unawaited(_quit());
+    if (key?.startsWith('connect:') == true ||
+        key?.startsWith('disconnect:') == true) {
+      unawaited(_tray.activate(key));
     }
   }
 
@@ -701,7 +696,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     await widget.onExit?.call();
     if (widget.desktopIntegration) {
       try {
-        await trayManager.destroy();
+        await _trayHost.destroy();
       } catch (_) {
         // An unavailable tray must not prevent closing the application window.
       }
@@ -720,7 +715,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
     _notifications.dispose();
     if (widget.desktopIntegration) {
       windowManager.removeListener(this);
-      trayManager.removeListener(this);
+      unawaited(_trayHost.destroy().catchError((Object _) {}));
     }
     unawaited(session.close());
     super.dispose();

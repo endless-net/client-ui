@@ -1,6 +1,7 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/foundation.dart';
-import 'package:tray_manager/tray_manager.dart';
 
 import 'client_operation.dart';
 import 'client_locale.dart';
@@ -8,6 +9,24 @@ import 'client_tray_labels.dart';
 import 'client_state_controller.dart';
 
 enum _TrayNotice { completed, failed, accepted, unknown }
+
+class ClientTrayMenuItem {
+  const ClientTrayMenuItem({
+    required this.label,
+    this.key,
+    this.disabled = false,
+  });
+
+  final String label;
+  final String? key;
+  final bool disabled;
+}
+
+class ClientTrayMenu {
+  const ClientTrayMenu({required this.items});
+
+  final List<ClientTrayMenuItem> items;
+}
 
 /// Native snapshot projection. Menu keys expire on every state change so a
 /// click queued by the OS cannot act on a newly selected profile or caller.
@@ -115,27 +134,31 @@ class ClientTray extends ChangeNotifier {
       ? clientTrayServiceLabel(state.snapshot!.status.serviceState, _locale)
       : clientLinkLabel(state.link, _locale);
 
-  Menu get menu => Menu(
+  ClientTrayMenu get menu => ClientTrayMenu(
     items: [
-      MenuItem(
+      ClientTrayMenuItem(
         key: 'open',
         label: _text('Open EndlessNet', 'Открыть EndlessNet'),
       ),
-      MenuItem(
+      ClientTrayMenuItem(
         label: _text('Runtime: $status', 'Служба: $status'),
         disabled: true,
       ),
-      MenuItem(
+      ClientTrayMenuItem(
         key: 'connect:$_generation',
         label: _text('Connect', 'Подключить'),
         disabled: !canConnect,
       ),
-      MenuItem(
+      ClientTrayMenuItem(
         key: 'disconnect:$_generation',
         label: _text('Disconnect', 'Отключить'),
         disabled: !canDisconnect,
       ),
-      MenuItem(key: 'exit', label: _text('Quit', 'Выход'), disabled: !_enabled),
+      ClientTrayMenuItem(
+        key: 'exit',
+        label: _text('Quit', 'Выход'),
+        disabled: !_enabled,
+      ),
     ],
   );
 
