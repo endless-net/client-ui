@@ -40,7 +40,7 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   crypto: 3.0.7
-  tray_manager: ^0.5.3
+  tray_manager: ^0.7.0
   window_manager: ^0.5.2
   url_launcher: ^6.3.2
   app_links: ^6.4.1
