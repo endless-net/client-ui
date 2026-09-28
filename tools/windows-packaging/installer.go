@@ -267,6 +267,18 @@ func renderWindowsInstallerWix(opts WindowsInstallerOptions) string {
       <Component Id="AppExecutable" Guid="*" Bitness="always64">
         <File Id="AppExeFile" Source="$(var.AppExe)" Name="endlessnet.exe" KeyPath="yes" />
       </Component>
+      <Component Id="DeepLinkProtocol" Guid="*" Bitness="always64">
+        <RegistryKey Root="HKLM" Key="Software\Classes\endlessnet">
+          <RegistryValue Type="string" Value="URL:EndlessNet Enrollment" />
+          <RegistryValue Name="URL Protocol" Type="string" Value="" />
+          <RegistryKey Key="DefaultIcon">
+            <RegistryValue Type="string" Value="&quot;[#AppExeFile]&quot;,0" />
+          </RegistryKey>
+          <RegistryKey Key="shell\open\command">
+            <RegistryValue Type="string" Value="&quot;[#AppExeFile]&quot; &quot;%%1&quot;" KeyPath="yes" />
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
       <Component Id="AppIcon" Guid="*" Bitness="always64">
         <File Id="AppIconFile" Source="$(var.IconFile)" Name="endlessnet.ico" KeyPath="yes" />
       </Component>

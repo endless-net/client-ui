@@ -2,6 +2,7 @@
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
 #include <shobjidl.h>
+#include "app_links/app_links_plugin_c_api.h"
 
 #include <algorithm>
 
@@ -14,6 +15,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // new console when running with a debugger.
   if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {
     CreateAndAttachConsole();
+  }
+
+  if (wcsstr(::GetCommandLineW(), L"endlessnet://") != nullptr) {
+    HWND existing = ::FindWindow(nullptr, L"EndlessNet");
+    if (existing != nullptr) {
+      SendAppLink(existing);
+      ::ShowWindow(existing, SW_RESTORE);
+      ::SetForegroundWindow(existing);
+      return EXIT_SUCCESS;
+    }
   }
 
   // Initialize COM, so that it is available for use in the library and/or

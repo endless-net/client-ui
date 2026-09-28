@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=EndlessNet
+Exec=endlessnet %u
+Terminal=false
+Categories=Network;
+MimeType=x-scheme-handler/endlessnet;

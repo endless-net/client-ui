@@ -3,6 +3,8 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'client_theme_store.dart';
+import 'client_deep_link.dart';
+import 'package:app_links/app_links.dart';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
@@ -39,11 +41,25 @@ const _appBuildDate = String.fromEnvironment(
 const _appTarget = String.fromEnvironment('ENDLESSNET_TARGET');
 const _defaultDebugLogDir = '~/.endlessnet/logs';
 const _showSignalPath = '~/.endlessnet/endlessnet.show';
+final _deepLinks = StreamController<Uri>.broadcast();
+final _pendingDeepLinks = <Uri>[];
+var _deepLinksReady = false;
+
+void _receiveDeepLink(Uri uri) {
+  if (_deepLinksReady) {
+    _deepLinks.add(uri);
+  } else {
+    _pendingDeepLinks.add(uri);
+  }
+}
 
 RandomAccessFile? _instanceLock;
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+  final appLinks = AppLinks();
+  appLinks.uriLinkStream.listen(_receiveDeepLink);
+  final initialLink = await appLinks.getInitialLink();
   late final AppConfig config;
   try {
     config = AppConfig.parse(args);
@@ -123,6 +139,14 @@ Future<void> main(List<String> args) async {
       /* Surface invalid configuration through the UI read action. */
     }
   }
+  final enrollmentUri = initialLink == null
+      ? config.enrollmentUri
+      : parseClientDeepLink(initialLink);
+  _deepLinksReady = true;
+  for (final uri in _pendingDeepLinks) {
+    _deepLinks.add(uri);
+  }
+  _pendingDeepLinks.clear();
   runApp(
     ClientDesktopApp(
       initialLocale: locale,
@@ -177,7 +201,9 @@ Future<void> main(List<String> args) async {
       },
       session: session,
       uiBuild: desktopBuildIdentity(),
-      showWindow: config.showWindow,
+      showWindow: config.showWindow || enrollmentUri != null,
+      enrollmentUri: enrollmentUri,
+      deepLinks: _deepLinks.stream,
       showSignal: showSignalWriteTime,
       onExit: () async {
         final activationStopped =
@@ -236,6 +262,7 @@ class AppConfig {
     required this.debug,
     required this.debugLogDir,
     required this.showVersion,
+    required this.enrollmentUri,
     required this.safeArgs,
   });
   final String endpoint;
@@ -243,6 +270,7 @@ class AppConfig {
   final bool debug;
   final String debugLogDir;
   final bool showVersion;
+  final Uri? enrollmentUri;
   final List<String> safeArgs;
 
   static AppConfig parse(List<String> args) {
@@ -251,8 +279,20 @@ class AppConfig {
     var debug = false;
     var debugLogDir = _defaultDebugLogDir;
     var showVersion = false;
+    Uri? enrollmentUri;
     for (var i = 0; i < args.length; i++) {
       final arg = args[i];
+      if (arg.toLowerCase().startsWith('endlessnet://')) {
+        final uri = Uri.tryParse(arg);
+        if (enrollmentUri != null ||
+            uri == null ||
+            parseClientDeepLink(uri) == null) {
+          throw const FormatException('Unsupported desktop startup option');
+        }
+        enrollmentUri = uri;
+        showWindow = true;
+        continue;
+      }
       String value() {
         if (i + 1 >= args.length ||
             args[i + 1].trim().isEmpty ||
@@ -285,6 +325,7 @@ class AppConfig {
       debug: debug,
       debugLogDir: debugLogDir,
       showVersion: showVersion,
+      enrollmentUri: enrollmentUri,
       safeArgs: List.unmodifiable(redactArgs(args)),
     );
   }

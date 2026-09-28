@@ -53,7 +53,6 @@ void main() {
         ['--elevated-enroll'],
         ['--server', 'synthetic-private-value'],
         ['--mode', 'workstation'],
-        ['endlessnet://enroll?enroll_token=synthetic-private-value'],
         ['--unknown'],
       ]) {
         expect(
@@ -67,6 +66,11 @@ void main() {
           ),
         );
       }
+      final enrollment = AppConfig.parse([
+        'endlessnet://enroll?enroll_token=synthetic-private-value&hostname=test&mode=server',
+      ]);
+      expect(enrollment.enrollmentUri?.host, 'enroll');
+      expect(enrollment.showWindow, isTrue);
     },
   );
   test('startup logging redacts secret tokens and deep links', () {

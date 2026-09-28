@@ -10,6 +10,7 @@ import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'client_session.dart';
+import 'client_deep_link.dart';
 import 'client_theme.dart';
 import 'client_adaptive_shell.dart';
 import 'client_state_controller.dart';
@@ -44,6 +45,8 @@ class ClientDesktopApp extends StatefulWidget {
     required this.session,
     this.desktopIntegration = true,
     this.showWindow = true,
+    this.enrollmentUri,
+    this.deepLinks,
     this.showSignal,
     this.onExit,
     this.uiBuild,
@@ -85,6 +88,8 @@ class ClientDesktopApp extends StatefulWidget {
   final api.BuildIdentity? uiBuild;
   final bool desktopIntegration;
   final bool showWindow;
+  final Uri? enrollmentUri;
+  final Stream<Uri>? deepLinks;
   final Future<DateTime?> Function()? showSignal;
   final Future<void> Function()? onExit;
   @override
@@ -101,6 +106,8 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   bool _busy = false;
   ClientPage _page = ClientPage.connection;
   late ThemeMode _themeMode;
+  Uri? _enrollmentUri;
+  StreamSubscription<Uri>? _deepLinkSubscription;
   Future<void>? _themeWrite;
   bool _themeSaveFailed = false;
   Future<void> _chooseTheme(ThemeMode? mode) async {
@@ -303,6 +310,14 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
   @override
   void initState() {
     super.initState();
+    _enrollmentUri = widget.enrollmentUri;
+    _deepLinkSubscription = widget.deepLinks?.listen((uri) {
+      if (parseClientDeepLink(uri) == null || !mounted) return;
+      setState(() {
+        _enrollmentUri = uri;
+        _page = ClientPage.connection;
+      });
+    });
     WidgetsBinding.instance.addObserver(this);
     _locale = widget.initialLocale;
     _themeMode = widget.initialTheme;
@@ -696,6 +711,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
 
   @override
   void dispose() {
+    _deepLinkSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _signals?.cancel();
     _trayReady = false;
@@ -772,6 +788,7 @@ class _ClientDesktopAppState extends State<ClientDesktopApp>
       ),
       body: ClientSessionPanel(
         page: _page,
+        enrollmentUri: _enrollmentUri,
         locale: _locale,
         session: session,
         uiBuild: widget.uiBuild,

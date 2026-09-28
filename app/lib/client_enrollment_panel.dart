@@ -19,10 +19,12 @@ class ClientEnrollmentPanel extends StatelessWidget {
     required this.state,
     required this.enroll,
     this.locale = ClientLocale.en,
+    this.enrollmentUri,
   });
   final ClientLocale locale;
   final ClientStateController state;
   final EnrollProfile enroll;
+  final Uri? enrollmentUri;
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -41,6 +43,7 @@ class ClientEnrollmentPanel extends StatelessWidget {
           state.cacheEpoch,
           state.domainEpoch(api.Domain.DOMAIN_PROFILES),
           state.domainEpoch(api.Domain.DOMAIN_SESSION),
+          enrollmentUri,
         )),
         locale: locale,
         isCurrent: () =>
@@ -48,6 +51,9 @@ class ClientEnrollmentPanel extends StatelessWidget {
             state.link == ClientLinkState.ready,
         profileId: enabled ? snapshot.status.activeProfileId : '',
         enroll: enroll,
+        initialHostname: enrollmentUri?.queryParameters['hostname'] ?? '',
+        initialToken: enrollmentUri?.queryParameters['enroll_token'] ?? '',
+        initialMode: enrollmentUri?.queryParameters['mode'] ?? '',
       );
     },
   );
@@ -60,9 +66,15 @@ class _EnrollmentForm extends StatefulWidget {
     required this.enroll,
     required this.locale,
     required this.isCurrent,
+    required this.initialHostname,
+    required this.initialToken,
+    required this.initialMode,
   });
   final ClientLocale locale;
   final bool Function() isCurrent;
+  final String initialHostname;
+  final String initialToken;
+  final String initialMode;
   final String profileId;
   final EnrollProfile enroll;
   @override
@@ -101,6 +113,21 @@ class _EnrollmentFormState extends State<_EnrollmentForm> {
   _EnrollmentNotice? _notice;
   bool Function()? _noticeCurrent;
   int _inputSerial = 0;
+  @override
+  void initState() {
+    super.initState();
+    _hostname.text = widget.initialHostname;
+    _token.text = widget.initialToken;
+    _useToken = widget.initialToken.isNotEmpty;
+    _mode = switch (widget.initialMode) {
+      'workstation' => api.EnrollmentMode.ENROLLMENT_MODE_WORKSTATION,
+      'server' => api.EnrollmentMode.ENROLLMENT_MODE_SERVER,
+      'subnet_router' => api.EnrollmentMode.ENROLLMENT_MODE_SUBNET_ROUTER,
+      'interactive' => api.EnrollmentMode.ENROLLMENT_MODE_INTERACTIVE,
+      _ => api.EnrollmentMode.ENROLLMENT_MODE_WORKSTATION,
+    };
+  }
+
   String _text(String en, String ru) => widget.locale.text(en: en, ru: ru);
   String _noticeText(_EnrollmentNotice notice) => switch (notice) {
     _EnrollmentNotice.result => _text(

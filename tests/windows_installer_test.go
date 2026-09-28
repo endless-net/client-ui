@@ -313,7 +313,7 @@ if ($urlProtocol -ne '') {
   Write-Error "URL Protocol marker = $urlProtocol"
   exit 1
 }
-if ($command -notmatch 'endlessnet\.exe' -or $command -notmatch '--enroll' -or $command -notmatch '%1') {
+if ($command -notmatch 'endlessnet\.exe' -or $command -notmatch '%1') {
   Write-Error "protocol command = $command"
   exit 1
 }

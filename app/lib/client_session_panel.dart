@@ -40,9 +40,11 @@ class ClientSessionPanel extends StatelessWidget {
     this.locale = ClientLocale.en,
     this.notifications,
     this.page = ClientPage.connection,
+    this.enrollmentUri,
   });
   final ClientSession session;
   final ClientPage page;
+  final Uri? enrollmentUri;
   final Widget? notifications;
   final ClientLocale locale;
   final api.BuildIdentity? uiBuild;
@@ -103,8 +105,10 @@ class ClientSessionPanel extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 16),
         child: Card(
           child: ExpansionTile(
-            key: ValueKey('setup-${panel.runtimeType}'),
+            key: ValueKey(('setup-${panel.runtimeType}', enrollmentUri)),
             maintainState: true,
+            initiallyExpanded:
+                panel is ClientEnrollmentPanel && enrollmentUri != null,
             title: Semantics(header: true, child: Text(heading)),
             childrenPadding: const EdgeInsets.all(20),
             children: [panel],
@@ -507,6 +511,7 @@ class ClientSessionPanel extends StatelessWidget {
     ),
     ClientEnrollmentPanel(
       locale: locale,
+      enrollmentUri: enrollmentUri,
       state: session.state,
       enroll: (id, mode, hostname, token) => session.submit(
         api.OperationKind.OPERATION_KIND_ENROLL,
