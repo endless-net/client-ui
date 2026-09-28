@@ -63,7 +63,11 @@ void main() {
           connection.events.add(fixtures.snapshot());
           await tester.pumpAndSettle();
           final setup = find.descendant(
-            of: find.byKey(const ValueKey('setup-ClientCreateProfilePanel')),
+            of: find.byKey(
+              const ValueKey<(String, Uri?)>(
+                ('setup-ClientCreateProfilePanel', null),
+              ),
+            ),
             matching: find.byType(ListTile),
           );
           await tester.ensureVisible(setup);

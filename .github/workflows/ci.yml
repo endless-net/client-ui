@@ -11,7 +11,79 @@ permissions:
   contents: read
 
 jobs:
-  windows:
+  go-tools:
+    name: Go tools
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Test Go tools
+        run: go test ./...
+
+  flutter-ui:
+    name: Flutter UI
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+          cache: false
+
+      - name: Prepare Flutter dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Checkout pinned native scenario producer
+        uses: actions/checkout@v7
+        with:
+          repository: endless-net/client
+          ref: 80d9cdc16241ca03200381b6b1b04fa5acca1987
+          path: client-source
+          persist-credentials: false
+
+      - name: Build native scenario host
+        shell: pwsh
+        working-directory: client-source/clientipc
+        run: >-
+          go build
+          -o "$env:RUNNER_TEMP/client-testserver.exe"
+          ./cmd/client-testserver
+
+      - name: Remove fixture checkout from UI source artifacts
+        shell: pwsh
+        run: |
+          $workspacePath = [System.IO.Path]::GetFullPath($env:GITHUB_WORKSPACE)
+          $fixturePath = [System.IO.Path]::GetFullPath((Join-Path $workspacePath 'client-source'))
+          if ([System.IO.Path]::GetDirectoryName($fixturePath) -ne $workspacePath) {
+            throw 'Fixture checkout must be a direct workspace child'
+          }
+          Remove-Item -LiteralPath $fixturePath -Recurse -Force
+
+      - name: Analyze and test Flutter UI
+        working-directory: app
+        env:
+          ENDLESSNET_TESTSERVER: ${{ runner.temp }}\client-testserver.exe
+        run: |
+          flutter analyze
+          flutter test
+
+  windows-package:
+    name: Windows packaging
     runs-on: windows-2022
     timeout-minutes: 60
     env:
@@ -50,43 +122,6 @@ jobs:
         run: |
           ./scripts/check-dependency-licenses.test.ps1
           ./scripts/check-dependency-licenses.ps1 -Output "$env:RUNNER_TEMP/dependency-licenses.json"
-
-      - name: Test Go tools
-        run: go test ./...
-
-      - name: Checkout pinned native scenario producer
-        uses: actions/checkout@v7
-        with:
-          repository: endless-net/client
-          ref: 80d9cdc16241ca03200381b6b1b04fa5acca1987
-          path: client-source
-          persist-credentials: false
-
-      - name: Build native scenario host
-        shell: pwsh
-        working-directory: client-source/clientipc
-        run: >-
-          go build
-          -o "$env:RUNNER_TEMP/client-testserver.exe"
-          ./cmd/client-testserver
-
-      - name: Remove fixture checkout from UI source artifacts
-        shell: pwsh
-        run: |
-          $workspacePath = [System.IO.Path]::GetFullPath($env:GITHUB_WORKSPACE)
-          $fixturePath = [System.IO.Path]::GetFullPath((Join-Path $workspacePath 'client-source'))
-          if ([System.IO.Path]::GetDirectoryName($fixturePath) -ne $workspacePath) {
-            throw 'Fixture checkout must be a direct workspace child'
-          }
-          Remove-Item -LiteralPath $fixturePath -Recurse -Force
-
-      - name: Analyze and test Flutter UI
-        working-directory: app
-        env:
-          ENDLESSNET_TESTSERVER: ${{ runner.temp }}\client-testserver.exe
-        run: |
-          flutter analyze
-          flutter test
 
       - name: Resolve reviewed public client core
         id: core
@@ -132,14 +167,6 @@ jobs:
           -DistributionDir "$env:RUNNER_TEMP/windows-client-msi"
           -Msi "$env:RUNNER_TEMP/windows-client-msi/EndlessNet.Client.$env:UI_VERSION.msi"
 
-      - name: Exercise unsigned install, repair and uninstall
-        env:
-          ENDLESSNET_E2E_WINDOWS_MSI: "1"
-        shell: pwsh
-        run: |
-          $env:ENDLESSNET_E2E_WINDOWS_MSI_PATH = "$env:RUNNER_TEMP/windows-client-msi/EndlessNet.Client.$env:UI_VERSION.msi"
-          go test -tags e2e ./tests -run TestWindowsClientMSIInstallUpgradeUninstall -count=1 -timeout 20m
-
       - name: Upload unsigned packaging-smoke MSI
         uses: actions/upload-artifact@v7
         with:
@@ -150,3 +177,33 @@ jobs:
             ${{ runner.temp }}/dependency-licenses.json
           if-no-files-found: error
           retention-days: 7
+
+  windows-install:
+    name: Windows installer smoke test
+    needs: windows-package
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: actions/download-artifact@v6
+        with:
+          name: unsigned-msi-packaging-smoke
+          path: ${{ runner.temp }}/packaging-smoke
+
+      - name: Exercise unsigned install, repair and uninstall
+        env:
+          ENDLESSNET_E2E_WINDOWS_MSI: "1"
+        shell: pwsh
+        run: |
+          $msis = @(Get-ChildItem "$env:RUNNER_TEMP/packaging-smoke/windows-client-msi" -Filter "EndlessNet.Client.*.msi")
+          if ($msis.Count -ne 1) {
+            throw "Expected exactly one packaging-smoke MSI, found $($msis.Count)"
+          }
+          $env:ENDLESSNET_E2E_WINDOWS_MSI_PATH = $msis[0].FullName
+          go test -tags e2e ./tests -run TestWindowsClientMSIInstallUpgradeUninstall -count=1 -timeout 20m

@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'package:endlessnet/client_adaptive_shell.dart';
 import 'package:endlessnet/client_locale.dart';
 import 'package:endlessnet/client_session_panel.dart';

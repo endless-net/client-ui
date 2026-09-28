@@ -1,3 +1,6 @@
+@Tags(['short'])
+library;
+
 import 'package:endlessnet/client_deep_link.dart';
 import 'package:flutter_test/flutter_test.dart';
 
