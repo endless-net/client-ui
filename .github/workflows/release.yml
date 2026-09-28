@@ -220,8 +220,14 @@ jobs:
         shell: pwsh
         run: |
           $msi = "$env:RUNNER_TEMP/release/EndlessNet.Client.$env:UI_VERSION.msi"
-          & msiexec.exe /i $msi /qn /norestart
-          if ($LASTEXITCODE -ne 0) { throw "MSI install failed with $LASTEXITCODE" }
+          $msiLog = Join-Path $env:RUNNER_TEMP "msi-install.log"
+          if (-not (Test-Path -LiteralPath $msi -PathType Leaf)) { throw "MSI artifact is missing: $msi" }
+          Get-Item -LiteralPath $msi | Select-Object FullName,Length,LastWriteTime | Format-List
+          $install = Start-Process msiexec.exe -ArgumentList @('/i', $msi, '/qn', '/norestart', '/L*V', $msiLog) -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $msiLog) { Get-Content -LiteralPath $msiLog -Tail 160 }
+            throw "MSI install failed with $($install.ExitCode); verbose log: $msiLog"
+          }
           try {
             $env:ENDLESSNET_LIVE_PIPE_TEST = "1"
             Push-Location app
