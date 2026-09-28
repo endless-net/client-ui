@@ -44,7 +44,7 @@ dependencies:
   window_manager: ^0.5.2
   url_launcher: ^6.3.2
   app_links: ^6.4.1
-  win32: ^6.3.0
+  win32: ^6.4.0
   ffi: ^2.2.0
 
 dev_dependencies:
