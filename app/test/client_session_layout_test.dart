@@ -153,7 +153,9 @@ void main() {
         await tester.pumpAndSettle();
         if (i == 10) {
           final setup = find.byKey(
-            const ValueKey('setup-ClientEnrollmentPanel'),
+            const ValueKey<(String, Uri?)>(
+              ('setup-ClientEnrollmentPanel', null),
+            ),
           );
           await tester.ensureVisible(setup);
           await tester.tap(

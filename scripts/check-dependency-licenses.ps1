@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "lib/dart-package-root.ps1")
 $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
 $DartPackageConfig = [System.IO.Path]::GetFullPath($DartPackageConfig)
-$allowed = @("Apache-2.0", "MIT", "BSD-2-Clause", "BSD-3-Clause")
+$allowed = @("Apache-2.0", "MIT", "BSD-2-Clause", "BSD-3-Clause", "MPL-2.0")
 
 function Find-LicenseFile([string]$Root, [string]$StopAt = "") {
     $current = [System.IO.Path]::GetFullPath($Root)
@@ -36,6 +36,9 @@ function Find-LicenseFile([string]$Root, [string]$StopAt = "") {
 
 function Resolve-License([string]$Path) {
     $text = Get-Content -LiteralPath $Path -Raw
+    if ($text -match 'Mozilla Public License\s+Version 2\.0') {
+        return "MPL-2.0"
+    }
     if ($text -match 'Apache License\s+Version 2\.0') {
         return "Apache-2.0"
     }
