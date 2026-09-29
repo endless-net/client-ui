@@ -61,7 +61,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	assertWindowsPathExists(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet-client.exe"))
 	assertWindowsPathExists(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "wintun.dll"))
 	assertWindowsPathExists(t, filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet.exe"))
-	assertWindowsAutostart(t)
+	assertWindowsAutostartNotConfiguredByInstaller(t)
 	assertWindowsStartMenuShortcut(t)
 	assertWindowsDeepLinkProtocol(t)
 
@@ -80,7 +80,7 @@ func TestWindowsClientMSIInstallUpgradeUninstall(t *testing.T) {
 	}
 	assertWindowsServiceAuto(t, "endlessnet-client")
 	assertWindowsServiceFailurePolicy(t, "endlessnet-client")
-	assertWindowsAutostart(t)
+	assertWindowsAutostartNotConfiguredByInstaller(t)
 	assertWindowsStartMenuShortcut(t)
 	assertWindowsDeepLinkProtocol(t)
 	assertWindowsProgramDataACL(t, stateRoot)
@@ -245,15 +245,11 @@ func assertWindowsPathMissing(t *testing.T, path string) {
 	}
 }
 
-func assertWindowsAutostart(t *testing.T) {
+func assertWindowsAutostartNotConfiguredByInstaller(t *testing.T) {
 	t.Helper()
-	out, err := exec.Command("powershell.exe", "-NoProfile", "-Command", `(Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'EndlessNet').EndlessNet`).CombinedOutput()
+	out, err := exec.Command("powershell.exe", "-NoProfile", "-Command", `if ((Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue).PSObject.Properties.Name -contains 'EndlessNet') { exit 1 }`).CombinedOutput()
 	if err != nil {
-		t.Fatalf("query app autostart: %v\n%s", err, out)
-	}
-	want := filepath.Join(os.Getenv("ProgramFiles"), "EndlessNet", "endlessnet.exe")
-	if !strings.Contains(strings.ToLower(string(out)), strings.ToLower(want)) {
-		t.Fatalf("app autostart = %q, want %s", out, want)
+		t.Fatalf("MSI unexpectedly configured current-user UI autostart: %v\n%s", err, out)
 	}
 }
 
