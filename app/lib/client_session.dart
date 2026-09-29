@@ -140,7 +140,6 @@ final class ClientSession {
   ClientConnection? _connection;
   int _epoch = 0;
   bool _closed = false;
-  final _submitting = <api.OperationKind>{};
 
   Future<void> connect() async {
     if (_closed) throw StateError('Client session is closed');
@@ -297,41 +296,30 @@ final class ClientSession {
     final epoch = _epoch;
     final cacheEpoch = state.cacheEpoch;
     final contextEpoch = state.contextEpoch;
-    if (!_submitting.add(kind)) {
-      throw StateError('A submission of this kind is already in progress');
-    }
-    try {
-      // The outbox survives reconnect/restart. A fresh UUID is not a retry of
-      // an accepted or uncertain command, even if the transport is ready again.
-      if ((await journal.pending()).any((intent) => intent.kind == kind)) {
+    // The local journal supports recovery and diagnostics; it is not an
+    // admission lock. The runtime client owns mutation policy and decides
+    // whether concurrent or repeated commands are valid.
+    return journal.submit(kind, (intent) async {
+      if (_closed ||
+          epoch != _epoch ||
+          state.link != ClientLinkState.ready ||
+          state.cacheEpoch != cacheEpoch) {
+        throw StateError('Client context changed before submission');
+      }
+      final operation = await send(
+        connection.mutations,
+        snapshot.mutationContext(intent.requestId),
+      );
+      if (_closed ||
+          epoch != _epoch ||
+          state.contextEpoch != contextEpoch ||
+          state.link != ClientLinkState.ready) {
         throw StateError(
-          'Recover the existing intention before submitting again',
+          'Client context changed after submission; recover the intention',
         );
       }
-      return await journal.submit(kind, (intent) async {
-        if (_closed ||
-            epoch != _epoch ||
-            state.link != ClientLinkState.ready ||
-            state.cacheEpoch != cacheEpoch) {
-          throw StateError('Client context changed before submission');
-        }
-        final operation = await send(
-          connection.mutations,
-          snapshot.mutationContext(intent.requestId),
-        );
-        if (_closed ||
-            epoch != _epoch ||
-            state.contextEpoch != contextEpoch ||
-            state.link != ClientLinkState.ready) {
-          throw StateError(
-            'Client context changed after submission; recover the intention',
-          );
-        }
-        return operation;
-      });
-    } finally {
-      _submitting.remove(kind);
-    }
+      return operation;
+    });
   }
 
   /// The platform launcher must use a fixed installed executable and argument

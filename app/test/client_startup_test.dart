@@ -27,7 +27,7 @@ void main() {
       final config = AppConfig.parse([]);
       expect(config.endpoint, validateLocalEndpoint(null));
       expect(config.showWindow, false);
-      expect(config.debug, false);
+      expect(config.debug, true);
       expect(AppConfig.parse(['--show-window', '--version']).showVersion, true);
       expect(AppConfig.parse(['--show-window']).showWindow, true);
     },

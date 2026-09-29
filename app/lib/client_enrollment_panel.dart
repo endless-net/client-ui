@@ -139,8 +139,8 @@ class _EnrollmentFormState extends State<_EnrollmentForm> {
       'Регистрация принята. Восстановите операцию, чтобы узнать необходимые действия и результат.',
     ),
     _EnrollmentNotice.unknown => _text(
-      'Enrollment could not be confirmed. Recover the intention before retrying.',
-      'Не удалось подтвердить регистрацию. Восстановите исходное намерение перед повторной попыткой.',
+      'The enrollment result could not be confirmed by the client.',
+      'Клиент не подтвердил результат регистрации.',
     ),
   };
   bool get _enabled => mounted && widget.profileId.isNotEmpty && !_busy;

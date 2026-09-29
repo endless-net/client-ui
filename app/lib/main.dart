@@ -276,7 +276,7 @@ class AppConfig {
   static AppConfig parse(List<String> args) {
     String? endpoint;
     var showWindow = false;
-    var debug = false;
+    var debug = true;
     var debugLogDir = _defaultDebugLogDir;
     var showVersion = false;
     Uri? enrollmentUri;
