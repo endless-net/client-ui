@@ -93,6 +93,13 @@ base class ClientIntentJournal {
     return File.fromUri(directory.absolute.uri.resolve('$id.json'));
   }
 
+  bool _samePath(String left, String right) {
+    if (!Platform.isWindows) return left == right;
+    String windowsPath(String value) =>
+        value.replaceAll('/', r'\').toLowerCase();
+    return windowsPath(left) == windowsPath(right);
+  }
+
   Future<List<PendingClientIntent>> pending() => _exclusive(_pending);
 
   Future<List<PendingClientIntent>> _pending() async {
@@ -117,7 +124,7 @@ base class ClientIntentJournal {
         final kind = api.OperationKind.valueOf(data['kind'] as int);
         if (kind == null ||
             kind == api.OperationKind.OPERATION_KIND_UNSPECIFIED ||
-            _file(id).absolute.path != entity.absolute.path) {
+            !_samePath(_file(id).absolute.path, entity.absolute.path)) {
           throw const FormatException();
         }
         result.add(PendingClientIntent(id, kind));
