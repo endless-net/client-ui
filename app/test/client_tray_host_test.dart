@@ -74,7 +74,13 @@ void main() {
             expect(call.arguments, isNull);
             return value;
           });
-          expect(await readClientTrayHostAvailability(platform), value == true);
+          expect(
+            await readClientTrayHostAvailability(
+              platform,
+              host: platform == 'windows' ? _BoundsHost(true) : null,
+            ),
+            value == true,
+          );
         }
       },
     );
@@ -83,9 +89,39 @@ void main() {
       messenger.setMockMethodCallHandler(channel, (_) async {
         throw PlatformException(code: 'private bus details');
       });
-      expect(await readClientTrayHostAvailability(platform), isFalse);
+      expect(
+        await readClientTrayHostAvailability(
+          platform,
+          host: platform == 'windows' ? _BoundsHost(true) : null,
+        ),
+        isFalse,
+      );
     });
   }
+  test('Windows tray availability checks the plugin-owned icon bounds', () async {
+    messenger.setMockMethodCallHandler(channel, (_) async => true);
+    expect(
+      await readClientTrayHostAvailability(
+        'windows',
+        host: _BoundsHost(true),
+      ),
+      isTrue,
+    );
+    expect(
+      await readClientTrayHostAvailability(
+        'windows',
+        host: _BoundsHost(false),
+      ),
+      isFalse,
+    );
+    expect(
+      await readClientTrayHostAvailability(
+        'windows',
+        host: _BoundsHost(false, fail: true),
+      ),
+      isFalse,
+    );
+  });
   test('macOS uses live tray bounds availability', () async {
     messenger.setMockMethodCallHandler(
       channel,

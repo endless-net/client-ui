@@ -143,10 +143,13 @@ Future<bool> readClientTrayHostAvailability(
   }
   if (platform != 'linux' && platform != 'windows') return false;
   try {
-    return await const MethodChannel(
+    final shellAvailable = await const MethodChannel(
           'endlessnet/ui-tray-host',
         ).invokeMethod<Object?>('isAvailable') ==
         true;
+    if (!shellAvailable) return false;
+    if (platform == 'windows') return host?.hasFiniteBounds() ?? false;
+    return true;
   } catch (_) {
     return false;
   }

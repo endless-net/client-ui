@@ -92,19 +92,11 @@ bool FlutterWindow::OnCreate() {
           tray_host_.Available(GetShellWindow() != nullptr)));
       return;
     }
-    // tray_manager 0.5.3 registers ID 1 on the root Flutter window. Query that
-    // exact icon: the plugin does not propagate Shell_NotifyIcon failures.
-    NOTIFYICONIDENTIFIER identifier{};
-    identifier.cbSize = sizeof(identifier);
-    identifier.hWnd = GetHandle();
-    identifier.uID = 1;
-    RECT bounds{};
-    const HRESULT query = Shell_NotifyIconGetRect(&identifier, &bounds);
-    const bool icon_present = UiTrayIconBoundsAvailable(
-        query == S_OK,
-        bounds.left, bounds.top, bounds.right, bounds.bottom);
+    // tray_manager's native API owns a separate window and icon identifier.
+    // Dart queries that exact TrayIcon via getBounds(); this channel only
+    // reports whether the shell host itself is ready.
     result->Success(flutter::EncodableValue(
-        tray_host_.IconAvailable(GetShellWindow() != nullptr, icon_present)));
+        tray_host_.Available(GetShellWindow() != nullptr)));
   });
 
   autostart_channel_ =
