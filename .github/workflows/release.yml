@@ -215,27 +215,48 @@ jobs:
           $path = (Get-ChildItem $dir -Filter "*.msi" | Select-Object -First 1).FullName
           "path=$path" >> $env:GITHUB_OUTPUT
 
-      - name: Test Flutter against installed Go service
+      - name: Checkout pinned native scenario producer
+        if: steps.idempotency.outputs.noop != 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: endless-net/client
+          ref: 80d9cdc16241ca03200381b6b1b04fa5acca1987
+          path: client-source
+          persist-credentials: false
+
+      - name: Set up Go for native scenario producer
+        if: steps.idempotency.outputs.noop != 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: client-source/clientipc/go.mod
+          cache: false
+
+      - name: Build pinned native scenario host
+        if: steps.idempotency.outputs.noop != 'true'
+        shell: pwsh
+        working-directory: client-source/clientipc
+        run: go build -o "$env:RUNNER_TEMP/client-testserver.exe" ./cmd/client-testserver
+
+      - name: Remove fixture checkout from UI source artifacts
         if: steps.idempotency.outputs.noop != 'true'
         shell: pwsh
         run: |
-          $msi = Join-Path (Join-Path $env:RUNNER_TEMP "release") ("EndlessNet.Client.{0}.msi" -f $env:UI_VERSION)
-          $msiLog = Join-Path $env:RUNNER_TEMP "msi-install.log"
-          if (-not (Test-Path -LiteralPath $msi -PathType Leaf)) { throw "MSI artifact is missing: $msi" }
-          Get-Item -LiteralPath $msi | Select-Object FullName,Length,LastWriteTime | Format-List
-          $install = Start-Process msiexec.exe -ArgumentList @('/i', $msi, '/qn', '/norestart', '/L*V', $msiLog) -Wait -PassThru
-          if ($install.ExitCode -ne 0) {
-            if (Test-Path -LiteralPath $msiLog) { Get-Content -LiteralPath $msiLog -Tail 160 }
-            throw "MSI install failed with $($install.ExitCode); verbose log: $msiLog"
+          $workspacePath = [System.IO.Path]::GetFullPath($env:GITHUB_WORKSPACE)
+          $fixturePath = [System.IO.Path]::GetFullPath((Join-Path $workspacePath 'client-source'))
+          if ([System.IO.Path]::GetDirectoryName($fixturePath) -ne $workspacePath) {
+            throw 'Fixture checkout must be a direct workspace child'
           }
-          try {
-            $env:ENDLESSNET_LIVE_PIPE_TEST = "1"
-            Push-Location app
-            try { flutter test test/named_pipe_live_test.dart } finally { Pop-Location }
-          } finally {
-            & msiexec.exe /x $msi /qn /norestart
-            if ($LASTEXITCODE -ne 0) { throw "MSI uninstall failed with $LASTEXITCODE" }
-          }
+          Remove-Item -LiteralPath $fixturePath -Recurse -Force
+
+      - name: Test Flutter local events against pinned Go host
+        if: steps.idempotency.outputs.noop != 'true'
+        env:
+          ENDLESSNET_TESTSERVER: ${{ runner.temp }}\client-testserver.exe
+        shell: pwsh
+        run: |
+          Push-Location app
+          try { flutter test --no-pub test/local_client_events_test.dart }
+          finally { Pop-Location }
 
       - name: Exercise install, repair, upgrade and uninstall
         if: steps.idempotency.outputs.noop != 'true'
