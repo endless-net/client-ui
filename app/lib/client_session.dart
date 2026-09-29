@@ -1,6 +1,9 @@
 import 'package:endlessnet_client_api/client_api.dart' as api;
+import 'package:endlessnet_local_client_rpc/local_client_rpc.dart';
+
 import 'dart:typed_data';
 import 'dart:io';
+
 import 'client_bundle_export.dart';
 import 'client_bundle_chunks.dart';
 
@@ -128,6 +131,8 @@ final class ClientSession {
     required this.journal,
     Future<ClientConnection> Function()? open,
     String? endpoint,
+    this.debugInfo,
+    this.debugError,
   }) : _open =
            open ??
            (() async => _LocalConnection(
@@ -135,6 +140,8 @@ final class ClientSession {
            ));
 
   final ClientIntentJournal journal;
+  final void Function(String)? debugInfo;
+  final void Function(String, Object, StackTrace)? debugError;
   final Future<ClientConnection> Function() _open;
   final ClientStateController state = ClientStateController();
   ClientConnection? _connection;
@@ -285,41 +292,67 @@ final class ClientSession {
     )
     send,
   ) async {
-    final connection = _connection;
-    final snapshot = state.snapshot;
-    if (_closed ||
-        connection == null ||
-        snapshot == null ||
-        state.link != ClientLinkState.ready) {
-      throw StateError('Mutation requires a current runtime snapshot');
-    }
-    final epoch = _epoch;
-    final cacheEpoch = state.cacheEpoch;
-    final contextEpoch = state.contextEpoch;
-    // The local journal supports recovery and diagnostics; it is not an
-    // admission lock. The runtime client owns mutation policy and decides
-    // whether concurrent or repeated commands are valid.
-    return journal.submit(kind, (intent) async {
+    String? requestId;
+    var stage = 'preflight';
+    debugInfo?.call('mutation kind=${kind.name} stage=started');
+    try {
+      final connection = _connection;
+      final snapshot = state.snapshot;
       if (_closed ||
-          epoch != _epoch ||
-          state.link != ClientLinkState.ready ||
-          state.cacheEpoch != cacheEpoch) {
-        throw StateError('Client context changed before submission');
-      }
-      final operation = await send(
-        connection.mutations,
-        snapshot.mutationContext(intent.requestId),
-      );
-      if (_closed ||
-          epoch != _epoch ||
-          state.contextEpoch != contextEpoch ||
+          connection == null ||
+          snapshot == null ||
           state.link != ClientLinkState.ready) {
-        throw StateError(
-          'Client context changed after submission; recover the intention',
-        );
+        throw StateError('Mutation requires a current runtime snapshot');
       }
-      return operation;
-    });
+      final epoch = _epoch;
+      final cacheEpoch = state.cacheEpoch;
+      final contextEpoch = state.contextEpoch;
+      // The local journal supports recovery and diagnostics; it is not an
+      // admission lock. The runtime client owns mutation policy and decides
+      // whether concurrent or repeated commands are valid.
+      stage = 'journal';
+      return await journal.submit(kind, (intent) async {
+        requestId = intent.requestId;
+        debugInfo?.call(
+          'mutation kind=${kind.name} request_id=$requestId stage=prepared',
+        );
+        if (_closed ||
+            epoch != _epoch ||
+            state.link != ClientLinkState.ready ||
+            state.cacheEpoch != cacheEpoch) {
+          throw StateError('Client context changed before submission');
+        }
+        stage = 'rpc';
+        debugInfo?.call(
+          'mutation kind=${kind.name} request_id=$requestId stage=rpc_started',
+        );
+        final operation = await send(
+          connection.mutations,
+          snapshot.mutationContext(intent.requestId),
+        );
+        stage = 'context_check';
+        debugInfo?.call(
+          'mutation kind=${kind.name} request_id=$requestId stage=rpc_completed operation_id=${operation.value.id} state=${operation.value.state.name} failure=${operation.value.hasFailure() ? operation.value.failure.code.name : 'none'}',
+        );
+        if (_closed ||
+            epoch != _epoch ||
+            state.contextEpoch != contextEpoch ||
+            state.link != ClientLinkState.ready) {
+          throw StateError(
+            'Client context changed after submission; recover the intention',
+          );
+        }
+        return operation;
+      });
+    } catch (error, stack) {
+      final failure = failureFromLocalRPCError(error);
+      debugError?.call(
+        'mutation kind=${kind.name} request_id=${requestId ?? 'none'} stage=$stage failure=${failure?.code.name ?? 'none'} action_owner=${failure?.actionOwner.name ?? 'none'}',
+        error,
+        stack,
+      );
+      rethrow;
+    }
   }
 
   /// The platform launcher must use a fixed installed executable and argument

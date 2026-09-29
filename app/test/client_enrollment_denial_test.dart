@@ -85,7 +85,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(submissions, 1);
         expect(
-          find.textContaining('Recover the intention before retrying'),
+          find.textContaining('The enrollment result could not be confirmed by the client.'),
           findsOneWidget,
         );
         expect(find.textContaining('private server diagnostic'), findsNothing);

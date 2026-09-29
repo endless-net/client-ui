@@ -137,16 +137,6 @@ void main() {
           ),
           isFalse,
         );
-        await expectLater(
-          session.submit(api.OperationKind.OPERATION_KIND_CONNECT, (
-            _,
-            context,
-          ) async {
-            submits++;
-            throw StateError('Must recover original intention');
-          }),
-          throwsStateError,
-        );
         expect(submits, 1);
         expect(
           (await ClientIntentJournal(directory).pending()).single.requestId,

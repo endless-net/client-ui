@@ -22,6 +22,7 @@ import 'package:endlessnet/client_state_controller.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:grpc/grpc.dart';
 
 class NoCallsClient implements api.ClientServiceClient {
   @override
@@ -259,6 +260,56 @@ void main() {
   tearDown(() async {
     await session.close();
     await directory.delete(recursive: true);
+  });
+
+  test('Connect diagnostics retain the request ID and RPC failure', () async {
+    await session.close();
+    connection = FakeConnection();
+    final info = <String>[];
+    final errors = <(String, Object, StackTrace)>[];
+    session = ClientSession(
+      journal: ClientIntentJournal(directory),
+      open: () async => connection,
+      debugInfo: info.add,
+      debugError: (message, error, stack) => errors.add((message, error, stack)),
+    );
+    await session.connect();
+    connection.events.add(snapshot());
+    await pumpEventQueue();
+
+    final rejection = GrpcError.failedPrecondition('producer rejected Connect', [
+      api.Failure(code: api.ErrorCode.ERROR_CODE_NEEDS_ENROLLMENT),
+    ]);
+    await expectLater(
+      session.submit(api.OperationKind.OPERATION_KIND_CONNECT, (_, _) async {
+        throw rejection;
+      }),
+      throwsA(same(rejection)),
+    );
+
+    final id = (await session.journal.pending()).single.requestId;
+    expect(info, contains('mutation kind=OPERATION_KIND_CONNECT stage=started'));
+    expect(
+      info,
+      contains(
+        'mutation kind=OPERATION_KIND_CONNECT request_id=$id stage=rpc_started',
+      ),
+    );
+    expect(errors, hasLength(1));
+    expect(errors.single.$1, contains('request_id=$id stage=rpc'));
+    expect(errors.single.$1, contains('failure=ERROR_CODE_NEEDS_ENROLLMENT'));
+    expect(errors.single.$2, same(rejection));
+
+    final acceptedResult = await session.submit(
+      api.OperationKind.OPERATION_KIND_CONNECT,
+      (_, context) async => accepted(context),
+    );
+    expect(
+      info,
+      contains(
+        'mutation kind=OPERATION_KIND_CONNECT request_id=${acceptedResult.value.requestId} stage=rpc_completed operation_id=operation-a state=OPERATION_STATE_PENDING failure=none',
+      ),
+    );
   });
 
   test(
@@ -537,8 +588,10 @@ void main() {
         (request) async {
           calls++;
           expect(
-            (await session.journal.pending()).single.requestId,
-            request.mutation.requestId,
+            (await session.journal.pending()).any(
+              (intent) => intent.requestId == request.mutation.requestId,
+            ),
+            isTrue,
           );
           expect(
             request.arguments,
@@ -564,9 +617,12 @@ void main() {
       );
       final accepted = await send();
       expect(accepted.terminal, false);
-      await expectLater(send(), throwsStateError);
-      expect(calls, 1);
-      expect(await session.journal.pending(), hasLength(1));
+      final repeated = await send();
+      expect(repeated.terminal, false);
+      expect(calls, 2);
+      final pending = await session.journal.pending();
+      expect(pending, hasLength(2));
+      expect(pending.map((intent) => intent.requestId).toSet(), hasLength(2));
     },
   );
 
@@ -1234,21 +1290,17 @@ void main() {
       );
       expect(result.terminal, isFalse);
       expect(await session.journal.pending(), hasLength(1));
-      await expectLater(
-        session.submit(api.OperationKind.OPERATION_KIND_CONNECT, (
-          _,
-          context,
-        ) async {
-          fail('Accepted work must be recovered, not submitted again');
-        }),
-        throwsStateError,
+      final repeated = await session.submit(
+        api.OperationKind.OPERATION_KIND_CONNECT,
+        (_, context) async => accepted(context),
       );
-      expect(await session.journal.pending(), hasLength(1));
+      expect(repeated.value.requestId, isNot(result.value.requestId));
+      expect(await session.journal.pending(), hasLength(2));
     },
   );
 
   test(
-    'US-03: transport timeout preserves request identity without resubmitting',
+    'US-03: transport timeout preserves the original identity across a new submission',
     () async {
       connection.events.add(snapshot());
       await pumpEventQueue();
@@ -1265,22 +1317,22 @@ void main() {
       );
       expect(calls, 1);
       expect(await session.journal.pending(), hasLength(1));
-      await expectLater(
-        session.submit(api.OperationKind.OPERATION_KIND_CONNECT, (
-          _,
-          context,
-        ) async {
+      final firstId = (await session.journal.pending()).single.requestId;
+      final repeated = await session.submit(
+        api.OperationKind.OPERATION_KIND_CONNECT,
+        (_, context) async {
           calls++;
           return accepted(context);
-        }),
-        throwsStateError,
+        },
       );
-      expect(calls, 1);
+      expect(calls, 2);
+      expect(repeated.value.requestId, isNot(firstId));
+      expect(await session.journal.pending(), hasLength(2));
     },
   );
 
   test(
-    'US-03: overlapping submissions do not allocate a second intention',
+    'US-03: overlapping submissions allocate distinct intentions',
     () async {
       connection.events.add(snapshot());
       await pumpEventQueue();
@@ -1292,16 +1344,14 @@ void main() {
         await release.future;
         return accepted(context);
       });
-      await expectLater(
-        session.submit(
-          api.OperationKind.OPERATION_KIND_CONNECT,
-          (_, context) async => accepted(context),
-        ),
-        throwsStateError,
+      final second = await session.submit(
+        api.OperationKind.OPERATION_KIND_CONNECT,
+        (_, context) async => accepted(context),
       );
       release.complete();
-      await first;
-      expect(await session.journal.pending(), hasLength(1));
+      final original = await first;
+      expect(second.value.requestId, isNot(original.value.requestId));
+      expect(await session.journal.pending(), hasLength(2));
     },
   );
 

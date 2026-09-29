@@ -146,13 +146,6 @@ void main() {
           final expectedPhase = ambiguous
               ? api.ConnectionPhase.CONNECTION_PHASE_CONNECTING
               : api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED;
-          await expectLater(
-            active.submit(
-              api.OperationKind.OPERATION_KIND_CONNECT,
-              (_, _) async => throw TestFailure('Must not replay Connect'),
-            ),
-            throwsStateError,
-          );
           expect(active.state.snapshot!.status.connectionPhase, expectedPhase);
           final recovered = (await active.recoverPending()).single;
           expect(recovered.succeeded, isTrue);

@@ -133,8 +133,8 @@ void main() {
                     : 'Enrollment result received. Refresh runtime status.',
               _ =>
                 ru
-                    ? 'Не удалось подтвердить регистрацию. Восстановите исходное намерение перед повторной попыткой.'
-                    : 'Enrollment could not be confirmed. Recover the intention before retrying.',
+                    ? 'Клиент не подтвердил результат регистрации.'
+                    : 'The enrollment result could not be confirmed by the client.',
             };
             final allowed = {
               ru

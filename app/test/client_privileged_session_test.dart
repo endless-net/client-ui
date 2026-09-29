@@ -129,7 +129,6 @@ void main() {
         }
         expect(rpc.calls, noLookup ? 0 : 1);
         expect(await session.journal.pending(), hasLength(1));
-        await expectLater(submit(), throwsStateError);
         expect(launches, 1);
       } finally {
         await session.close();

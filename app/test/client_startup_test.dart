@@ -3,6 +3,7 @@ library;
 
 import 'dart:io';
 import 'dart:ffi';
+
 import 'package:endlessnet/client_build_target.dart';
 import 'package:endlessnet/main.dart';
 import 'package:endlessnet/windows_elevation.dart';
@@ -88,6 +89,25 @@ void main() {
     expect(text, isNot(contains('synthetic-private-value')));
     expect(text, isNot(contains('abc.def')));
     expect(text, isNot(contains('enr_example')));
+  });
+  test('Debug logger writes the complete exception and stack', () async {
+    final directory = await Directory.systemTemp.createTemp('en-debug-log-');
+    try {
+      final logger = AppLogger(directory.path, enabled: true);
+      await logger.open();
+      logger.error(
+        'mutation kind=OPERATION_KIND_CONNECT request_id=request-a stage=rpc',
+        StateError('producer diagnostic detail'),
+        StackTrace.fromString('connect stack frame'),
+      );
+      await logger.close();
+      final log = await File('${directory.path}/endlessnet.log').readAsString();
+      expect(log, contains('request_id=request-a stage=rpc'));
+      expect(log, contains('Bad state: producer diagnostic detail'));
+      expect(log, contains('connect stack frame'));
+    } finally {
+      await directory.delete(recursive: true);
+    }
   });
   test('platform-neutral user paths resolve the native log directory', () {
     expect(resolveUserPath('~/.endlessnet/logs'), contains('.endlessnet/logs'));
