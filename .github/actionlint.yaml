@@ -1,0 +1,5 @@
+# GitHub-hosted Ubuntu 26.04 опубликован в runner reference; каталог actionlint
+# 1.7.12 ещё не знает этот label. Расширение каталога не меняет runs-on или класс CI.
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04

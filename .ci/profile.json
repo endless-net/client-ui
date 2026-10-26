@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "component": "client-ui",
+  "modules": [{"path": "app", "kind": "flutter", "unit": []}],
+  "artifacts": [
+    {"release": "runtime", "kind": "flutter-desktop", "name": "client-ui-windows-amd64", "module": "app", "target": {"os": "windows", "arch": "amd64"}},
+    {"release": "runtime", "kind": "flutter-desktop", "name": "client-ui-linux-amd64", "module": "app", "target": {"os": "linux", "arch": "amd64"}},
+    {"release": "runtime", "kind": "flutter-desktop", "name": "client-ui-darwin-amd64", "module": "app", "target": {"os": "darwin", "arch": "amd64"}},
+    {"release": "runtime", "kind": "flutter-desktop", "name": "client-ui-darwin-arm64", "module": "app", "target": {"os": "darwin", "arch": "arm64"}}
+  ]
+}

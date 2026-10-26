@@ -55,13 +55,23 @@ Service Kit или приватного workspace, их credentials, код, wor
 
 ## Проверки владельца
 
-В текущем checkout нет `pubspec.yaml`, Flutter package, runtime или собственного
-API-модуля. Поэтому Go/Flutter команды сейчас неприменимы и не получают pass.
-Для документации проверить существующие локальные ссылки и `git diff --check`.
+Собственный Flutter package — `app/`, версия SDK закреплена в `.flutter-version`.
+В Ubuntu 26.04 выполнять `python3 -B scripts/ci.py check`: locked dependencies,
+format/analyze, объявленные unit entrypoints и meaningful unit fixtures publisher.
+У пустого UI сейчас нет unit/widget-сценариев; отсутствие сообщается явно,
+не получает pass как покрытие и не требует бессодержательного теста.
+Появление поведения требует добавить unit tests в [profile](.ci/profile.json).
+Integration/E2E и транспортные suites в базовый контур не включать.
 
-При появлении настоящего Flutter package выполнять его locked dependency setup,
-`flutter analyze` и `flutter test` из корня этого package, а также применимые
-платформенные проверки. Не создавать пакет или тест ради фиктивной проверки.
+Native build выполнять на соответствующей ОС по [README](README.md): только
+Windows amd64, Linux amd64, macOS amd64/arm64, без web/mobile. Production codesigning
+и notarization этим validation build не подтверждаются. Go-модуля здесь нет;
+проверки Go неприменимы. Для документации проверить ссылки и `git diff --check`.
+
+Новая v0-линейка не поддерживает обратную совместимость даже между patch:
+hard cutover без shims/fallback/dual APIs. Runtime/API имеют независимые exact
+версии; local replace запрещён. Сохранение данных прямой миграцией не требует
+поддержки старого бинарника и не разрешает скрытый reset.
 UI потребляет SDK producer Client по существующему immutable revision, не
 копирует схемы; consent/отображение requested/effective/local state не дают UI
 права управлять туннелем в обход Client и OS caller authority. Секретные ключи и
