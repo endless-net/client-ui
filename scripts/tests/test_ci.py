@@ -92,6 +92,34 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(command.call_args_list[0].args[0], ["flutter", "--version"])
             self.assertEqual(command.call_args_list[1].args[0], ["flutter", "--version", "--machine"])
 
+    def test_ci_rejects_dirty_source_and_bounds_path_diagnostics(self):
+        status = "\n".join(" M app/generated_" + str(index) + ".cc" for index in range(45))
+        with patch.object(CI, "run", side_effect=[status, "45 files changed"]), patch.dict(
+                os.environ, {"GITHUB_ACTIONS": "true"}, clear=True):
+            with self.assertRaisesRegex(ValueError, "CI checkout"):
+                CI.source_state(Path.cwd())
+        message = CI.print.call_args_list[0].args[0]
+        state = json.loads(message.removeprefix("GIT_SOURCE_DIRTY "))
+        self.assertEqual(len(state["dirty_paths"]), 40)
+        self.assertTrue(state["dirty_paths_truncated"])
+
+    def test_local_development_keeps_honest_dirty_paths(self):
+        status = " M app/windows/flutter/generated_plugins.cmake\n?? unexpected/"
+        with patch.object(CI, "run", side_effect=[status, "1 file changed"]), patch.dict(
+                os.environ, {}, clear=True):
+            state = CI.source_state(Path.cwd())
+        self.assertTrue(state["dirty"])
+        self.assertEqual(state["dirty_paths"], status.splitlines())
+        self.assertFalse(state["dirty_paths_truncated"])
+
+    def test_clean_ci_source_is_accepted(self):
+        with patch.object(CI, "run", return_value="") as command, patch.dict(
+                os.environ, {"GITHUB_ACTIONS": "true"}, clear=True):
+            state = CI.source_state(Path.cwd())
+        self.assertFalse(state["dirty"])
+        self.assertEqual(state["dirty_paths"], [])
+        self.assertEqual(command.call_count, 1)
+
     def fixture(self, root):
         (root / ".ci").mkdir()
         (root / ".ci/profile.json").write_text(json.dumps(PROFILE))

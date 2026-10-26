@@ -173,6 +173,22 @@ def verify_binary(path: Path, target: str, root: Path) -> None:
             raise ValueError("Неверная архитектура macOS executable")
 
 
+def source_state(root: Path) -> dict:
+    status = run(["git", "status", "--porcelain=v1", "--untracked-files=normal"], root, capture=True)
+    paths = status.splitlines()
+    state = {"dirty": bool(paths), "dirty_paths": [line[:300] for line in paths[:40]],
+             "dirty_paths_truncated": len(paths) > 40 or any(len(line) > 300 for line in paths)}
+    if paths:
+        # Только filenames/status и ограниченная статистика, без содержимого файлов.
+        print("GIT_SOURCE_DIRTY " + json.dumps(state), file=sys.stderr, flush=True)
+        diff = run(["git", "diff", "--stat", "HEAD", "--"], root, capture=True)
+        print("GIT_SOURCE_DIFFSTAT " + json.dumps([line[:300] for line in diff.splitlines()[:40]]),
+              file=sys.stderr, flush=True)
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            raise ValueError("CI checkout изменён: сборка не может считаться готовой к выпуску")
+    return state
+
+
 def build(root: Path, target: str, out: Path) -> None:
     profile = load_profile(root)
     artifact = next(item for item in profile["artifacts"]
@@ -181,6 +197,7 @@ def build(root: Path, target: str, out: Path) -> None:
     actual_os = {"Windows": "windows", "Linux": "linux", "Darwin": "darwin"}.get(platform.system())
     if actual_os != expected_os:
         raise ValueError("Native Flutter target должен собираться на соответствующей ОС")
+    source_state(root)
     verify_flutter(root)
     module = inside(root, artifact["module"])
     run(["flutter", "pub", "get", "--enforce-lockfile"], module)
@@ -212,12 +229,13 @@ def build(root: Path, target: str, out: Path) -> None:
             shutil.rmtree(destination)
         shutil.copytree(applications[0], destination, symlinks=True)
     verify_binary(executable, target, root)
+    state = source_state(root)
     suffix = ".zip" if expected_os == "windows" else ".tar.gz"
     path = out / (artifact["name"] + suffix)
     archive(source, path, windows=expected_os == "windows")
     digest = sha256(path)
     identity = {"repository": REPOSITORY, "commit": run(["git", "rev-parse", "HEAD"], root, capture=True),
-                "dirty": bool(run(["git", "status", "--porcelain"], root, capture=True)),
+                **state,
                 "target": target, "archive": path.name, "sha256": digest,
                 "flutter": FLUTTER_VERSION, "dart": DART_VERSION}
     (out / (path.name + ".json")).write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
