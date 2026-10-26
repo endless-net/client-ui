@@ -1,13 +1,21 @@
 # EndlessNet Client UI
 
-Минимальный Flutter desktop-каркас показывает пустое окно. Сетевой runtime,
-ключи, системные привилегии, подключение SDK и продуктовая логика здесь не реализованы.
+Минимальный Flutter desktop-каркас показывает пустое окно. Producer-owned Client
+SDK подключён как Git dependency; сетевой runtime, ключи, системные привилегии
+и продуктовая интеграция SDK с UI здесь не реализованы.
 
 ## Проверки
 
 Flutter 3.47.7, revision `abaf9c523780a608bd46686fd5e53740a07077f8`, Dart 3.13.5.
 Зависимости закреплены в [lockfile](app/pubspec.lock), профиль —
 [.ci/profile.json](.ci/profile.json).
+
+`endlessnet_client_api` получается из `https://github.com/endless-net/client.git`,
+revision `46ca2d1944a3a48ddd606305bab712a766786f93` опубликованного `api/v0.1.0`,
+package path `api/dart`. Manifest и lockfile закрепляют remote Git source без
+соседнего checkout или `dependency_overrides`. Разрешение зависимости не означает
+реализации IPC, consent или другой runtime-интеграции. Версия Dart package `0.0.0`
+принадлежит producer и не заменяет независимый API tag.
 
 ```bash
 python3 -B scripts/ci.py check
@@ -57,6 +65,6 @@ publisher тестируется локальными fake GitHub fixtures.
 
 Новая v0-линейка использует hard cutover без обратной совместимости даже между
 patch-версиями. Compatibility shims, fallback, dual APIs и local replace запрещены.
-SDK producer Client будет подключаться по отдельной опубликованной exact версии,
-когда появится использующая его логика. Данные сохраняются прямыми миграциями.
+SDK producer Client закреплён на отдельной опубликованной exact версии;
+использующая его runtime-логика остаётся отдельным этапом. Данные сохраняются прямыми миграциями.
 Production signing, auto-update и deployment требуют отдельного этапа.

@@ -9,6 +9,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  endlessnet_client_api:
+    git:
+      url: https://github.com/endless-net/client.git
+      ref: 46ca2d1944a3a48ddd606305bab712a766786f93 # api/v0.1.0
+      path: api/dart
 
 dev_dependencies:
   flutter_lints: 6.0.0
