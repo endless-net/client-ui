@@ -87,6 +87,9 @@ def load_profile(root: Path) -> dict:
 def verify_flutter(root: Path) -> None:
     if (root / ".flutter-version").read_text(encoding="utf-8").strip() != FLUTTER_VERSION:
         raise ValueError("Pin Flutter не совпадает с CI")
+    # Первый запуск SDK выводит bootstrap сообщения в stdout даже с --machine.
+    # Завершаем bootstrap до строгого чтения JSON, без игнорирования мусора в нём.
+    run(["flutter", "--version"], root)
     version = json.loads(run(["flutter", "--version", "--machine"], root, capture=True))
     if (version.get("frameworkVersion") != FLUTTER_VERSION
             or version.get("frameworkRevision") != FLUTTER_REVISION

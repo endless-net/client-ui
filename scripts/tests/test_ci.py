@@ -80,6 +80,18 @@ class PipelineTests(unittest.TestCase):
         printer.start()
         self.addCleanup(printer.stop)
 
+    def test_sdk_cold_start_is_bootstrapped_before_machine_json(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".flutter-version").write_text(CI.FLUTTER_VERSION)
+            machine = json.dumps({"frameworkVersion": CI.FLUTTER_VERSION,
+                                  "frameworkRevision": CI.FLUTTER_REVISION,
+                                  "dartSdkVersion": CI.DART_VERSION})
+            with patch.object(CI, "run", side_effect=["Downloading Dart SDK...", machine]) as command:
+                CI.verify_flutter(root)
+            self.assertEqual(command.call_args_list[0].args[0], ["flutter", "--version"])
+            self.assertEqual(command.call_args_list[1].args[0], ["flutter", "--version", "--machine"])
+
     def fixture(self, root):
         (root / ".ci").mkdir()
         (root / ".ci/profile.json").write_text(json.dumps(PROFILE))
