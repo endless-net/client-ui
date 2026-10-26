@@ -1,8 +1,41 @@
-# Working Rules
+# Правила работы: client-ui
 
-- Before working in this repository, read and follow the shared rules in
-  [servicekit/AGENTS.md](../servicekit/AGENTS.md).
-- Resolve the local path relative to this file. If the local file is unavailable,
-  read and follow [service-kit/AGENTS.md on GitHub](https://github.com/endless-net/service-kit/blob/main/AGENTS.md)
-  from the `main` branch instead. Use authenticated GitHub access if required.
-- If neither source is accessible, report the blocker before making changes.
+Репозиторий публичный и использует автономный локальный профиль по STD-030,
+STD-035 и STD-036. Этот профиль заменяет прежний private include: чтение
+Service Kit или приватного workspace, их credentials, код, workflows и образы
+не являются обязательной зависимостью. Приватный профиль не копируется сюда.
+
+- Перед изменениями прочитать [локальную конституцию](.specify/memory/constitution.md)
+  и существующие документы затронутого контракта. Зафиксировать revision и dirty
+  state прочитанных источников; недоступность необходимого источника назвать явно.
+- Выполнять только запрошенную работу в этом репозитории. Сохранять чужие локальные
+  изменения; соседний checkout или упоминание consumer не разрешает его менять.
+  Commit/push, PR, выпуск, deployment и реальные инфраструктурные операции требуют
+  соответствующего запроса. Skills без явного разрешения не изменять.
+- Spec Kit запускать только по явному запросу пользователя; запрошенный этап
+  не запускает следующие автоматически. Предложение и успешная сборка не означают
+  принятие продукта или разрешение перейти к runtime.
+- Схема, генерация и SDK принадлежат producer (STD-006/007). Consumer не создаёт
+  ручную копию доменной модели. API/wire/runtime versions и migration status
+  фиксировать отдельно; credentials не помещать в Git, логи или generated files.
+- Для public CI использовать GitHub-hosted runners и публичные локальные configs
+  (STD-015/029/033/035). Общие Bash/scripts/baseline checks выполняются в Ubuntu
+  26.04; platform-specific проверки отдельно указывают OS и точный scope.
+- При отказе необходимого инструмента или проверке с skip фиксировать not-verified,
+  не pass. Для изменения кода выполнять применимые обязательные проверки всего
+  затронутого модуля, а не только изменённых строк. Для документации проверить
+  локальные ссылки и `git diff --check`.
+
+## Проверки владельца
+
+В текущем checkout нет `pubspec.yaml`, Flutter package, runtime или собственного
+API-модуля. Поэтому Go/Flutter команды сейчас неприменимы и не получают pass.
+Для документации проверить существующие локальные ссылки и `git diff --check`.
+
+При появлении настоящего Flutter package выполнять его locked dependency setup,
+`flutter analyze` и `flutter test` из корня этого package, а также применимые
+платформенные проверки. Не создавать пакет или тест ради фиктивной проверки.
+UI потребляет SDK producer Client по существующему immutable revision, не
+копирует схемы; consent/отображение requested/effective/local state не дают UI
+права управлять туннелем в обход Client и OS caller authority. Секретные ключи и
+session renewal grants не экспортируются UI.
