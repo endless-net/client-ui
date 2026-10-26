@@ -38,6 +38,10 @@ Windows требует Visual Studio Desktop development with C++. macOS тре�
 Наличие локальных изменений записывается в identity; такой архив нельзя опубликовать.
 Нет web, Android или iOS target. Сборка не доказывает runtime-поведение ОС.
 
+Tracked plugin registrants используют LF по `.gitattributes`, как Flutter generator.
+Это исключает ложный modified status после Windows checkout с `core.autocrlf=true`.
+Содержательные изменения исходников по-прежнему блокируют CI build и publisher.
+
 ## CI и выпуск
 
 Автономный public workflow не читает Service Kit и приватный workspace.

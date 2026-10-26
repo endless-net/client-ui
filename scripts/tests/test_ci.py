@@ -120,6 +120,45 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(state["dirty_paths"], [])
         self.assertEqual(command.call_count, 1)
 
+    def test_regenerated_registrants_stay_clean_with_windows_checkout_policy(self):
+        registrants = [
+            "app/linux/flutter/generated_plugin_registrant.cc",
+            "app/linux/flutter/generated_plugin_registrant.h",
+            "app/linux/flutter/generated_plugins.cmake",
+            "app/windows/flutter/generated_plugin_registrant.cc",
+            "app/windows/flutter/generated_plugin_registrant.h",
+            "app/windows/flutter/generated_plugins.cmake",
+            "app/macos/Flutter/GeneratedPluginRegistrant.swift",
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def git(*arguments):
+                return subprocess.run(["git", *arguments], cwd=root, check=True,
+                                      text=True, capture_output=True).stdout.strip()
+            git("init", "--quiet")
+            git("config", "core.autocrlf", "true")
+            policy = Path(CI.__file__).resolve().parents[1] / ".gitattributes"
+            (root / ".gitattributes").write_bytes(policy.read_bytes())
+            content = b"// Generated plugin fixture.\n"
+            for name in registrants:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            git("add", ".gitattributes", *registrants)
+            git("-c", "user.name=CI fixture", "-c", "user.email=ci@example.invalid",
+                "commit", "--quiet", "-m", "fixture")
+            for name in registrants:
+                (root / name).unlink()
+            git("checkout", "--", *registrants)
+            for name in registrants:
+                self.assertEqual((root / name).read_bytes(), content)
+                (root / name).write_bytes(content)
+            with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
+                self.assertFalse(CI.source_state(root)["dirty"])
+                (root / registrants[0]).write_bytes(content + b"// Changed source.\n")
+                with self.assertRaisesRegex(ValueError, "CI checkout"):
+                    CI.source_state(root)
+
     def fixture(self, root):
         (root / ".ci").mkdir()
         (root / ".ci/profile.json").write_text(json.dumps(PROFILE))

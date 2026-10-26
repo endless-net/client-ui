@@ -1,0 +1,7 @@
+# Flutter регенерирует эти tracked registrants с LF на всех ОС.
+# Checkout не должен превращать их в CRLF перед повторной генерацией.
+app/linux/flutter/generated_plugin_registrant.* text eol=lf
+app/linux/flutter/generated_plugins.cmake text eol=lf
+app/windows/flutter/generated_plugin_registrant.* text eol=lf
+app/windows/flutter/generated_plugins.cmake text eol=lf
+app/macos/Flutter/GeneratedPluginRegistrant.swift text eol=lf
