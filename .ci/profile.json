@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "component": "client-ui",
-  "modules": [{"path": "app", "kind": "flutter", "unit": []}],
+  "modules": [{"path": "app", "kind": "flutter", "unit": ["test/enrollment_controller_test.dart", "test/grpc_enrollment_client_test.dart", "test/enrollment_panel_test.dart", "test/correlation_journal_test.dart", "test/server_trust_controller_test.dart", "test/server_trust_panel_test.dart", "test/launch_config_test.dart", "test/session_test.dart"]}],
   "artifacts": [
     {"release": "runtime", "kind": "flutter-desktop", "name": "client-ui-windows-amd64", "module": "app", "target": {"os": "windows", "arch": "amd64"}},
     {"release": "runtime", "kind": "flutter-desktop", "name": "client-ui-linux-amd64", "module": "app", "target": {"os": "linux", "arch": "amd64"}},

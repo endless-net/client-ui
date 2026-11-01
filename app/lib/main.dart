@@ -1,18 +1,9 @@
 import 'package:flutter/material.dart';
 
-void main() {
-  runApp(const MainApp());
-}
+import 'app/app.dart';
+import 'app/windows_runtime_platform.dart';
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      title: 'EndlessNet',
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(body: SizedBox.expand()),
-    );
-  }
+void main(List<String> arguments) {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(MainApp(platform: WindowsUiRuntimePlatform(arguments)));
 }

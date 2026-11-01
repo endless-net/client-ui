@@ -1,8 +1,13 @@
 # EndlessNet Client UI
 
-Минимальный Flutter desktop-каркас показывает пустое окно. Producer-owned Client
-SDK подключён как Git dependency; сетевой runtime, ключи, системные привилегии
-и продуктовая интеграция SDK с UI здесь не реализованы.
+Windows main подключает config, authenticated pipe, correlation journal и панели
+регистрации/подтверждения сервера через published Client SDK. Запуск требует
+--config <absolute local path>; сам файл проверяется native admin-authority reader.
+DLL берётся рядом с текущим executable, config не переопределяет её или digest.
+Рабочие значения установки предоставляет внешний платформенный контур.
+UI восстанавливает исходный UUID; Enroll, browser и trust выполняются только по
+явным действиям. UI не получает device keys, grants или системные привилегии.
+Actual configured startup/installed pair и живой browser/VK flow ещё не проверены.
 
 ## Проверки
 
@@ -11,7 +16,7 @@ Flutter 3.47.7, revision `abaf9c523780a608bd46686fd5e53740a07077f8`, Dart 3.13.5
 [.ci/profile.json](.ci/profile.json).
 
 `endlessnet_client_api` получается из `https://github.com/endless-net/client.git`,
-revision `46ca2d1944a3a48ddd606305bab712a766786f93` опубликованного `api/v0.1.0`,
+revision `0600e7a17d3bc8ad4c2c844109b4abbbeb7ae0a9` опубликованного `api/v0.2.0`,
 package path `api/dart`. Manifest и lockfile закрепляют remote Git source без
 соседнего checkout или `dependency_overrides`. Разрешение зависимости не означает
 реализации IPC, consent или другой runtime-интеграции. Версия Dart package `0.0.0`
@@ -22,8 +27,10 @@ python3 -B scripts/ci.py check
 ```
 
 Команда проверяет pin SDK, locked dependencies, Dart format и Flutter analyze.
-Unit tests проверяют границы publisher и архивов. У пустого UI нет widget/unit
-сценариев: `UNIT_ABSENT` не означает покрытие. Integration/E2E не запускаются.
+Declared unit tests проверяют controller, generated RPC adapter и widget-панель;
+publisher fixtures — границы выпуска/архивов. Используются memory Client/store
+и injected browser callback: они не доказывают Windows IPC/disk durability или
+установленную Client/UI pair. Integration/E2E не запускаются.
 
 ## Native сборки
 
@@ -68,3 +75,155 @@ patch-версиями. Compatibility shims, fallback, dual APIs и local replac
 SDK producer Client закреплён на отдельной опубликованной exact версии;
 использующая его runtime-логика остаётся отдельным этапом. Данные сохраняются прямыми миграциями.
 Production signing, auto-update и deployment требуют отдельного этапа.
+
+## UI correlation journal
+
+app/lib/client/windows_correlation_store.dart открывает bounded append-only journal
+по явно переданному абсолютному пути в подготовленном приватном per-user каталоге.
+Factory не выбирает путь и не создаёт ACL/каталоги. В журнале только UI correlation:
+profile/origin, UUID, hostname/mode и первый recovery deadline; device keys, native
+grants и server credentials не записываются. Запись завершается после flush.
+Recovery bound может только сокращаться при чтении более раннего producer deadline;
+увеличение/удаление запрещены, прежние append-only записи сохраняются.
+Corrupt/partial/existing-empty file, конфликт UUID/deadline, исчерпание budget или
+ошибка lock/IO запрещают работу без truncate/reset/fallback. Lock удерживается
+до await store.close(); app обязан дождаться текущей операции перед завершением.
+Это Windows adapter; другие ОС не получают неподтверждённую гарантию file locking.
+
+Отдельная native Windows проверка (не базовый unit gate), из app/:
+
+```powershell
+dart run test/integration/windows_correlation_store.dart
+```
+
+Fixture использует только собственный временный каталог и дочерние Dart-процессы;
+проверяет flush acknowledgement, restart, межпроцессный lock, immutable deadline
+и отказ при повреждении без сброса файла. Это не power-loss или installed-app
+acceptance. Production namespace/ACL и shell подключены ниже; actual configured
+installed startup проверяется отдельно.
+
+## Windows pipe transport
+
+app/lib/client/windows_pipe.dart использует public grpc/http2 connector API и
+app/native/windows/endlessnet_windows_pipe.dll. Windows CMake собирает DLL и
+включает в bundle рядом с exe. Helper атомарно возвращает Win32 error вместе с
+ReadFile/WriteFile/GetOverlappedResult/CreateFile; отдельного Dart GetLastError нет.
+Дополнительная compile dependency — обычный Windows C++ toolchain сборки Flutter.
+
+WindowsPipeConfig требует trusted instance UUID/SID, absolute local path этой DLL,
+connect/write deadlines≤30s и pending write budget≤1MiB. Connector открывает только
+локальный named pipe, проверяет owner SID по handle до HTTP2, выполняет SDK
+GetRuntimeInfo handshake exact instance/protocol/IPC0/contract digest. Канал
+одноразовый, без TCP/role claim/automatic reconnect или mutation retry. Native
+isolate отменяет pending I/O до освобождения OVERLAPPED/buffers.
+
+Отдельный Client Windows integration fixture TestWindowsDartUIOwnedPipe принимает
+explicit absolute ENDLESSNET_DART_BINARY, ENDLESSNET_UI_PIPE_PROBE (этот app/test/
+integration/windows_pipe_probe.dart) и ENDLESSNET_UI_PIPE_LIBRARY. Без explicit
+probe этот transport suite skipped, в unit gate не входит. Fixture использует
+настоящую pipe OS boundary, synthetic handlers и текущий OS token; не настраивает
+production, не создаёт OS users и не подтверждает весь enrollment. Реальный
+installed discovery/config, consent/trust и shell lifecycle требуют отдельной
+проверки полной установки; source adapters подключены в main.
+
+## Подтверждение сервера
+
+ServerTrustController/ServerTrustPanel читают public identity через Client и
+показывают отдельный диалог origin/key IDs/announcement. Принятие доступно только
+по явному действию; UI hint administrator не заменяет проверку настоящего OS
+caller у Client. Stale dialog/profile/controller не отправляет старую команду.
+После TrustServerIdentity обязательна свежая matching identity; lost response
+остаётся unknown до ручного read без повторной mutation. Эта операция не
+создаёт новую enrollment attempt и сама не доказывает регистрацию Node.
+Панель подключается к enrollment component optional controller seam; actual
+app composition/config/launcher подключены; actual discovery/native trust
+acceptance требуют полной установки.
+
+## UI launch config boundary
+
+lib/app/launch_config.dart определяет собственный UI launch config: schema1,
+instance_id/server_sid/profile_id/control_origin и explicit connect/write/RPC
+timeouts, poll interval, journal/pending-write/Failure budgets. Все поля обязательны,
+no defaults; nested/unknown/secret keys, duplicate decoded keys и malformed input
+отвергаются. Это UI input contract, не Client discovery file или deployment example.
+Производственные значения/создание файла относятся к установочному внешнему контуру.
+
+windows_config_reader.dart использует native reader: absolute fixed local path,
+pinned directory/file handles, no reparse/UNC/traversal, SYSTEM/Administrators
+owner и write grants только им. Reader не создаёт/исправляет ACL и не активирует
+сервисы. Missing/busy/untrusted/invalid/component/platform ошибки различаются без
+вывода raw config. Worker читает≤64KiB; reader не повышает права процесса.
+
+Client descriptor digest compiled в lib/client/contract_identity.dart. CI
+сверяет его с api/client.binpb из actual exact Git SDK cache и manifest/lock.
+Конфигурация не может принять другой digest и обойти pairing. Config/reader,
+per-user storage и launcher подключены в lib/app/windows_runtime_platform.dart.
+Native reader fixture запускается отдельно: dart run
+test/integration/windows_config_reader.dart <absolute compiled helper DLL>.
+Он не создаёт production config и не доказывает установленную Client/UI pair.
+
+## Windows per-user state и browser launcher
+
+lib/app/windows_user_services.dart выбирает собственный UI journal через Windows
+LocalAppData текущего пользователя: EndlessNet/ClientUI/correlation.bin. Native
+helper создаёт только эти два каталога и файл UI; protected DACL допускает текущего
+пользователя, SYSTEM и Administrators. Существующие ACL/content не исправляются.
+Reparse/UNC и доступ других principals отвергаются. Guard удерживает directory и
+file handles без delete sharing до close(), включая новый пустой файл. Journal
+инициализируется только по native createdEmpty acknowledgement; существующий
+пустой/повреждённый файл по-прежнему fail-closed. Закрывать journal перед guard.
+
+Browser launcher — отдельный explicit-action adapter через ShellExecuteExW в
+worker isolate, только для проверенного HTTPS URL. Он не подтверждает вход/Node
+и не запускается автоматически. Main использует его только для текущего browserAction.
+
+Отдельная проверка в собственном Temp: собрать native/windows через CMake с
+-DENDLESSNET_NATIVE_FIXTURE=ON и выполнить из app/ dart run
+test/integration/windows_user_state.dart <absolute fixture DLL>. Export с Temp
+root отсутствует в обычной DLL (option OFF); production adapter отвергает fixture
+DLL. Проверяются DACL/reopen/original UUID, удержание file/directory от rename,
+отказ при расширении ACL; browser получает только отрицательные входы без запуска.
+Fixture не пишет в настоящий LocalAppData и не меняет настройки Client/ОС.
+
+Enrollment snapshot инвалидирует старое trust observation при изменении
+profile/origin/instance/revision, новом server_identity restriction или потере
+доступности. In-flight read/confirmation старого поколения не восстанавливает
+это observation; новый read не может быть старше известного local snapshot.
+UI только инвалидирует кэш, доверие по-прежнему подтверждается Client.
+
+## App session и закрытие окна
+
+lib/app/session.dart последовательно получает config, connection и storage;
+после каждого await проверяет отмену запуска. Частичный startup закрывает только
+полученные ресурсы, продолжая cleanup при ошибке другого ресурса. Контроллеры
+привязываются к config profile; initialize только читает/восстанавливает UUID.
+Trust observation загружается отдельным явным действием панели.
+
+AppLifecycleListener ждёт close при обычном Windows WM_CLOSE: dispose controllers,
+cancel/terminate pipe, затем завершение journal operation/close и release guard.
+Повторный exit разделяет один cleanup; при ошибке exit отменяется с безопасным
+сообщением. Асинхронный Flutter exit dispatch сохраняет дочерние lifecycle
+observers до своего завершения, команды UI блокируются overlay. Force kill и
+power loss этим контрактом не покрываются. Unit/widget fixtures проверяют
+startup cancellation, original UUID reopen, late reply, cleanup/error/exit await
+без запуска настоящего browser или изменения production config.
+
+При потере канала доступно явное переподключение: закрывается прежняя сессия,
+заново читается trusted config и открываются IPC/journal. Восстанавливается тот же
+UUID, Enroll не повторяется. До первой попытки можно отдельно перечитать state/
+availability без сохранения UUID. После dispose контроллер отклоняет команды
+независимо от состояния старых кнопок и keyboard focus.
+
+UI применяет один active waiting deadline к polling/browser/actions: для known
+состояния — login/approval/total, для uncertain — минимум сохранённого UI recovery,
+producer recovery и total. Исторический recovery не останавливает подтверждённое
+обычное ожидание; при новой потере ответа его нельзя продлить. Более ранний
+producer bound сохраняется до принятия snapshot, ошибка flush останавливает
+automatic polling. Истечение UI budget не объявляет remote rollback или Node denial.
+
+Отдельный `app/test/integration/owner_chain_test.dart` проверяет реальные
+controller/panel, native pipe и журнал на Docker owner chain. Его запускает
+opt-in Client test `TestWindowsUIAgainstActualOwnerChain`, передавая только Temp
+конфигурацию и публичные идентификаторы. Два запуска проверяют unknown outcome и
+восстановление исходного UUID до подтверждённой регистрации. Этот entrypoint
+не входит в unit profile; VK/browser и discovery являются изолированными fixtures.

@@ -165,6 +165,13 @@ class PipelineTests(unittest.TestCase):
         (root / "app").mkdir()
         (root / "app/pubspec.yaml").write_text("name: fixture\n")
         (root / "app/pubspec.lock").write_text("packages: {}\n")
+        # Profile теперь содержит настоящие UI unit entrypoints. Fixture
+        # publisher проверяет наличие путей, не запускает Flutter/private IPC.
+        for module in PROFILE["modules"]:
+            for entry in module["unit"]:
+                path = root / module["path"] / entry
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("// Synthetic profile path fixture.\n")
         out = root / ".artifacts"
         out.mkdir()
         for artifact in PROFILE["artifacts"]:

@@ -51,6 +51,8 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
+add_subdirectory("../native/windows" "native_pipe")
+add_dependencies(${BINARY_NAME} endlessnet_windows_pipe)
 
 
 # Generated plugin build rules, which manage building the plugins and adding
@@ -71,6 +73,9 @@ endif()
 
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
+
+install(TARGETS endlessnet_windows_pipe RUNTIME DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  COMPONENT Runtime)
 
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)

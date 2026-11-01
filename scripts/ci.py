@@ -18,6 +18,8 @@ import sys
 import tarfile
 import tempfile
 import zipfile
+from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname
 
 
 FLUTTER_VERSION = "3.47.7"
@@ -97,11 +99,52 @@ def verify_flutter(root: Path) -> None:
         raise ValueError("Требуется закреплённый Flutter/Dart SDK")
 
 
+def verify_client_contract(module: Path) -> None:
+    """Compiled consumer digest must describe the actual immutable producer SDK."""
+    source = (module / "lib/client/contract_identity.dart").read_text(encoding="utf-8")
+    revisions = re.findall(r"clientApiRevision\s*=\s*'([0-9a-f]{40})'", source)
+    digests = re.findall(r"clientContractSha256\s*=\s*'([0-9a-f]{64})'", source)
+    if len(revisions) != 1 or len(digests) != 1:
+        raise ValueError("Client contract identity не определён однозначно")
+    revision, digest = revisions[0], digests[0]
+    manifest = (module / "pubspec.yaml").read_text(encoding="utf-8")
+    lock = (module / "pubspec.lock").read_text(encoding="utf-8")
+    if ("dependency_overrides:" in manifest or
+            not re.search(r"^      ref: " + revision + r"(?: +#.*)?$", manifest, re.M)):
+        raise ValueError("Client SDK manifest pin не совпадает с compiled identity")
+    entries = re.findall(r"^  endlessnet_client_api:\n(.*?)(?=^  [a-zA-Z_]|^sdks:|\Z)", lock, re.M | re.S)
+    if len(entries) != 1 or any(not re.search(pattern, entries[0], re.M) for pattern in (
+            r'^      ref: "' + revision + r'"$',
+            r'^      resolved-ref: "' + revision + r'"$',
+            r'^      path: "api/dart"$', r'^    source: git$')):
+        raise ValueError("Client SDK lock не совпадает с compiled identity")
+    config = module / ".dart_tool/package_config.json"
+    packages = json.loads(config.read_text(encoding="utf-8"))["packages"]
+    roots = [p["rootUri"] for p in packages if p["name"] == "endlessnet_client_api"]
+    if len(roots) != 1:
+        raise ValueError("Client SDK package root неоднозначен")
+    uri = urlparse(roots[0])
+    if uri.scheme == "file" and not uri.netloc:
+        sdk = Path(url2pathname(uri.path)).resolve(strict=True)
+    elif not uri.scheme and not uri.netloc:
+        sdk = (config.parent / unquote(uri.path)).resolve(strict=True)
+    else:
+        raise ValueError("Client SDK должен быть resolved local Git cache")
+    if (sdk.name != "dart" or sdk.parent.name != "api" or
+            run(["git", "rev-parse", "HEAD"], sdk, capture=True) != revision or
+            run(["git", "status", "--porcelain", "--", "."], sdk, capture=True)):
+        raise ValueError("Client SDK cache не равен exact producer source")
+    descriptor = sdk.parent / "client.binpb"
+    if not descriptor.is_file() or hashlib.sha256(descriptor.read_bytes()).hexdigest() != digest:
+        raise ValueError("Compiled Client digest не равен published descriptor")
+
+
 def check(root: Path) -> None:
     profile = load_profile(root)
     verify_flutter(root)
     module = inside(root, profile["modules"][0]["path"])
     run(["flutter", "pub", "get", "--enforce-lockfile"], module)
+    verify_client_contract(module)
     run(["dart", "format", "--output=none", "--set-exit-if-changed", "lib"], module)
     run(["flutter", "analyze", "--no-pub"], module)
     units = profile["modules"][0]["unit"]

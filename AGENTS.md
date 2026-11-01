@@ -58,8 +58,8 @@ Service Kit или приватного workspace, их credentials, код, wor
 Собственный Flutter package — `app/`, версия SDK закреплена в `.flutter-version`.
 В Ubuntu 26.04 выполнять `python3 -B scripts/ci.py check`: locked dependencies,
 format/analyze, объявленные unit entrypoints и meaningful unit fixtures publisher.
-У пустого UI сейчас нет unit/widget-сценариев; отсутствие сообщается явно,
-не получает pass как покрытие и не требует бессодержательного теста.
+Отсутствие применимых unit/widget-сценариев сообщается явно, не получает pass
+как покрытие и не требует бессодержательного теста.
 Появление поведения требует добавить unit tests в [profile](.ci/profile.json).
 Integration/E2E и транспортные suites в базовый контур не включать.
 
