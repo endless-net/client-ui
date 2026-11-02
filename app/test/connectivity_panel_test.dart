@@ -6,6 +6,93 @@ import 'package:flutter_test/flutter_test.dart';
 import 'connectivity_controller_test.dart' as fixture;
 
 void main() {
+  testWidgets('recovery is visible without claiming application access', (
+    tester,
+  ) async {
+    final client = fixture.ConnectivityFixture();
+    client.value.serviceState = api.ServiceState.SERVICE_STATE_RECOVERING;
+    client.value.connectionPhase =
+        api.ConnectionPhase.CONNECTION_PHASE_CONNECTING;
+    client.value.clearAgent();
+    final c = fixture.controller(client);
+    await c.bind(fixture.profile());
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: ConnectivityPanel(controller: c)),
+      ),
+    );
+    expect(
+      find.text('Соединение: подключение или восстановление выполняется'),
+      findsOneWidget,
+    );
+    expect(find.text('Direct-путь: подтверждён'), findsNothing);
+    expect(client.connects, 0);
+  });
+
+  for (final entry in {
+    'client.connection.trust_required': 'подтвердите доверие отдельно',
+    'client.connection.credential_expired':
+        'вход в учётную запись не продлевает это право',
+    'client.connection.deadline': 'бюджет 30 секунд исчерпан',
+    'client.connection.registration_revoked': 'Регистрация устройства отозвана',
+  }.entries) {
+    testWidgets('recovery reason ${entry.key} has a safe next action', (
+      tester,
+    ) async {
+      final client = fixture.ConnectivityFixture();
+      client.value.serviceState = api.ServiceState.SERVICE_STATE_ERROR;
+      client.value.failures.add(api.Failure(reasonKey: entry.key));
+      final c = fixture.controller(client);
+      await c.bind(fixture.profile());
+      addTearDown(c.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ConnectivityPanel(controller: c),
+            ),
+          ),
+        ),
+      );
+      expect(find.textContaining(entry.value), findsOneWidget);
+      expect(client.connects, 0);
+    });
+  }
+  testWidgets(
+    'blocked target explains new authorized admission without claiming a confirmed revoke',
+    (tester) async {
+      final client = fixture.ConnectivityFixture();
+      client.value.serviceState = api.ServiceState.SERVICE_STATE_POLICY_BLOCKED;
+      client.value.failures.add(
+        api.Failure(
+          code: api.ErrorCode.ERROR_CODE_POLICY_BLOCKED,
+          reasonKey: 'client.connection.access_denied',
+        ),
+      );
+      final c = fixture.controller(client);
+      await c.bind(fixture.profile());
+      addTearDown(c.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ConnectivityPanel(controller: c),
+            ),
+          ),
+        ),
+      );
+      expect(
+        find.textContaining(
+          'Если регистрация отозвана, для возврата нужен новый авторизованный допуск',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Запрет подтверждён'), findsNothing);
+      expect(client.connects, 0);
+      expect(client.disconnects, 0);
+    },
+  );
   testWidgets(
     'acknowledged apply and Direct path remain separate from application availability',
     (tester) async {
@@ -33,7 +120,10 @@ void main() {
       };
       await tester.tap(find.text('Подключить'));
       await tester.pumpAndSettle();
-      expect(find.text('Соединение: подключение выполняется'), findsOneWidget);
+      expect(
+        find.text('Соединение: подключение или восстановление выполняется'),
+        findsOneWidget,
+      );
       expect(find.text('Direct-путь: не подтверждён'), findsOneWidget);
       client.value.serviceState = api.ServiceState.SERVICE_STATE_CONNECTED;
       client.value.connectionPhase =
@@ -94,6 +184,9 @@ void main() {
       client.value.credential = api.CredentialStatus(
         state: api.CredentialState.CREDENTIAL_STATE_EXPIRED,
       );
+      client.value.session = api.Session(
+        state: api.SessionState.SESSION_STATE_EXPIRED,
+      );
       client.value.connectionPhase =
           api.ConnectionPhase.CONNECTION_PHASE_UNSPECIFIED;
       client.value.serviceState = api.ServiceState.SERVICE_STATE_ERROR;
@@ -111,6 +204,7 @@ void main() {
         find.textContaining('Учётные данные устройства истекли.'),
         findsOneWidget,
       );
+      expect(find.textContaining('Сеанс пользователя истёк.'), findsOneWidget);
       expect(
         find.text('Очистка сетевых ресурсов не подтверждена.'),
         findsOneWidget,

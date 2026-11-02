@@ -27,6 +27,10 @@ class ConnectivityPanel extends StatelessWidget {
     if (s?.controlState == api.ControlState.CONTROL_STATE_OFFLINE_CACHE) {
       return 'Соединение: сервер управления недоступен';
     }
+    if (s?.serviceState == api.ServiceState.SERVICE_STATE_RECOVERING &&
+        s?.connectionPhase == api.ConnectionPhase.CONNECTION_PHASE_CONNECTING) {
+      return 'Соединение: подключение или восстановление выполняется';
+    }
     return switch (s?.connectionPhase) {
       api.ConnectionPhase.CONNECTION_PHASE_CONNECTING =>
         'Соединение: подключение выполняется',
@@ -43,6 +47,18 @@ class ConnectivityPanel extends StatelessWidget {
   }
 
   String _reason(api.Failure f) {
+    if (f.reasonKey == 'client.connection.registration_revoked') {
+      return 'Регистрация устройства отозвана. Для возврата нужен новый авторизованный допуск; переподключение не восстанавливает прежнее право.';
+    }
+    if (f.reasonKey == 'client.connection.trust_required') {
+      return 'Доверенная подпись сервера изменилась или не подтверждена. Проверьте сервер и подтвердите доверие отдельно; повтор подключения не подтверждает новую подпись.';
+    }
+    if (f.reasonKey == 'client.connection.credential_expired') {
+      return 'Право устройства истекло или его срок неизвестен. Выполните авторизованное продление учётных данных устройства; вход в учётную запись не продлевает это право.';
+    }
+    if (f.reasonKey == 'client.connection.deadline') {
+      return 'Попытка подключения или восстановления завершена: бюджет 30 секунд исчерпан. Проверьте сеть и разрешённый Direct-путь, затем повторите подключение.';
+    }
     if (f.reasonKey == 'client.connection.cleanup_unconfirmed') {
       return 'Очистка сетевых ресурсов не подтверждена.';
     }
@@ -59,8 +75,7 @@ class ConnectivityPanel extends StatelessWidget {
       return 'Безопасное время выполнения не подтверждено. Проверьте службу и часы устройства.';
     }
     return switch (f.code) {
-      api.ErrorCode.ERROR_CODE_POLICY_BLOCKED =>
-        'Разрешение отозвано, истекло или не подтверждено.',
+      api.ErrorCode.ERROR_CODE_POLICY_BLOCKED => 'Разрешение отозвано, истекло или не подтверждено. Если регистрация отозвана, для возврата нужен новый авторизованный допуск. Повтор подключения не восстанавливает прежнее право.',
       api.ErrorCode.ERROR_CODE_PERMISSION_REQUIRED =>
         'Недостаточно локальных разрешений.',
       api.ErrorCode.ERROR_CODE_RESOURCE_CONFLICT =>
@@ -151,6 +166,11 @@ class ConnectivityPanel extends StatelessWidget {
                       api.CredentialState.CREDENTIAL_STATE_EXPIRED)
                 const Text(
                   'Учётные данные устройства истекли. Требуется восстановить право доступа.',
+                ),
+              if (c.fresh &&
+                  s?.session.state == api.SessionState.SESSION_STATE_EXPIRED)
+                const Text(
+                  'Сеанс пользователя истёк. Для действий учётной записи войдите снова; это не продлевает право устройства.',
                 ),
               if (c.uncertain)
                 const Text(

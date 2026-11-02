@@ -48,6 +48,12 @@ class ContractIdentityTests(unittest.TestCase):
     def test_exact_clean_sdk_descriptor_matches_compiled_identity(self):
         CI.verify_client_contract(self.module)
 
+    def test_pub_lock_may_leave_an_exact_hex_ref_unquoted(self):
+        lock = self.module / "pubspec.lock"
+        lock.write_text(lock.read_text(encoding="utf-8").replace(
+            '"' + self.revision + '"', self.revision), encoding="utf-8")
+        CI.verify_client_contract(self.module)
+
     def test_modified_cached_sdk_is_not_exact_producer_source(self):
         (self.sdk / "sdk.txt").write_text("modified", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "exact producer"):

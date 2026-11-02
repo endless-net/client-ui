@@ -4,11 +4,12 @@ import 'package:grpc/grpc.dart' as grpc;
 import 'call_failure.dart';
 import 'connectivity_client.dart';
 import 'enrollment_client.dart';
+import 'revocation_client.dart';
 
 // Generated SDK получает уже OS-authenticated pipe channel. Здесь нет TCP,
 // channel credentials, server SDK, retry interceptor или transport fallback.
 final class GrpcEnrollmentClient
-    implements EnrollmentClient, ConnectivityClient {
+    implements EnrollmentClient, ConnectivityClient, RevocationClient {
   GrpcEnrollmentClient(this._client, {required this.maxFailureBytes}) {
     if (maxFailureBytes <= 0 || maxFailureBytes > 65536) {
       throw ArgumentError('failure budget');
@@ -16,6 +17,50 @@ final class GrpcEnrollmentClient
   }
   final api.ClientServiceClient _client;
   final int maxFailureBytes;
+
+  @override
+  Future<api.ListNodeRevocationTargetsResponse> revocationTargets(
+    api.ListNodeRevocationTargetsRequest request,
+    Duration timeout,
+  ) => _invoke(
+    () => _client.listNodeRevocationTargets(
+      api.ListNodeRevocationTargetsRequest.fromBuffer(request.writeToBuffer()),
+      options: _options(timeout),
+    ),
+  );
+  @override
+  Future<api.NodeRevocationResult> revokeNode(
+    api.RevokeNodeAccessRequest request,
+    Duration timeout,
+  ) async {
+    final r = await _invoke(
+      () => _client.revokeNodeAccess(
+        api.RevokeNodeAccessRequest.fromBuffer(request.writeToBuffer()),
+        options: _options(timeout),
+      ),
+    );
+    if (!r.hasResult()) {
+      throw ClientCallFailure.protocol();
+    }
+    return api.NodeRevocationResult.fromBuffer(r.result.writeToBuffer());
+  }
+
+  @override
+  Future<api.NodeRevocationResult> nodeRevocation(
+    api.GetNodeRevocationRequest request,
+    Duration timeout,
+  ) async {
+    final r = await _invoke(
+      () => _client.getNodeRevocation(
+        api.GetNodeRevocationRequest.fromBuffer(request.writeToBuffer()),
+        options: _options(timeout),
+      ),
+    );
+    if (!r.hasResult()) {
+      throw ClientCallFailure.protocol();
+    }
+    return api.NodeRevocationResult.fromBuffer(r.result.writeToBuffer());
+  }
 
   grpc.CallOptions _options(Duration timeout) {
     if (timeout <= Duration.zero || timeout > const Duration(seconds: 30)) {

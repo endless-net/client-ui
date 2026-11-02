@@ -114,8 +114,8 @@ def verify_client_contract(module: Path) -> None:
         raise ValueError("Client SDK manifest pin не совпадает с compiled identity")
     entries = re.findall(r"^  endlessnet_client_api:\n(.*?)(?=^  [a-zA-Z_]|^sdks:|\Z)", lock, re.M | re.S)
     if len(entries) != 1 or any(not re.search(pattern, entries[0], re.M) for pattern in (
-            r'^      ref: "' + revision + r'"$',
-            r'^      resolved-ref: "' + revision + r'"$',
+            r'^      ref: (?:' + revision + r'|"' + revision + r'")$',
+            r'^      resolved-ref: (?:' + revision + r'|"' + revision + r'")$',
             r'^      path: "api/dart"$', r'^    source: git$')):
         raise ValueError("Client SDK lock не совпадает с compiled identity")
     config = module / ".dart_tool/package_config.json"

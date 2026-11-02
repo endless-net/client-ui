@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 
 import 'enrollment_client.dart';
+import 'revocation_correlation.dart';
 
 // UI-owned correlation only. This is neither an API DTO nor a device-key store.
 abstract interface class CorrelationJournalIO {
@@ -33,7 +34,8 @@ final class CorrelationStoreFailure implements Exception {
 
 // Caller supplies an already exclusively locked handle for this store lifetime.
 // The Windows factory owns that contract. Memory IO is used only by unit tests.
-final class JournalCorrelationStore implements CorrelationStore {
+final class JournalCorrelationStore
+    implements CorrelationStore, RevocationCorrelationStore {
   JournalCorrelationStore(this._io, {required this.maxBytes}) {
     if (maxBytes < 8192 || maxBytes > 16 * 1024 * 1024) {
       throw ArgumentError('correlation journal budget');
@@ -100,6 +102,31 @@ final class JournalCorrelationStore implements CorrelationStore {
       }
     }();
   }
+
+  @override
+  Future<RevocationCorrelation?> readRevocation(
+    String profile,
+    String origin,
+  ) => _run(() async {
+    final rows = CorrelationJournal.revocationRecords(await _io.read(maxBytes));
+    final selected = rows.where(
+      (c) => c.profileId == profile && c.controlOrigin == origin,
+    );
+    return selected.isEmpty ? null : selected.last;
+  });
+
+  @override
+  Future<void> saveRevocation(RevocationCorrelation value) => _run(() async {
+    final existing = await _io.read(maxBytes);
+    final frame = CorrelationJournal.appendRevocation(existing, value);
+    if (existing.length + frame.length > maxBytes) {
+      throw const CorrelationStoreFailure(CorrelationStoreProblem.full);
+    }
+    if (frame.isNotEmpty) {
+      await _io.append(frame);
+    }
+    await _io.flush();
+  });
 }
 
 final class CorrelationJournal {
@@ -208,6 +235,11 @@ final class CorrelationJournal {
 
       try {
         final profile = field();
+        if (profile == '@REV006') {
+          RevocationCorrelation.decode(body.sublist(offset));
+          pos = end + _hashBytes;
+          continue;
+        }
         final origin = field();
         final uuid = field();
         final hostname = field();
@@ -273,6 +305,75 @@ final class CorrelationJournal {
       ..add((ByteData(4)..setUint32(0, payload.length)).buffer.asUint8List())
       ..add(payload);
     final bytes = frame.takeBytes();
+    return (BytesBuilder(copy: false)
+          ..add(existing.isEmpty ? _magic : const [])
+          ..add(bytes)
+          ..add(sha256.convert(bytes).bytes))
+        .takeBytes();
+  }
+
+  static List<RevocationCorrelation> revocationRecords(Uint8List data) {
+    decode(
+      data,
+    ); // Validate all frames, including interleaved enrollment history.
+    final result = <RevocationCorrelation>[];
+    var pos = data.isEmpty ? 0 : _magic.length;
+    while (pos < data.length) {
+      final length = ByteData.sublistView(data, pos, pos + 4).getUint32(0);
+      final body = Uint8List.sublistView(data, pos + 4, pos + 4 + length);
+      const marker = [0, 7, 64, 82, 69, 86, 48, 48, 54]; // length + @REV006.
+      if (body.length >= marker.length &&
+          _same(body.sublist(0, marker.length), marker)) {
+        result.add(RevocationCorrelation.decode(body.sublist(marker.length)));
+      }
+      pos += 4 + length + _hashBytes;
+    }
+    return result;
+  }
+
+  static Uint8List appendRevocation(
+    Uint8List existing,
+    RevocationCorrelation value,
+  ) {
+    value.validate();
+    final records = revocationRecords(existing);
+    final selected = records
+        .where(
+          (c) =>
+              c.profileId == value.profileId &&
+              c.controlOrigin == value.controlOrigin,
+        )
+        .toList();
+    final old = selected.isEmpty ? null : selected.last;
+    final reused = selected.where((c) => c.commandId == value.commandId);
+    if (old == null && value.resolved ||
+        old != null &&
+            (old.commandId == value.commandId &&
+                    (!old.same(value) || old.resolved && !value.resolved) ||
+                old.commandId != value.commandId &&
+                    (!old.resolved || value.resolved || reused.isNotEmpty))) {
+      throw const CorrelationStoreFailure(CorrelationStoreProblem.conflict);
+    }
+    if (old != null && old.same(value) && old.resolved == value.resolved) {
+      return Uint8List(0);
+    }
+    final payload =
+        (BytesBuilder(copy: false)
+              ..add(const [0, 7, 64, 82, 69, 86, 48, 48, 54])
+              ..add(value.encode()))
+            .takeBytes();
+    if (payload.length > _maxFrame) {
+      throw const CorrelationStoreFailure(CorrelationStoreProblem.full);
+    }
+    final bytes =
+        (BytesBuilder(copy: false)
+              ..add(
+                (ByteData(
+                  4,
+                )..setUint32(0, payload.length)).buffer.asUint8List(),
+              )
+              ..add(payload))
+            .takeBytes();
     return (BytesBuilder(copy: false)
           ..add(existing.isEmpty ? _magic : const [])
           ..add(bytes)

@@ -3,6 +3,9 @@ import 'dart:async';
 import '../client/enrollment_client.dart';
 import '../client/connectivity_client.dart';
 import '../connectivity/controller.dart';
+import '../revocation/controller.dart';
+import '../client/revocation_client.dart';
+import '../client/revocation_correlation.dart';
 import '../enrollment/controller.dart';
 import '../enrollment/server_trust_controller.dart';
 import 'launch_config.dart';
@@ -58,7 +61,18 @@ final class UiSession {
         expectedInstanceId: config.pipe.instanceId,
         readTimeout: config.rpcTimeout,
         pollInterval: config.pollInterval,
-      ) {
+      ),
+      revocation =
+          _connection.client is RevocationClient &&
+              _storage.store is RevocationCorrelationStore
+          ? RevocationController(
+              client: _connection.client as RevocationClient,
+              store: _storage.store as RevocationCorrelationStore,
+              expectedContractSha256: config.contractSha256,
+              expectedInstanceId: config.pipe.instanceId,
+              timeout: config.rpcTimeout,
+            )
+          : null {
     enrollment.addListener(_observeEnrollment);
   }
 
@@ -69,6 +83,8 @@ final class UiSession {
   final EnrollmentController enrollment;
   final ServerTrustController trust;
   final ConnectivityController connectivity;
+  final RevocationController? revocation;
+  String _revocationNodeContext = '';
   Future<void>? _initialization;
   Future<void>? _closing;
   bool get closed => _closing != null;
@@ -83,6 +99,13 @@ final class UiSession {
           !enrollment.callRejected,
     );
     unawaited(connectivity.refresh());
+    final node = enrollment.currentAttempt?.nodeId ?? '';
+    if (node != _revocationNodeContext) {
+      _revocationNodeContext = node;
+      if (node.isNotEmpty && revocation != null) {
+        unawaited(revocation!.refresh());
+      }
+    }
   }
 
   static Future<UiSession> open(
@@ -126,6 +149,7 @@ final class UiSession {
     return _initialization ??= () async {
       await enrollment.bind(config.profile);
       if (!closed) await connectivity.bind(config.profile);
+      if (!closed) await revocation?.bind(config.profile);
     }();
   }
 
@@ -140,6 +164,7 @@ final class UiSession {
     enrollment.dispose();
     trust.dispose();
     connectivity.dispose();
+    revocation?.dispose();
     return _closing = () async {
       try {
         await _connection.close();
