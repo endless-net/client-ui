@@ -10,6 +10,7 @@ import 'package:endlessnet_client_ui/app/session.dart';
 import 'package:endlessnet_client_ui/app/windows_runtime_platform.dart';
 import 'package:endlessnet_client_ui/client/contract_identity.dart';
 import 'package:endlessnet_client_ui/client/enrollment_client.dart';
+import 'package:endlessnet_client_ui/client/connectivity_client.dart';
 import 'package:endlessnet_client_ui/client/call_failure.dart';
 import 'package:grpc/grpc.dart' as grpc;
 import 'package:flutter/material.dart';
@@ -20,6 +21,29 @@ import 'enrollment_controller_test.dart' as fixture;
 import 'launch_config_test.dart' as config_fixture;
 import 'server_trust_controller_test.dart' as trust_fixture;
 
+final class SessionConnectivity implements ConnectivityClient {
+  SessionConnectivity(this.client);
+  final EnrollmentClient client;
+  int connects = 0, disconnects = 0;
+  @override
+  Future<api.RuntimeInfo> runtimeInfo(Duration timeout) =>
+      client.runtimeInfo(timeout);
+  @override
+  Future<api.Status> status(Duration timeout) => client.status(timeout);
+  @override
+  Future<void> connect(api.ConnectRequest request, Duration timeout) async {
+    connects++;
+  }
+
+  @override
+  Future<void> disconnect(
+    api.DisconnectRequest request,
+    Duration timeout,
+  ) async {
+    disconnects++;
+  }
+}
+
 final class TestPlatform implements UiRuntimePlatform {
   TestPlatform({fixture.FakeClient? client})
     : client = client ?? fixture.FakeClient() {
@@ -29,6 +53,7 @@ final class TestPlatform implements UiRuntimePlatform {
     Uint8List.fromList(utf8.encode(jsonEncode(config_fixture.launchValues()))),
     nativeLibraryPath: r'C:\bundle\endlessnet_windows_pipe.dll',
   );
+  late final connectivity = SessionConnectivity(client);
   final fixture.FakeClient client;
   final store = fixture.MemoryCorrelation();
   final events = <String>[];
@@ -51,7 +76,7 @@ final class TestPlatform implements UiRuntimePlatform {
     return UiClientConnection(client, () async {
       events.add('connection.close');
       if (failConnectionClose) throw StateError('raw-close-diagnostic');
-    });
+    }, connectivity: connectivity);
   }
 
   @override

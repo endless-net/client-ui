@@ -17,6 +17,7 @@ class EnrollmentPanel extends StatefulWidget {
     this.openBrowser,
     this.serverTrust,
     this.reconnect,
+    this.connectivityPanel,
   });
 
   final EnrollmentController controller;
@@ -24,6 +25,7 @@ class EnrollmentPanel extends StatefulWidget {
   final DateTime Function() now;
   final Future<bool> Function(Uri)? openBrowser;
   final Future<void> Function()? reconnect;
+  final Widget? connectivityPanel;
 
   @override
   State<EnrollmentPanel> createState() => _EnrollmentPanelState();
@@ -182,6 +184,7 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
               Text('Сервер: ${profile.controlOrigin}'),
             ],
             if (c.busy) const LinearProgressIndicator(),
+            if (widget.connectivityPanel != null) widget.connectivityPanel!,
             if (reason.isNotEmpty) Text(reason),
             if (action.isNotEmpty) Text(action),
             if (attempt == null && c.correlation == null) ...[

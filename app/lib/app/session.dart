@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import '../client/enrollment_client.dart';
+import '../client/connectivity_client.dart';
+import '../connectivity/controller.dart';
 import '../enrollment/controller.dart';
 import '../enrollment/server_trust_controller.dart';
 import 'launch_config.dart';
@@ -8,8 +10,9 @@ import 'launch_config.dart';
 // Own UI resource boundaries; production uses the verified Windows adapters.
 // Test implementations do not participate in main's platform selection.
 final class UiClientConnection {
-  UiClientConnection(this.client, this.close);
+  UiClientConnection(this.client, this.close, {required this.connectivity});
   final EnrollmentClient client;
+  final ConnectivityClient connectivity;
   final Future<void> Function() close;
 }
 
@@ -48,6 +51,13 @@ final class UiSession {
         client: _connection.client,
         expectedContractSha256: config.contractSha256,
         callTimeout: config.rpcTimeout,
+      ),
+      connectivity = ConnectivityController(
+        client: _connection.connectivity,
+        expectedContractSha256: config.contractSha256,
+        expectedInstanceId: config.pipe.instanceId,
+        readTimeout: config.rpcTimeout,
+        pollInterval: config.pollInterval,
       ) {
     enrollment.addListener(_observeEnrollment);
   }
@@ -58,18 +68,22 @@ final class UiSession {
   final UiCorrelationStorage _storage;
   final EnrollmentController enrollment;
   final ServerTrustController trust;
+  final ConnectivityController connectivity;
   Future<void>? _initialization;
   Future<void>? _closing;
   bool get closed => _closing != null;
 
-  void _observeEnrollment() => trust.observeLocalState(
-    enrollment.profile,
-    enrollment.localSnapshot,
-    reasonKey: enrollment.reasonKey,
-    available:
-        enrollment.link == EnrollmentLinkState.available &&
-        !enrollment.callRejected,
-  );
+  void _observeEnrollment() {
+    trust.observeLocalState(
+      enrollment.profile,
+      enrollment.localSnapshot,
+      reasonKey: enrollment.reasonKey,
+      available:
+          enrollment.link == EnrollmentLinkState.available &&
+          !enrollment.callRejected,
+    );
+    unawaited(connectivity.refresh());
+  }
 
   static Future<UiSession> open(
     UiRuntimePlatform platform, {
@@ -109,7 +123,10 @@ final class UiSession {
   // opens a browser or accepts a server announcement.
   Future<void> initialize() {
     if (closed) return Future.value();
-    return _initialization ??= enrollment.bind(config.profile);
+    return _initialization ??= () async {
+      await enrollment.bind(config.profile);
+      if (!closed) await connectivity.bind(config.profile);
+    }();
   }
 
   Future<bool> openBrowser(Uri url) async {
@@ -122,6 +139,7 @@ final class UiSession {
     enrollment.removeListener(_observeEnrollment);
     enrollment.dispose();
     trust.dispose();
+    connectivity.dispose();
     return _closing = () async {
       try {
         await _connection.close();

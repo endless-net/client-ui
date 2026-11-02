@@ -2,11 +2,13 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:grpc/grpc.dart' as grpc;
 
 import 'call_failure.dart';
+import 'connectivity_client.dart';
 import 'enrollment_client.dart';
 
 // Generated SDK получает уже OS-authenticated pipe channel. Здесь нет TCP,
 // channel credentials, server SDK, retry interceptor или transport fallback.
-final class GrpcEnrollmentClient implements EnrollmentClient {
+final class GrpcEnrollmentClient
+    implements EnrollmentClient, ConnectivityClient {
   GrpcEnrollmentClient(this._client, {required this.maxFailureBytes}) {
     if (maxFailureBytes <= 0 || maxFailureBytes > 65536) {
       throw ArgumentError('failure budget');
@@ -50,6 +52,29 @@ final class GrpcEnrollmentClient implements EnrollmentClient {
     );
     if (!response.hasStatus()) throw ClientCallFailure.protocol();
     return api.Status.fromBuffer(response.status.writeToBuffer());
+  }
+
+  @override
+  Future<void> connect(api.ConnectRequest request, Duration timeout) async {
+    await _invoke(
+      () => _client.connect(
+        api.ConnectRequest.fromBuffer(request.writeToBuffer()),
+        options: _options(timeout),
+      ),
+    );
+  }
+
+  @override
+  Future<void> disconnect(
+    api.DisconnectRequest request,
+    Duration timeout,
+  ) async {
+    await _invoke(
+      () => _client.disconnect(
+        api.DisconnectRequest.fromBuffer(request.writeToBuffer()),
+        options: _options(timeout),
+      ),
+    );
   }
 
   @override

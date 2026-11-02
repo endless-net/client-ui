@@ -9,6 +9,17 @@ UI восстанавливает исходный UUID; Enroll, browser и trus
 явным действиям. UI не получает device keys, grants или системные привилегии.
 Actual configured startup/installed pair и живой browser/VK flow ещё не проверены.
 
+Панель подключения005 использует тот же Client SDK и authenticated channel:
+показывает intent, локальное применение, Direct-путь, собственный адрес EndlessNet,
+offline-ограничения и ошибки/следующий шаг. Работа приложения второго устройства
+проверяется отдельно. Connect/Disconnect выполняются по явному действию с CAS
+instance/revision и сроками30s/10s. ACK, stale или timeout приводят к чтению status,
+без автоматического повторения команды. Unknown/partial cleanup не считается
+успешным отключением. Poll interval/read timeout берутся из existing config.
+Возврат окна из background инвалидирует прежний read и запрашивает fresh status;
+late ответы прежнего профиля/runtime не меняют экран. Закрытие UI не отправляет
+Disconnect и не владеет lifetime daemon. Ключи, grants и OS settings UI не получает.
+
 ## Проверки
 
 Flutter 3.47.7, revision `abaf9c523780a608bd46686fd5e53740a07077f8`, Dart 3.13.5.

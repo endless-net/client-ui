@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../client/correlation_journal.dart';
 import '../client/windows_pipe_config.dart';
 import '../enrollment/panel.dart';
+import '../connectivity/panel.dart';
 import 'launch_config.dart';
 import 'session.dart';
 
@@ -30,7 +31,10 @@ class _MainAppState extends State<MainApp> {
   @override
   void initState() {
     super.initState();
-    _lifecycle = AppLifecycleListener(onExitRequested: _requestExit);
+    _lifecycle = AppLifecycleListener(
+      onExitRequested: _requestExit,
+      onResume: () => unawaited(_session?.connectivity.resume()),
+    );
     _begin();
   }
 
@@ -148,6 +152,10 @@ class _MainAppState extends State<MainApp> {
                       now: DateTime.now,
                       openBrowser: _session!.openBrowser,
                       reconnect: _reconnect,
+                      connectivityPanel: ConnectivityPanel(
+                        controller: _session!.connectivity,
+                        reconnect: _reconnect,
+                      ),
                     )
                   : Center(
                       child: _problem == null

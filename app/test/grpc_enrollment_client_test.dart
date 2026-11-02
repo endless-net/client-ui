@@ -82,6 +82,38 @@ Any packed(api.Failure value) => Any(
 );
 
 void main() {
+  test('connection SDK preserves bounded command and CAS without declaring an outcome', () async {
+    final channel = MemoryChannel()
+      ..respond = (path, _) async => path.endsWith('/Connect')
+          ? api.ConnectResponse().writeToBuffer()
+          : api.DisconnectResponse().writeToBuffer();
+    final adapter = GrpcEnrollmentClient(
+      api.ClientServiceClient(channel),
+      maxFailureBytes: 16384,
+    );
+    final request = api.ConnectRequest(
+      profile: api.ProfileRef(profileId: 'profile'),
+      async: true,
+      mutation: api.MutationContext(expectedInstanceId: 'instance')
+        ..expectedRevision = api.MutationContext().expectedRevision + 7,
+    );
+    await adapter.connect(request, const Duration(seconds: 30));
+    expect(channel.path, '/client.v0.ClientService/Connect');
+    expect(channel.timeout, const Duration(seconds: 30));
+    final sent = api.ConnectRequest.fromBuffer(channel.requestBytes!);
+    expect(sent.async, isTrue);
+    expect(sent.mutation.expectedRevision.toStringUnsigned(), '7');
+    await adapter.disconnect(
+      api.DisconnectRequest(
+        profile: request.profile,
+        mutation: request.mutation,
+      ),
+      const Duration(seconds: 10),
+    );
+    expect(channel.path, '/client.v0.ClientService/Disconnect');
+    expect(channel.timeout, const Duration(seconds: 10));
+    expect(channel.calls, 2);
+  });
   test('identity SDK methods preserve confirmation and never infer trust from acknowledgement', () async {
     final channel = MemoryChannel();
     channel.respond = (path, bytes) async {

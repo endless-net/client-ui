@@ -38,7 +38,11 @@ final class WindowsUiRuntimePlatform implements UiRuntimePlatform {
       expectedContractSha256: config.contractSha256,
       maxFailureBytes: config.failureMaxBytes,
     );
-    return UiClientConnection(connection.client, connection.close);
+    return UiClientConnection(
+      connection.client,
+      connection.close,
+      connectivity: connection.client,
+    );
   }
 
   @override
