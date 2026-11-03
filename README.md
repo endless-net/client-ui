@@ -1,5 +1,12 @@
 # EndlessNet Client UI
 
+Общий брендбук и библиотека компонентов Admin + Client UI находятся в
+[packages/endlessnet_ui](packages/endlessnet_ui/README.md). Это единый producer;
+подключение приложений по опубликованному exact Git source выполняется отдельно.
+Functional и component design tests библиотеки запускаются раздельно:
+`python3 -B scripts/check_ui_library.py` и
+`python3 -B scripts/check_ui_library.py --design`.
+
 Windows main подключает config, authenticated pipe, correlation journal и панели
 регистрации/подтверждения сервера через published Client SDK. Запуск требует
 --config <absolute local path>; сам файл проверяется native admin-authority reader.

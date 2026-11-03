@@ -55,6 +55,19 @@ Service Kit или приватного workspace, их credentials, код, wor
 
 ## Проверки владельца
 
+Общий публичный package `packages/endlessnet_ui/` — единственный источник
+брендбука/tokens/fonts/widgets для Client UI и Admin. Он не импортирует domain
+SDK/IPC и не зависит от приватного Service Kit. Consumers закрепляют опубликованный
+Git SHA/path; local replace/соседние checkout не заменяют publication.
+Его functional unit checks: `python3 -B scripts/check_ui_library.py`.
+Component design tests отдельно: `python3 -B scripts/check_ui_library.py --design`;
+они не входят в обычный CI unit gate. Catalog: из package
+`flutter run -d chrome -t tool/component_catalog/main.dart`.
+Дизайн полных feature screens, screenshots/goldens/geometry/overflow и их
+theme/viewport/text-scale matrices не входят в feature tasks/acceptance.
+Library widgets/theme/catalog меняются в общем package и проверяются там;
+consumers не копируют общую design suite.
+
 Собственный Flutter package — `app/`, версия SDK закреплена в `.flutter-version`.
 В Ubuntu 26.04 выполнять `python3 -B scripts/ci.py check`: locked dependencies,
 format/analyze, объявленные unit entrypoints и meaningful unit fixtures publisher.

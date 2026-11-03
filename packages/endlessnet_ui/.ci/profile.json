@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "component": "endlessnet-ui",
+  "modules": [{
+    "path": ".",
+    "kind": "flutter",
+    "unit": [
+      "test/test_boundaries_test.dart",
+      "test/controls_test.dart",
+      "test/collections_test.dart",
+      "test/feedback_test.dart"
+    ]
+  }]
+}

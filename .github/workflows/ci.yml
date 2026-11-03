@@ -33,6 +33,8 @@ jobs:
           test "$VERSION_ID" = 26.04
       - name: Static and tooling unit checks
         run: python3 -B scripts/ci.py check
+      - name: Shared Flutter library unit checks
+        run: python3 -B scripts/check_ui_library.py
 
   build:
     needs: checks
