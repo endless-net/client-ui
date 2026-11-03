@@ -13,6 +13,10 @@ void main() {
       final fixture = BoundaryProjectFixture();
       try {
         expect(inspectProject(fixture.app), isEmpty);
+        fixture.addStandaloneIntegrationDriver();
+        expect(inspectProject(fixture.app), isEmpty);
+        fixture.importIntegrationDriver();
+        expect(inspectProject(fixture.app), isNotEmpty);
         fixture.addHelper(forbiddenSources.first);
         expect(inspectProject(fixture.app), isNotEmpty);
         fixture.setTest(escapedDesignImport);

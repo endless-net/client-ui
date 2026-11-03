@@ -9,7 +9,7 @@ const forbiddenSources = <String>[
   'import "../test_design/../test_design/components/helper.dart";',
   'expect(style.color, Colors.red);',
   'expect(style.fontSize, 14);',
-  'expect(tester.takeException(), isNull);',
+  'expect(message, contains("RenderFlex overflowed by"));',
   'for (final theme in themes) { run(theme); }',
   'Process.run("flutter", ["test"]);',
   'final s = "http://example"; tester.getRect(widget);',
@@ -21,6 +21,7 @@ const allowedSource = '''
 /* import '../test_design/ignored.dart'; */
 expect(find.text('Ошибка'), findsOneWidget);
 expect(calls, 1);
+expect(tester.takeException(), isNull); // Lifecycle/error assertion, not geometry.
 expect(node.hasFlag(SemanticsFlag.isEnabled), isFalse);
 await tester.enterText(find.byType(TextField), 'Новый текст');
 ''';
@@ -50,6 +51,15 @@ class BoundaryProjectFixture {
     File('${app.path}/helpers/helper.dart').writeAsStringSync(source);
     setTest("import '../helpers/helper.dart';");
   }
+
+  void addStandaloneIntegrationDriver() {
+    Directory('${app.path}/test/integration').createSync();
+    File('${app.path}/test/integration/driver.dart')
+        .writeAsStringSync('Process.run("external-runtime", []);');
+  }
+
+  void importIntegrationDriver() =>
+      setTest("import 'integration/driver.dart';");
 
   void dispose() => root.deleteSync(recursive: true);
 }

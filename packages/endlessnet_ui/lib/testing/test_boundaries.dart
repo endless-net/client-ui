@@ -23,11 +23,14 @@ final _rules = <String, RegExp>{
     r'test_design[/\\]|componentFrames|DESIGN_\w*CAPTURE|COMPONENT_CAPTURE',
   ),
   'design assertions': RegExp(
-    r'\bexpect\s*\([^;]*(\.(color|fontSize|fontFamily|fontWeight|padding|size|width|height|position|left|right|top|bottom|overflow)\b|takeException\s*\()',
+    r'\bexpect\s*\([^;]*\.(color|fontSize|fontFamily|fontWeight|padding|size|width|height|position|left|right|top|bottom|overflow)\b',
     dotAll: true,
   ),
   'theme matrix': RegExp(
     r'for\s*\([^\n]*(theme|Theme|brightness|Brightness|viewport|textScale)',
+  ),
+  'overflow acceptance': RegExp(
+    r'RenderFlex|overflowed by|debugOverflowIndicator',
   ),
   'external suite/process': RegExp(
     r'\bProcess\.(run|start|runSync|startSync)\s*\(|package:integration_test/',
@@ -165,7 +168,9 @@ List<BoundaryIssue> inspectProject(Directory app) {
   final tests = testRoot
       .listSync(recursive: true, followLinks: false)
       .whereType<File>()
-      .where((file) => file.path.endsWith('.dart'))
+      // Start at executable unit entrypoints, then follow their helpers. Explicit
+      // standalone integration drivers are not part of the ordinary test suite.
+      .where((file) => file.path.endsWith('_test.dart'))
       .toList();
   for (final file in tests) {
     visit(file);
