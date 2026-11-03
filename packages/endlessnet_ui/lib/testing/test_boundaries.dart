@@ -158,6 +158,12 @@ List<BoundaryIssue> inspectProject(Directory app) {
           continue;
         } else if (uri.path.contains('/test_design/')) {
           issues.add(BoundaryIssue(normalized.path, 1, 'design helper import'));
+        } else if (uri.toString().startsWith(
+          root.resolve('test/integration/').toString(),
+        )) {
+          issues.add(
+            BoundaryIssue(normalized.path, 1, 'integration helper import'),
+          );
         } else {
           visit(File.fromUri(uri));
         }
@@ -171,6 +177,11 @@ List<BoundaryIssue> inspectProject(Directory app) {
       // Start at executable unit entrypoints, then follow their helpers. Explicit
       // standalone integration drivers are not part of the ordinary test suite.
       .where((file) => file.path.endsWith('_test.dart'))
+      .where(
+        (file) => !file.absolute.uri.toString().startsWith(
+          root.resolve('test/integration/').toString(),
+        ),
+      )
       .toList();
   for (final file in tests) {
     visit(file);

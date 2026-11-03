@@ -56,6 +56,8 @@ class BoundaryProjectFixture {
     Directory('${app.path}/test/integration').createSync();
     File('${app.path}/test/integration/driver.dart')
         .writeAsStringSync('Process.run("external-runtime", []);');
+    File('${app.path}/test/integration/driver_test.dart')
+        .writeAsStringSync('Process.run("external-runtime", []);');
   }
 
   void importIntegrationDriver() =>
