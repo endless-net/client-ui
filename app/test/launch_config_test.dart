@@ -28,6 +28,55 @@ UiLaunchConfig decode(
 );
 
 void main() {
+  test('installed policy uses the current runtime instance on each read', () {
+    final policy = launchValues()..remove('instance_id');
+    for (final instance in [
+      '34b5fbe6-9641-4c73-8ae4-974123fa2e52',
+      '258d48c3-f86f-4b7f-9d14-53da3b76a628',
+    ]) {
+      final config = UiLaunchConfig.decode(
+        Uint8List.fromList(utf8.encode(jsonEncode(policy))),
+        nativeLibraryPath: r'C:\bundle\endlessnet_windows_pipe.dll',
+        runtimeInstance: instance,
+      );
+      expect(config.pipe.instanceId, instance);
+      expect(config.pipe.serverSid, 'S-1-5-18');
+    }
+  });
+
+  test(
+    'missing or invalid runtime cannot fall back to a persisted instance',
+    () {
+      final policy = launchValues()..remove('instance_id');
+      for (final instance in [
+        '',
+        'not-an-instance',
+        '00000000-0000-0000-0000-000000000000',
+      ]) {
+        expect(
+          () => UiLaunchConfig.decode(
+            Uint8List.fromList(utf8.encode(jsonEncode(policy))),
+            nativeLibraryPath: r'C:\bundle\endlessnet_windows_pipe.dll',
+            runtimeInstance: instance,
+          ),
+          throwsA(isA<UiConfigurationFailure>()),
+        );
+      }
+      expect(
+        () => decode(jsonEncode(policy)),
+        throwsA(isA<UiConfigurationFailure>()),
+      );
+      expect(
+        () => UiLaunchConfig.decode(
+          Uint8List.fromList(utf8.encode(jsonEncode(launchValues()))),
+          nativeLibraryPath: r'C:\bundle\endlessnet_windows_pipe.dll',
+          runtimeInstance: '34b5fbe6-9641-4c73-8ae4-974123fa2e52',
+        ),
+        throwsA(isA<UiConfigurationFailure>()),
+      );
+    },
+  );
+
   test('explicit values preserve profile and budgets; descriptor identity is compiled', () {
     final config = decode(
       const JsonEncoder.withIndent('  ').convert(launchValues()),

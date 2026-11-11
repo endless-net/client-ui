@@ -8,12 +8,15 @@ import '../client/windows_pipe_config.dart';
 import '../enrollment/panel.dart';
 import '../connectivity/panel.dart';
 import '../revocation/panel.dart';
+import '../update/controller.dart';
+import '../update/panel.dart';
 import 'launch_config.dart';
 import 'session.dart';
 
 class MainApp extends StatefulWidget {
-  const MainApp({super.key, required this.platform});
+  const MainApp({super.key, required this.platform, this.openUpdates});
   final UiRuntimePlatform platform;
+  final Future<UpdateController> Function()? openUpdates;
   @override
   State<MainApp> createState() => _MainAppState();
 }
@@ -28,6 +31,8 @@ class _MainAppState extends State<MainApp> {
   bool _cleanupFailed = false;
   bool _reconnecting = false;
   int _epoch = 0;
+  UpdateController? _updates;
+  bool _updatesUnavailable = false;
 
   @override
   void initState() {
@@ -37,6 +42,23 @@ class _MainAppState extends State<MainApp> {
       onResume: () => unawaited(_session?.connectivity.resume()),
     );
     _begin();
+    unawaited(_openUpdates());
+  }
+
+  Future<void> _openUpdates() async {
+    final open = widget.openUpdates;
+    if (open == null) return;
+    try {
+      final updates = await open();
+      if (!mounted || _closing) {
+        updates.dispose();
+        return;
+      }
+      setState(() => _updates = updates);
+      updates.start();
+    } catch (_) {
+      if (mounted && !_closing) setState(() => _updatesUnavailable = true);
+    }
   }
 
   void _begin() {
@@ -125,6 +147,7 @@ class _MainAppState extends State<MainApp> {
     ++_epoch;
     _closing = true;
     _lifecycle.dispose();
+    _updates?.dispose();
     // Detachment is not a cancellable OS exit. Still release all resources and
     // consume safe close errors; normal WM_CLOSE awaits _requestExit above.
     unawaited(_session?.close().catchError((Object _) {}));
@@ -137,6 +160,15 @@ class _MainAppState extends State<MainApp> {
     debugShowCheckedModeBanner: false,
     home: Scaffold(
       appBar: AppBar(title: const Text('EndlessNet')),
+      bottomNavigationBar: _updates != null
+          ? UpdatePanel(controller: _updates!)
+          : _updatesUnavailable
+          ? const ListTile(
+              title: Text(
+                'Проверка обновлений недоступна. Проверьте установленную версию UI.',
+              ),
+            )
+          : null,
       body: Stack(
         children: [
           // Keep lifecycle observers mounted throughout Flutter's asynchronous

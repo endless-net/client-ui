@@ -245,3 +245,41 @@ opt-in Client test `TestWindowsUIAgainstActualOwnerChain`, передавая т
 конфигурацию и публичные идентификаторы. Два запуска проверяют unknown outcome и
 восстановление исходного UUID до подтверждённой регистрации. Этот entrypoint
 не входит в unit profile; VK/browser и discovery являются изолированными fixtures.
+
+Единый MSI собирается на Windows с WiX7, CMake, Visual Studio C++ и Flutter:
+
+```powershell
+./scripts/build-windows-installer.ps1 -UIBundle <flutter-release-bundle> -ClientBundle <client-runtime-bundle> -ServiceProfile <service.json> -UiPolicy <policy.json> -Version 0.1.0 -OutputDir <output>
+```
+
+Client bundle содержит `client.exe`, `wintun.dll` и `WINTUN-LICENSE.txt` из
+producer build. Service profile — JSON строковых `ENDLESSNET_CLIENT_*`
+настроек; UI policy — существующая schema1 без `instance_id`, с теми же
+default profile/control origin. Builder проверяет их настоящими Client/UI
+валидаторами. Installation ID создаётся при первой установке; состояние
+и policy сохраняются при major upgrade. Visual C++ runtime включается рядом
+с UI из установленного VS redist либо `-CrtDirectory`.
+UI executable version должен совпадать с MSI: например,
+`flutter build windows --release --build-name=0.1.0`.
+Для подписи UI, update script и MSI:
+`-Sign -CertificateThumbprint <thumbprint> -SignTool <signtool>`;
+сертификат с private key берётся из CurrentUser/My build-аккаунта.
+Без `-Sign` получается только неподписанный пакет для локальной проверки.
+Builder не запускает установку.
+
+UI проверяет GitHub Releases `endless-net/client-ui` при запуске и каждую
+минуту, независимо от соединения с Client. Новый release должен содержать
+`EndlessNet-v0.MINOR.PATCH-windows-amd64.msi` с GitHub SHA256 digest.
+До нажатия «Скачать и обновить» пакет не скачивается. Перед обычным
+`msiexec /i` проверяются hash, Windows Authenticode, тот же издатель, что у
+установленного UI, UpgradeCode и точная версия MSI. Неподписанные пакеты
+отклоняются; metadata error/rate limit не выдаётся за отсутствие обновлений.
+Коды Windows Installer определяют завершение, ошибку или необходимость
+перезагрузки; закрытие UI не отменяет уже запущенную установку.
+
+Windows shortcut единого установщика использует
+`--config <policy.json> --runtime-instance <runtime-instance>`.
+В таком policy отсутствует install-time `instance_id`: текущий UUID читается
+из отдельного файла через тот же admin-owned native reader. Затем применяется
+существующая OS-auth named-pipe проверка. Для явного запуска с заранее известным
+instance остаётся исходный `--config <config.json>`; автоматического fallback нет.
