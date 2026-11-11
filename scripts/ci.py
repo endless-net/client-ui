@@ -232,6 +232,16 @@ def source_state(root: Path) -> dict:
     return state
 
 
+def windows_version_arguments(environment: dict[str, str]) -> list[str]:
+    ref = environment.get("GITHUB_REF", "")
+    if not ref.startswith("refs/tags/"):
+        return []
+    tag = ref.removeprefix("refs/tags/")
+    if not TAG.fullmatch(tag):
+        raise ValueError("Windows release version requires a v0 tag")
+    return ["--build-name=" + tag.removeprefix("v")]
+
+
 def build(root: Path, target: str, out: Path) -> None:
     profile = load_profile(root)
     artifact = next(item for item in profile["artifacts"]
@@ -251,7 +261,8 @@ def build(root: Path, target: str, out: Path) -> None:
         platform_name = "macos"
     else:
         platform_name = expected_os
-    run(["flutter", "build", platform_name, "--release", "--no-pub"], module, env=environment)
+    version_args = windows_version_arguments(environment) if expected_os == "windows" else []
+    run(["flutter", "build", platform_name, "--release", "--no-pub", *version_args], module, env=environment)
     if expected_os == "windows":
         source = module / "build/windows/x64/runner/Release"
         executable = source / "endlessnet_client_ui.exe"

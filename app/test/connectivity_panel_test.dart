@@ -1,3 +1,4 @@
+import 'package:endlessnet_ui/endlessnet_ui.dart';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:endlessnet_client_ui/connectivity/panel.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ void main() {
     addTearDown(c.dispose);
     await tester.pumpWidget(
       MaterialApp(
+        theme: BrandTheme.dark(),
         home: Scaffold(body: ConnectivityPanel(controller: c)),
       ),
     );
@@ -48,6 +50,7 @@ void main() {
       addTearDown(c.dispose);
       await tester.pumpWidget(
         MaterialApp(
+          theme: BrandTheme.dark(),
           home: Scaffold(
             body: SingleChildScrollView(
               child: ConnectivityPanel(controller: c),
@@ -75,6 +78,7 @@ void main() {
       addTearDown(c.dispose);
       await tester.pumpWidget(
         MaterialApp(
+          theme: BrandTheme.dark(),
           home: Scaffold(
             body: SingleChildScrollView(
               child: ConnectivityPanel(controller: c),
@@ -102,6 +106,7 @@ void main() {
       addTearDown(c.dispose);
       await tester.pumpWidget(
         MaterialApp(
+          theme: BrandTheme.dark(),
           home: Scaffold(
             body: SingleChildScrollView(
               child: ConnectivityPanel(controller: c),
@@ -165,6 +170,7 @@ void main() {
       await c.bind(fixture.profile());
       await tester.pumpWidget(
         MaterialApp(
+          theme: BrandTheme.dark(),
           home: Scaffold(
             body: SingleChildScrollView(
               child: ConnectivityPanel(controller: c),
@@ -229,4 +235,80 @@ void main() {
       expect(connect.onPressed, isNull);
     },
   );
+  for (final entry in {
+    api.TransportSearchState.TRANSPORT_SEARCH_STATE_SEARCHING:
+        'Поиск Direct выполняется',
+    api.TransportSearchState.TRANSPORT_SEARCH_STATE_BACKOFF:
+        'Повторный поиск Direct запланирован',
+    api.TransportSearchState.TRANSPORT_SEARCH_STATE_EXHAUSTED:
+        'Доступный Direct-вариант пока не найден',
+    api.TransportSearchState.TRANSPORT_SEARCH_STATE_UNSUPPORTED:
+        'Для предложенного транспорта требуется обновление клиента',
+  }.entries) {
+    testWidgets('Relay stays available while ${entry.key}', (tester) async {
+      final client = fixture.ConnectivityFixture();
+      client.value.serviceState = api.ServiceState.SERVICE_STATE_CONNECTED;
+      client.value.connectionPhase =
+          api.ConnectionPhase.CONNECTION_PHASE_CONNECTED;
+      client.value.peerTransports.add(
+        api.PeerTransportStatus(
+          peerId: 'peer-b',
+          selectedPath: api.PathKind.PATH_KIND_RELAY,
+          engine: 'amneziawg',
+          protocolVersion: '3.1',
+          transportProfileId: 'profile-7',
+          searchState: entry.key,
+          reasonKey: 'synthetic-private-diagnostic',
+        ),
+      );
+      final c = fixture.controller(client);
+      addTearDown(c.dispose);
+      await c.bind(fixture.profile());
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: BrandTheme.dark(),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ConnectivityPanel(controller: c),
+            ),
+          ),
+        ),
+      );
+      expect(find.text('Соединение: подключено'), findsOneWidget);
+      expect(find.text('Путь: Relay'), findsOneWidget);
+      expect(find.text(entry.value), findsOneWidget);
+      expect(
+        find.textContaining('Транспорт: AmneziaWG; версия: 3.1'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('synthetic-private-diagnostic'), findsNothing);
+      expect(find.text('Direct-путь: подтверждён'), findsNothing);
+      client.readFailure = StateError('IPC unavailable');
+      await c.refresh();
+      await tester.pumpAndSettle();
+      expect(find.text('Путь: Relay'), findsNothing);
+      expect(
+        find.text('Последний известный путь: Relay (не подтверждён)'),
+        findsOneWidget,
+      );
+      expect(find.text(entry.value), findsNothing);
+      expect(find.text('Состояние поиска Direct устарело'), findsOneWidget);
+      client.readFailure = null;
+      client.value.peerTransports.single.selectedPath =
+          api.PathKind.PATH_KIND_DIRECT;
+      await c.resume();
+      await tester.pumpAndSettle();
+      expect(find.text('Путь: Direct'), findsOneWidget);
+      client.runtime.contractSha256 = 'b' * 64;
+      await c.refresh();
+      await tester.pumpAndSettle();
+      expect(find.text('Путь: Direct'), findsNothing);
+      expect(
+        find.textContaining('несовместимый локальный клиент'),
+        findsOneWidget,
+      );
+      expect(client.connects, 0);
+      expect(client.disconnects, 0);
+    });
+  }
 }

@@ -60,14 +60,18 @@ final class UiLaunchConfig {
   static UiLaunchConfig decode(
     Uint8List bytes, {
     required String nativeLibraryPath,
+    String? runtimeInstance,
   }) {
     try {
       if (bytes.isEmpty || bytes.length > 65536) {
         throw const UiConfigurationFailure();
       }
       final map = _FlatJson(utf8.decode(bytes)).read();
-      if (map.length != keys.length ||
-          !map.keys.toSet().containsAll(keys) ||
+      final expected = runtimeInstance == null
+          ? keys
+          : keys.difference({'instance_id'});
+      if (map.length != expected.length ||
+          !map.keys.toSet().containsAll(expected) ||
           map['schema'] != 1 ||
           map['schema'] is! int) {
         throw const UiConfigurationFailure();
@@ -105,7 +109,7 @@ final class UiLaunchConfig {
       }
       return UiLaunchConfig._(
         WindowsPipeConfig(
-          instanceId: text('instance_id'),
+          instanceId: runtimeInstance ?? text('instance_id'),
           serverSid: text('server_sid'),
           nativeLibraryPath: nativeLibraryPath,
           connectTimeout: Duration(

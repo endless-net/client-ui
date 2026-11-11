@@ -23,12 +23,18 @@ final class WindowsUiRuntimePlatform implements UiRuntimePlatform {
         UiConfigurationProblem.unsupportedPlatform,
       );
     }
-    if (_arguments.length != 2 ||
+    if ((_arguments.length != 2 && _arguments.length != 4) ||
         _arguments.first != '--config' ||
-        _arguments.last.isEmpty) {
+        _arguments[1].isEmpty ||
+        (_arguments.length == 4 &&
+            (_arguments[2] != '--runtime-instance' || _arguments[3].isEmpty))) {
       throw const UiConfigurationFailure();
     }
-    return readWindowsLaunchConfig(_arguments.last, _libraryPath);
+    return readWindowsLaunchConfig(
+      _arguments[1],
+      _libraryPath,
+      runtimeInstancePath: _arguments.length == 4 ? _arguments[3] : null,
+    );
   }
 
   @override

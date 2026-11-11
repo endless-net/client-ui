@@ -53,11 +53,20 @@ packages:
     dependency: "direct main"
     description:
       path: "api/dart"
-      ref: f3a8e331bf88cb50712f46f6d428e8442054fc57
-      resolved-ref: f3a8e331bf88cb50712f46f6d428e8442054fc57
+      ref: c1872645fd91dc8a48cf98f2b843b46b82a1a285
+      resolved-ref: c1872645fd91dc8a48cf98f2b843b46b82a1a285
       url: "https://github.com/endless-net/client.git"
     source: git
     version: "0.0.0"
+  endlessnet_ui:
+    dependency: "direct main"
+    description:
+      path: "packages/endlessnet_ui"
+      ref: acc88b52f96ddac996a88c6c3638edfb4b0bd119
+      resolved-ref: acc88b52f96ddac996a88c6c3638edfb4b0bd119
+      url: "https://github.com/endless-net/client-ui.git"
+    source: git
+    version: "0.1.0"
   fake_async:
     dependency: transitive
     description:
@@ -208,10 +217,10 @@ packages:
     dependency: transitive
     description:
       name: meta
-      sha256: c82594181e3312f3d0695fc95aaaf7758d75b8d4ae2bbecf223b9fd5109a059d
+      sha256: "307249ce4ff29d58a18e97f6345f539382eb9c9c29ecda628900f31de0443dd9"
       url: "https://pub.dev"
     source: hosted
-    version: "1.18.3"
+    version: "1.19.0"
   path:
     dependency: transitive
     description:

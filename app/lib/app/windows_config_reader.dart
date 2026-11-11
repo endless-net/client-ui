@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
@@ -10,10 +11,28 @@ import '../client/windows_pipe_config.dart';
 
 Future<UiLaunchConfig> readWindowsLaunchConfig(
   String path,
-  String libraryPath,
-) async {
+  String libraryPath, {
+  String? runtimeInstancePath,
+}) async {
   final bytes = await readWindowsAdminFile(path, libraryPath);
-  return UiLaunchConfig.decode(bytes, nativeLibraryPath: libraryPath);
+  try {
+    final instance = runtimeInstancePath == null
+        ? null
+        : utf8
+              .decode(
+                await readWindowsAdminFile(runtimeInstancePath, libraryPath),
+              )
+              .trim();
+    return UiLaunchConfig.decode(
+      bytes,
+      nativeLibraryPath: libraryPath,
+      runtimeInstance: instance,
+    );
+  } on UiConfigurationFailure {
+    rethrow;
+  } catch (_) {
+    throw const UiConfigurationFailure();
+  }
 }
 
 // Exposed separately for native reader acceptance; production parses the result

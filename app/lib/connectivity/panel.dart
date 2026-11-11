@@ -1,5 +1,6 @@
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
+import 'package:endlessnet_ui/endlessnet_ui.dart';
 
 import 'controller.dart';
 
@@ -104,6 +105,54 @@ class ConnectivityPanel extends StatelessWidget {
     _ => 'Следующий шаг: проверьте состояние перед повторной командой.',
   };
 
+  Widget _transport(api.PeerTransportStatus peer, bool fresh) {
+    // Render only the producer's public projection. Never echo raw diagnostics.
+    final path = switch (peer.selectedPath) {
+      api.PathKind.PATH_KIND_DIRECT => 'Direct',
+      api.PathKind.PATH_KIND_RELAY => 'Relay',
+      _ => 'не подтверждён',
+    };
+    final engine = switch (peer.engine) {
+      'wireguard' => 'WireGuard',
+      'amneziawg' => 'AmneziaWG',
+      _ => 'неизвестен',
+    };
+    final search = switch (peer.searchState) {
+      api.TransportSearchState.TRANSPORT_SEARCH_STATE_SEARCHING =>
+        'Поиск Direct выполняется',
+      api.TransportSearchState.TRANSPORT_SEARCH_STATE_BACKOFF =>
+        'Повторный поиск Direct запланирован',
+      api.TransportSearchState.TRANSPORT_SEARCH_STATE_UNSUPPORTED =>
+        'Для предложенного транспорта требуется обновление клиента',
+      api.TransportSearchState.TRANSPORT_SEARCH_STATE_EXHAUSTED =>
+        'Доступный Direct-вариант пока не найден',
+      api.TransportSearchState.TRANSPORT_SEARCH_STATE_IDLE =>
+        'Поиск Direct ожидает',
+      _ => 'Состояние поиска Direct неизвестно',
+    };
+    // IDs/version strings are bounded labels, never interpreted configuration.
+    String label(String value) =>
+        RegExp(r'^[A-Za-z0-9._-]{1,128}$').hasMatch(value)
+        ? value
+        : 'неизвестен';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Устройство: ${label(peer.peerId)}'),
+        Text(
+          fresh
+              ? 'Путь: $path'
+              : 'Последний известный путь: $path (не подтверждён)',
+        ),
+        Text('Транспорт: $engine; версия: ${label(peer.protocolVersion)}'),
+        Text(
+          'Профиль транспорта: ${label(peer.transportProfileId)}; ревизия: ${peer.transportProfileRevision.toStringUnsigned()}',
+        ),
+        Text(fresh ? search : 'Состояние поиска Direct устарело'),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller,
@@ -152,6 +201,9 @@ class ConnectivityPanel extends StatelessWidget {
                     : 'неизвестно'}',
               ),
               Text('Direct-путь: ${path ? 'подтверждён' : 'не подтверждён'}'),
+              for (final peer
+                  in s?.peerTransports ?? <api.PeerTransportStatus>[])
+                _transport(peer, c.fresh),
               if (c.fresh && applied)
                 for (final address in s.overlayAddresses)
                   SelectableText('Адрес EndlessNet: $address'),
@@ -199,17 +251,22 @@ class ConnectivityPanel extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 children: [
-                  FilledButton(
-                    onPressed: c.canConnect ? c.connect : null,
-                    child: const Text('Подключить'),
+                  EnButton(
+                    enabled: c.canConnect,
+                    onPressed: c.connect,
+                    label: 'Подключить',
                   ),
-                  OutlinedButton(
-                    onPressed: c.canDisconnect ? c.disconnect : null,
-                    child: const Text('Отключить'),
+                  EnButton(
+                    kind: EnButtonKind.secondary,
+                    enabled: c.canDisconnect,
+                    onPressed: c.disconnect,
+                    label: 'Отключить',
                   ),
-                  TextButton(
-                    onPressed: c.busy ? null : c.refresh,
-                    child: const Text('Обновить состояние'),
+                  EnButton(
+                    kind: EnButtonKind.text,
+                    enabled: !c.busy,
+                    onPressed: c.refresh,
+                    label: 'Обновить состояние',
                   ),
                 ],
               ),
