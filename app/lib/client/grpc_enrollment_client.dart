@@ -5,11 +5,16 @@ import 'call_failure.dart';
 import 'connectivity_client.dart';
 import 'enrollment_client.dart';
 import 'revocation_client.dart';
+import 'session_login_client.dart';
 
 // Generated SDK получает уже OS-authenticated pipe channel. Здесь нет TCP,
 // channel credentials, server SDK, retry interceptor или transport fallback.
 final class GrpcEnrollmentClient
-    implements EnrollmentClient, ConnectivityClient, RevocationClient {
+    implements
+        EnrollmentClient,
+        ConnectivityClient,
+        RevocationClient,
+        SessionLoginClient {
   GrpcEnrollmentClient(this._client, {required this.maxFailureBytes}) {
     if (maxFailureBytes <= 0 || maxFailureBytes > 65536) {
       throw ArgumentError('failure budget');
@@ -17,6 +22,53 @@ final class GrpcEnrollmentClient
   }
   final api.ClientServiceClient _client;
   final int maxFailureBytes;
+
+  @override
+  Future<api.GetSessionResponse> session(
+    api.GetSessionRequest request,
+    Duration timeout,
+  ) async {
+    final response = await _invoke(
+      () => _client.getSession(
+        api.GetSessionRequest.fromBuffer(request.writeToBuffer()),
+        options: _options(timeout),
+      ),
+    );
+    if (!response.hasSession() || !response.hasMetadata()) {
+      throw ClientCallFailure.protocol();
+    }
+    return api.GetSessionResponse.fromBuffer(response.writeToBuffer());
+  }
+
+  @override
+  Future<api.SessionLoginAttempt> startSessionLogin(
+    api.StartSessionLoginRequest request,
+    Duration timeout,
+  ) async {
+    final response = await _invoke(
+      () => _client.startSessionLogin(
+        api.StartSessionLoginRequest.fromBuffer(request.writeToBuffer()),
+        options: _options(timeout),
+      ),
+    );
+    if (!response.hasAttempt()) throw ClientCallFailure.protocol();
+    return api.SessionLoginAttempt.fromBuffer(response.attempt.writeToBuffer());
+  }
+
+  @override
+  Future<api.SessionLoginAttempt> sessionLogin(
+    api.GetSessionLoginRequest request,
+    Duration timeout,
+  ) async {
+    final response = await _invoke(
+      () => _client.getSessionLogin(
+        api.GetSessionLoginRequest.fromBuffer(request.writeToBuffer()),
+        options: _options(timeout),
+      ),
+    );
+    if (!response.hasAttempt()) throw ClientCallFailure.protocol();
+    return api.SessionLoginAttempt.fromBuffer(response.attempt.writeToBuffer());
+  }
 
   @override
   Future<api.ListNodeRevocationTargetsResponse> revocationTargets(

@@ -8,6 +8,9 @@ import '../connectivity/controller.dart';
 import '../revocation/controller.dart';
 import '../client/revocation_client.dart';
 import '../client/revocation_correlation.dart';
+import '../client/session_login_client.dart';
+import '../client/session_login_correlation.dart';
+import '../session_login/controller.dart';
 import '../enrollment/controller.dart';
 import '../enrollment/server_trust_controller.dart';
 import 'launch_config.dart';
@@ -65,6 +68,18 @@ final class UiSession {
         readTimeout: config.rpcTimeout,
         pollInterval: config.pollInterval,
       ),
+      sessionLogin =
+          _connection.client is SessionLoginClient &&
+              _storage.store is SessionLoginCorrelationStore
+          ? SessionLoginController(
+              client: _connection.client as SessionLoginClient,
+              store: _storage.store as SessionLoginCorrelationStore,
+              expectedContractSha256: config.contractSha256,
+              expectedInstanceId: config.pipe.instanceId,
+              timeout: config.rpcTimeout,
+              now: DateTime.now,
+            )
+          : null,
       revocation =
           _connection.client is RevocationClient &&
               _storage.store is RevocationCorrelationStore
@@ -77,6 +92,7 @@ final class UiSession {
             )
           : null {
     enrollment.addListener(_observeEnrollment);
+    sessionLogin?.addListener(_observeSession);
   }
 
   final UiLaunchConfig config;
@@ -87,6 +103,19 @@ final class UiSession {
   final ServerTrustController trust;
   final ConnectivityController connectivity;
   final RevocationController? revocation;
+  final SessionLoginController? sessionLogin;
+  String _sessionLoginPhase = '';
+  void _observeSession() {
+    final a = sessionLogin?.attempt;
+    final phase = '${a?.attemptId}:${a?.phase}';
+    if (_sessionLoginPhase != phase) {
+      _sessionLoginPhase = phase;
+      if (a?.phase == api.SessionLoginPhase.SESSION_LOGIN_PHASE_SUCCEEDED) {
+        unawaited(connectivity.refresh());
+      }
+    }
+  }
+
   String _revocationNodeContext = '';
   Future<void>? _initialization;
   Future<void>? _closing;
@@ -123,6 +152,9 @@ final class UiSession {
       _revocationNodeContext = node;
       if (node.isNotEmpty && revocation != null) {
         unawaited(revocation!.refresh());
+      }
+      if (node.isNotEmpty && sessionLogin != null) {
+        unawaited(sessionLogin!.refresh());
       }
     }
   }
@@ -169,11 +201,17 @@ final class UiSession {
       await enrollment.bind(config.profile);
       if (!closed) await connectivity.bind(config.profile);
       if (!closed) await revocation?.bind(config.profile);
+      if (!closed) await sessionLogin?.bind(config.profile);
     }();
   }
 
   Future<bool> openBrowser(Uri url) async {
     if (closed || url != enrollment.browserAction) return false;
+    return _platform.openBrowser(url);
+  }
+
+  Future<bool> openSessionBrowser(Uri url) async {
+    if (closed || url != sessionLogin?.browserAction) return false;
     return _platform.openBrowser(url);
   }
 
@@ -184,6 +222,8 @@ final class UiSession {
     trust.dispose();
     connectivity.dispose();
     revocation?.dispose();
+    sessionLogin?.removeListener(_observeSession);
+    sessionLogin?.dispose();
     return _closing = () async {
       try {
         await _connection.close();

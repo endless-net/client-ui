@@ -9,6 +9,7 @@ import '../client/correlation_journal.dart';
 import '../client/windows_pipe_config.dart';
 import '../enrollment/panel.dart';
 import '../connectivity/panel.dart';
+import '../session_login/panel.dart';
 import '../update/controller.dart';
 import '../update/panel.dart';
 import 'launch_config.dart';
@@ -199,6 +200,11 @@ class _MainAppState extends State<MainApp> {
                       reconnect: _reconnect,
                       connectivityPanel: Column(
                         children: [
+                          if (_session!.sessionLogin != null)
+                            SessionLoginPanel(
+                              controller: _session!.sessionLogin!,
+                              openBrowser: _session!.openSessionBrowser,
+                            ),
                           ConnectivityPanel(
                             controller: _session!.connectivity,
                             reconnect: _reconnect,

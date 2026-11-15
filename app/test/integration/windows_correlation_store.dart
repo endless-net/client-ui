@@ -6,6 +6,7 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:endlessnet_client_ui/client/correlation_journal.dart';
 import 'package:endlessnet_client_ui/client/enrollment_client.dart';
 import 'package:endlessnet_client_ui/client/windows_correlation_store.dart';
+import 'package:endlessnet_client_ui/client/session_login_correlation.dart';
 
 // Explicit native Windows fixture, excluded from declared baseline unit tests.
 const profile = 'fixture-profile';
@@ -53,6 +54,10 @@ Future<void> child(String action, File file) async {
     await store.save(correlation(deadline: until));
     stdout.writeln('UPDATED');
   } else {
+    if (action == 'read') {
+      final login = await store.readSessionLogin(profile, origin);
+      require(login?.requestId == uuid && login?.nodeId == 'original-node');
+    }
     require(
       saved?.recoveryDeadline ==
           (action == 'read-short'
@@ -111,6 +116,14 @@ Future<void> main(List<String> args) async {
     require(await invoke('write', file) == 'WRITTEN');
     final held = await openWindowsCorrelationStore(file, maxBytes: 8192);
     require(await invoke('locked', file) == 'LOCKED');
+    await held.saveSessionLogin(
+      const SessionLoginCorrelation(
+        profileId: profile,
+        controlOrigin: origin,
+        nodeId: 'original-node',
+        requestId: uuid,
+      ),
+    );
     await held.close();
     require(await invoke('update', file) == 'UPDATED');
     require(await invoke('read', file) == 'READ');

@@ -7,6 +7,7 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 
 import 'enrollment_client.dart';
 import 'revocation_correlation.dart';
+import 'session_login_correlation.dart';
 
 // UI-owned correlation only. This is neither an API DTO nor a device-key store.
 abstract interface class CorrelationJournalIO {
@@ -35,7 +36,10 @@ final class CorrelationStoreFailure implements Exception {
 // Caller supplies an already exclusively locked handle for this store lifetime.
 // The Windows factory owns that contract. Memory IO is used only by unit tests.
 final class JournalCorrelationStore
-    implements CorrelationStore, RevocationCorrelationStore {
+    implements
+        CorrelationStore,
+        RevocationCorrelationStore,
+        SessionLoginCorrelationStore {
   JournalCorrelationStore(this._io, {required this.maxBytes}) {
     if (maxBytes < 8192 || maxBytes > 16 * 1024 * 1024) {
       throw ArgumentError('correlation journal budget');
@@ -44,6 +48,29 @@ final class JournalCorrelationStore
 
   final CorrelationJournalIO _io;
   final int maxBytes;
+
+  @override
+  Future<SessionLoginCorrelation?> readSessionLogin(
+    String profile,
+    String origin,
+  ) => _run(() async {
+    final rows = CorrelationJournal.sessionLoginRecords(
+      await _io.read(maxBytes),
+    ).where((c) => c.profileId == profile && c.controlOrigin == origin);
+    return rows.isEmpty ? null : rows.last;
+  });
+
+  @override
+  Future<void> saveSessionLogin(SessionLoginCorrelation value) =>
+      _run(() async {
+        final existing = await _io.read(maxBytes);
+        final frame = CorrelationJournal.appendSessionLogin(existing, value);
+        if (existing.length + frame.length > maxBytes) {
+          throw const CorrelationStoreFailure(CorrelationStoreProblem.full);
+        }
+        if (frame.isNotEmpty) await _io.append(frame);
+        await _io.flush();
+      });
   Completer<void>? _active;
   bool _closing = false;
   Future<void>? _close;
@@ -240,6 +267,11 @@ final class CorrelationJournal {
           pos = end + _hashBytes;
           continue;
         }
+        if (profile == '@SES003') {
+          SessionLoginCorrelation.decode(body.sublist(offset));
+          pos = end + _hashBytes;
+          continue;
+        }
         final origin = field();
         final uuid = field();
         final hostname = field();
@@ -305,6 +337,77 @@ final class CorrelationJournal {
       ..add((ByteData(4)..setUint32(0, payload.length)).buffer.asUint8List())
       ..add(payload);
     final bytes = frame.takeBytes();
+    return (BytesBuilder(copy: false)
+          ..add(existing.isEmpty ? _magic : const [])
+          ..add(bytes)
+          ..add(sha256.convert(bytes).bytes))
+        .takeBytes();
+  }
+
+  static const _sessionMarker = [0, 7, 64, 83, 69, 83, 48, 48, 51];
+
+  static List<SessionLoginCorrelation> sessionLoginRecords(Uint8List data) {
+    decode(data);
+    final result = <SessionLoginCorrelation>[];
+    var pos = data.isEmpty ? 0 : _magic.length;
+    while (pos < data.length) {
+      final length = ByteData.sublistView(data, pos, pos + 4).getUint32(0);
+      final body = Uint8List.sublistView(data, pos + 4, pos + 4 + length);
+      if (body.length >= _sessionMarker.length &&
+          _same(body.sublist(0, _sessionMarker.length), _sessionMarker)) {
+        final value = SessionLoginCorrelation.decode(
+          body.sublist(_sessionMarker.length),
+        );
+        final reused = result.where((c) => c.requestId == value.requestId);
+        if (reused.any((c) => !c.same(value))) {
+          throw const CorrelationStoreFailure(CorrelationStoreProblem.conflict);
+        }
+        result.add(value);
+      }
+      pos += 4 + length + _hashBytes;
+    }
+    return result;
+  }
+
+  static Uint8List appendSessionLogin(
+    Uint8List existing,
+    SessionLoginCorrelation value,
+  ) {
+    value.validate();
+    final rows = sessionLoginRecords(existing);
+    final reused = rows.where((c) => c.requestId == value.requestId);
+    if (reused.any((c) => !c.same(value))) {
+      throw const CorrelationStoreFailure(CorrelationStoreProblem.conflict);
+    }
+    // Re-appending an old UUID would move the selected attempt backwards.
+    if (reused.isNotEmpty) {
+      final selected = rows.where(
+        (c) =>
+            c.profileId == value.profileId &&
+            c.controlOrigin == value.controlOrigin,
+      );
+      if (!selected.last.same(value)) {
+        throw const CorrelationStoreFailure(CorrelationStoreProblem.conflict);
+      }
+      return Uint8List(0);
+    }
+    final payload =
+        (BytesBuilder(copy: false)
+              ..add(_sessionMarker)
+              ..add(value.encode()))
+            .takeBytes();
+    if (payload.length > _maxFrame) {
+      throw const CorrelationStoreFailure(CorrelationStoreProblem.full);
+    }
+    final bytes =
+        (BytesBuilder(copy: false)
+              ..add(
+                (ByteData(
+                  4,
+                )..setUint32(0, payload.length)).buffer.asUint8List(),
+              )
+              ..add(payload))
+            .takeBytes();
     return (BytesBuilder(copy: false)
           ..add(existing.isEmpty ? _magic : const [])
           ..add(bytes)

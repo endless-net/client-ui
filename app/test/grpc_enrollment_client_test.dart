@@ -82,6 +82,62 @@ Any packed(api.Failure value) => Any(
 );
 
 void main() {
+  test('session login adapter uses generated methods with exact UUID/CAS and bounded calls', () async {
+    final channel = MemoryChannel()
+      ..respond = (path, _) async {
+        final attempt = api.SessionLoginAttempt(
+          requestId: 'saved-request',
+          profileId: 'profile',
+        );
+        if (path.endsWith('/GetSession')) {
+          return api.GetSessionResponse(
+            session: api.Session(state: api.SessionState.SESSION_STATE_EXPIRED),
+            metadata: api.SnapshotMetadata(instanceId: 'instance'),
+            loginAttempt: attempt,
+          ).writeToBuffer();
+        }
+        if (path.endsWith('/StartSessionLogin')) {
+          return api.StartSessionLoginResponse(attempt: attempt)
+              .writeToBuffer();
+        }
+        return api.GetSessionLoginResponse(attempt: attempt).writeToBuffer();
+      };
+    final adapter = GrpcEnrollmentClient(
+      api.ClientServiceClient(channel),
+      maxFailureBytes: 16384,
+    );
+    const timeout = Duration(seconds: 3);
+    final ref = api.ProfileRef(profileId: 'profile');
+    final state = await adapter.session(
+      api.GetSessionRequest(profile: ref),
+      timeout,
+    );
+    expect(state.loginAttempt.requestId, 'saved-request');
+    final request = api.StartSessionLoginRequest(
+      profile: ref,
+      requestId: 'saved-request',
+      mutation: api.MutationContext(
+        expectedInstanceId: 'instance',
+        expectedRevision: api.MutationContext().expectedRevision + 9,
+      ),
+    );
+    await adapter.startSessionLogin(request, timeout);
+    expect(channel.path, '/client.v0.ClientService/StartSessionLogin');
+    final sent = api.StartSessionLoginRequest.fromBuffer(channel.requestBytes!);
+    expect(sent.requestId, 'saved-request');
+    expect(sent.mutation.expectedRevision.toStringUnsigned(), '9');
+    await adapter.sessionLogin(
+      api.GetSessionLoginRequest(profile: ref, requestId: 'saved-request'),
+      timeout,
+    );
+    expect(channel.path, '/client.v0.ClientService/GetSessionLogin');
+    expect(
+      api.GetSessionLoginRequest.fromBuffer(channel.requestBytes!).requestId,
+      'saved-request',
+    );
+    expect(channel.timeout, timeout);
+    expect(channel.calls, 3);
+  });
   test('connection SDK preserves bounded command and CAS without declaring an outcome', () async {
     final channel = MemoryChannel()
       ..respond = (path, _) async => path.endsWith('/Connect')

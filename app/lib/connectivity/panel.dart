@@ -63,6 +63,9 @@ class ConnectivityPanel extends StatelessWidget {
   }
 
   String _reason(api.Failure f) {
+    if (f.reasonKey == 'client.connection.node_renewal_unresolved') {
+      return 'Не подтверждён результат обновления доступа устройства. Вход пользователя не заменяет этот результат; требуется проверка владельцем сервиса.';
+    }
     if (f.reasonKey == 'client.connection.registration_revoked') {
       return 'Регистрация устройства отозвана. Для возврата нужен новый авторизованный допуск; переподключение не восстанавливает прежнее право.';
     }
