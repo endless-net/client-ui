@@ -36,7 +36,7 @@ def run(args: list[str], cwd: Path, *, capture: bool = False,
     if os.name == "nt" and command[0] in {"flutter", "dart"}:
         command = ["cmd.exe", "/d", "/c", *command]
     print("+ " + " ".join(args), file=sys.stderr, flush=True)
-    result = subprocess.run(command, cwd=cwd, check=True, text=True,
+    result = subprocess.run(command, cwd=cwd, check=True, text=True, encoding="utf-8",
                             stdout=subprocess.PIPE if capture else None, env=env)
     return result.stdout.strip() if capture else ""
 

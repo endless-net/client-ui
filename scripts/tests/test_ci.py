@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -74,6 +75,13 @@ class FakeGitHub:
 
 
 class PipelineTests(unittest.TestCase):
+    def test_subprocess_metadata_is_utf8_even_on_windows(self):
+        # GitHub CLI emits UTF-8 JSON regardless of the Windows ANSI codepage.
+        expected = "Сборка готова — ✓"
+        source = "import sys; sys.stdout.buffer.write(" + repr(expected) + ".encode('utf-8'))"
+        actual = CI.run([sys.executable, "-c", source], Path(__file__).resolve().parent, capture=True)
+        self.assertEqual(actual, expected)
+
     def setUp(self):
         # Сообщение fake publisher не должно выглядеть как настоящий GitHub release.
         printer = patch.object(CI, "print", create=True)
