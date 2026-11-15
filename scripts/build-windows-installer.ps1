@@ -110,7 +110,7 @@ try {
     if ($LASTEXITCODE) { throw 'MSI source generation failed' }
     $releaseVersion = 'v' + $Version.TrimStart('v')
     $msi = Join-Path $output "EndlessNet-$releaseVersion-windows-amd64.msi"
-    & wix build (Join-Path $work 'EndlessNet.wxs') -arch x64 -o $msi
+    & wix build (Join-Path $work 'EndlessNet.wxs') -arch x64 -o $msi --acceptEula
     if ($LASTEXITCODE) { throw 'MSI compilation failed' }
     if ($Sign) {
         if (-not $CertificateThumbprint) { throw 'CertificateThumbprint is required for signing' }
