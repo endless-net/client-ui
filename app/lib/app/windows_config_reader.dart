@@ -9,6 +9,31 @@ import 'package:ffi/ffi.dart';
 import 'launch_config.dart';
 import '../client/windows_pipe_config.dart';
 
+Future<UiLaunchConfig> readInstalledWindowsLaunchConfig(
+  String libraryPath,
+) async {
+  final directory = await Isolate.run(() {
+    final library = DynamicLibrary.open(libraryPath);
+    final read = library
+        .lookupFunction<
+          Int32 Function(Pointer<Utf16>, Uint32),
+          int Function(Pointer<Utf16>, int)
+        >('en_ui_program_data');
+    final buffer = calloc<Uint16>(32768).cast<Utf16>();
+    try {
+      if (read(buffer, 32768) == 0) throw const UiConfigurationFailure();
+      return buffer.toDartString();
+    } finally {
+      calloc.free(buffer);
+    }
+  });
+  return readWindowsLaunchConfig(
+    '$directory\\EndlessNet\\Client\\launch-policy.json',
+    libraryPath,
+    runtimeInstancePath: '$directory\\EndlessNet\\Client\\runtime-instance',
+  );
+}
+
 Future<UiLaunchConfig> readWindowsLaunchConfig(
   String path,
   String libraryPath, {

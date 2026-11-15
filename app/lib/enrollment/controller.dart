@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/foundation.dart';
+import 'package:grpc/grpc.dart' show StatusCode;
 
 import '../client/enrollment_client.dart';
 import '../client/call_failure.dart';
@@ -20,6 +21,7 @@ final class EnrollmentController extends ChangeNotifier {
     required Duration recoveryPollInterval,
     String Function()? requestId,
     this.automaticPolling = true,
+    this.restoreInstalledAttempt = false,
   }) : _digest = expectedContractSha256,
        _timeout = callTimeout,
        _recoveryPoll = recoveryPollInterval,
@@ -42,6 +44,7 @@ final class EnrollmentController extends ChangeNotifier {
   final Duration _recoveryPoll;
   final String Function() _requestId;
   final bool automaticPolling;
+  final bool restoreInstalledAttempt;
   api.Profile? _profile;
   api.RuntimeInfo? _runtime;
   api.Status? _status;
@@ -120,15 +123,26 @@ final class EnrollmentController extends ChangeNotifier {
       !_busy &&
       _link == EnrollmentLinkState.available &&
       _correlation == null &&
+      !registeredConfirmed &&
       enrollmentRestriction?.availability ==
           api.Availability.AVAILABILITY_AVAILABLE;
 
   bool get registeredConfirmed {
     final a = _attempt;
     final s = _status;
+    if (a == null) {
+      return !_rejected &&
+          _link == EnrollmentLinkState.available &&
+          s != null &&
+          s.activeProfileId == _profile?.id &&
+          s.nodeId.isNotEmpty &&
+          s.accountId.isNotEmpty &&
+          s.network.id.isNotEmpty &&
+          (s.controlState == api.ControlState.CONTROL_STATE_REGISTERED ||
+              s.controlState == api.ControlState.CONTROL_STATE_READY);
+    }
     return !_rejected &&
         _link == EnrollmentLinkState.available &&
-        a != null &&
         s != null &&
         a.phase == api.EnrollmentPhase.ENROLLMENT_PHASE_REGISTERED &&
         a.certainty == api.EnrollmentCertainty.ENROLLMENT_CERTAINTY_KNOWN &&
@@ -166,7 +180,10 @@ final class EnrollmentController extends ChangeNotifier {
         url.userInfo.isNotEmpty ||
         url.hasFragment ||
         url.hasQuery ||
-        url.origin != p.controlOrigin) {
+        url.origin !=
+            (p.controlOrigin == "https://api.endlessnet.ru"
+                ? "https://admin.endlessnet.ru"
+                : p.controlOrigin)) {
       return null;
     }
     return url;
@@ -246,6 +263,40 @@ final class EnrollmentController extends ChangeNotifier {
       _link = EnrollmentLinkState.available;
       if (stored != null) {
         await _recover(epoch);
+      } else if (restoreInstalledAttempt &&
+          !registeredConfirmed &&
+          status.activeProfileId == bound.id) {
+        try {
+          final attempt = await _call(
+            _client.attempt(
+              api.GetEnrollmentAttemptRequest(
+                profile: api.ProfileRef(profileId: bound.id),
+                current: true,
+              ),
+              _timeout,
+            ),
+          );
+          if (!_current(epoch)) return;
+          if (attempt.profileId != bound.id ||
+              !_validUuid(attempt.requestId) ||
+              attempt.hostname.isEmpty ||
+              !_validMetadata(attempt.metadata)) {
+            throw ClientCallFailure.protocol();
+          }
+          final record = EnrollmentCorrelation(
+            profileId: bound.id,
+            controlOrigin: bound.controlOrigin,
+            requestId: attempt.requestId,
+            hostname: attempt.hostname,
+            mode: attempt.mode,
+          );
+          await _store.save(record);
+          if (!_current(epoch)) return;
+          _correlation = record;
+          await _accept(attempt, epoch);
+        } on ClientCallFailure catch (error) {
+          if (error.transportCode != StatusCode.notFound) rethrow;
+        }
       } else if (enrollmentRestriction?.availability !=
           api.Availability.AVAILABILITY_AVAILABLE) {
         _reason = enrollmentRestriction?.reasonKey ?? 'ui.unsupported';

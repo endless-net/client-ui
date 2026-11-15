@@ -64,10 +64,17 @@ jobs:
         run: |
           git clone --depth 1 --branch 3.47.7 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - name: Install pinned WiX for the Windows MSI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          dotnet tool install --tool-path "$env:RUNNER_TEMP/wix" wix --version 7.0.0
+          "$env:RUNNER_TEMP/wix" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Native desktop archive
         shell: bash
         env:
           BUILD_TARGET: ${{ matrix.target }}
+          GH_TOKEN: ${{ github.token }}
         run: python -B scripts/ci.py build --target "$BUILD_TARGET"
       - uses: actions/upload-artifact@v4
         with:

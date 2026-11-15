@@ -220,6 +220,64 @@ EnrollmentController automaticController(
 );
 
 void main() {
+  test('UI adopts the CLI pending attempt and official consent origin without Enroll', () async {
+    final client = FakeClient();
+    client.snapshot = api.Status(
+      metadata: metadata(),
+      activeProfileId: 'profile-A',
+    );
+    client.value.hostname = 'installed-PC';
+    client.value.mode = api.EnrollmentMode.ENROLLMENT_MODE_WORKSTATION;
+    client.value.browserAction.verificationUrl =
+        'https://admin.endlessnet.ru/api/v1/auth/native-login/transaction';
+    final store = MemoryCorrelation();
+    final c = EnrollmentController(
+      client: client,
+      store: store,
+      expectedContractSha256: 'a' * 64,
+      now: () => now,
+      callTimeout: const Duration(seconds: 1),
+      recoveryPollInterval: const Duration(seconds: 1),
+      automaticPolling: false,
+      restoreInstalledAttempt: true,
+    );
+    addTearDown(c.dispose);
+    await c.bind(
+      api.Profile(id: 'profile-A', controlOrigin: 'https://api.endlessnet.ru'),
+    );
+    expect(client.lookup!.current, isTrue);
+    expect(c.correlation!.requestId, requestId);
+    expect(c.browserAction!.host, 'admin.endlessnet.ru');
+    expect(client.enrolls, 0);
+    client.value.browserAction.verificationUrl =
+        'https://foreign.invalid/api/v1/auth/native-login/transaction';
+    await c.refresh();
+    expect(c.browserAction, isNull);
+  });
+
+  test(
+    'installed CLI registration is displayed without another enrollment',
+    () async {
+      final client = FakeClient();
+      client.snapshot = api.Status(
+        metadata: metadata(),
+        activeProfileId: 'profile-A',
+        nodeId: 'same-node',
+        accountId: 'account',
+        network: api.Network(id: 'network'),
+        controlState: api.ControlState.CONTROL_STATE_READY,
+      );
+      final store = MemoryCorrelation();
+      final c = controller(client, store);
+      addTearDown(c.dispose);
+      await c.bind(profile());
+      expect(c.registeredConfirmed, isTrue);
+      expect(c.canEnroll, isFalse);
+      expect(client.enrolls, 0);
+      expect(store.records, isEmpty);
+    },
+  );
+
   testWidgets(
     'deadline timer does not begin another automatic read; explicit original lookup remains available',
     (tester) async {

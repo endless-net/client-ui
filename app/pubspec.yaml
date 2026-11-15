@@ -1,7 +1,7 @@
 name: endlessnet_client_ui
-description: "Минимальный desktop-каркас EndlessNet."
+description: "Интерфейс установленной службы EndlessNet Client."
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.5.0+1
 
 environment:
   sdk: ^3.13.5
@@ -22,7 +22,7 @@ dependencies:
   endlessnet_client_api:
     git:
       url: https://github.com/endless-net/client.git
-      ref: c1872645fd91dc8a48cf98f2b843b46b82a1a285 # api/v0.4.0
+      ref: 72817ee22ba3017643f551a03a85f313ae7621e7 # api/v0.6.0
       path: api/dart
 
 dev_dependencies:

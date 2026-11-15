@@ -9,9 +9,11 @@ class ConnectivityPanel extends StatelessWidget {
     super.key,
     required this.controller,
     this.reconnect,
+    this.simple = false,
   });
   final ConnectivityController controller;
   final Future<void> Function()? reconnect;
+  final bool simple;
 
   String _state(ConnectivityController c, api.Status? s) {
     if (c.link == ConnectivityLink.mismatch) {
@@ -31,6 +33,19 @@ class ConnectivityPanel extends StatelessWidget {
     if (s?.serviceState == api.ServiceState.SERVICE_STATE_RECOVERING &&
         s?.connectionPhase == api.ConnectionPhase.CONNECTION_PHASE_CONNECTING) {
       return 'Соединение: подключение или восстановление выполняется';
+    }
+    if (s?.serviceState == api.ServiceState.SERVICE_STATE_LOCAL_READY &&
+        s?.connectionPhase ==
+            api.ConnectionPhase.CONNECTION_PHASE_LOCAL_READY &&
+        s?.controlState == api.ControlState.CONTROL_STATE_READY &&
+        s?.peerCount == 0 &&
+        (s?.mapRevision.toInt() ?? 0) > 0 &&
+        (s?.overlayAddresses.isNotEmpty ?? false) &&
+        s?.agent.snapshotState ==
+            api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_CURRENT &&
+        s?.agent.directPathCount == 0 &&
+        s?.agent.relayPathCount == 0) {
+      return 'Туннель готов, других устройств нет';
     }
     return switch (s?.connectionPhase) {
       api.ConnectionPhase.CONNECTION_PHASE_CONNECTING =>
@@ -52,10 +67,13 @@ class ConnectivityPanel extends StatelessWidget {
       return 'Регистрация устройства отозвана. Для возврата нужен новый авторизованный допуск; переподключение не восстанавливает прежнее право.';
     }
     if (f.reasonKey == 'client.connection.trust_required') {
-      return 'Доверенная подпись сервера изменилась или не подтверждена. Проверьте сервер и подтвердите доверие отдельно; повтор подключения не подтверждает новую подпись.';
+      return 'Не удалось подтвердить подпись сервера. Проверьте адрес сервера и установленную версию EndlessNet; повтор подключения не принимает новый ключ.';
     }
     if (f.reasonKey == 'client.connection.credential_expired') {
-      return 'Право устройства истекло или его срок неизвестен. Выполните авторизованное продление учётных данных устройства; вход в учётную запись не продлевает это право.';
+      return 'Право устройства истекло или его срок неизвестен. Нажмите «Подключить»: служба проверит возможность продления для того же устройства. Если срок запроса истёк, повтор не гарантирует продление; требуется восстановить авторизованный вход.';
+    }
+    if (f.reasonKey == 'client.connection.login_required') {
+      return 'Для подключения нужен актуальный вход в учётную запись. Регистрация устройства сохранена.';
     }
     if (f.reasonKey == 'client.connection.deadline') {
       return 'Попытка подключения или восстановления завершена: бюджет 30 секунд исчерпан. Проверьте сеть и разрешённый Direct-путь, затем повторите подключение.';
@@ -186,24 +204,28 @@ class ConnectivityPanel extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               if (c.busy) const LinearProgressIndicator(),
-              Text(
-                'Намерение${c.fresh ? '' : ' (последнее известное)'}: ${switch (s?.intent.desiredState) {
-                  api.DesiredState.DESIRED_STATE_CONNECTED => 'подключить',
-                  api.DesiredState.DESIRED_STATE_DISCONNECTED => 'отключить',
-                  _ => 'неизвестно',
-                }}',
-              ),
-              Text(
-                'Локальное применение: ${applied
-                    ? 'подтверждено'
-                    : disconnected
-                    ? 'отключено'
-                    : 'неизвестно'}',
-              ),
-              Text('Direct-путь: ${path ? 'подтверждён' : 'не подтверждён'}'),
-              for (final peer
-                  in s?.peerTransports ?? <api.PeerTransportStatus>[])
-                _transport(peer, c.fresh),
+              if (!simple)
+                Text(
+                  'Намерение${c.fresh ? '' : ' (последнее известное)'}: ${switch (s?.intent.desiredState) {
+                    api.DesiredState.DESIRED_STATE_CONNECTED => 'подключить',
+                    api.DesiredState.DESIRED_STATE_DISCONNECTED => 'отключить',
+                    _ => 'неизвестно',
+                  }}',
+                ),
+              if (!simple)
+                Text(
+                  'Локальное применение: ${applied
+                      ? 'подтверждено'
+                      : disconnected
+                      ? 'отключено'
+                      : 'неизвестно'}',
+                ),
+              if (!simple)
+                Text('Direct-путь: ${path ? 'подтверждён' : 'не подтверждён'}'),
+              if (!simple)
+                for (final peer
+                    in s?.peerTransports ?? <api.PeerTransportStatus>[])
+                  _transport(peer, c.fresh),
               if (c.fresh && applied)
                 for (final address in s.overlayAddresses)
                   SelectableText('Адрес EndlessNet: $address'),
@@ -213,13 +235,15 @@ class ConnectivityPanel extends StatelessWidget {
                 const Text(
                   'Новые соединения запрещены. Существующие потоки ограничены исходным сроком разрешения.',
                 ),
-              if (c.fresh &&
+              if (!simple &&
+                  c.fresh &&
                   s?.credential.state ==
                       api.CredentialState.CREDENTIAL_STATE_EXPIRED)
                 const Text(
                   'Учётные данные устройства истекли. Требуется восстановить право доступа.',
                 ),
-              if (c.fresh &&
+              if (!simple &&
+                  c.fresh &&
                   s?.session.state == api.SessionState.SESSION_STATE_EXPIRED)
                 const Text(
                   'Сеанс пользователя истёк. Для действий учётной записи войдите снова; это не продлевает право устройства.',
@@ -237,7 +261,7 @@ class ConnectivityPanel extends StatelessWidget {
                 ),
               for (final failure in failures) ...[
                 Text(_reason(failure)),
-                Text(_actor(failure.actionOwner)),
+                if (!simple) Text(_actor(failure.actionOwner)),
               ],
               if (c.supported &&
                   c.restriction?.availability !=
@@ -245,9 +269,10 @@ class ConnectivityPanel extends StatelessWidget {
                 const Text(
                   'Управление соединением недоступно текущему пользователю.',
                 ),
-              const Text(
-                'Работа приложения второго устройства проверяется отдельно от сетевого пути.',
-              ),
+              if (!simple)
+                const Text(
+                  'Работа приложения второго устройства проверяется отдельно от сетевого пути.',
+                ),
               Wrap(
                 spacing: 8,
                 children: [

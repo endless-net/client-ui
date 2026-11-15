@@ -18,6 +18,9 @@ class EnrollmentPanel extends StatefulWidget {
     this.serverTrust,
     this.reconnect,
     this.connectivityPanel,
+    this.simple = false,
+    this.hostname = "",
+    this.onStart,
   });
 
   final EnrollmentController controller;
@@ -26,6 +29,9 @@ class EnrollmentPanel extends StatefulWidget {
   final Future<bool> Function(Uri)? openBrowser;
   final Future<void> Function()? reconnect;
   final Widget? connectivityPanel;
+  final bool simple;
+  final String hostname;
+  final Future<void> Function(String, api.EnrollmentMode)? onStart;
 
   @override
   State<EnrollmentPanel> createState() => _EnrollmentPanelState();
@@ -44,6 +50,7 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
   @override
   void initState() {
     super.initState();
+    _hostname.text = widget.hostname;
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -101,7 +108,7 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
     return switch (c.currentAttempt?.phase) {
       api.EnrollmentPhase.ENROLLMENT_PHASE_AWAITING_LOGIN => 'Ожидание входа',
       api.EnrollmentPhase.ENROLLMENT_PHASE_CHOOSING_CONTEXT =>
-        'Выберите аккаунт и сеть',
+        'Ожидание назначения сети сервером',
       api.EnrollmentPhase.ENROLLMENT_PHASE_REGISTERING =>
         'Регистрация устройства',
       api.EnrollmentPhase.ENROLLMENT_PHASE_PENDING_APPROVAL =>
@@ -169,7 +176,10 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
           attempt?.restriction.actionOwner ??
           c.enrollmentRestriction?.actionOwner ??
           api.ActionOwner.ACTION_OWNER_UNSPECIFIED;
-      final reason = _reason(c.reasonKey);
+      final reason =
+          widget.simple && c.reasonKey.startsWith('client.server_identity.')
+          ? 'Не удалось проверить сервер EndlessNet. Проверьте соединение и установленную версию; вход не начат.'
+          : _reason(c.reasonKey);
       final action = _owner(owner);
       return SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -178,54 +188,67 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
           children: [
             Text(_title(c), style: Theme.of(context).textTheme.headlineSmall),
             if (profile != null) ...[
+              if (!widget.simple)
+                Text(
+                  'Профиль: ${profile.displayName.isEmpty ? profile.id : profile.displayName}',
+                ),
               Text(
-                'Профиль: ${profile.displayName.isEmpty ? profile.id : profile.displayName}',
+                'Сервер: ${profile.controlOrigin == 'https://api.endlessnet.ru' ? 'https://endlessnet.ru' : profile.controlOrigin}',
               ),
-              Text('Сервер: ${profile.controlOrigin}'),
             ],
             if (c.busy) const LinearProgressIndicator(),
             if (widget.connectivityPanel != null) widget.connectivityPanel!,
             if (reason.isNotEmpty) Text(reason),
             if (action.isNotEmpty) Text(action),
-            if (attempt == null && c.correlation == null) ...[
-              TextField(
-                controller: _hostname,
-                enabled: c.canEnroll,
-                decoration: const InputDecoration(labelText: 'Имя компьютера'),
-              ),
-              DropdownButton<api.EnrollmentMode>(
-                value: _mode,
-                items: const [
-                  DropdownMenuItem(
-                    value: api.EnrollmentMode.ENROLLMENT_MODE_WORKSTATION,
-                    child: Text('Рабочая станция'),
+            if (attempt == null &&
+                c.correlation == null &&
+                !c.registeredConfirmed) ...[
+              if (!widget.simple)
+                TextField(
+                  controller: _hostname,
+                  enabled: c.canEnroll,
+                  decoration: const InputDecoration(
+                    labelText: 'Имя компьютера',
                   ),
-                  DropdownMenuItem(
-                    value: api.EnrollmentMode.ENROLLMENT_MODE_SERVER,
-                    child: Text('Сервер'),
-                  ),
-                ],
-                onChanged: c.canEnroll
-                    ? (value) {
-                        if (value != null) setState(() => _mode = value);
-                      }
-                    : null,
-              ),
+                ),
+              if (!widget.simple)
+                DropdownButton<api.EnrollmentMode>(
+                  value: _mode,
+                  items: const [
+                    DropdownMenuItem(
+                      value: api.EnrollmentMode.ENROLLMENT_MODE_WORKSTATION,
+                      child: Text('Рабочая станция'),
+                    ),
+                    DropdownMenuItem(
+                      value: api.EnrollmentMode.ENROLLMENT_MODE_SERVER,
+                      child: Text('Сервер'),
+                    ),
+                  ],
+                  onChanged: c.canEnroll
+                      ? (value) {
+                          if (value != null) setState(() => _mode = value);
+                        }
+                      : null,
+                ),
               FilledButton(
                 onPressed: c.canEnroll
-                    ? () => c.start(_hostname.text, _mode)
+                    ? () => (widget.onStart ?? c.start)(_hostname.text, _mode)
                     : null,
-                child: const Text('Начать вход'),
+                child: Text(
+                  widget.simple
+                      ? 'Войти и подключить компьютер'
+                      : 'Начать вход',
+                ),
               ),
             ],
             if (attempt != null) ...[
-              Text('Попытка: ${attempt.attemptId}'),
-              if (attempt.accountId.isNotEmpty)
+              if (!widget.simple) Text('Попытка: ${attempt.attemptId}'),
+              if (!widget.simple && attempt.accountId.isNotEmpty)
                 Text('Аккаунт: ${attempt.accountId}'),
-              if (attempt.networkId.isNotEmpty)
+              if (!widget.simple && attempt.networkId.isNotEmpty)
                 Text('Сеть: ${attempt.networkId}'),
               if (c.registeredConfirmed) ...[
-                Text('Устройство: ${attempt.nodeId}'),
+                if (!widget.simple) Text('Устройство: ${attempt.nodeId}'),
                 const Text(
                   'Регистрация подтверждена. Доступность сетевых ресурсов проверяется отдельно.',
                 ),
@@ -249,7 +272,8 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
                 'Автоматическая проверка',
                 c.correlation!.recoveryDeadline!,
               ),
-            if (widget.serverTrust != null &&
+            if (!widget.simple &&
+                widget.serverTrust != null &&
                 profile != null &&
                 (c.reasonKey.startsWith('client.server_identity.') ||
                     _trustProfile == profile.id)) ...[
@@ -269,6 +293,8 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
                 ),
             ],
             if (c.browserAction != null)
+              SelectableText(c.browserAction.toString()),
+            if (c.browserAction != null)
               OutlinedButton(
                 onPressed: !_opening && widget.openBrowser != null
                     ? _open
@@ -281,7 +307,7 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
               const Text(
                 'Не удалось открыть браузер. Повторите открытие страницы входа.',
               ),
-            if (c.canLoadTargets) ...[
+            if (!widget.simple && c.canLoadTargets) ...[
               OutlinedButton(
                 onPressed: () => c.loadTargets(),
                 child: const Text('Загрузить доступные аккаунты и сети'),

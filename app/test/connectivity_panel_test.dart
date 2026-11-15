@@ -7,6 +7,42 @@ import 'package:flutter_test/flutter_test.dart';
 import 'connectivity_controller_test.dart' as fixture;
 
 void main() {
+  testWidgets(
+    'sole-node local ready is explicit and never claims a peer path',
+    (tester) async {
+      final client = fixture.ConnectivityFixture();
+      client.value
+        ..serviceState = api.ServiceState.SERVICE_STATE_LOCAL_READY
+        ..connectionPhase = api.ConnectionPhase.CONNECTION_PHASE_LOCAL_READY
+        ..controlState = api.ControlState.CONTROL_STATE_READY
+        ..mapRevision = fixture.metadata().revision
+        ..overlayAddresses.add('100.64.0.1/32')
+        ..agent = api.AgentStatus(
+          snapshotState: api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_CURRENT,
+        );
+      final c = fixture.controller(client);
+      await c.bind(fixture.profile());
+      addTearDown(c.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: BrandTheme.dark(),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ConnectivityPanel(controller: c),
+            ),
+          ),
+        ),
+      );
+      expect(find.text('Туннель готов, других устройств нет'), findsOneWidget);
+      expect(find.text('Direct-путь: подтверждён'), findsNothing);
+      client.value.peerCount = 1;
+      await c.refresh();
+      await tester.pump();
+      expect(find.text('Туннель готов, других устройств нет'), findsNothing);
+      expect(client.connects, 0);
+    },
+  );
+
   testWidgets('recovery is visible without claiming application access', (
     tester,
   ) async {
@@ -33,9 +69,10 @@ void main() {
   });
 
   for (final entry in {
-    'client.connection.trust_required': 'подтвердите доверие отдельно',
+    'client.connection.trust_required':
+        'Проверьте адрес сервера и установленную версию',
     'client.connection.credential_expired':
-        'вход в учётную запись не продлевает это право',
+        'проверит возможность продления для того же устройства',
     'client.connection.deadline': 'бюджет 30 секунд исчерпан',
     'client.connection.registration_revoked': 'Регистрация устройства отозвана',
   }.entries) {

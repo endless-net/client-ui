@@ -182,6 +182,14 @@ class PipelineTests(unittest.TestCase):
                 "repository": CI.REPOSITORY, "commit": HEAD, "dirty": False,
                 "target": f"{artifact['target']['os']}-{artifact['target']['arch']}",
                 "archive": path.name, "sha256": CI.sha256(path)}))
+        installer = out / CI.installer_name(PROFILE, "v0.1.0")
+        installer.write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1fixture-msi")
+        (out / (installer.name + ".json")).write_text(json.dumps({
+            "repository": CI.REPOSITORY, "commit": HEAD, "dirty": False,
+            "target": "windows-installer", "archive": installer.name,
+            "sha256": CI.sha256(installer),
+            "client_tag": PROFILE["installer"]["client_tag"],
+            "client_commit": PROFILE["installer"]["client_commit"]}))
         return out
 
     def test_only_exact_normal_v0_tag_push_is_allowed(self):
@@ -252,7 +260,29 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(github.created, 1)
             self.assertEqual(github.promoted, 1)
             self.assertFalse(github.release["draft"])
-            self.assertEqual(len(github.bytes), 6)
+            self.assertEqual(len(github.bytes), 7)
+
+    def test_missing_or_wrong_client_installer_cannot_create_a_release(self):
+        for failure in ("missing", "client", "format"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                out = self.fixture(root)
+                path = out / CI.installer_name(PROFILE, "v0.1.0")
+                identity_path = out / (path.name + ".json")
+                identity = json.loads(identity_path.read_text())
+                if failure == "missing":
+                    path.unlink()
+                elif failure == "client":
+                    identity["client_commit"] = "b" * 40
+                else:
+                    path.write_bytes(b"not-an-msi")
+                    identity["sha256"] = CI.sha256(path)
+                identity_path.write_text(json.dumps(identity))
+                github = FakeGitHub()
+                with patch.object(CI, "run", side_effect=github.run), patch.dict(os.environ, EVENT, clear=True):
+                    with self.assertRaises((ValueError, FileNotFoundError)):
+                        CI.publish(root, out)
+                self.assertEqual(github.created, 0)
 
     def test_partial_upload_stays_draft_and_retry_resumes(self):
         with tempfile.TemporaryDirectory() as directory:

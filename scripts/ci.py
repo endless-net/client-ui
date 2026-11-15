@@ -83,6 +83,11 @@ def load_profile(root: Path) -> dict:
         names.add(name)
     if actual_targets != TARGETS:
         raise ValueError("Профиль должен содержать все четыре desktop target")
+    installer = profile.get("installer", {})
+    if (installer.get("name") != "EndlessNet-{tag}-windows-amd64.msi"
+            or not TAG.fullmatch(installer.get("client_tag", ""))
+            or not re.fullmatch(r"[0-9a-f]{40}", installer.get("client_commit", ""))):
+        raise ValueError("Профиль должен объявлять MSI и exact Client runtime pin")
     return profile
 
 
@@ -242,6 +247,57 @@ def windows_version_arguments(environment: dict[str, str]) -> list[str]:
     return ["--build-name=" + tag.removeprefix("v")]
 
 
+def installer_name(profile: dict, tag: str) -> str:
+    if not TAG.fullmatch(tag):
+        raise ValueError("Installer version requires a v0 tag")
+    return profile["installer"]["name"].format(tag=tag)
+
+
+def build_installer(root: Path, bundle: Path, out: Path, tag: str, profile: dict) -> None:
+    pin = profile["installer"]
+    client_tag, client_commit = pin["client_tag"], pin["client_commit"]
+    name = f"client-{client_tag}-windows-amd64.zip"
+    metadata = gh_json(root, f"repos/endless-net/client/releases/tags/{client_tag}")
+    if metadata.get("draft") or metadata.get("prerelease"):
+        raise ValueError("Client runtime release is not published")
+    asset = next(item for item in metadata["assets"] if item["name"] == name)
+    if not 0 < asset["size"] <= 1024 * 1024 * 1024:
+        raise ValueError("Invalid Client runtime size")
+    with tempfile.TemporaryDirectory(prefix="client-ui-installer-") as directory:
+        temporary = Path(directory)
+        run(["gh", "release", "download", client_tag, "--repo", "endless-net/client",
+             "--pattern", name, "--pattern", "source.json", "--dir", str(temporary)], root)
+        archive_path = temporary / name
+        if asset.get("digest") != "sha256:" + sha256(archive_path) or archive_path.stat().st_size != asset["size"]:
+            raise ValueError("Client runtime digest differs from GitHub asset")
+        identity = json.loads((temporary / "source.json").read_text(encoding="utf-8"))
+        if identity.get("commit") != client_commit or identity.get("tag") != client_tag:
+            raise ValueError("Client runtime is not the pinned producer commit")
+        client = temporary / "client"
+        client.mkdir()
+        with zipfile.ZipFile(archive_path) as archive:
+            total = 0
+            for entry in archive.infolist():
+                relative = Path(entry.filename)
+                total += entry.file_size
+                if (relative.is_absolute() or ".." in relative.parts or ":" in entry.filename
+                        or "\\" in entry.filename or total > 1024 * 1024 * 1024
+                        or (entry.external_attr >> 16) & 0o170000 == 0o120000):
+                    raise ValueError("Unsafe Client archive entry")
+            archive.extractall(client)
+        out.mkdir(parents=True, exist_ok=True)
+        run(["pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File",
+             str(root / "scripts/build-windows-installer.ps1"), "-UIBundle", str(bundle),
+             "-ClientBundle", str(client), "-Version", tag, "-OutputDir", str(out)], root)
+    path = out / installer_name(profile, tag)
+    state = source_state(root)
+    (out / (path.name + ".json")).write_text(json.dumps({
+        "repository": REPOSITORY, "commit": run(["git", "rev-parse", "HEAD"], root, capture=True),
+        "archive": path.name, "sha256": sha256(path), "target": "windows-installer",
+        "client_tag": client_tag, "client_commit": client_commit, **state,
+    }, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def build(root: Path, target: str, out: Path) -> None:
     profile = load_profile(root)
     artifact = next(item for item in profile["artifacts"]
@@ -283,6 +339,14 @@ def build(root: Path, target: str, out: Path) -> None:
             shutil.rmtree(destination)
         shutil.copytree(applications[0], destination, symlinks=True)
     verify_binary(executable, target, root)
+    if expected_os == "windows":
+        ref = environment.get("GITHUB_REF", "")
+        if ref.startswith("refs/tags/"):
+            installer_tag = ref.removeprefix("refs/tags/")
+        else:
+            manifest = (module / "pubspec.yaml").read_text(encoding="utf-8")
+            installer_tag = "v" + re.search(r"^version: ([0-9]+\.[0-9]+\.[0-9]+)", manifest, re.M)[1]
+        build_installer(root, source, out, installer_tag, profile)
     state = source_state(root)
     suffix = ".zip" if expected_os == "windows" else ".tar.gz"
     path = out / (artifact["name"] + suffix)
@@ -362,6 +426,19 @@ def publish(root: Path, out: Path) -> None:
                 or identity.get("dirty", True)):
             raise ValueError("Архив не принадлежит exact source или повреждён")
         assets[path.name] = digest
+    installer = out / installer_name(profile, tag)
+    installer_identity = json.loads((out / (installer.name + ".json")).read_text(encoding="utf-8"))
+    installer_digest = sha256(installer)
+    if (installer_identity.get("repository") != REPOSITORY or installer_identity.get("commit") != head
+            or installer_identity.get("dirty", True) or installer_identity.get("target") != "windows-installer"
+            or installer_identity.get("archive") != installer.name or installer_identity.get("sha256") != installer_digest
+            or installer_identity.get("client_tag") != profile["installer"]["client_tag"]
+            or installer_identity.get("client_commit") != profile["installer"]["client_commit"]):
+        raise ValueError("Installer does not belong to the exact checked UI/Client inputs")
+    with installer.open("rb") as stream:
+        if stream.read(8) != b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
+            raise ValueError("Expected Windows Installer compound file")
+    assets[installer.name] = installer_digest
     checksums = out / "checksums.txt"
     checksums.write_text("".join(f"{assets[name]}  {name}\n" for name in sorted(assets)), encoding="utf-8")
     identity_path = out / "source.json"
@@ -378,7 +455,8 @@ def publish(root: Path, out: Path) -> None:
         raise ValueError("Несколько release с одним тегом")
     if not matches:
         run(["gh", "release", "create", tag, "--repo", REPOSITORY, "--draft", "--verify-tag",
-             "--target", head, "--title", tag, "--generate-notes", "--notes", f"Source commit: {head}"], root)
+             "--target", head, "--title", tag, "--generate-notes", "--notes",
+             f"Source commit: {head}\nWindows MSI includes the standard https://endlessnet.ru configuration. This build is unsigned unless publisher signing was configured."], root)
         release = release_view(root, tag)
     else:
         release = matches[0]

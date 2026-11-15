@@ -1,8 +1,7 @@
 param(
     [Parameter(Mandatory)][string]$UIBundle,
     [Parameter(Mandatory)][string]$ClientBundle,
-    [Parameter(Mandatory)][string]$ServiceProfile,
-    [Parameter(Mandatory)][string]$UiPolicy,
+    [string]$Server = 'https://endlessnet.ru',
     [Parameter(Mandatory)][string]$Version,
     [Parameter(Mandatory)][string]$OutputDir,
     [string]$CrtDirectory,
@@ -13,7 +12,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 if ($Version -cnotmatch '^v?0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw 'Expected v0.MINOR.PATCH' }
-foreach ($name in 'UIBundle','ClientBundle','ServiceProfile','UiPolicy') {
+foreach ($name in 'UIBundle','ClientBundle') {
     Set-Variable $name (Resolve-Path -LiteralPath (Get-Variable $name -ValueOnly)).Path
 }
 $output = [IO.Path]::GetFullPath($OutputDir)
@@ -27,6 +26,17 @@ New-Item -ItemType Directory -Force -Path $output | Out-Null
 $work = Join-Path ([IO.Path]::GetTempPath()) ('endlessnet-msi-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $work | Out-Null
 try {
+    $defaultsPath = Join-Path $ClientBundle 'install-defaults.json'
+    $defaults = Get-Content -LiteralPath $defaultsPath -Raw | ConvertFrom-Json
+    $addresses = @(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway } | ForEach-Object { $_.IPv4Address.IPAddress } | Select-Object -Unique)
+    if ($addresses.Count -ne 1) { throw 'Cannot select one active IPv4 interface for configuration validation' }
+    $endpoint = $addresses[0] + ':' + $defaults.ENDLESSNET_CLIENT_CONNECTION_LISTEN_PORT
+    $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    $data = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'EndlessNet\Client'
+    & python -B (Join-Path $PSScriptRoot 'install_configuration.py') --defaults $defaultsPath --server $Server --endpoint $endpoint --sid $sid --state-directory (Join-Path $data 'state') --output $work
+    if ($LASTEXITCODE) { throw 'Cannot prepare installation configuration' }
+    $ServiceProfile = Join-Path $work 'service.json'
+    $UiPolicy = Join-Path $work 'policy.json'
     foreach ($file in (Join-Path $ClientBundle 'client.exe'), (Join-Path $ClientBundle 'wintun.dll'), (Join-Path $UIBundle 'endlessnet_client_ui.exe')) {
         $stream = [IO.File]::OpenRead($file)
         try {
@@ -62,7 +72,6 @@ try {
 
     # Validate with the actual producer binary. This mode performs no state/SCM IO.
     $settings = Get-Content -LiteralPath $ServiceProfile -Raw | ConvertFrom-Json
-    $data = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'EndlessNet\Client'
     $process = [Diagnostics.ProcessStartInfo]::new((Join-Path $ClientBundle 'client.exe'), 'validate-config')
     $process.UseShellExecute = $false
     $process.CreateNoWindow = $true

@@ -44,6 +44,34 @@ final class SessionConnectivity implements ConnectivityClient {
   }
 }
 
+class InstalledClient extends fixture.FakeClient {
+  InstalledClient(this.instance);
+  final String instance;
+  @override
+  Future<api.EnrollmentAttempt> enroll(
+    api.EnrollRequest request,
+    Duration timeout,
+  ) {
+    value.requestId = request.requestId;
+    return super.enroll(request, timeout);
+  }
+
+  @override
+  Future<api.RuntimeInfo> runtimeInfo(Duration timeout) async {
+    final runtime = await super.runtimeInfo(timeout);
+    runtime.instanceId = instance;
+    runtime.capabilities.add(
+      api.CapabilityStatus(
+        capability: api.Capability.CAPABILITY_CONNECTION,
+        restriction: api.Restriction(
+          availability: api.Availability.AVAILABILITY_AVAILABLE,
+        ),
+      ),
+    );
+    return runtime;
+  }
+}
+
 final class TestPlatform implements UiRuntimePlatform {
   TestPlatform({fixture.FakeClient? client})
     : client = client ?? fixture.FakeClient() {
@@ -118,6 +146,57 @@ Future<void> turns() async {
 }
 
 void main() {
+  test('explicit login connects once after registration, reopen never auto-connects', () async {
+    final values = config_fixture.launchValues();
+    final client = InstalledClient(values['instance_id'] as String);
+    final p = TestPlatform(client: client);
+    client.snapshot = api.Status(
+      metadata: fixture.metadata()..instanceId = client.instance,
+    );
+    client.value =
+        fixture.makeAttempt(
+            profileId: p.config.profile.id,
+            phase: api.EnrollmentPhase.ENROLLMENT_PHASE_REGISTERED,
+          )
+          ..metadata.instanceId = client.instance
+          ..nodeId = 'same-node'
+          ..accountId = 'account'
+          ..networkId = 'network';
+    client.snapshot
+      ..activeProfileId = p.config.profile.id
+      ..nodeId = 'same-node'
+      ..accountId = 'account'
+      ..network = api.Network(id: 'network')
+      ..storedState = api.StoredStatePresence(nodeCredentialPresent: true)
+      ..controlState = api.ControlState.CONTROL_STATE_NOT_REGISTERED
+      ..connectionPhase = api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED;
+    // No prior attempt exists before the explicit enrollment action.
+    client.lookupFailure = ClientCallFailure.fromGrpc(
+      grpc.GrpcError.notFound('fixture'),
+      4096,
+    );
+    final session = await UiSession.open(p, cancelled: () => false);
+    await session.initialize();
+    expect(p.connectivity.connects, 0);
+    client.lookupFailure = null;
+    await session.startEnrollment(
+      'this-PC',
+      api.EnrollmentMode.ENROLLMENT_MODE_WORKSTATION,
+    );
+    await turns();
+    expect(p.connectivity.connects, 1);
+    await session.enrollment.refresh();
+    await turns();
+    expect(p.connectivity.connects, 1);
+    await session.close();
+    expect(p.connectivity.disconnects, 0);
+    final reopened = await UiSession.open(p, cancelled: () => false);
+    await reopened.initialize();
+    await turns();
+    expect(p.connectivity.connects, 1);
+    await reopened.close();
+  });
+
   testWidgets(
     'exit during explicit reconnect waits for old resources and cannot start a new connection',
     (tester) async {

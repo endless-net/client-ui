@@ -30,11 +30,12 @@ class WindowsInstallerTests(unittest.TestCase):
         self.ui.mkdir()
         self.client.mkdir()
         (self.ui / "endlessnet_client_ui.exe").write_bytes(b"fixture-ui")
-        for name in ("client.exe", "wintun.dll", "WINTUN-LICENSE.txt"):
+        for name in ("client.exe", "endlessnet.exe", "wintun.dll", "WINTUN-LICENSE.txt"):
             (self.client / name).write_bytes(b"fixture-client")
         self.actions = self.root / "actions.dll"
         self.actions.write_bytes(b"fixture-actions")
-        self.service = {"ENDLESSNET_CLIENT_DEFAULT_PROFILE_ID": "fixture-profile",
+        self.service = {"ENDLESSNET_CLIENT_CONNECTION_LISTEN_PORT": "51820",
+                        "ENDLESSNET_CLIENT_DEFAULT_PROFILE_ID": "fixture-profile",
                         "ENDLESSNET_CLIENT_CONTROL_ORIGIN": "https://control.invalid"}
         self.policy = {"schema": 1, "profile_id": "fixture-profile",
                        "control_origin": "https://control.invalid"}
@@ -56,7 +57,7 @@ class WindowsInstallerTests(unittest.TestCase):
         self.assertEqual((init.get("Execute"), init.get("Impersonate"), init.get("Return")),
                          ("deferred", "no", "check"))
         condition = tree.find(".//w:Custom[@Action='InitializeState']", NS)
-        self.assertEqual(condition.get("After"), "WriteRegistryValues")
+        self.assertEqual(condition.get("After"), "WriteUiPolicy")
         self.assertIn("NOT ENDLESSNET_EXISTING_INSTALLATION", condition.get("Condition"))
 
     def test_upgrade_keeps_identity_policy_and_private_state(self):
@@ -64,15 +65,31 @@ class WindowsInstallerTests(unittest.TestCase):
         self.assertEqual(tree.find(".//w:Package", NS).get("UpgradeCode"), INSTALLER.UPGRADE_CODE)
         self.assertEqual(tree.find(".//w:MajorUpgrade", NS).get("Schedule"), "afterInstallInitialize")
         policy = tree.find(".//w:File[@Id='LaunchPolicy']/..", NS)
-        self.assertEqual((policy.get("Permanent"), policy.get("NeverOverwrite")), ("yes", "yes"))
+        self.assertEqual((policy.get("Permanent"), policy.get("NeverOverwrite")), ("yes", None))
         identity = tree.find(".//w:RegistryValue[@Name='InstallationId']/..", NS)
         self.assertEqual(identity.get("Permanent"), "yes")
         state = tree.find(".//w:Directory[@Id='ClientState']//w:PermissionEx", NS)
         self.assertEqual(state.get("Sddl"), INSTALLER.PRIVATE)
         self.assertNotIn(";;;BU)", state.get("Sddl"))
+        self.assertNotIn(";;;BA)", state.get("Sddl"))
+        vendor = tree.find(".//w:Directory[@Id='DataVendor']/w:Component/w:CreateFolder/w:PermissionEx", NS)
+        self.assertIn("(A;;FRFX;;;BU)", vendor.get("Sddl"))
+        self.assertNotIn("(A;OICI;FRFX;;;BU)", vendor.get("Sddl"))
         first_guids = [node.get("Guid") for node in tree.findall(".//w:Component", NS)]
         next_guids = [node.get("Guid") for node in self.render("0.1.1").findall(".//w:Component", NS)]
         self.assertEqual(first_guids, next_guids)
+
+    def test_standalone_takeover_and_policy_follow_preserved_service(self):
+        tree = self.render()
+        related = tree.find(".//w:Upgrade[@Id='{9B78E1DF-849D-588C-B5D6-DC393A1B033B}']/w:UpgradeVersion", NS)
+        self.assertEqual(related.get("Property"), "ENDLESSNET_STANDALONE_PRODUCT")
+        self.assertIsNone(related.get("OnlyDetect"))
+        self.assertIsNotNone(tree.find(".//w:File[@Source='" + str(self.client / "endlessnet.exe") + "']", NS))
+        action = tree.find(".//w:CustomAction[@Id='WriteUiPolicy']", NS)
+        self.assertEqual((action.get("Execute"), action.get("Impersonate")), ("deferred", "no"))
+        self.assertEqual(tree.find(".//w:Custom[@Action='WriteUiPolicy']", NS).get("After"), "WriteRegistryValues")
+        values = [node.get("Value") for node in tree.findall(".//w:MultiStringValue", NS)]
+        self.assertIn("ENDLESSNET_CLIENT_DEFAULT_PROFILE_ID=[ENSET_ENDLESSNET_CLIENT_DEFAULT_PROFILE_ID]", values)
 
     def test_conflicting_inputs_and_absent_runtime_are_rejected(self):
         (self.ui / "CLIENT.EXE").write_bytes(b"conflict")
@@ -86,8 +103,8 @@ class WindowsInstallerTests(unittest.TestCase):
     def test_policy_and_literal_values(self):
         self.service["ENDLESSNET_CLIENT_PROFILE_DISPLAY_NAME"] = "$(name)[value]"
         tree = self.render()
-        values = [node.get("Value") for node in tree.findall(".//w:MultiStringValue", NS)]
-        self.assertIn(r"ENDLESSNET_CLIENT_PROFILE_DISPLAY_NAME=$$(name)[\[]value[\]]", values)
+        values = [node.get("Value") for node in tree.findall(".//w:Property", NS)]
+        self.assertIn(r"$$(name)[\[]value[\]]", values)
         self.policy["instance_id"] = "stale-runtime"
         with self.assertRaisesRegex(ValueError, "instance_id"):
             self.render()

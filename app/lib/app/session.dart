@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:endlessnet_client_api/client_api.dart' as api;
+
 import '../client/enrollment_client.dart';
 import '../client/connectivity_client.dart';
 import '../connectivity/controller.dart';
@@ -49,6 +51,7 @@ final class UiSession {
         now: DateTime.now,
         callTimeout: config.rpcTimeout,
         recoveryPollInterval: config.pollInterval,
+        restoreInstalledAttempt: true,
       ),
       trust = ServerTrustController(
         client: _connection.client,
@@ -88,6 +91,22 @@ final class UiSession {
   Future<void>? _initialization;
   Future<void>? _closing;
   bool get closed => _closing != null;
+  bool _connectAfterEnrollment = false;
+
+  Future<void> startEnrollment(String hostname, api.EnrollmentMode mode) async {
+    if (closed || !enrollment.canEnroll) return;
+    _connectAfterEnrollment = true;
+    await enrollment.start(hostname, mode);
+  }
+
+  Future<void> _syncConnectivity() async {
+    await connectivity.refresh();
+    if (closed || !_connectAfterEnrollment || !enrollment.registeredConfirmed) {
+      return;
+    }
+    _connectAfterEnrollment = false;
+    await connectivity.connect();
+  }
 
   void _observeEnrollment() {
     trust.observeLocalState(
@@ -98,7 +117,7 @@ final class UiSession {
           enrollment.link == EnrollmentLinkState.available &&
           !enrollment.callRejected,
     );
-    unawaited(connectivity.refresh());
+    unawaited(_syncConnectivity());
     final node = enrollment.currentAttempt?.nodeId ?? '';
     if (node != _revocationNodeContext) {
       _revocationNodeContext = node;

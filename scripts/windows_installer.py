@@ -10,7 +10,8 @@ import xml.etree.ElementTree as ET
 NS = "http://wixtoolset.org/schemas/v4/wxs"
 UPGRADE_CODE = "{FA0F488C-9869-47EC-A2B0-F41313F40657}"
 PUBLIC = "O:SYG:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FRFX;;;BU)"
-PRIVATE = "O:SYG:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)"
+CONTAINER_ONLY = "O:SYG:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;;FRFX;;;BU)"
+PRIVATE = "O:SYG:SYD:P(A;OICI;FA;;;SY)"
 SERVICE = r"SYSTEM\CurrentControlSet\Services\endlessnet-client"
 
 
@@ -27,7 +28,7 @@ def render(ui, client, service, policy, actions, version, output):
     if not re.fullmatch(r"v?0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", version):
         raise ValueError("Требуется версия v0.MINOR.PATCH")
     ui, client, output = Path(ui).resolve(), Path(client).resolve(), Path(output).resolve()
-    if not (ui / "endlessnet_client_ui.exe").is_file() or not all((client / name).is_file() for name in ("client.exe", "wintun.dll", "WINTUN-LICENSE.txt")):
+    if not (ui / "endlessnet_client_ui.exe").is_file() or not all((client / name).is_file() for name in ("client.exe", "endlessnet.exe", "wintun.dll", "WINTUN-LICENSE.txt")):
         raise ValueError("Не найдены UI bundle или Client runtime")
     if not Path(actions).is_file():
         raise ValueError("Не собран installer actions DLL")
@@ -54,12 +55,20 @@ def render(ui, client, service, policy, actions, version, output):
                   Scope="perMachine", InstallerVersion="500", Compressed="yes")
     add(package, "MajorUpgrade", Schedule="afterInstallInitialize", DowngradeErrorMessage="Установлена более новая версия EndlessNet.")
     add(package, "MediaTemplate", EmbedCab="yes")
+    standalone = add(package, "Upgrade", Id="{9B78E1DF-849D-588C-B5D6-DC393A1B033B}")
+    add(standalone, "UpgradeVersion", Minimum="0.0.0", IncludeMinimum="yes", Property="ENDLESSNET_STANDALONE_PRODUCT")
     add(package, "Property", Id="ENDLESSNET_INSTALLATION_ID", Secure="yes")
     add(package, "Property", Id="ENDLESSNET_EXISTING_INSTALLATION", Secure="yes")
+    port = service.get("ENDLESSNET_CLIENT_CONNECTION_LISTEN_PORT", "")
+    if not port.isdecimal() or not 1 <= int(port) <= 65535:
+        raise ValueError("Invalid producer listen port")
+    add(package, "Property", Id="EndlessNetListenPort", Value=port)
+    add(package, "Property", Id="ENDLESSNET_LOCAL_ENDPOINT", Secure="yes")
     program = add(package, "StandardDirectory", Id="ProgramFiles64Folder")
     app = add(program, "Directory", Id="AppRoot", Name="EndlessNet")
     common = add(package, "StandardDirectory", Id="CommonAppDataFolder")
-    data = add(add(common, "Directory", Id="DataVendor", Name="EndlessNet"), "Directory", Id="ClientData", Name="Client")
+    vendor = add(common, "Directory", Id="DataVendor", Name="EndlessNet")
+    data = add(vendor, "Directory", Id="ClientData", Name="Client")
     state = add(data, "Directory", Id="ClientState", Name="state")
     menu = add(package, "StandardDirectory", Id="ProgramMenuFolder")
     feature = add(package, "Feature", Id="Product", Title="EndlessNet", Level="1")
@@ -70,7 +79,7 @@ def render(ui, client, service, policy, actions, version, output):
         add(feature, "ComponentRef", Id=cid)
         return node
 
-    for directory, name, sddl in [(app, "app", PUBLIC), (data, "data", PUBLIC), (state, "state", PRIVATE)]:
+    for directory, name, sddl in [(app, "app", PUBLIC), (vendor, "vendor", CONTAINER_ONLY), (data, "data", PUBLIC), (state, "state", PRIVATE)]:
         node = component(directory, "directory:" + name, permanent=name != "app")
         add(add(node, "CreateFolder"), "PermissionEx", Sddl=sddl)
 
@@ -98,18 +107,25 @@ def render(ui, client, service, policy, actions, version, output):
         if fid == "ClientExe":
             add(node, "ServiceInstall", Id="ClientService", Name="endlessnet-client", DisplayName="EndlessNet Client", Type="ownProcess", Start="auto", ErrorControl="normal", Account="LocalSystem", Arguments="installed-run")
             add(node, "ServiceControl", Id="ClientControl", Name="endlessnet-client", Start="install", Stop="both", Remove="uninstall", Wait="yes")
-            env = add(node, "RegistryValue", Root="HKLM", Key=SERVICE, Name="Environment", Type="multiString")
-            settings = {key: literal(value) for key, value in service.items()}
-            settings.update({"ENDLESSNET_CLIENT_INSTALLATION_ID": "[ENDLESSNET_INSTALLATION_ID]",
-                             "ENDLESSNET_CLIENT_SERVICE_SID": "S-1-5-18",
-                             "ENDLESSNET_CLIENT_STATE_DIRECTORY": "[CommonAppDataFolder]EndlessNet\\Client\\state",
-                             "ENDLESSNET_CLIENT_RUNTIME_INSTANCE_FILE": "[CommonAppDataFolder]EndlessNet\\Client\\runtime-instance"})
-            for key, value in sorted(settings.items()):
-                add(env, "MultiStringValue", Value=key + "=" + value)
+        if relative == "endlessnet.exe":
+            add(node, "Environment", Id="CliPath", Name="PATH", Value="[AppRoot]", Action="set", Part="last", System="yes")
+    settings = {key: literal(value) for key, value in service.items()}
+    settings.update({"ENDLESSNET_CLIENT_INSTALLATION_ID": "[ENDLESSNET_INSTALLATION_ID]",
+                     "ENDLESSNET_CLIENT_ALLOWED_SIDS": "[UserSID]",
+                     "ENDLESSNET_CLIENT_CONNECTION_ENDPOINT": "[ENDLESSNET_LOCAL_ENDPOINT]",
+                     "ENDLESSNET_CLIENT_SERVICE_SID": "S-1-5-18",
+                     "ENDLESSNET_CLIENT_STATE_DIRECTORY": "[CommonAppDataFolder]EndlessNet\\Client\\state",
+                     "ENDLESSNET_CLIENT_RUNTIME_INSTANCE_FILE": "[CommonAppDataFolder]EndlessNet\\Client\\runtime-instance"})
+    node = component(data, "service-configuration")
+    env = add(node, "RegistryValue", Root="HKLM", Key=SERVICE, Name="Environment", Type="multiString", KeyPath="yes")
+    for key, value in sorted(settings.items()):
+        prop = "ENSET_" + key
+        add(package, "Property", Id=prop, Value=value, Secure="yes", Hidden="yes")
+        add(env, "MultiStringValue", Value=key + "=[" + prop + "]")
     node = component(data, "machine-id", permanent=True)
+    node.set("NeverOverwrite", "yes")
     add(node, "RegistryValue", Root="HKLM", Key=r"SOFTWARE\EndlessNet\Client", Name="InstallationId", Type="string", Value="[ENDLESSNET_INSTALLATION_ID]", KeyPath="yes")
     node = component(data, "launch-policy", permanent=True)
-    node.set("NeverOverwrite", "yes")
     add(add(node, "File", Id="LaunchPolicy", Source=str(policy_file), KeyPath="yes"), "PermissionEx", Sddl=PUBLIC)
     node = component(menu, "shortcut")
     add(node, "Shortcut", Id="StartMenu", Name="EndlessNet", Target="[#UiExe]", WorkingDirectory="AppRoot", Arguments='--config "[ClientData]launch-policy.json" --runtime-instance "[ClientData]runtime-instance"')
@@ -117,10 +133,12 @@ def render(ui, client, service, policy, actions, version, output):
     add(package, "Binary", Id="InstallerActions", SourceFile=str(Path(actions).resolve()))
     add(package, "CustomAction", Id="PrepareMachine", BinaryRef="InstallerActions", DllEntry="PrepareMachine", Return="check")
     add(package, "CustomAction", Id="InitializeState", FileRef="ClientExe", ExeCommand="installed-init", Execute="deferred", Impersonate="no", Return="check")
+    add(package, "CustomAction", Id="WriteUiPolicy", BinaryRef="InstallerActions", DllEntry="WriteUiPolicy", Execute="deferred", Impersonate="no", Return="check")
     sequence = add(package, "InstallExecuteSequence")
     add(sequence, "Custom", Action="PrepareMachine", After="CostFinalize", Condition='NOT REMOVE')
     add(sequence, "WriteRegistryValues", Sequence="5810")
-    add(sequence, "Custom", Action="InitializeState", After="WriteRegistryValues", Condition='NOT Installed AND NOT ENDLESSNET_EXISTING_INSTALLATION AND NOT REMOVE')
+    add(sequence, "Custom", Action="WriteUiPolicy", After="WriteRegistryValues", Condition='NOT REMOVE')
+    add(sequence, "Custom", Action="InitializeState", After="WriteUiPolicy", Condition='NOT Installed AND NOT ENDLESSNET_EXISTING_INSTALLATION AND NOT REMOVE')
     filename = output / "EndlessNet.wxs"
     ET.ElementTree(root).write(filename, encoding="utf-8", xml_declaration=True)
     return filename

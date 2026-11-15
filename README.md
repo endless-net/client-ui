@@ -7,14 +7,20 @@ Functional и component design tests библиотеки запускаются
 `python3 -B scripts/check_ui_library.py` и
 `python3 -B scripts/check_ui_library.py --design`.
 
-Windows main подключает config, authenticated pipe, correlation journal и панели
-регистрации/подтверждения сервера через published Client SDK. Запуск требует
---config <absolute local path>; сам файл проверяется native admin-authority reader.
-DLL берётся рядом с текущим executable, config не переопределяет её или digest.
-Рабочие значения установки предоставляет внешний платформенный контур.
-UI восстанавливает исходный UUID; Enroll, browser и trust выполняются только по
-явным действиям. UI не получает device keys, grants или системные привилегии.
-Actual configured startup/installed pair и живой browser/VK flow ещё не проверены.
+Windows11 x64: установите единый MSI и запустите EndlessNet из меню «Пуск».
+Он содержит Flutter UI, Client как фоновую службу, CLI и необходимые библиотеки.
+При добавлении UI к установленному Client сохраняются identity, регистрация и
+настройки службы. Общий сервер — `https://endlessnet.ru`, ручные JSON не нужны.
+UI обнаруживает текущий runtime через защищённые machine settings и OS-auth pipe;
+ключи, маршруты и сеансы остаются у службы. «Войти и подключить компьютер» запускает
+существующий Client enrollment, показывает ссылку/ожидание/исход и после подтверждения
+однократно отправляет Connect. Уже зарегистрированный клиент управляется кнопками
+«Подключить»/«Отключить». Для единственного устройства показано
+«Туннель готов, других устройств нет». Закрытие UI не отключает службу.
+Технический запуск `--config <absolute path> --runtime-instance <absolute path>`
+сохранён для явной конфигурации; обычный запуск без аргументов использует Windows
+Known Folder ProgramData и native admin-authority reader. DLL берётся рядом с EXE,
+config не переопределяет её или compiled contract digest.
 
 Панель подключения005 использует тот же Client SDK и authenticated channel:
 показывает intent, локальное применение, Direct-путь, собственный адрес EndlessNet,
@@ -34,7 +40,7 @@ Flutter 3.47.7, revision `abaf9c523780a608bd46686fd5e53740a07077f8`, Dart 3.13.5
 [.ci/profile.json](.ci/profile.json).
 
 `endlessnet_client_api` получается из `https://github.com/endless-net/client.git`,
-revision `0600e7a17d3bc8ad4c2c844109b4abbbeb7ae0a9` опубликованного `api/v0.2.0`,
+revision `72817ee22ba3017643f551a03a85f313ae7621e7` опубликованного `api/v0.6.0`,
 package path `api/dart`. Manifest и lockfile закрепляют remote Git source без
 соседнего checkout или `dependency_overrides`. Разрешение зависимости не означает
 реализации IPC, consent или другой runtime-интеграции. Версия Dart package `0.0.0`
@@ -257,36 +263,41 @@ Functional и component design tests библиотеки запускаются
 `python3 -B scripts/check_ui_library.py` и
 `python3 -B scripts/check_ui_library.py --design`.
 
-Единый MSI собирается на Windows с WiX7, CMake, Visual Studio C++ и Flutter:
+Обычный Windows release включает готовый `EndlessNet-v0.MINOR.PATCH-windows-amd64.msi`.
+В нём уже задан `https://endlessnet.ru`; ServiceProfile/UiPolicy пользователь
+не готовит. Внутренние значения входят в Client runtime как `install-defaults.json`.
+Идентификатор установки, SID пользователя и локальный IPv4 endpoint определяются
+на целевой Windows. Для endpoint используется существующая модель Client с одним
+активным default IPv4 интерфейсом; NAT discovery этим не объявляется.
+
+Для ручной сборки того же пакета (WiX7, CMake, Visual Studio C++ и Flutter):
 
 ```powershell
-./scripts/build-windows-installer.ps1 -UIBundle <flutter-release-bundle> -ClientBundle <client-runtime-bundle> -ServiceProfile <service.json> -UiPolicy <policy.json> -Version 0.1.0 -OutputDir <output>
+./scripts/build-windows-installer.ps1 -UIBundle <flutter-release-bundle> -ClientBundle <client-runtime-bundle> -Version 0.5.0 -OutputDir <output>
 ```
 
-Client bundle содержит `client.exe`, `wintun.dll` и `WINTUN-LICENSE.txt` из
-producer build. Service profile — JSON строковых `ENDLESSNET_CLIENT_*`
-настроек; UI policy — существующая schema1 без `instance_id`, с теми же
-default profile/control origin. Builder проверяет их настоящими Client/UI
-валидаторами. Installation ID создаётся при первой установке; состояние
-и policy сохраняются при major upgrade. Visual C++ runtime включается рядом
-с UI из установленного VS redist либо `-CrtDirectory`.
-UI executable version должен совпадать с MSI: например,
-`flutter build windows --release --build-name=0.1.0`.
-Для подписи UI, update script и MSI:
-`-Sign -CertificateThumbprint <thumbprint> -SignTool <signtool>`;
-сертификат с private key берётся из CurrentUser/My build-аккаунта.
-Без `-Sign` получается только неподписанный пакет для локальной проверки.
+Client bundle содержит `client.exe`, `wintun.dll`, `WINTUN-LICENSE.txt` и
+`install-defaults.json` из producer build. UI executable version совпадает с MSI;
+для сборки используется `flutter build windows --release --build-name=0.5.0`.
+Builder автоматически формирует и проверяет настройки настоящими Client/UI
+валидаторами. GitHub workflow делает это при сборке Windows, используя exact
+Client release/commit из `.ci/profile.json`; publisher проверяет MSI вместе
+с четырьмя runtime archives. Installation ID, default profile, OS owner, SCM settings и state сохраняются при upgrade.
+UI policy формируется из фактически сохранённого service profile, включая существующий UUID.
+
+Для publisher signing поддерживаются `-Sign -CertificateThumbprint <thumbprint>
+-SignTool <signtool>` (сертификат build-аккаунта CurrentUser/My). Без настройки
+подписи пакет остаётся unsigned: обычная установка использует стандартный запрос
+Windows, а существующая UI-проверка обновления отклоняет неподписанный пакет.
+Это настройка выпуска, а не файл, который должен готовить пользователь.
 Builder не запускает установку.
 
 UI проверяет GitHub Releases `endless-net/client-ui` при запуске и каждую
-минуту, независимо от соединения с Client. Новый release должен содержать
-`EndlessNet-v0.MINOR.PATCH-windows-amd64.msi` с GitHub SHA256 digest.
-До нажатия «Скачать и обновить» пакет не скачивается. Перед обычным
-`msiexec /i` проверяются hash, Windows Authenticode, тот же издатель, что у
-установленного UI, UpgradeCode и точная версия MSI. Неподписанные пакеты
-отклоняются; metadata error/rate limit не выдаётся за отсутствие обновлений.
-Коды Windows Installer определяют завершение, ошибку или необходимость
-перезагрузки; закрытие UI не отменяет уже запущенную установку.
+минуту, независимо от соединения с Client. До нажатия «Скачать и обновить»
+пакет не скачивается. Перед `msiexec /i` проверяются GitHub SHA256,
+Authenticode, издатель, UpgradeCode и точная версия MSI. Ошибка источника
+или подписи не выдаётся за отсутствие обновлений или успешную установку.
+Закрытие UI не отменяет уже запущенный Windows Installer.
 
 Windows shortcut единого установщика использует
 `--config <policy.json> --runtime-instance <runtime-instance>`.

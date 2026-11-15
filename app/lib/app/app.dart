@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:async';
 import 'dart:ui' show AppExitResponse;
 
@@ -8,7 +9,6 @@ import '../client/correlation_journal.dart';
 import '../client/windows_pipe_config.dart';
 import '../enrollment/panel.dart';
 import '../connectivity/panel.dart';
-import '../revocation/panel.dart';
 import '../update/controller.dart';
 import '../update/panel.dart';
 import 'launch_config.dart';
@@ -190,6 +190,9 @@ class _MainAppState extends State<MainApp> {
               child: _session != null
                   ? EnrollmentPanel(
                       controller: _session!.enrollment,
+                      simple: true,
+                      hostname: Platform.localHostname,
+                      onStart: _session!.startEnrollment,
                       serverTrust: _session!.trust,
                       now: DateTime.now,
                       openBrowser: _session!.openBrowser,
@@ -199,9 +202,8 @@ class _MainAppState extends State<MainApp> {
                           ConnectivityPanel(
                             controller: _session!.connectivity,
                             reconnect: _reconnect,
+                            simple: true,
                           ),
-                          if (_session!.revocation != null)
-                            RevocationPanel(controller: _session!.revocation!),
                         ],
                       ),
                     )
@@ -245,13 +247,13 @@ String _safeProblem(Object error) => switch (error) {
   UiConfigurationFailure(:final problem) => switch (problem) {
     UiConfigurationProblem.unsupportedPlatform =>
       'Регистрация в этой поставке доступна только в Windows.',
-    UiConfigurationProblem.missing => 'Файл настроек интерфейса не найден. Обратитесь к администратору установки.',
+    UiConfigurationProblem.missing => 'Служба EndlessNet не обнаружена или ещё не запущена. Установите EndlessNet либо запустите службу и повторите подключение.',
     UiConfigurationProblem.busy =>
       'Файл настроек занят. Повторите подключение позже.',
-    UiConfigurationProblem.untrusted => 'Не удалось проверить права доступа к настройкам. Обратитесь к администратору установки.',
+    UiConfigurationProblem.untrusted => 'Не удалось проверить установленный EndlessNet. Повторите установку с правами администратора.',
     UiConfigurationProblem.componentUnavailable =>
       'Компонент Windows UI недоступен. Проверьте установленную версию.',
-    UiConfigurationProblem.invalid => 'Не заданы корректные настройки запуска интерфейса. Обратитесь к администратору установки.',
+    UiConfigurationProblem.invalid => 'Не удалось прочитать настройки установленного EndlessNet. Повторите установку.',
   },
   WindowsPipeFailure(problem: WindowsPipeProblem.authentication) => 'Не удалось подтвердить локальный клиент или версию контракта. Проверьте согласованность установки.',
   CorrelationStoreFailure() => 'Локальное хранилище восстановления недоступно. Закройте другие окна интерфейса и проверьте права и целостность файла.',

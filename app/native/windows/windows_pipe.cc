@@ -6,6 +6,14 @@
 #include <shlobj.h>
 #include <shellapi.h>
 
+extern "C" __declspec(dllexport) BOOL en_ui_program_data(wchar_t* output, DWORD capacity) {
+  PWSTR folder = nullptr;
+  if (FAILED(SHGetKnownFolderPath(FOLDERID_ProgramData, KF_FLAG_DONT_VERIFY, nullptr, &folder))) return FALSE;
+  const bool ok = wcslen(folder) < capacity && wcscpy_s(output, capacity, folder) == 0;
+  CoTaskMemFree(folder);
+  return ok;
+}
+
 // Capture thread-local GetLastError atomically with its API call. Dart FFI/VM
 // transitions may change that slot, so a separate Dart GetLastError is unsafe.
 extern "C" __declspec(dllexport) HANDLE en_pipe_open(
@@ -204,6 +212,39 @@ bool PrivateObject(HANDLE handle, PSID user, bool directory) {
 }  // namespace
 
 namespace {
+// The vendor container can predate Client UI and inherit read-only entries.
+// Only the ClientUI child and its journal must be private. Other users must
+// never be able to write/delete children or change the container's authority.
+bool UserContainer(HANDLE handle, PSID user) {
+  BYTE system[SECURITY_MAX_SID_SIZE]{}, admins[SECURITY_MAX_SID_SIZE]{};
+  DWORD systemSize = sizeof(system), adminsSize = sizeof(admins);
+  if (!CreateWellKnownSid(WinLocalSystemSid, nullptr, system, &systemSize) ||
+      !CreateWellKnownSid(WinBuiltinAdministratorsSid, nullptr, admins, &adminsSize)) return false;
+  PSECURITY_DESCRIPTOR descriptor = nullptr;
+  PSID owner = nullptr;
+  PACL dacl = nullptr;
+  const DWORD result = GetSecurityInfo(handle, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+                                     &owner, nullptr, &dacl, nullptr, &descriptor);
+  bool valid = result == ERROR_SUCCESS && owner && dacl && EqualSid(owner, user);
+  ACL_SIZE_INFORMATION size{};
+  if (valid) valid = GetAclInformation(dacl, &size, sizeof(size), AclSizeInformation) != 0;
+  for (DWORD i = 0; valid && i < size.AceCount; ++i) {
+    void* raw = nullptr;
+    if (!GetAce(dacl, i, &raw)) { valid = false; break; }
+    const auto header = static_cast<ACE_HEADER*>(raw);
+    if (header->AceType == ACCESS_DENIED_ACE_TYPE || (header->AceFlags & INHERIT_ONLY_ACE)) continue;
+    if (header->AceType != ACCESS_ALLOWED_ACE_TYPE) { valid = false; break; }
+    const auto ace = static_cast<ACCESS_ALLOWED_ACE*>(raw);
+    const PSID subject = &ace->SidStart;
+    constexpr DWORD writes = FILE_WRITE_DATA | FILE_APPEND_DATA | FILE_WRITE_EA | FILE_DELETE_CHILD |
+      FILE_WRITE_ATTRIBUTES | DELETE | WRITE_DAC | WRITE_OWNER | GENERIC_ALL | GENERIC_WRITE |
+      ACCESS_SYSTEM_SECURITY | MAXIMUM_ALLOWED;
+    if ((ace->Mask & writes) && !EqualSid(subject, user) && !EqualSid(subject, system) && !EqualSid(subject, admins)) valid = false;
+  }
+  if (descriptor) LocalFree(descriptor);
+  return valid;
+}
+
 BOOL OpenPrivateState(const wchar_t* folder, wchar_t* output, DWORD capacity, void** guard, BOOL* created, DWORD* error) {
   *guard = nullptr;
   *created = FALSE;
@@ -235,7 +276,9 @@ BOOL OpenPrivateState(const wchar_t* folder, wchar_t* output, DWORD capacity, vo
     if (!CreateDirectoryW(base.c_str(), &attributes) && GetLastError() != ERROR_ALREADY_EXISTS) { valid = false; break; }
     const HANDLE dir = CreateFileW(base.c_str(), FILE_LIST_DIRECTORY | READ_CONTROL | FILE_READ_ATTRIBUTES, FILE_SHARE_READ,
       nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
-    if (!handles->Add(dir) || !PlainObject(dir, true) || !PrivateObject(dir, user, true)) { valid = false; break; }
+    const bool container = wcscmp(child, L"EndlessNet") == 0;
+    if (!handles->Add(dir) || !PlainObject(dir, true) ||
+        !(container ? UserContainer(dir, user) : PrivateObject(dir, user, true))) { valid = false; break; }
   }
   LocalFree(descriptor);
   if (!valid) return FALSE;

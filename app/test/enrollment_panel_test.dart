@@ -9,6 +9,37 @@ import 'enrollment_controller_test.dart' as fixture;
 
 void main() {
   testWidgets(
+    'simple installed flow uses the computer name without network or role selection',
+    (tester) async {
+      final client = fixture.FakeClient();
+      final c = fixture.controller(client, fixture.MemoryCorrelation());
+      await c.bind(fixture.profile());
+      addTearDown(c.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EnrollmentPanel(
+              controller: c,
+              now: () => fixture.now,
+              simple: true,
+              hostname: 'my-PC',
+            ),
+          ),
+        ),
+      );
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text('Рабочая станция'), findsNothing);
+      expect(find.text('Загрузить доступные аккаунты и сети'), findsNothing);
+      await tester.tap(find.text('Войти и подключить компьютер'));
+      await tester.pump();
+      expect(client.sent!.hostname, 'my-PC');
+      expect(client.sent!.mode, api.EnrollmentMode.ENROLLMENT_MODE_WORKSTATION);
+      expect(find.byType(SelectableText), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
     'completing is shown as finishing registration without claiming success',
     (tester) async {
       final client = fixture.FakeClient()
