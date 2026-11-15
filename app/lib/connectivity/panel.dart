@@ -39,7 +39,7 @@ class ConnectivityPanel extends StatelessWidget {
             api.ConnectionPhase.CONNECTION_PHASE_LOCAL_READY &&
         s?.controlState == api.ControlState.CONTROL_STATE_READY &&
         s?.peerCount == 0 &&
-        (s?.mapRevision.toInt() ?? 0) > 0 &&
+        (s?.mapRevision.toStringUnsigned() ?? '0') != '0' &&
         (s?.overlayAddresses.isNotEmpty ?? false) &&
         s?.agent.snapshotState ==
             api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_CURRENT &&

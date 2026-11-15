@@ -15,7 +15,7 @@ void main() {
         ..serviceState = api.ServiceState.SERVICE_STATE_LOCAL_READY
         ..connectionPhase = api.ConnectionPhase.CONNECTION_PHASE_LOCAL_READY
         ..controlState = api.ControlState.CONTROL_STATE_READY
-        ..mapRevision = fixture.metadata().revision
+        ..mergeFromProto3Json({'mapRevision': '18446744073709551615'})
         ..overlayAddresses.add('100.64.0.1/32')
         ..agent = api.AgentStatus(
           snapshotState: api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_CURRENT,
