@@ -288,6 +288,9 @@ Builder автоматически формирует и проверяет на
 валидаторами. GitHub workflow делает это при сборке Windows, используя exact
 Client release/commit из `.ci/profile.json`; publisher проверяет MSI вместе
 с четырьмя runtime archives. Installation ID, default profile, OS owner, SCM settings и state сохраняются при upgrade.
+Build и publisher отклоняют pin, не совпадающий с latest stable Client release;
+при новом producer release требуется явно обновить pin и пересобрать MSI.
+`source.json` и release notes указывают bundled Client tag/commit.
 UI policy формируется из фактически сохранённого service profile, включая существующий UUID.
 
 Для publisher signing поддерживаются `-Sign -CertificateThumbprint <thumbprint>

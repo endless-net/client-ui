@@ -16,6 +16,16 @@ NS = {"w": INSTALLER.NS}
 
 
 class WindowsInstallerTests(unittest.TestCase):
+    def test_stale_runtime_pin_blocks_release_instead_of_bundling_old_service(self):
+        from unittest.mock import patch
+        pin = {"client_tag": "v0.13.1"}
+        with patch.object(CI, "gh_json", return_value={"tag_name": "v0.13.1"}):
+            CI.verify_latest_client(Path("."), pin)
+        for release in ({"tag_name": "v0.13.2"}, {"tag_name": "v0.13.1", "draft": True},
+                        {"tag_name": "v0.13.1", "prerelease": True}, {}):
+            with patch.object(CI, "gh_json", return_value=release), self.assertRaisesRegex(ValueError, "latest"):
+                CI.verify_latest_client(Path("."), pin)
+
     def test_tag_build_uses_release_version_in_the_ui_executable(self):
         self.assertEqual(CI.windows_version_arguments({"GITHUB_REF": "refs/tags/v0.4.2"}), ["--build-name=0.4.2"])
         self.assertEqual(CI.windows_version_arguments({"GITHUB_REF": "refs/heads/main"}), [])

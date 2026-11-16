@@ -35,6 +35,8 @@ class FakeGitHub:
             return HEAD
         if arguments[:2] == ["gh", "api"]:
             endpoint = arguments[-1]
+            if endpoint == "repos/endless-net/client/releases/latest":
+                return json.dumps({"tag_name": PROFILE["installer"]["client_tag"], "draft": False, "prerelease": False})
             if endpoint.endswith("/git/ref/tags/v0.1.0"):
                 return json.dumps({"object": {"type": "commit", "sha": HEAD}})
             if endpoint.endswith("/releases"):
@@ -291,6 +293,23 @@ class PipelineTests(unittest.TestCase):
                     with self.assertRaises((ValueError, FileNotFoundError)):
                         CI.publish(root, out)
                 self.assertEqual(github.created, 0)
+
+    def test_new_producer_release_blocks_publication_before_creating_draft(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            out = self.fixture(root)
+            github = FakeGitHub()
+
+            def producer_advanced(arguments, cwd, **kwargs):
+                if arguments[:2] == ["gh", "api"] and arguments[-1] == "repos/endless-net/client/releases/latest":
+                    return json.dumps({"tag_name": "v0.99.0", "draft": False, "prerelease": False})
+                return github.run(arguments, cwd, **kwargs)
+
+            with patch.object(CI, "run", side_effect=producer_advanced), patch.dict(os.environ, EVENT, clear=True):
+                with self.assertRaisesRegex(ValueError, "latest"):
+                    CI.publish(root, out)
+            self.assertEqual(github.created, 0)
+            self.assertFalse(github.bytes)
 
     def test_partial_upload_stays_draft_and_retry_resumes(self):
         with tempfile.TemporaryDirectory() as directory:

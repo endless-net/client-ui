@@ -253,8 +253,16 @@ def installer_name(profile: dict, tag: str) -> str:
     return profile["installer"]["name"].format(tag=tag)
 
 
+def verify_latest_client(root: Path, pin: dict) -> None:
+    latest = gh_json(root, "repos/endless-net/client/releases/latest")
+    if (latest.get("draft") or latest.get("prerelease")
+            or latest.get("tag_name") != pin["client_tag"]):
+        raise ValueError("Installer Client pin is not the latest published stable runtime")
+
+
 def build_installer(root: Path, bundle: Path, out: Path, tag: str, profile: dict) -> None:
     pin = profile["installer"]
+    verify_latest_client(root, pin)
     client_tag, client_commit = pin["client_tag"], pin["client_commit"]
     name = f"client-{client_tag}-windows-amd64.zip"
     metadata = gh_json(root, f"repos/endless-net/client/releases/tags/{client_tag}")
@@ -413,6 +421,7 @@ def publish(root: Path, out: Path) -> None:
     head = run(["git", "rev-parse", "HEAD"], root, capture=True)
     tag = validate_event(dict(os.environ), head)
     verify_remote_tag(root, tag, head)
+    verify_latest_client(root, profile["installer"])
     assets: dict[str, str] = {}
     for artifact in profile["artifacts"]:
         suffix = ".zip" if artifact["target"]["os"] == "windows" else ".tar.gz"
@@ -443,7 +452,9 @@ def publish(root: Path, out: Path) -> None:
     checksums.write_text("".join(f"{assets[name]}  {name}\n" for name in sorted(assets)), encoding="utf-8")
     identity_path = out / "source.json"
     identity_path.write_text(json.dumps({"repository": REPOSITORY, "commit": head, "tag": tag,
-                                         "flutter": FLUTTER_VERSION, "dart": DART_VERSION},
+                                         "flutter": FLUTTER_VERSION, "dart": DART_VERSION,
+                                         "client_tag": profile["installer"]["client_tag"],
+                                         "client_commit": profile["installer"]["client_commit"]},
                                         sort_keys=True, indent=2) + "\n", encoding="utf-8")
     assets[checksums.name] = sha256(checksums)
     assets[identity_path.name] = sha256(identity_path)
@@ -456,7 +467,7 @@ def publish(root: Path, out: Path) -> None:
     if not matches:
         run(["gh", "release", "create", tag, "--repo", REPOSITORY, "--draft", "--verify-tag",
              "--target", head, "--title", tag, "--generate-notes", "--notes",
-             f"Source commit: {head}\nWindows MSI includes the standard https://endlessnet.ru configuration. This build is unsigned unless publisher signing was configured."], root)
+             f"Source commit: {head}\nWindows MSI includes Client {profile['installer']['client_tag']} ({profile['installer']['client_commit']}) and the standard https://endlessnet.ru configuration. This build is unsigned unless publisher signing was configured."], root)
         release = release_view(root, tag)
     else:
         release = matches[0]
@@ -478,6 +489,7 @@ def publish(root: Path, out: Path) -> None:
             verified = {path.name: sha256(path) for path in downloaded.iterdir() if path.is_file()}
             if reconcile_assets(verified, assets, draft=True):
                 raise ValueError("Draft upload не завершён")
+        verify_latest_client(root, profile["installer"])
         run(["gh", "release", "edit", tag, "--repo", REPOSITORY, "--draft=false"], root)
     final = release_view(root, tag)
     if final["draft"] or final["prerelease"] or final.get("target_commitish") != head:
