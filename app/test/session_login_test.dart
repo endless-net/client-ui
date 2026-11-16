@@ -37,6 +37,8 @@ SessionLoginCorrelation correlation({
 
 final class Remote implements SessionLoginClient {
   int mutations = 0, reads = 0;
+  int sessionReads = 0;
+  bool failFreshSession = false;
   bool lose = false,
       missing = false,
       wrongDigest = false,
@@ -44,6 +46,7 @@ final class Remote implements SessionLoginClient {
       administrator = false;
   String node = 'original-node';
   api.SessionLoginAttempt? current;
+  final history = <String, api.SessionLoginAttempt>{};
   api.StartSessionLoginRequest? sent;
   api.Session state = api.Session(
     state: api.SessionState.SESSION_STATE_EXPIRED,
@@ -93,6 +96,10 @@ final class Remote implements SessionLoginClient {
     Duration timeout,
   ) async {
     reads++;
+    sessionReads++;
+    if (failFreshSession && sessionReads > 1) {
+      throw ClientCallFailure.fromGrpc(const grpc.GrpcError.notFound(), 1024);
+    }
     return api.GetSessionResponse(
       session: state,
       metadata: metadata(),
@@ -106,10 +113,13 @@ final class Remote implements SessionLoginClient {
     Duration timeout,
   ) async {
     reads++;
-    if (missing || current == null) {
+    final selected = current?.requestId == request.requestId
+        ? current
+        : history[request.requestId];
+    if (missing || selected == null) {
       throw ClientCallFailure.fromGrpc(const grpc.GrpcError.notFound(), 1024);
     }
-    return api.SessionLoginAttempt.fromBuffer(current!.writeToBuffer());
+    return api.SessionLoginAttempt.fromBuffer(selected.writeToBuffer());
   }
 
   @override
@@ -159,6 +169,94 @@ SessionLoginController controller(
 );
 
 void main() {
+  test('reopen selects newer current success after original deadline without a mutation', () async {
+    final r = Remote();
+    r.history[requestId] = r.receipt(requestId)
+      ..phase = api.SessionLoginPhase.SESSION_LOGIN_PHASE_UNCERTAIN
+      ..pollAfterSeconds = 0
+      ..clearBrowserAction();
+    r.current = r.receipt(nextId)
+      ..attemptId = 'new-attempt'
+      ..createdAt = Timestamp.fromDateTime(at.add(const Duration(minutes: 11)))
+      ..deadline = Timestamp.fromDateTime(at.add(const Duration(minutes: 21)))
+      ..phase = api.SessionLoginPhase.SESSION_LOGIN_PHASE_SUCCEEDED
+      ..clearBrowserAction()
+      ..pollAfterSeconds = 0
+      ..session = api.Session(
+        state: api.SessionState.SESSION_STATE_ACTIVE,
+        expiresAt: Timestamp.fromDateTime(at.add(const Duration(hours: 1))),
+      );
+    r.state = r.current!.session;
+    final s = Store()..value = correlation();
+    final c = controller(r, s, now: () => at.add(const Duration(minutes: 12)));
+    await c.bind(profile());
+    expect(c.attempt!.requestId, nextId);
+    expect(
+      c.attempt!.phase,
+      api.SessionLoginPhase.SESSION_LOGIN_PHASE_SUCCEEDED,
+    );
+    expect(s.value!.requestId, nextId);
+    expect(r.mutations, 0);
+    expect(c.canStart, isFalse);
+    c.dispose();
+  });
+  test('foreign current, failed fresh read and failed journal save retain the original', () async {
+    for (final failure in ['foreign', 'fresh-read', 'save']) {
+      final foreignProfile = failure == 'foreign';
+      final r = Remote();
+      r.failFreshSession = failure == 'fresh-read';
+      r.history[requestId] = r.receipt(requestId)
+        ..phase = api.SessionLoginPhase.SESSION_LOGIN_PHASE_UNCERTAIN
+        ..pollAfterSeconds = 0
+        ..clearBrowserAction();
+      r.current = r.receipt(nextId)
+        ..createdAt = Timestamp.fromDateTime(
+          at.add(const Duration(minutes: 11)),
+        )
+        ..deadline = Timestamp.fromDateTime(
+          at.add(const Duration(minutes: 21)),
+        );
+      if (foreignProfile) r.current!.profileId = 'foreign-profile';
+      final s = Store()
+        ..value = correlation()
+        ..fail = failure == 'save';
+      final c = controller(
+        r,
+        s,
+        now: () => at.add(const Duration(minutes: 12)),
+      );
+      await c.bind(profile());
+      expect(s.value!.requestId, requestId);
+      expect(c.browserAction, isNull);
+      expect(c.canStart, isFalse);
+      expect(r.mutations, 0);
+      c.dispose();
+    }
+  });
+  test('different current cannot replace a known request before its original deadline', () async {
+    final r = Remote();
+    r.history[requestId] = r.receipt(requestId);
+    r.current = r.receipt(nextId)
+      ..createdAt = Timestamp.fromDateTime(at.add(const Duration(minutes: 1)));
+    final s = Store()..value = correlation();
+    final c = controller(r, s, now: () => at.add(const Duration(minutes: 2)));
+    await c.bind(profile());
+    expect(c.attempt!.requestId, requestId);
+    expect(s.value!.requestId, requestId);
+    expect(r.mutations, 0);
+    c.dispose();
+  });
+  test('current different request cannot replace an unknown locally persisted UUID', () async {
+    final r = Remote()..current = Remote().receipt(nextId);
+    final s = Store()..value = correlation();
+    final c = controller(r, s, now: () => at.add(const Duration(hours: 1)));
+    await c.bind(profile());
+    expect(s.value!.requestId, requestId);
+    expect(c.canRetryOriginal, isTrue);
+    expect(c.attempt, isNull);
+    expect(r.mutations, 0);
+    c.dispose();
+  });
   test(
     'lost Start ACK and UI reopen recover original without another mutation',
     () async {

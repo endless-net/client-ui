@@ -194,6 +194,7 @@ final class SessionLoginController extends ChangeNotifier {
           response.loginAttempt.requestId == _correlation!.requestId) {
         _accept(response.loginAttempt);
       } else {
+        var originalFound = false;
         try {
           final a = await _client
               .sessionLogin(
@@ -204,9 +205,50 @@ final class SessionLoginController extends ChangeNotifier {
                 _timeout,
               )
               .timeout(_timeout);
-          if (_current(epoch)) _accept(a);
+          originalFound = true;
+          if (!_current(epoch)) return;
+          _accept(a);
+          if (response.hasLoginAttempt() &&
+              !_now().isBefore(a.deadline.toDateTime()) &&
+              response.loginAttempt.hasCreatedAt() &&
+              response.loginAttempt.createdAt.toDateTime().isAfter(
+                a.createdAt.toDateTime(),
+              )) {
+            // A known older receipt may be superseded by another explicit caller.
+            // NotFound never reaches this path: an unacknowledged local UUID stays selected.
+            final fresh = await _client
+                .session(api.GetSessionRequest(profile: _ref), _timeout)
+                .timeout(_timeout);
+            if (!_current(epoch)) return;
+            if (!fresh.hasMetadata() ||
+                !fresh.hasSession() ||
+                !fresh.hasLoginAttempt() ||
+                fresh.loginAttempt.requestId !=
+                    response.loginAttempt.requestId ||
+                !fresh.loginAttempt.createdAt.toDateTime().isAfter(
+                  a.createdAt.toDateTime(),
+                )) {
+              throw ClientCallFailure.protocol();
+            }
+            _checkMetadata(fresh.metadata);
+            _validateAttempt(fresh.loginAttempt, fresh.loginAttempt.requestId);
+            final selected = SessionLoginCorrelation(
+              profileId: _profile!.id,
+              controlOrigin: _profile!.controlOrigin,
+              nodeId: _node,
+              requestId: fresh.loginAttempt.requestId,
+            );
+            await _store.saveSessionLogin(selected);
+            if (!_current(epoch)) return;
+            _correlation = selected;
+            _attempt = null;
+            _session = api.Session.fromBuffer(fresh.session.writeToBuffer());
+            _accept(fresh.loginAttempt);
+          }
         } on ClientCallFailure catch (e) {
-          if (e.transportCode != grpc.StatusCode.notFound) rethrow;
+          if (e.transportCode != grpc.StatusCode.notFound || originalFound) {
+            rethrow;
+          }
           if (_current(epoch)) {
             _attempt = null;
             _problem = 'Сохранённый запрос ещё не найден. Можно повторить тот же запрос.';
