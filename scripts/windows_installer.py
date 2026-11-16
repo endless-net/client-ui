@@ -55,6 +55,9 @@ def render(ui, client, service, policy, actions, version, output):
                   Scope="perMachine", InstallerVersion="500", Compressed="yes")
     add(package, "MajorUpgrade", Schedule="afterInstallInitialize", DowngradeErrorMessage="Установлена более новая версия EndlessNet.")
     add(package, "MediaTemplate", EmbedCab="yes")
+    icon = Path(__file__).resolve().parents[1] / "app/windows/runner/resources/app_icon.ico"
+    add(package, "Icon", Id="EndlessNetIcon", SourceFile=str(icon))
+    add(package, "Property", Id="ARPPRODUCTICON", Value="EndlessNetIcon")
     standalone = add(package, "Upgrade", Id="{9B78E1DF-849D-588C-B5D6-DC393A1B033B}")
     add(standalone, "UpgradeVersion", Minimum="0.0.0", IncludeMinimum="yes", Property="ENDLESSNET_STANDALONE_PRODUCT")
     add(package, "Property", Id="ENDLESSNET_INSTALLATION_ID", Secure="yes")
@@ -128,7 +131,7 @@ def render(ui, client, service, policy, actions, version, output):
     node = component(data, "launch-policy", permanent=True)
     add(add(node, "File", Id="LaunchPolicy", Source=str(policy_file), KeyPath="yes"), "PermissionEx", Sddl=PUBLIC)
     node = component(menu, "shortcut")
-    add(node, "Shortcut", Id="StartMenu", Name="EndlessNet", Target="[#UiExe]", WorkingDirectory="AppRoot", Arguments='--config "[ClientData]launch-policy.json" --runtime-instance "[ClientData]runtime-instance"')
+    add(node, "Shortcut", Id="StartMenu", Name="EndlessNet", Target="[#UiExe]", WorkingDirectory="AppRoot", Icon="EndlessNetIcon", IconIndex="0", Arguments='--config "[ClientData]launch-policy.json" --runtime-instance "[ClientData]runtime-instance"')
     add(node, "RegistryValue", Root="HKLM", Key=r"SOFTWARE\EndlessNet\Client", Name="Shortcut", Type="integer", Value="1", KeyPath="yes")
     add(package, "Binary", Id="InstallerActions", SourceFile=str(Path(actions).resolve()))
     add(package, "CustomAction", Id="PrepareMachine", BinaryRef="InstallerActions", DllEntry="PrepareMachine", Return="check")

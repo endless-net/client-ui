@@ -60,6 +60,16 @@ class WindowsInstallerTests(unittest.TestCase):
         self.assertEqual(condition.get("After"), "WriteUiPolicy")
         self.assertIn("NOT ENDLESSNET_EXISTING_INSTALLATION", condition.get("Condition"))
 
+    def test_installed_product_and_shortcut_share_the_application_icon(self):
+        tree = self.render()
+        icon = tree.find(".//w:Icon", NS)
+        self.assertEqual(Path(icon.get("SourceFile")).name, "app_icon.ico")
+        self.assertTrue(Path(icon.get("SourceFile")).is_file())
+        self.assertEqual(tree.find(".//w:Property[@Id='ARPPRODUCTICON']", NS).get("Value"), icon.get("Id"))
+        shortcut = tree.find(".//w:Shortcut[@Id='StartMenu']", NS)
+        self.assertEqual(shortcut.get("Icon"), icon.get("Id"))
+        self.assertEqual(shortcut.get("IconIndex"), "0")
+
     def test_upgrade_keeps_identity_policy_and_private_state(self):
         tree = self.render()
         self.assertEqual(tree.find(".//w:Package", NS).get("UpgradeCode"), INSTALLER.UPGRADE_CODE)
