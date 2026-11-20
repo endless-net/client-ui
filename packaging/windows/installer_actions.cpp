@@ -228,9 +228,11 @@ extern "C" __declspec(dllexport) UINT __stdcall PrepareMachine(MSIHANDLE session
   if (rc != ERROR_SUCCESS || wcscmp(installation, L"Client") != 0) return Fail(session, L"OS installation type", rc);
   if (!TargetIs(session, L"AppRoot", FOLDERID_ProgramFilesX64, L"\\EndlessNet\\") ||
       !TargetIs(session, L"ClientData", FOLDERID_ProgramData, L"\\EndlessNet\\Client\\") ||
-      !TargetIs(session, L"ClientState", FOLDERID_ProgramData, L"\\EndlessNet\\Client\\state\\"))
+      !TargetIs(session, L"ClientState", FOLDERID_ProgramData, L"\\EndlessNet\\Client\\state\\") ||
+      !TargetIs(session, L"ClientUpdates", FOLDERID_ProgramData, L"\\EndlessNet\\Client\\updates\\"))
     return Fail(session, L"installation directories");
-  if (!SafeExistingPath(session, L"AppRoot") || !SafeExistingPath(session, L"ClientState"))
+  if (!SafeExistingPath(session, L"AppRoot") || !SafeExistingPath(session, L"ClientState") ||
+      !SafeExistingPath(session, L"ClientUpdates"))
     return Fail(session, L"installation path reparse or access");
   if (!ServiceAvailable(session)) return Fail(session, L"existing service belongs to another installation");
   if (!LocalEndpoint(session)) return Fail(session, L"local IPv4 endpoint", GetLastError());

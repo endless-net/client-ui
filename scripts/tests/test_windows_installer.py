@@ -39,7 +39,9 @@ class WindowsInstallerTests(unittest.TestCase):
         self.ui, self.client = self.root / "ui", self.root / "client"
         self.ui.mkdir()
         self.client.mkdir()
-        (self.ui / "endlessnet_client_ui.exe").write_bytes(b"fixture-ui")
+        for name in ("endlessnet_client_ui.exe", "endlessnet_updater.exe", "install-update.ps1",
+                     "release-signature.ps1", "update-worker.ps1"):
+            (self.ui / name).write_bytes(b"fixture-ui")
         for name in ("client.exe", "endlessnet.exe", "wintun.dll", "WINTUN-LICENSE.txt"):
             (self.client / name).write_bytes(b"fixture-client")
         self.actions = self.root / "actions.dll"
@@ -56,10 +58,10 @@ class WindowsInstallerTests(unittest.TestCase):
 
     def test_service_registry_and_initialization_order(self):
         tree = self.render()
-        service = tree.find(".//w:ServiceInstall", NS)
+        service = tree.find(".//w:ServiceInstall[@Id='ClientService']", NS)
         self.assertEqual((service.get("Account"), service.get("Start"), service.get("Arguments")),
                          ("LocalSystem", "auto", "installed-run"))
-        control = tree.find(".//w:ServiceControl", NS)
+        control = tree.find(".//w:ServiceControl[@Id='ClientControl']", NS)
         self.assertEqual((control.get("Start"), control.get("Stop"), control.get("Remove")),
                          ("install", "both", "uninstall"))
         self.assertEqual(tree.find(".//w:WriteRegistryValues", NS).get("Sequence"), "5810")
@@ -69,6 +71,20 @@ class WindowsInstallerTests(unittest.TestCase):
         condition = tree.find(".//w:Custom[@Action='InitializeState']", NS)
         self.assertEqual(condition.get("After"), "WriteUiPolicy")
         self.assertIn("NOT ENDLESSNET_EXISTING_INSTALLATION", condition.get("Condition"))
+
+    def test_update_service_only_grants_interactive_start_and_status(self):
+        tree = self.render()
+        updater = tree.find(".//w:ServiceInstall[@Id='UpdateService']", NS)
+        self.assertEqual((updater.get("Account"), updater.get("Start"), updater.get("Arguments")),
+                         ("LocalSystem", "demand", None))
+        self.assertEqual(updater.find("w:PermissionEx", NS).get("Sddl"),
+                         "D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;LCRP;;;IU)")
+        control = tree.find(".//w:ServiceControl[@Id='UpdateControl']", NS)
+        self.assertEqual((control.get("Start"), control.get("Stop"), control.get("Remove")),
+                         (None, "both", "uninstall"))
+        updates = tree.find(".//w:Directory[@Id='ClientUpdates']/w:Component", NS)
+        self.assertEqual(updates.get("Permanent"), "yes")
+        self.assertEqual(updates.find("w:CreateFolder/w:PermissionEx", NS).get("Sddl"), INSTALLER.PUBLIC)
 
     def test_installed_product_and_shortcut_share_the_application_icon(self):
         tree = self.render()

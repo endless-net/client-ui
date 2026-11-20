@@ -89,7 +89,7 @@ class PipelineTests(unittest.TestCase):
         printer = patch.object(CI, "print", create=True)
         printer.start()
         self.addCleanup(printer.stop)
-        signature_check = patch.object(CI, "verify_windows_signing")
+        signature_check = patch.object(CI, "sign_windows_release", side_effect=lambda root, manifest, signature: signature.write_bytes(b"signed fixture"))
         self.signature_check = signature_check.start()
         self.addCleanup(signature_check.stop)
 
@@ -273,7 +273,7 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(github.created, 1)
             self.assertEqual(github.promoted, 1)
             self.assertFalse(github.release["draft"])
-            self.assertEqual(len(github.bytes), 7)
+            self.assertEqual(len(github.bytes), 9)
 
     def test_invalid_signature_cannot_create_a_release(self):
         with tempfile.TemporaryDirectory() as directory:

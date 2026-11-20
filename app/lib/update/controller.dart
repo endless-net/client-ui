@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
@@ -19,7 +18,7 @@ final class UpdateController extends ChangeNotifier {
   UpdateController(this.current, this.source, this.install);
   final ReleaseVersion current;
   final ReleaseSource source;
-  final Future<int> Function(File, WindowsRelease) install;
+  final Future<int> Function(WindowsRelease) install;
   UpdateStatus status = UpdateStatus.checking;
   WindowsRelease? release;
   Timer? _timer;
@@ -72,11 +71,8 @@ final class UpdateController extends ChangeNotifier {
     _busy = true;
     final selected = release!;
     _show(UpdateStatus.installing);
-    File? file;
     try {
-      file = await source.download(selected);
-      if (_disposed) return;
-      final code = await install(file, selected);
+      final code = await install(selected);
       _show(switch (code) {
         0 => UpdateStatus.completed,
         3010 || 1641 => UpdateStatus.restart,
@@ -85,13 +81,6 @@ final class UpdateController extends ChangeNotifier {
     } catch (_) {
       _show(UpdateStatus.failed);
     } finally {
-      if (file != null) {
-        try {
-          await file.parent.delete(recursive: true);
-        } catch (_) {
-          /* Temp cleanup is best effort after MSI exits. */
-        }
-      }
       _busy = false;
     }
   }

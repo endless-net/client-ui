@@ -18,18 +18,14 @@ Future<UpdateController> openWindowsUpdates() async {
   ]).timeout(const Duration(seconds: 30));
   if (info.exitCode != 0) throw const UpdateFailure();
   final version = ReleaseVersion((info.stdout as String).trim());
-  return UpdateController(version, GitHubReleases(), (file, release) async {
+  return UpdateController(version, GitHubReleases(), (release) async {
     final result = await Process.run(powershell, [
       ...prefix,
       script,
       '-Mode',
-      'Install',
-      '-Package',
-      file.path,
-      '-ExpectedVersion',
+      'Request',
+      '-Version',
       release.version.text,
-      '-ExpectedHash',
-      release.digest,
     ]);
     return result.exitCode;
   });

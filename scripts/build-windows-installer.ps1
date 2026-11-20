@@ -6,12 +6,10 @@ param(
     [Parameter(Mandatory)][string]$OutputDir,
     [string]$CrtDirectory,
     [switch]$Sign,
-    [switch]$CopySignedUIToBundle,
     [string]$CertificateThumbprint,
     [string]$SignTool = 'signtool.exe'
 )
 $ErrorActionPreference = 'Stop'
-if ($CopySignedUIToBundle -and -not $Sign) { throw 'CopySignedUIToBundle requires signing' }
 $repo = Split-Path $PSScriptRoot -Parent
 if ($Version -cnotmatch '^v?0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw 'Expected v0.MINOR.PATCH' }
 foreach ($name in 'UIBundle','ClientBundle') {
@@ -100,6 +98,7 @@ try {
     & cmake --build (Join-Path $work 'native') --config Release
     if ($LASTEXITCODE) { throw 'Native installer build failed' }
     $actions = Join-Path $work 'native/Release/endlessnet_installer_actions.dll'
+    Copy-Item -LiteralPath (Join-Path $work 'native/Release/endlessnet_updater.exe') -Destination $bundle
     if ($Sign) {
         if (-not $CertificateThumbprint) { throw 'CertificateThumbprint is required for signing' }
         & $SignTool sign /sha1 $CertificateThumbprint /fd SHA256 (Join-Path $bundle 'endlessnet_client_ui.exe')
@@ -118,11 +117,6 @@ try {
         if (-not $CertificateThumbprint) { throw 'CertificateThumbprint is required for signing' }
         & $SignTool sign /sha1 $CertificateThumbprint /fd SHA256 $msi
         if ($LASTEXITCODE) { throw 'MSI signing failed' }
-        if ($CopySignedUIToBundle) {
-            foreach ($file in 'endlessnet_client_ui.exe','install-update.ps1') {
-                Copy-Item -LiteralPath (Join-Path $bundle $file) -Destination (Join-Path $UIBundle $file) -Force
-            }
-        }
     } else { Write-Warning 'Unsigned local validation MSI; not a production release.' }
     Get-FileHash -Algorithm SHA256 -LiteralPath $msi
 } finally {

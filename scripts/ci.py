@@ -294,17 +294,9 @@ def build_installer(root: Path, bundle: Path, out: Path, tag: str, profile: dict
                     raise ValueError("Unsafe Client archive entry")
             archive.extractall(client)
         out.mkdir(parents=True, exist_ok=True)
-        signing = []
-        if os.environ.get("GITHUB_REF", "").startswith("refs/tags/"):
-            thumbprint = release_thumbprint()
-            sign_tool = os.environ.get("WINDOWS_SIGNTOOL", "")
-            if not Path(sign_tool).is_file():
-                raise ValueError("Release requires Windows SDK SignTool")
-            signing = ["-Sign", "-CertificateThumbprint", thumbprint, "-SignTool", sign_tool,
-                       "-CopySignedUIToBundle"]
         run(["pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File",
              str(root / "scripts/build-windows-installer.ps1"), "-UIBundle", str(bundle),
-             "-ClientBundle", str(client), "-Version", tag, "-OutputDir", str(out), *signing], root)
+             "-ClientBundle", str(client), "-Version", tag, "-OutputDir", str(out)], root)
     path = out / installer_name(profile, tag)
     state = source_state(root)
     (out / (path.name + ".json")).write_text(json.dumps({
@@ -424,24 +416,10 @@ def reconcile_assets(existing: dict[str, str], expected: dict[str, str], *, draf
     return missing
 
 
-def release_thumbprint() -> str:
-    thumbprint = os.environ.get("WINDOWS_CODESIGN_EXPECTED_THUMBPRINT", "").strip().upper()
-    if not re.fullmatch(r"[0-9A-F]{40}", thumbprint):
-        raise ValueError("Release requires WINDOWS_CODESIGN_EXPECTED_THUMBPRINT")
-    return thumbprint
-
-
-def verify_windows_signing(root: Path, installer: Path, desktop_archive: Path) -> None:
-    thumbprint = release_thumbprint()
-    with tempfile.TemporaryDirectory(prefix="client-ui-authenticode-") as directory:
-        with zipfile.ZipFile(desktop_archive) as bundle:
-            for name in ("endlessnet_client_ui.exe", "install-update.ps1"):
-                if bundle.namelist().count(name) != 1:
-                    raise ValueError(f"Windows archive must contain exactly one {name}")
-                bundle.extract(name, directory)
-        run(["pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File",
-             str(root / "scripts/verify-windows-release-signing.ps1"),
-             "-Thumbprint", thumbprint, "-Installer", str(installer), "-Bundle", directory], root)
+def sign_windows_release(root: Path, manifest: Path, signature: Path) -> None:
+    run(["pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File",
+         str(root / "scripts/sign-windows-release.ps1"),
+         "-Manifest", str(manifest), "-Signature", str(signature)], root)
 
 
 def publish(root: Path, out: Path) -> None:
@@ -475,10 +453,16 @@ def publish(root: Path, out: Path) -> None:
     with installer.open("rb") as stream:
         if stream.read(8) != b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
             raise ValueError("Expected Windows Installer compound file")
-    windows_archive = next(item["name"] + ".zip" for item in profile["artifacts"]
-                           if item["target"]["os"] == "windows")
-    verify_windows_signing(root, installer, out / windows_archive)
     assets[installer.name] = installer_digest
+    manifest = out / "windows-update.json"
+    signature = out / "windows-update.p7s"
+    manifest.write_text(json.dumps({"schema": 1, "repository": REPOSITORY, "version": tag[1:],
+                                    "commit": head,
+                                    "msi": {"sha256": installer_digest, "size": installer.stat().st_size},
+                                    "assets": assets}, sort_keys=True) + "\n", encoding="utf-8")
+    sign_windows_release(root, manifest, signature)
+    assets[manifest.name] = sha256(manifest)
+    assets[signature.name] = sha256(signature)
     checksums = out / "checksums.txt"
     checksums.write_text("".join(f"{assets[name]}  {name}\n" for name in sorted(assets)), encoding="utf-8")
     identity_path = out / "source.json"
@@ -498,7 +482,7 @@ def publish(root: Path, out: Path) -> None:
     if not matches:
         run(["gh", "release", "create", tag, "--repo", REPOSITORY, "--draft", "--verify-tag",
              "--target", head, "--title", tag, "--generate-notes", "--notes",
-             f"Source commit: {head}\nWindows MSI includes Client {profile['installer']['client_tag']} ({profile['installer']['client_commit']}) and the standard https://endlessnet.ru configuration. Windows MSI uses trusted Authenticode signing."], root)
+             f"Source commit: {head}\nWindows MSI includes Client {profile['installer']['client_tag']} ({profile['installer']['client_commit']}) and the standard https://endlessnet.ru configuration. Windows updates are authenticated by the EndlessNet release signature (windows-update.p7s)."], root)
         release = release_view(root, tag)
     else:
         release = matches[0]

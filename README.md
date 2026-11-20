@@ -298,24 +298,20 @@ Build и publisher отклоняют pin, не совпадающий с latest
 `source.json` и release notes указывают bundled Client tag/commit.
 UI policy формируется из фактически сохранённого service profile, включая существующий UUID.
 
-GitHub Release с тегом `v0.*` требует доверенной Authenticode-подписи
-Windows MSI, `endlessnet_client_ui.exe` и `install-update.ps1`. Подписанный EXE
-и скрипт входят в MSI и Windows ZIP. В окружении GitHub `release` хранятся
-секреты `WINDOWS_CODESIGN_PFX_BASE64`, `WINDOWS_CODESIGN_PFX_PASSWORD` и
-переменная `WINDOWS_CODESIGN_EXPECTED_THUMBPRINT`. Ключ импортируется на
-одноразовом GitHub-hosted Windows runner. Перед публикацией Windows проверяет
-подпись файлов и отпечаток издателя. Ошибка проверки блокирует выпуск.
+Публикатор GitHub Release требует отделённую подпись CMS
+`windows-update.p7s` для `windows-update.json`. Описание связывает версию,
+commit, SHA-256 и размер MSI. CI проверяет эту подпись закреплённым публичным
+сертификатом EndlessNet до создания релиза. Закрытый ключ передаётся
+одноразовому GitHub runner из двух секретов окружения `release` —
+`WINDOWS_CODESIGN_PFX_BASE64` и `WINDOWS_CODESIGN_PFX_PASSWORD`.
 
-Локально сборщик принимает `-Sign -CertificateThumbprint <thumbprint>
--SignTool <signtool>` для сертификата из `CurrentUser/My`. Сборки для проверки
-ветки или PR могут оставаться неподписанными. Builder не запускает установку.
-
-UI проверяет GitHub Releases `endless-net/client-ui` при запуске и каждую
-минуту, независимо от соединения с Client. До нажатия «Скачать и обновить»
-пакет не скачивается. Перед `msiexec /i` проверяются GitHub SHA256,
-Authenticode, издатель, UpgradeCode и точная версия MSI. Ошибка источника
-или подписи не выдаётся за отсутствие обновлений или успешную установку.
-Закрытие UI не отменяет уже запущенный Windows Installer.
+UI проверяет GitHub Releases при запуске и каждую минуту. По подтверждению
+локальный интерфейс запускает `endlessnet-updater` через SCM с выбранной
+версией. Служба скачивает описание и пакет из GitHub, проверяет закреплённую
+подпись, размер, SHA-256 и версию MSI, затем вызывает Windows Installer
+через уже установленные полномочия службы. Публичный ключ поставляется
+внутри MSI. При переходе с раннего клиента нужен один ручной запуск MSI.
+Сборка для ветки/PR создаёт MSI для проверки пакета.
 
 Windows shortcut единого установщика использует
 `--config <policy.json> --runtime-instance <runtime-instance>`.

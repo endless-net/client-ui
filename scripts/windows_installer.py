@@ -28,7 +28,10 @@ def render(ui, client, service, policy, actions, version, output):
     if not re.fullmatch(r"v?0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", version):
         raise ValueError("Требуется версия v0.MINOR.PATCH")
     ui, client, output = Path(ui).resolve(), Path(client).resolve(), Path(output).resolve()
-    if not (ui / "endlessnet_client_ui.exe").is_file() or not all((client / name).is_file() for name in ("client.exe", "endlessnet.exe", "wintun.dll", "WINTUN-LICENSE.txt")):
+    ui_files = ("endlessnet_client_ui.exe", "endlessnet_updater.exe", "install-update.ps1",
+                "release-signature.ps1", "update-worker.ps1")
+    if not all((ui / name).is_file() for name in ui_files) or not all(
+            (client / name).is_file() for name in ("client.exe", "endlessnet.exe", "wintun.dll", "WINTUN-LICENSE.txt")):
         raise ValueError("Не найдены UI bundle или Client runtime")
     if not Path(actions).is_file():
         raise ValueError("Не собран installer actions DLL")
@@ -73,6 +76,7 @@ def render(ui, client, service, policy, actions, version, output):
     vendor = add(common, "Directory", Id="DataVendor", Name="EndlessNet")
     data = add(vendor, "Directory", Id="ClientData", Name="Client")
     state = add(data, "Directory", Id="ClientState", Name="state")
+    updates = add(data, "Directory", Id="ClientUpdates", Name="updates")
     menu = add(package, "StandardDirectory", Id="ProgramMenuFolder")
     feature = add(package, "Feature", Id="Product", Title="EndlessNet", Level="1")
 
@@ -82,7 +86,7 @@ def render(ui, client, service, policy, actions, version, output):
         add(feature, "ComponentRef", Id=cid)
         return node
 
-    for directory, name, sddl in [(app, "app", PUBLIC), (vendor, "vendor", CONTAINER_ONLY), (data, "data", PUBLIC), (state, "state", PRIVATE)]:
+    for directory, name, sddl in [(app, "app", PUBLIC), (vendor, "vendor", CONTAINER_ONLY), (data, "data", PUBLIC), (state, "state", PRIVATE), (updates, "updates", PUBLIC)]:
         node = component(directory, "directory:" + name, permanent=name != "app")
         add(add(node, "CreateFolder"), "PermissionEx", Sddl=sddl)
 
@@ -110,6 +114,13 @@ def render(ui, client, service, policy, actions, version, output):
         if fid == "ClientExe":
             add(node, "ServiceInstall", Id="ClientService", Name="endlessnet-client", DisplayName="EndlessNet Client", Type="ownProcess", Start="auto", ErrorControl="normal", Account="LocalSystem", Arguments="installed-run")
             add(node, "ServiceControl", Id="ClientControl", Name="endlessnet-client", Start="install", Stop="both", Remove="uninstall", Wait="yes")
+        if relative == "endlessnet_updater.exe":
+            updater = add(node, "ServiceInstall", Id="UpdateService", Name="endlessnet-updater",
+                          DisplayName="EndlessNet Updater", Type="ownProcess", Start="demand",
+                          ErrorControl="normal", Account="LocalSystem")
+            add(updater, "PermissionEx", Sddl="D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;LCRP;;;IU)")
+            add(node, "ServiceControl", Id="UpdateControl", Name="endlessnet-updater",
+                Stop="both", Remove="uninstall", Wait="yes")
         if relative == "endlessnet.exe":
             add(node, "Environment", Id="CliPath", Name="PATH", Value="[AppRoot]", Action="set", Part="last", System="yes")
     settings = {key: literal(value) for key, value in service.items()}

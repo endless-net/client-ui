@@ -5,3 +5,8 @@ add_library(endlessnet_installer_actions SHARED installer_actions.cpp)
 target_compile_features(endlessnet_installer_actions PRIVATE cxx_std_17)
 target_compile_definitions(endlessnet_installer_actions PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(endlessnet_installer_actions PRIVATE msi ole32 advapi32 shell32 iphlpapi ws2_32)
+
+add_executable(endlessnet_updater updater_service.cpp)
+target_compile_features(endlessnet_updater PRIVATE cxx_std_17)
+target_compile_definitions(endlessnet_updater PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(endlessnet_updater PRIVATE advapi32)
