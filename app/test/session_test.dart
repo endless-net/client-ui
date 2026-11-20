@@ -446,6 +446,43 @@ void main() {
   );
 
   testWidgets(
+    'hiding and restoring the window keeps its session and refreshes status',
+    (tester) async {
+      final values = config_fixture.launchValues();
+      final client = InstalledClient(values['instance_id'] as String);
+      final platform = TestPlatform(client: client);
+      client.snapshot = api.Status(
+        metadata: fixture.metadata()..instanceId = client.instance,
+        activeProfileId: platform.config.profile.id,
+        nodeId: 'same-node',
+        accountId: 'account',
+        network: api.Network(id: 'network'),
+        controlState: api.ControlState.CONTROL_STATE_REGISTERED,
+        connectionPhase: api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED,
+      );
+
+      await tester.pumpWidget(MainApp(platform: platform));
+      await tester.pumpAndSettle();
+      expect(find.text('Соединение: отключено'), findsOneWidget);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      await tester.pump();
+      client.snapshot.connectionPhase =
+          api.ConnectionPhase.CONNECTION_PHASE_CONNECTING;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Соединение: подключение'), findsOneWidget);
+      expect(platform.events, ['config', 'connect', 'storage']);
+      expect(platform.connectivity.connects, 0);
+      expect(platform.connectivity.disconnects, 0);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
     'OS exit waits for session storage; repeated exit requests share cleanup',
     (tester) async {
       final p = TestPlatform()..closeWait = Completer<void>();

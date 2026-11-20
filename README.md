@@ -228,7 +228,12 @@ lib/app/session.dart последовательно получает config, con
 привязываются к config profile; initialize только читает/восстанавливает UUID.
 Trust observation загружается отдельным явным действием панели.
 
-AppLifecycleListener ждёт close при обычном Windows WM_CLOSE: dispose controllers,
+Крестик скрывает окно в системный трей Windows. «Открыть» возвращает то же окно
+и обновляет состояние службы. «Выйти из интерфейса» завершает UI и убирает
+значок, сохраняя службу и туннель. Если трей недоступен, крестик предлагает
+подтвердить выход и оставляет окно открытым при отказе.
+
+AppLifecycleListener ждёт close при завершении через Windows WM_CLOSE: dispose controllers,
 cancel/terminate pipe, затем завершение journal operation/close и release guard.
 Повторный exit разделяет один cleanup; при ошибке exit отменяется с безопасным
 сообщением. Асинхронный Flutter exit dispatch сохраняет дочерние lifecycle
