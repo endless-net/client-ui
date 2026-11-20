@@ -41,16 +41,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - target: linux-amd64
-            runner: ubuntu-26.04
-          - target: windows-amd64
-            runner: windows-2022
-          - target: darwin-amd64
-            runner: macos-15-intel
-          - target: darwin-arm64
-            runner: macos-15
-    runs-on: ${{ matrix.runner }}
+        target: [linux-amd64, windows-amd64, darwin-amd64, darwin-arm64]
+        exclude:
+          - target: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v0.') && 'windows-amd64' || 'none' }}
+    runs-on: ${{ fromJSON('{"linux-amd64":"ubuntu-26.04","windows-amd64":"windows-2022","darwin-amd64":"macos-15-intel","darwin-arm64":"macos-15"}')[matrix.target] }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -83,10 +77,57 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
 
+  build_signed_windows:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v0.')
+    needs: checks
+    runs-on: windows-2022
+    environment: release
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify release source is on main
+        shell: bash
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          git merge-base --is-ancestor HEAD origin/main
+      - name: Install pinned Flutter
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 3.47.7 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - name: Install pinned WiX for the Windows MSI
+        shell: pwsh
+        run: |
+          dotnet tool install --tool-path "$env:RUNNER_TEMP/wix" wix --version 7.0.0
+          "$env:RUNNER_TEMP/wix" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Import trusted publisher certificate
+        shell: pwsh
+        env:
+          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
+          WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
+          WINDOWS_CODESIGN_EXPECTED_THUMBPRINT: ${{ vars.WINDOWS_CODESIGN_EXPECTED_THUMBPRINT }}
+        run: ./scripts/import-release-signing-certificate.ps1
+      - name: Build signed Windows artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WINDOWS_CODESIGN_EXPECTED_THUMBPRINT: ${{ vars.WINDOWS_CODESIGN_EXPECTED_THUMBPRINT }}
+        run: python -B scripts/ci.py build --target windows-amd64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-ui-windows-amd64
+          path: .artifacts/*
+          include-hidden-files: true
+          if-no-files-found: error
+
   release:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v0.')
-    needs: [checks, build]
-    runs-on: ubuntu-26.04
+    needs: [checks, build, build_signed_windows]
+    runs-on: windows-2022
+    environment: release
     timeout-minutes: 5
     permissions:
       contents: write
@@ -100,4 +141,5 @@ jobs:
       - name: Publish exact checked tag
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 -B scripts/ci.py publish
+          WINDOWS_CODESIGN_EXPECTED_THUMBPRINT: ${{ vars.WINDOWS_CODESIGN_EXPECTED_THUMBPRINT }}
+        run: python -B scripts/ci.py publish

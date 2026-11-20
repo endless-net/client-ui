@@ -89,6 +89,9 @@ class PipelineTests(unittest.TestCase):
         printer = patch.object(CI, "print", create=True)
         printer.start()
         self.addCleanup(printer.stop)
+        signature_check = patch.object(CI, "verify_windows_signing")
+        self.signature_check = signature_check.start()
+        self.addCleanup(signature_check.stop)
 
     def test_sdk_cold_start_is_bootstrapped_before_machine_json(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -271,6 +274,17 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(github.promoted, 1)
             self.assertFalse(github.release["draft"])
             self.assertEqual(len(github.bytes), 7)
+
+    def test_invalid_signature_cannot_create_a_release(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            out = self.fixture(root)
+            github = FakeGitHub()
+            self.signature_check.side_effect = subprocess.CalledProcessError(1, "Authenticode")
+            with patch.dict(os.environ, EVENT, clear=True), patch.object(CI, "run", github.run):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    CI.publish(root, out)
+            self.assertEqual(github.created, 0)
 
     def test_missing_or_wrong_client_installer_cannot_create_a_release(self):
         for failure in ("missing", "client", "format"):

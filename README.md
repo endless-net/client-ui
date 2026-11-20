@@ -298,12 +298,17 @@ Build и publisher отклоняют pin, не совпадающий с latest
 `source.json` и release notes указывают bundled Client tag/commit.
 UI policy формируется из фактически сохранённого service profile, включая существующий UUID.
 
-Для publisher signing поддерживаются `-Sign -CertificateThumbprint <thumbprint>
--SignTool <signtool>` (сертификат build-аккаунта CurrentUser/My). Без настройки
-подписи пакет остаётся unsigned: обычная установка использует стандартный запрос
-Windows, а существующая UI-проверка обновления отклоняет неподписанный пакет.
-Это настройка выпуска, а не файл, который должен готовить пользователь.
-Builder не запускает установку.
+GitHub Release с тегом `v0.*` требует доверенной Authenticode-подписи
+Windows MSI, `endlessnet_client_ui.exe` и `install-update.ps1`. Подписанный EXE
+и скрипт входят в MSI и Windows ZIP. В окружении GitHub `release` хранятся
+секреты `WINDOWS_CODESIGN_PFX_BASE64`, `WINDOWS_CODESIGN_PFX_PASSWORD` и
+переменная `WINDOWS_CODESIGN_EXPECTED_THUMBPRINT`. Ключ импортируется на
+одноразовом GitHub-hosted Windows runner. Перед публикацией Windows проверяет
+подпись файлов и отпечаток издателя. Ошибка проверки блокирует выпуск.
+
+Локально сборщик принимает `-Sign -CertificateThumbprint <thumbprint>
+-SignTool <signtool>` для сертификата из `CurrentUser/My`. Сборки для проверки
+ветки или PR могут оставаться неподписанными. Builder не запускает установку.
 
 UI проверяет GitHub Releases `endless-net/client-ui` при запуске и каждую
 минуту, независимо от соединения с Client. До нажатия «Скачать и обновить»
