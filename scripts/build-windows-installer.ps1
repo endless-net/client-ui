@@ -28,9 +28,9 @@ New-Item -ItemType Directory -Path $work | Out-Null
 try {
     $defaultsPath = Join-Path $ClientBundle 'install-defaults.json'
     $defaults = Get-Content -LiteralPath $defaultsPath -Raw | ConvertFrom-Json
-    $addresses = @(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway } | ForEach-Object { $_.IPv4Address.IPAddress } | Select-Object -Unique)
-    if ($addresses.Count -ne 1) { throw 'Cannot select one active IPv4 interface for configuration validation' }
-    $endpoint = $addresses[0] + ':' + $defaults.ENDLESSNET_CLIENT_CONNECTION_LISTEN_PORT
+    # validate-config uses a TEST-NET address. The MSI resolves its actual
+    # endpoint on the target machine through ENDLESSNET_LOCAL_ENDPOINT.
+    $endpoint = '192.0.2.1:' + $defaults.ENDLESSNET_CLIENT_CONNECTION_LISTEN_PORT
     $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
     $data = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'EndlessNet\Client'
     & python -B (Join-Path $PSScriptRoot 'install_configuration.py') --defaults $defaultsPath --server $Server --endpoint $endpoint --sid $sid --state-directory (Join-Path $data 'state') --output $work
