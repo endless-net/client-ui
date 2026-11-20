@@ -318,3 +318,24 @@ Windows shortcut единого установщика использует
 из отдельного файла через тот же admin-owned native reader. Затем применяется
 существующая OS-auth named-pipe проверка. Для явного запуска с заранее известным
 instance остаётся исходный `--config <config.json>`; автоматического fallback нет.
+
+## Локальный MCP для Windows
+
+Откройте **MCP** в верхней панели EndlessNet, выберите **Разрешить** и
+скопируйте конфигурацию. Для Codex используйте абсолютный `command` и
+массив `args` из конфигурации. Заполните путь и `clientId` в команде PowerShell.
+
+```powershell
+codex mcp add endlessnet-client-ui -- 'C:\путь\endlessnet_client_ui.exe' --mcp-stdio --client 'clientId-из-окна'
+```
+
+Codex запускает тот же EXE в режиме stdio. Оставьте EndlessNet запущенным.
+
+Доступны `app_status`, `logs_read`, `connectivity_refresh`,
+`connectivity_connect` и `connectivity_disconnect`. Ответ `acknowledged`
+означает, что локальная служба приняла вызов. Фактическое состояние
+показывается в поле `connectivity` и может обновляться после ответа.
+
+Доступ выключен по умолчанию. Разрешение действует до выхода из приложения,
+максимум восемь часов. Кнопка **Отозвать** завершает доступ, а **Заменить разрешение**
+выдаёт новый `clientId`. После замены обновите аргументы MCP-сервера.

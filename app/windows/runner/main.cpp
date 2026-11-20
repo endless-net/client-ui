@@ -5,8 +5,19 @@
 #include "flutter_window.h"
 #include "utils.h"
 
+extern "C" __declspec(dllimport) int en_mcp_stdio(const char* client_id);
+
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
+  auto command_line_arguments = GetCommandLineArguments();
+  if (!command_line_arguments.empty() &&
+      command_line_arguments[0] == "--mcp-stdio") {
+    if (command_line_arguments.size() != 3 ||
+        command_line_arguments[1] != "--client") {
+      return 2;
+    }
+    return en_mcp_stdio(command_line_arguments[2].c_str());
+  }
   // Attach to console when present (e.g., 'flutter run') or create a
   // new console when running with a debugger.
   if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {
@@ -18,9 +29,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
   flutter::DartProject project(L"data");
-
-  std::vector<std::string> command_line_arguments =
-      GetCommandLineArguments();
 
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 

@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:endlessnet_ui/endlessnet_ui.dart';
 
 import '../client/correlation_journal.dart';
@@ -12,6 +14,8 @@ import '../connectivity/panel.dart';
 import '../session_login/panel.dart';
 import '../update/controller.dart';
 import '../update/panel.dart';
+import '../mcp/protocol.dart';
+import '../mcp/windows_mcp.dart';
 import 'launch_config.dart';
 import 'session.dart';
 
@@ -35,10 +39,17 @@ class _MainAppState extends State<MainApp> {
   int _epoch = 0;
   UpdateController? _updates;
   bool _updatesUnavailable = false;
+  final _diagnostics = UiDiagnostics();
+  WindowsMcp? _mcp;
+  String? _lastConnectivity;
+  String? _lastEnrollment;
+  bool _sessionInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    if (Platform.isWindows) _mcp = WindowsMcp(_invokeMcp);
+    _diagnostics.record('app', 'started');
     _lifecycle = AppLifecycleListener(
       onExitRequested: _requestExit,
       onResume: () => unawaited(_session?.connectivity.resume()),
@@ -57,8 +68,10 @@ class _MainAppState extends State<MainApp> {
         return;
       }
       setState(() => _updates = updates);
+      updates.addListener(_observeUpdates);
       updates.start();
     } catch (_) {
+      _diagnostics.record('updates', 'unavailable');
       if (mounted && !_closing) setState(() => _updatesUnavailable = true);
     }
   }
@@ -66,6 +79,8 @@ class _MainAppState extends State<MainApp> {
   void _begin() {
     if (_closing || _opening != null || _session != null) return;
     final epoch = ++_epoch;
+    _sessionInitialized = false;
+    _diagnostics.record('app', 'openingSession');
     _problem = null;
     _opening = _open(epoch).whenComplete(() {
       _opening = null;
@@ -84,12 +99,19 @@ class _MainAppState extends State<MainApp> {
         return;
       }
       setState(() => _session = session);
+      session.connectivity.addListener(_observeConnectivity);
+      session.enrollment.addListener(_observeEnrollment);
       await session.initialize();
+      if (mounted && !_closing && epoch == _epoch) {
+        _sessionInitialized = true;
+        _diagnostics.record('app', 'sessionInitialized');
+      }
     } on UiStartupCancelled {
       // The acquisition path closed its own partial resources.
     } catch (error) {
       if (error is UiCleanupFailure) _cleanupFailed = true;
       if (mounted && !_closing && epoch == _epoch) {
+        _diagnostics.record('app', 'sessionUnavailable');
         setState(() => _problem = _safeProblem(error));
       }
     }
@@ -102,6 +124,7 @@ class _MainAppState extends State<MainApp> {
       return;
     }
     _reconnecting = true;
+    _diagnostics.record('app', 'reconnecting');
     ++_epoch;
     setState(() {});
     try {
@@ -125,6 +148,7 @@ class _MainAppState extends State<MainApp> {
 
   Future<AppExitResponse> _shutdown() async {
     _closing = true;
+    _mcp?.disable();
     ++_epoch;
     if (mounted) setState(() {});
     try {
@@ -149,11 +173,168 @@ class _MainAppState extends State<MainApp> {
     ++_epoch;
     _closing = true;
     _lifecycle.dispose();
+    _mcp?.dispose();
     _updates?.dispose();
     // Detachment is not a cancellable OS exit. Still release all resources and
     // consume safe close errors; normal WM_CLOSE awaits _requestExit above.
     unawaited(_session?.close().catchError((Object _) {}));
     super.dispose();
+  }
+
+  Json _connectivityState(UiSession session) {
+    final controller = session.connectivity;
+    final snapshot = controller.snapshot;
+    return {
+      'link': controller.link.name,
+      'fresh': controller.fresh,
+      'busy': controller.busy,
+      'uncertain': controller.uncertain,
+      'canConnect': controller.canConnect,
+      'canDisconnect': controller.canDisconnect,
+      'failureCode': ?controller.failure?.code.name,
+      'service': ?snapshot?.serviceState.name,
+      'control': ?snapshot?.controlState.name,
+      'phase': ?snapshot?.connectionPhase.name,
+      'revision': ?snapshot?.metadata.revision.toStringUnsigned(),
+      'directPaths': ?snapshot?.agent.directPathCount,
+      'relayPaths': ?snapshot?.agent.relayPathCount,
+    };
+  }
+
+  Json _enrollmentState(UiSession session) => {
+    'link': session.enrollment.link.name,
+    'registered': session.enrollment.registeredConfirmed,
+    'uncertain': session.enrollment.uncertain,
+  };
+
+  void _observeConnectivity() {
+    final state = _connectivityState(_session!)..remove('revision');
+    final signature = jsonEncode(state);
+    if (_lastConnectivity == signature) return;
+    _lastConnectivity = signature;
+    _diagnostics.record('connectivity', 'stateChanged', state);
+  }
+
+  void _observeEnrollment() {
+    final state = _enrollmentState(_session!);
+    final signature = jsonEncode(state);
+    if (_lastEnrollment == signature) return;
+    _lastEnrollment = signature;
+    _diagnostics.record('enrollment', 'stateChanged', state);
+  }
+
+  void _observeUpdates() =>
+      _diagnostics.record('updates', _updates!.status.name);
+
+  Future<Json> _invokeMcp(
+    String name,
+    Json arguments,
+    bool Function() authorized,
+  ) async {
+    if (!authorized() || _closing) return {'error': 'accessRevoked'};
+    final session = _session;
+    final ready =
+        session != null &&
+        !session.closed &&
+        _sessionInitialized &&
+        !_reconnecting;
+    if (name == 'app_status') {
+      return {
+        'ui': _reconnecting
+            ? 'reconnecting'
+            : ready
+            ? 'ready'
+            : _problem != null
+            ? 'unavailable'
+            : 'opening',
+        if (ready) 'enrollment': _enrollmentState(session),
+        if (ready) 'connectivity': _connectivityState(session),
+        'updates':
+            _updates?.status.name ??
+            (_updatesUnavailable ? 'unavailable' : 'opening'),
+      };
+    }
+    if (name == 'logs_read') return _diagnostics.read(arguments);
+    if (!ready) return {'error': 'clientSessionUnavailable'};
+    if (name == 'connectivity_refresh') {
+      await session.connectivity.refresh();
+      if (!authorized() || _session != session || session.closed) {
+        return {'error': 'sessionChanged'};
+      }
+      final state = _connectivityState(session);
+      return {
+        if (!session.connectivity.fresh) 'error': 'statusUnconfirmed',
+        'connectivity': state,
+      };
+    }
+    final outcome = await session.connectivity.requestConnection(
+      name == 'connectivity_connect',
+      admitted: () =>
+          authorized() && _session == session && !_reconnecting && !_closing,
+    );
+    _diagnostics.record('mcp', name, {'outcome': outcome});
+    if (!authorized() || _session != session || session.closed) {
+      return {'error': 'sessionChanged', 'outcome': outcome};
+    }
+    return {
+      'outcome': outcome,
+      if (outcome != 'acknowledged') 'error': outcome,
+      'connectivity': _connectivityState(session),
+    };
+  }
+
+  Future<void> _showMcp(WindowsMcp mcp) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => ListenableBuilder(
+        listenable: mcp,
+        builder: (context, _) => AlertDialog(
+          title: const Text('Доступ по MCP'),
+          content: SizedBox(
+            width: 500,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Разрешение открывает чтение состояния и журнала, '
+                    'обновление статуса службы, подключение и отключение. '
+                    'Оно действует до выхода из приложения, максимум 8 часов.',
+                  ),
+                  if (mcp.unavailable)
+                    const Text('Не удалось открыть локальный MCP-канал.'),
+                  if (mcp.clientId != null) SelectableText(mcp.configuration),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Закрыть'),
+            ),
+            if (mcp.clientId != null) ...[
+              TextButton(
+                onPressed: () => mcp.disable(),
+                child: const Text('Отозвать'),
+              ),
+              TextButton(
+                onPressed: () =>
+                    Clipboard.setData(ClipboardData(text: mcp.configuration)),
+                child: const Text('Копировать конфигурацию'),
+              ),
+            ],
+            FilledButton(
+              onPressed: _closing ? null : mcp.enable,
+              child: Text(
+                mcp.clientId == null ? 'Разрешить' : 'Заменить разрешение',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -169,6 +350,16 @@ class _MainAppState extends State<MainApp> {
           child: BrandMark(size: 32),
         ),
         title: const Text('EndlessNet'),
+        actions: [
+          if (_mcp case final mcp?)
+            ListenableBuilder(
+              listenable: mcp,
+              builder: (context, _) => TextButton(
+                onPressed: _closing ? null : () => _showMcp(mcp),
+                child: Text(mcp.clientId == null ? 'MCP' : 'MCP включён'),
+              ),
+            ),
+        ],
       ),
       bottomNavigationBar: _updates != null
           ? UpdatePanel(controller: _updates!)

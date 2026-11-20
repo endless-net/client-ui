@@ -1,9 +1,15 @@
 cmake_minimum_required(VERSION 3.14)
 project(endlessnet_windows_pipe LANGUAGES CXX)
-add_library(endlessnet_windows_pipe SHARED windows_pipe.cc)
+add_library(endlessnet_mcp_transport STATIC
+  mcp/mcp_pipe.cpp mcp/peer_identity.cpp mcp/security.cpp)
+target_compile_features(endlessnet_mcp_transport PRIVATE cxx_std_17)
+target_compile_definitions(endlessnet_mcp_transport PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(endlessnet_mcp_transport PRIVATE advapi32 bcrypt crypt32 shell32 ole32 uuid)
+
+add_library(endlessnet_windows_pipe SHARED windows_pipe.cc mcp/owner.cpp)
 target_compile_features(endlessnet_windows_pipe PRIVATE cxx_std_17)
 target_compile_definitions(endlessnet_windows_pipe PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(endlessnet_windows_pipe PRIVATE advapi32 shell32 ole32 uuid)
+target_link_libraries(endlessnet_windows_pipe PRIVATE advapi32 shell32 ole32 uuid endlessnet_mcp_transport bcrypt crypt32)
 if(MSVC)
   target_compile_options(endlessnet_windows_pipe PRIVATE /W4 /WX)
 endif()

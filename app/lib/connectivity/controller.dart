@@ -195,11 +195,16 @@ final class ConnectivityController extends ChangeNotifier {
     }
   }
 
-  Future<void> connect() => _command(true);
-  Future<void> disconnect() => _command(false);
+  Future<void> connect() async => await requestConnection(true);
+  Future<void> disconnect() async => await requestConnection(false);
 
-  Future<void> _command(bool connect) async {
-    if (connect ? !canConnect : !canDisconnect) return;
+  Future<String> requestConnection(
+    bool connect, {
+    bool Function()? admitted,
+  }) async {
+    if ((connect ? !canConnect : !canDisconnect) || admitted?.call() == false) {
+      return 'notAdmitted';
+    }
     final epoch = _epoch;
     _mutating = true;
     _failure = null;
@@ -210,8 +215,9 @@ final class ConnectivityController extends ChangeNotifier {
       // can overwrite the reconciliation read after an accepted command.
       await _reading;
       if (!_current(epoch) ||
+          admitted?.call() == false ||
           !(connect ? _connectAllowed : _disconnectAllowed)) {
-        return;
+        return 'notAdmitted';
       }
       final mutation = api.MutationContext(
         expectedInstanceId: _instance,
@@ -239,17 +245,20 @@ final class ConnectivityController extends ChangeNotifier {
             )
             .timeout(timeout);
       }
+      return 'acknowledged';
     } on ClientCallFailure catch (error) {
       if (_current(epoch)) {
         _failure = error.failure;
         _uncertain = !error.definiteRejection;
         _emit();
       }
+      return error.definiteRejection ? 'rejected' : 'outcomeUnknown';
     } catch (_) {
       if (_current(epoch)) {
         _uncertain = true;
         _emit();
       }
+      return 'outcomeUnknown';
     } finally {
       if (_current(epoch)) {
         // ACK/timeout/stale never invents an outcome or retries a mutation.

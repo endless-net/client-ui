@@ -181,6 +181,25 @@ void main() {
     await first;
     expect(client.disconnects, 0);
   });
+  test(
+    'revoked MCP access aborts a queued command before the Client RPC',
+    () async {
+      final client = ConnectivityFixture();
+      final c = controller(client);
+      addTearDown(c.dispose);
+      await c.bind(profile());
+      client.readGate = Completer<api.Status>();
+      final reading = c.refresh();
+      await Future<void>.delayed(Duration.zero);
+      var authorized = true;
+      final command = c.requestConnection(true, admitted: () => authorized);
+      authorized = false;
+      client.readGate!.complete(disconnected());
+      await reading;
+      expect(await command, 'notAdmitted');
+      expect(client.connects, 0);
+    },
+  );
   test('ACK is scheduling only, disconnect supersedes pending connect and uses current CAS', () async {
     final client = ConnectivityFixture();
     final c = controller(client);
