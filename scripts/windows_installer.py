@@ -78,6 +78,7 @@ def render(ui, client, service, policy, actions, version, output):
     state = add(data, "Directory", Id="ClientState", Name="state")
     updates = add(data, "Directory", Id="ClientUpdates", Name="updates")
     menu = add(package, "StandardDirectory", Id="ProgramMenuFolder")
+    startup = add(package, "StandardDirectory", Id="StartupFolder")
     feature = add(package, "Feature", Id="Product", Title="EndlessNet", Level="1")
 
     def component(directory, name, permanent=False):
@@ -141,9 +142,16 @@ def render(ui, client, service, policy, actions, version, output):
     add(node, "RegistryValue", Root="HKLM", Key=r"SOFTWARE\EndlessNet\Client", Name="InstallationId", Type="string", Value="[ENDLESSNET_INSTALLATION_ID]", KeyPath="yes")
     node = component(data, "launch-policy", permanent=True)
     add(add(node, "File", Id="LaunchPolicy", Source=str(policy_file), KeyPath="yes"), "PermissionEx", Sddl=PUBLIC)
-    node = component(menu, "shortcut")
-    add(node, "Shortcut", Id="StartMenu", Name="EndlessNet", Target="[#UiExe]", WorkingDirectory="AppRoot", Icon="EndlessNetIcon", IconIndex="0", Arguments='--config "[ClientData]launch-policy.json" --runtime-instance "[ClientData]runtime-instance"')
-    add(node, "RegistryValue", Root="HKLM", Key=r"SOFTWARE\EndlessNet\Client", Name="Shortcut", Type="integer", Value="1", KeyPath="yes")
+    launch_arguments = '--config "[ClientData]launch-policy.json" --runtime-instance "[ClientData]runtime-instance"'
+    for directory, component_name, shortcut_id, marker in [
+        (menu, "shortcut", "StartMenu", "Shortcut"),
+        (startup, "startup-shortcut", "StartupShortcut", "StartupShortcut"),
+    ]:
+        node = component(directory, component_name)
+        add(node, "Shortcut", Id=shortcut_id, Name="EndlessNet", Target="[#UiExe]",
+            WorkingDirectory="AppRoot", Icon="EndlessNetIcon", IconIndex="0", Arguments=launch_arguments)
+        add(node, "RegistryValue", Root="HKLM", Key=r"SOFTWARE\EndlessNet\Client",
+            Name=marker, Type="integer", Value="1", KeyPath="yes")
     add(package, "Binary", Id="InstallerActions", SourceFile=str(Path(actions).resolve()))
     add(package, "CustomAction", Id="PrepareMachine", BinaryRef="InstallerActions", DllEntry="PrepareMachine", Return="check")
     add(package, "CustomAction", Id="InitializeState", FileRef="ClientExe", ExeCommand="installed-init", Execute="deferred", Impersonate="no", Return="check")

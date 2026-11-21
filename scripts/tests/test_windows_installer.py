@@ -115,6 +115,22 @@ class WindowsInstallerTests(unittest.TestCase):
         next_guids = [node.get("Guid") for node in self.render("0.1.1").findall(".//w:Component", NS)]
         self.assertEqual(first_guids, next_guids)
 
+    def test_machine_installer_owns_the_startup_shortcut(self):
+        tree = self.render()
+        self.assertEqual(tree.find(".//w:Package", NS).get("Scope"), "perMachine")
+        component = tree.find(".//w:StandardDirectory[@Id='StartupFolder']/w:Component", NS)
+        self.assertIsNone(component.get("Permanent"))
+        marker = component.find("w:RegistryValue[@Name='StartupShortcut']", NS)
+        self.assertEqual((marker.get("Root"), marker.get("KeyPath")), ("HKLM", "yes"))
+        self.assertIsNotNone(tree.find(f".//w:Feature/w:ComponentRef[@Id='{component.get('Id')}']", NS))
+        startup = component.find("w:Shortcut[@Id='StartupShortcut']", NS)
+        menu = tree.find(".//w:Shortcut[@Id='StartMenu']", NS)
+        for attribute in ("Name", "Target", "WorkingDirectory", "Arguments"):
+            self.assertEqual(startup.get(attribute), menu.get(attribute))
+        self.assertEqual(startup.get("Target"), "[#UiExe]")
+        self.assertEqual(startup.get("Arguments"),
+                         '--config "[ClientData]launch-policy.json" --runtime-instance "[ClientData]runtime-instance"')
+
     def test_standalone_takeover_and_policy_follow_preserved_service(self):
         tree = self.render()
         related = tree.find(".//w:Upgrade[@Id='{9B78E1DF-849D-588C-B5D6-DC393A1B033B}']/w:UpgradeVersion", NS)
