@@ -99,8 +99,7 @@ struct BridgePorts {
   std::function<void(const std::string&)> sendFrame;
   std::function<std::string()> readFrame;
 };
-struct BridgeAuthorization { int64_t version = 0, expiresAt = 0; };
-inline BridgeAuthorization AuthenticateBridge(BridgePorts& ports, const std::string& client) {
+inline int64_t AuthenticateBridge(BridgePorts& ports, const std::string& client) {
   int failure = 20; std::vector<uint8_t> cipher, secret; std::string auth;
   try {
     if (!CanonicalUuid(client)) throw BoundaryFailure{2};
@@ -122,12 +121,11 @@ inline BridgeAuthorization AuthenticateBridge(BridgePorts& ports, const std::str
       try { ports.sendFrame(Encode(Json::Object{{"kind","authDeniedAcknowledged"},{"version",1}})); } catch (...) {}
       throw BoundaryFailure{22};
     }
-    if (accepted.object().size() != 4 || accepted.at("kind").string() != "authorized" || accepted.at("version").integer() != 1) InvalidJson();
+    if (accepted.object().size() != 3 || accepted.at("kind").string() != "authorized" || accepted.at("version").integer() != 1) InvalidJson();
     const auto acceptedVersion = accepted.at("grantVersion").integer();
-    const auto expiresAt = accepted.at("expiresAt").integer();
-    if (acceptedVersion < 1 || acceptedVersion > 9007199254740991LL || expiresAt < 1 || expiresAt > 9007199254740991LL) InvalidJson();
+    if (acceptedVersion < 1 || acceptedVersion > 9007199254740991LL) InvalidJson();
     if (acceptedVersion != version) throw BoundaryFailure{22};
-    return {version, expiresAt};
+    return version;
   } catch (const BoundaryFailure&) { Wipe(cipher); Wipe(secret); Wipe(auth); throw; }
   catch (...) { Wipe(cipher); Wipe(secret); Wipe(auth); throw BoundaryFailure{failure}; }
 }

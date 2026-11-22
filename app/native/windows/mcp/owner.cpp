@@ -9,16 +9,6 @@ namespace {
 using sd::mcp::Broker;
 using sd::mcp::Json;
 
-constexpr uint64_t kGrantLifetimeMs = 8ULL * 60 * 60 * 1000;
-
-int64_t ExpirationUnixMs() {
-  FILETIME time{};
-  GetSystemTimeAsFileTime(&time);
-  const auto ticks = (static_cast<uint64_t>(time.dwHighDateTime) << 32) |
-      time.dwLowDateTime;
-  return static_cast<int64_t>(ticks / 10000 - 11644473600000ULL + kGrantLifetimeMs);
-}
-
 struct Owner {
   std::filesystem::path root = sd::DataRoot();
   sd::Handle lock{CreateFileW((root / L"owner.lock").c_str(),
@@ -26,8 +16,6 @@ struct Owner {
       OPEN_ALWAYS, FILE_FLAG_OPEN_REPARSE_POINT, nullptr)};
   std::string id = sd::Utf8(sd::Uuid());
   std::string secret;
-  uint64_t deadline = GetTickCount64() + kGrantLifetimeMs;
-  int64_t expires_at = ExpirationUnixMs();
   std::unique_ptr<Broker> broker;
 
   Owner() {
@@ -119,7 +107,7 @@ extern "C" __declspec(dllexport) const char* en_mcp_enable() {
 }
 
 extern "C" __declspec(dllexport) int en_mcp_active() {
-  return owner && GetTickCount64() < owner->deadline;
+  return owner != nullptr;
 }
 
 extern "C" __declspec(dllexport) const char* en_mcp_events() {
@@ -137,8 +125,7 @@ extern "C" __declspec(dllexport) const char* en_mcp_events() {
           if (frame.at("kind").string() == "auth") {
             if (owner->Authorize(frame)) {
               owner->broker->Send(event.channelId, sd::mcp::Encode(Json::Object{
-                  {"kind", "authorized"}, {"version", 1}, {"grantVersion", 1},
-                  {"expiresAt", owner->expires_at}}));
+                  {"kind", "authorized"}, {"version", 1}, {"grantVersion", 1}}));
             } else {
               owner->broker->Close(event.channelId);
             }

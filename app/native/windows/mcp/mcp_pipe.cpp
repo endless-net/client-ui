@@ -356,7 +356,7 @@ int RunStdio(const std::string& clientId) {
     idlePorts.connect = [&] {
       // Wake always re-verifies current owner, grant and DPAPI. No cached secret.
       pipe.reset(); lines = Lines();
-      return AuthenticateBridge(ports, clientId).version;
+      return AuthenticateBridge(ports, clientId);
     };
     idlePorts.disconnect = [&] { pipe.reset(); lines = Lines(); };
     idlePorts.send = ports.sendFrame;

@@ -86,9 +86,8 @@ final class WindowsMcp extends ChangeNotifier {
   void _poll() {
     final events = _readEvents();
     if (events == nullptr) {
-      final expired = _active() == 0;
       disable(notify: false);
-      unavailable = !expired;
+      unavailable = true;
       notifyListeners();
       return;
     }
