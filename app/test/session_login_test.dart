@@ -449,6 +449,14 @@ void main() {
       expect(find.text('Сессия пользователя действует.'), findsOneWidget);
       expect(find.text('Войти снова'), findsNothing);
 
+      c.observeConnectionLoginRequired(true);
+      await tester.pump();
+      expect(
+        find.text('Требуется повторный вход для подключения.'),
+        findsOneWidget,
+      );
+      c.observeConnectionLoginRequired(false);
+
       clock = at.add(const Duration(hours: 1));
       r.state = api.Session(
         state: api.SessionState.SESSION_STATE_EXPIRED,

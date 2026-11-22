@@ -65,10 +65,19 @@ final class SessionLoginController extends ChangeNotifier {
           _session?.state == api.SessionState.SESSION_STATE_ACTIVE &&
               _session!.hasExpiresAt() &&
               !_now().isBefore(_session!.expiresAt.toDateTime()));
+  bool _connectionLoginRequired = false;
+  bool get connectionLoginRequired => _connectionLoginRequired;
+
+  void observeConnectionLoginRequired(bool required) {
+    if (_connectionLoginRequired == required) return;
+    _connectionLoginRequired = required;
+    _emit();
+  }
+
   bool get canStart =>
       _ready &&
       !_busy &&
-      !sessionActive &&
+      (!sessionActive || connectionLoginRequired) &&
       (_correlation == null ||
           _attempt != null &&
               !_now().isBefore(_attempt!.deadline.toDateTime()));
@@ -305,7 +314,7 @@ final class SessionLoginController extends ChangeNotifier {
       await _readContext(epoch);
       if (!_current(epoch)) return;
       if (!retryOriginal &&
-          (sessionActive ||
+          ((sessionActive && !connectionLoginRequired) ||
               _correlation != null &&
                   (_attempt == null ||
                       _now().isBefore(_attempt!.deadline.toDateTime())))) {

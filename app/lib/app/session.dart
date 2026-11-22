@@ -111,6 +111,7 @@ final class UiSession {
 
   void _observeConnectivity() {
     if (!connectivity.fresh) return;
+    sessionLogin?.observeConnectionLoginRequired(connectivity.loginRequired);
     final ready =
         connectivity.snapshot?.controlState ==
         api.ControlState.CONTROL_STATE_READY;

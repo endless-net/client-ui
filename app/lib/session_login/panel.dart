@@ -20,7 +20,9 @@ class SessionLoginPanel extends StatelessWidget {
       if (!c.registered) return const SizedBox.shrink();
       final a = c.attempt;
       final url = c.browserAction;
-      final sessionState = c.sessionActive
+      final sessionState = c.connectionLoginRequired
+          ? 'Требуется повторный вход для подключения.'
+          : c.sessionActive
           ? 'Сессия пользователя действует.'
           : c.sessionExpired
           ? 'Срок текущей сессии истёк. Нажмите «Подключить», чтобы проверить автоматическое продление.'

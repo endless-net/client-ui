@@ -21,6 +21,8 @@ class ConnectivityPanel extends StatelessWidget {
     }
     if (!c.fresh) return 'Соединение: фактическое состояние неизвестно';
     if (!c.supported) return 'Соединение: функция недоступна в этом клиенте';
+    if (c.loginRequired) return 'Соединение: требуется вход';
+    if (c.retryScheduled) return 'Соединение: повтор подключения запланирован';
     if (s?.serviceState == api.ServiceState.SERVICE_STATE_POLICY_BLOCKED) {
       return 'Соединение: доступ заблокирован';
     }
@@ -77,10 +79,12 @@ class ConnectivityPanel extends StatelessWidget {
       return 'Право устройства истекло или его срок неизвестен. Нажмите «Подключить»: служба проверит возможность продления для того же устройства. Если срок запроса истёк, повтор не гарантирует продление; требуется восстановить авторизованный вход.';
     }
     if (f.reasonKey == 'client.connection.login_required') {
-      return 'Для подключения нужен актуальный вход в учётную запись. Регистрация устройства сохранена.';
+      return 'Войдите снова, чтобы возобновить подключение. Регистрация устройства сохранена.';
     }
     if (f.reasonKey == 'client.connection.deadline') {
-      return 'Время подключения или восстановления истекло. Проверьте связь с сервером управления и повторите попытку.';
+      return controller.retryScheduled
+          ? 'Время предыдущей попытки истекло.'
+          : 'Время подключения или восстановления истекло. Проверьте связь с сервером управления и повторите попытку.';
     }
     if (f.reasonKey == 'client.connection.cleanup_unconfirmed') {
       return 'Очистка сетевых ресурсов не подтверждена.';
@@ -195,7 +199,9 @@ class ConnectivityPanel extends StatelessWidget {
           c.fresh &&
           s?.connectionPhase ==
               api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED;
-      final failures = <api.Failure>[...?s?.failures, ?c.failure];
+      final failures = <api.Failure>[...?s?.failures, ?c.failure].where(
+        (failure) => failure.reasonKey != 'client.connection.retry_scheduled',
+      );
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),

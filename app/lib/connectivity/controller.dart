@@ -83,9 +83,18 @@ final class ConnectivityController extends ChangeNotifier {
       (_snapshot?.nodeId.isNotEmpty ?? false) &&
       (_snapshot?.network.id.isNotEmpty ?? false) &&
       (_snapshot?.storedState.nodeCredentialPresent ?? false);
+  bool _hasReason(String reason) =>
+      _fresh &&
+      (_snapshot?.failures.any((failure) => failure.reasonKey == reason) ??
+          false);
+
+  bool get loginRequired => _hasReason('client.connection.login_required');
+  bool get retryScheduled => _hasReason('client.connection.retry_scheduled');
+
   bool get canConnect => !_mutating && _connectAllowed;
   bool get _connectAllowed =>
       _eligible &&
+      !loginRequired &&
       _snapshot?.serviceState !=
           api.ServiceState.SERVICE_STATE_POLICY_BLOCKED &&
       (_snapshot?.intent.desiredState !=
