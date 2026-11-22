@@ -13,6 +13,8 @@ import 'package:endlessnet_client_ui/client/contract_identity.dart';
 import 'package:endlessnet_client_ui/client/enrollment_client.dart';
 import 'package:endlessnet_client_ui/client/connectivity_client.dart';
 import 'package:endlessnet_client_ui/client/call_failure.dart';
+import 'package:endlessnet_client_ui/client/session_login_client.dart';
+import 'package:endlessnet_client_ui/client/session_login_correlation.dart';
 import 'package:grpc/grpc.dart' as grpc;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,6 +23,7 @@ import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 import 'enrollment_controller_test.dart' as fixture;
 import 'launch_config_test.dart' as config_fixture;
 import 'server_trust_controller_test.dart' as trust_fixture;
+import 'session_login_test.dart' as login_fixture;
 
 final class SessionConnectivity implements ConnectivityClient {
   SessionConnectivity(this.client);
@@ -73,9 +76,72 @@ class InstalledClient extends fixture.FakeClient {
   }
 }
 
+final class InstalledSessionClient extends InstalledClient
+    implements SessionLoginClient {
+  InstalledSessionClient(super.instance);
+
+  int sessionReads = 0;
+  late api.Session userSession;
+  Completer<void>? sessionReadWait;
+
+  @override
+  Future<api.RuntimeInfo> runtimeInfo(Duration timeout) async {
+    final runtime = await super.runtimeInfo(timeout);
+    runtime.capabilities.add(
+      api.CapabilityStatus(
+        capability: api.Capability.CAPABILITY_SESSION_LOGIN,
+        restriction: api.Restriction(
+          availability: api.Availability.AVAILABILITY_AVAILABLE,
+        ),
+      ),
+    );
+    return runtime;
+  }
+
+  @override
+  Future<api.GetSessionResponse> session(
+    api.GetSessionRequest request,
+    Duration timeout,
+  ) async {
+    sessionReads++;
+    final result = api.GetSessionResponse(
+      session: userSession,
+      metadata: snapshot.metadata,
+    );
+    await sessionReadWait?.future;
+    return result;
+  }
+
+  @override
+  Future<api.SessionLoginAttempt> sessionLogin(
+    api.GetSessionLoginRequest request,
+    Duration timeout,
+  ) async => throw StateError('unexpected login attempt lookup');
+
+  @override
+  Future<api.SessionLoginAttempt> startSessionLogin(
+    api.StartSessionLoginRequest request,
+    Duration timeout,
+  ) async => throw StateError('unexpected login mutation');
+}
+
+final class SessionCorrelation extends fixture.MemoryCorrelation
+    implements SessionLoginCorrelationStore {
+  final _sessionStore = login_fixture.Store();
+
+  @override
+  Future<SessionLoginCorrelation?> readSessionLogin(String id, String origin) =>
+      _sessionStore.readSessionLogin(id, origin);
+
+  @override
+  Future<void> saveSessionLogin(SessionLoginCorrelation correlation) =>
+      _sessionStore.saveSessionLogin(correlation);
+}
+
 final class TestPlatform implements UiRuntimePlatform {
-  TestPlatform({fixture.FakeClient? client})
-    : client = client ?? fixture.FakeClient() {
+  TestPlatform({fixture.FakeClient? client, fixture.MemoryCorrelation? store})
+    : client = client ?? fixture.FakeClient(),
+      store = store ?? fixture.MemoryCorrelation() {
     this.client.digest = clientContractSha256;
   }
   final config = UiLaunchConfig.decode(
@@ -84,7 +150,7 @@ final class TestPlatform implements UiRuntimePlatform {
   );
   late final connectivity = SessionConnectivity(client);
   final fixture.FakeClient client;
-  final store = fixture.MemoryCorrelation();
+  final fixture.MemoryCorrelation store;
   final events = <String>[];
   Completer<void>? configWait, connectWait, storageWait, closeWait;
   bool failConfig = false, failStorage = false, failConnectionClose = false;
@@ -147,6 +213,57 @@ Future<void> turns() async {
 }
 
 void main() {
+  test(
+    'ready control refreshes an expired session after an older read',
+    () async {
+      final values = config_fixture.launchValues();
+      final client = InstalledSessionClient(values['instance_id'] as String);
+      final p = TestPlatform(client: client, store: SessionCorrelation());
+      client.snapshot = api.Status(
+        metadata: fixture.metadata()..instanceId = client.instance,
+        activeProfileId: p.config.profile.id,
+        nodeId: 'same-node',
+        controlState: api.ControlState.CONTROL_STATE_REGISTERED,
+      );
+      client.userSession = api.Session(
+        state: api.SessionState.SESSION_STATE_EXPIRED,
+      );
+      final s = await UiSession.open(p, cancelled: () => false);
+      addTearDown(s.close);
+      await s.initialize();
+      final login = s.sessionLogin!;
+      expect(login.sessionExpired, isTrue);
+      expect(login.canStart, isTrue);
+
+      final previousRead = Completer<void>();
+      client.sessionReadWait = previousRead;
+      final refresh = login.refresh();
+      await turns();
+      expect(client.sessionReads, 2);
+
+      client.sessionReadWait = null;
+      client.userSession = api.Session(
+        state: api.SessionState.SESSION_STATE_ACTIVE,
+        expiresAt: Timestamp.fromDateTime(
+          DateTime.now().add(const Duration(hours: 1)),
+        ),
+      );
+      client.snapshot
+        ..controlState = api.ControlState.CONTROL_STATE_READY
+        ..connectionPhase = api.ConnectionPhase.CONNECTION_PHASE_LOCAL_READY;
+      await s.connectivity.refresh();
+      previousRead.complete();
+      await refresh;
+      await turns();
+
+      expect(login.sessionActive, isTrue);
+      expect(login.canStart, isFalse);
+      await s.connectivity.refresh();
+      expect(client.sessionReads, 3);
+      expect(p.browserCalls, 0);
+    },
+  );
+
   test('explicit login connects once after registration, reopen never auto-connects', () async {
     final values = config_fixture.launchValues();
     final client = InstalledClient(values['instance_id'] as String);

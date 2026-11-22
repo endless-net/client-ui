@@ -92,6 +92,7 @@ final class UiSession {
             )
           : null {
     enrollment.addListener(_observeEnrollment);
+    connectivity.addListener(_observeConnectivity);
     sessionLogin?.addListener(_observeSession);
   }
 
@@ -105,6 +106,27 @@ final class UiSession {
   final RevocationController? revocation;
   final SessionLoginController? sessionLogin;
   String _sessionLoginPhase = '';
+  bool _controlReady = false;
+  bool _sessionRefreshPending = false;
+
+  void _observeConnectivity() {
+    if (!connectivity.fresh) return;
+    final ready =
+        connectivity.snapshot?.controlState ==
+        api.ControlState.CONTROL_STATE_READY;
+    if (ready == _controlReady) return;
+    _controlReady = ready;
+    _sessionRefreshPending = ready;
+    _refreshRecoveredSession();
+  }
+
+  void _refreshRecoveredSession() {
+    final login = sessionLogin;
+    if (!_sessionRefreshPending || login == null || login.busy) return;
+    _sessionRefreshPending = false;
+    if (login.registered && !login.sessionActive) unawaited(login.refresh());
+  }
+
   void _observeSession() {
     final a = sessionLogin?.attempt;
     final phase = '${a?.attemptId}:${a?.phase}';
@@ -114,6 +136,7 @@ final class UiSession {
         unawaited(connectivity.refresh());
       }
     }
+    _refreshRecoveredSession();
   }
 
   String _revocationNodeContext = '';
@@ -220,6 +243,7 @@ final class UiSession {
     enrollment.removeListener(_observeEnrollment);
     enrollment.dispose();
     trust.dispose();
+    connectivity.removeListener(_observeConnectivity);
     connectivity.dispose();
     revocation?.dispose();
     sessionLogin?.removeListener(_observeSession);
