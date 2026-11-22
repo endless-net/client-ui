@@ -59,6 +59,12 @@ final class SessionLoginController extends ChangeNotifier {
       _session?.state == api.SessionState.SESSION_STATE_ACTIVE &&
       _session!.hasExpiresAt() &&
       _now().isBefore(_session!.expiresAt.toDateTime());
+  bool get sessionExpired =>
+      _ready &&
+      (_session?.state == api.SessionState.SESSION_STATE_EXPIRED ||
+          _session?.state == api.SessionState.SESSION_STATE_ACTIVE &&
+              _session!.hasExpiresAt() &&
+              !_now().isBefore(_session!.expiresAt.toDateTime()));
   bool get canStart =>
       _ready &&
       !_busy &&
@@ -394,18 +400,22 @@ final class SessionLoginController extends ChangeNotifier {
   }
 
   void _schedule() {
-    final a = _attempt;
-    if (!automaticPolling ||
-        !_ready ||
-        _disposed ||
-        a == null ||
-        a.pollAfterSeconds == 0 ||
-        !_now().isBefore(a.deadline.toDateTime())) {
-      return;
+    if (!automaticPolling || !_ready || _disposed) return;
+    final now = _now();
+    Duration? delay;
+    if (sessionActive) {
+      delay = _session!.expiresAt.toDateTime().difference(now);
     }
-    final remaining = a.deadline.toDateTime().difference(_now());
-    final delay = Duration(seconds: a.pollAfterSeconds);
-    _timer = Timer(delay < remaining ? delay : remaining, refresh);
+    final a = _attempt;
+    if (a != null && a.pollAfterSeconds > 0) {
+      final remaining = a.deadline.toDateTime().difference(now);
+      if (remaining > Duration.zero) {
+        final interval = Duration(seconds: a.pollAfterSeconds);
+        final poll = interval < remaining ? interval : remaining;
+        if (delay == null || poll < delay) delay = poll;
+      }
+    }
+    if (delay != null) _timer = Timer(delay, refresh);
   }
 
   static String _uuid() {

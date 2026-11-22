@@ -157,6 +157,7 @@ SessionLoginController controller(
   SessionLoginCorrelationStore store, {
   String id = requestId,
   DateTime Function()? now,
+  bool automaticPolling = false,
 }) => SessionLoginController(
   client: remote,
   store: store,
@@ -165,7 +166,7 @@ SessionLoginController controller(
   timeout: const Duration(seconds: 2),
   now: now ?? () => at,
   requestId: () => id,
-  automaticPolling: false,
+  automaticPolling: automaticPolling,
 );
 
 void main() {
@@ -415,7 +416,7 @@ void main() {
     await s.close();
   });
   testWidgets(
-    'success displays session outcome without promising connection or starting a new login',
+    'the current session takes precedence over an earlier successful login',
     (tester) async {
       final r = Remote();
       r.current = r.receipt(requestId)
@@ -427,7 +428,13 @@ void main() {
           expiresAt: Timestamp.fromDateTime(at.add(const Duration(hours: 1))),
         );
       r.state = r.current!.session;
-      final c = controller(r, Store());
+      var clock = at;
+      final c = controller(
+        r,
+        Store(),
+        now: () => clock,
+        automaticPolling: true,
+      );
       await c.bind(profile());
       await tester.pumpWidget(
         MaterialApp(
@@ -439,11 +446,24 @@ void main() {
           ),
         ),
       );
+      expect(find.text('Сессия пользователя действует.'), findsOneWidget);
+      expect(find.text('Войти снова'), findsNothing);
+
+      clock = at.add(const Duration(hours: 1));
+      r.state = api.Session(
+        state: api.SessionState.SESSION_STATE_EXPIRED,
+        expiresAt: Timestamp.fromDateTime(clock),
+      );
+      await tester.pump(const Duration(hours: 1));
+      await tester.pumpAndSettle();
+      expect(find.text('Сессия пользователя действует.'), findsNothing);
       expect(
-        find.text('Вход подтверждён. Состояние соединения показано отдельно.'),
+        find.text(
+          'Срок текущей сессии истёк. Нажмите «Подключить», чтобы проверить автоматическое продление.',
+        ),
         findsOneWidget,
       );
-      expect(find.text('Войти снова'), findsNothing);
+      expect(find.text('Войти снова'), findsOneWidget);
       expect(r.mutations, 0);
       c.dispose();
     },

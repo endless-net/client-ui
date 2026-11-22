@@ -45,7 +45,7 @@ class ConnectivityPanel extends StatelessWidget {
             api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_CURRENT &&
         s?.agent.directPathCount == 0 &&
         s?.agent.relayPathCount == 0) {
-      return 'Туннель готов, других устройств нет';
+      return 'Туннель готов';
     }
     return switch (s?.connectionPhase) {
       api.ConnectionPhase.CONNECTION_PHASE_CONNECTING =>
@@ -53,8 +53,9 @@ class ConnectivityPanel extends StatelessWidget {
       api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTING =>
         'Соединение: отключение выполняется',
       api.ConnectionPhase.CONNECTION_PHASE_CONNECTED =>
-        s?.serviceState == api.ServiceState.SERVICE_STATE_CONNECTED
-            ? 'Соединение: подключено'
+        s?.serviceState == api.ServiceState.SERVICE_STATE_CONNECTED &&
+                s?.controlState == api.ControlState.CONTROL_STATE_READY
+            ? 'Туннель готов'
             : 'Соединение: ограничено',
       api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED =>
         'Соединение: отключено',
@@ -79,13 +80,13 @@ class ConnectivityPanel extends StatelessWidget {
       return 'Для подключения нужен актуальный вход в учётную запись. Регистрация устройства сохранена.';
     }
     if (f.reasonKey == 'client.connection.deadline') {
-      return 'Попытка подключения или восстановления завершена: бюджет 30 секунд исчерпан. Проверьте сеть и разрешённый Direct-путь, затем повторите подключение.';
+      return 'Время подключения или восстановления истекло. Проверьте связь с сервером управления и повторите попытку.';
     }
     if (f.reasonKey == 'client.connection.cleanup_unconfirmed') {
       return 'Очистка сетевых ресурсов не подтверждена.';
     }
     if (f.reasonKey == 'client.connection.path_unconfirmed') {
-      return 'Direct-путь до второго устройства не подтверждён.';
+      return 'Не удалось подтвердить сетевые параметры туннеля.';
     }
     if (f.reasonKey == 'client.connection.control_unavailable') {
       return 'Не удалось подтвердить результат через сервер управления.';
@@ -131,7 +132,7 @@ class ConnectivityPanel extends StatelessWidget {
     final path = switch (peer.selectedPath) {
       api.PathKind.PATH_KIND_DIRECT => 'Direct',
       api.PathKind.PATH_KIND_RELAY => 'Relay',
-      _ => 'не подтверждён',
+      _ => null,
     };
     final engine = switch (peer.engine) {
       'wireguard' => 'WireGuard',
@@ -162,14 +163,18 @@ class ConnectivityPanel extends StatelessWidget {
         Text('Устройство: ${label(peer.peerId)}'),
         Text(
           fresh
-              ? 'Путь: $path'
-              : 'Последний известный путь: $path (не подтверждён)',
+              ? (path == null ? 'Нет подтверждённого пути' : 'Путь: $path')
+              : (path == null
+                    ? 'Состояние пути неизвестно'
+                    : 'Последний известный путь: $path (не подтверждён)'),
         ),
-        Text('Транспорт: $engine; версия: ${label(peer.protocolVersion)}'),
-        Text(
-          'Профиль транспорта: ${label(peer.transportProfileId)}; ревизия: ${peer.transportProfileRevision.toStringUnsigned()}',
-        ),
-        Text(fresh ? search : 'Состояние поиска Direct устарело'),
+        if (!simple) ...[
+          Text('Транспорт: $engine; версия: ${label(peer.protocolVersion)}'),
+          Text(
+            'Профиль транспорта: ${label(peer.transportProfileId)}; ревизия: ${peer.transportProfileRevision.toStringUnsigned()}',
+          ),
+          Text(fresh ? search : 'Состояние поиска Direct устарело'),
+        ],
       ],
     );
   }
@@ -190,11 +195,6 @@ class ConnectivityPanel extends StatelessWidget {
           c.fresh &&
           s?.connectionPhase ==
               api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED;
-      final path =
-          c.fresh &&
-          s?.serviceState == api.ServiceState.SERVICE_STATE_CONNECTED &&
-          (s?.agent.directPathCount ?? 0) > 0 &&
-          !(s?.agent.connectionPaused ?? true);
       final failures = <api.Failure>[...?s?.failures, ?c.failure];
       return Card(
         child: Padding(
@@ -223,12 +223,9 @@ class ConnectivityPanel extends StatelessWidget {
                       ? 'отключено'
                       : 'неизвестно'}',
                 ),
-              if (!simple)
-                Text('Direct-путь: ${path ? 'подтверждён' : 'не подтверждён'}'),
-              if (!simple)
-                for (final peer
-                    in s?.peerTransports ?? <api.PeerTransportStatus>[])
-                  _transport(peer, c.fresh),
+              for (final peer
+                  in s?.peerTransports ?? <api.PeerTransportStatus>[])
+                _transport(peer, c.fresh),
               if (c.fresh && applied)
                 for (final address in s.overlayAddresses)
                   SelectableText('Адрес EndlessNet: $address'),

@@ -33,12 +33,11 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Туннель готов, других устройств нет'), findsOneWidget);
-      expect(find.text('Direct-путь: подтверждён'), findsNothing);
+      expect(find.text('Туннель готов'), findsOneWidget);
       client.value.peerCount = 1;
       await c.refresh();
       await tester.pump();
-      expect(find.text('Туннель готов, других устройств нет'), findsNothing);
+      expect(find.text('Туннель готов'), findsNothing);
       expect(client.connects, 0);
     },
   );
@@ -64,8 +63,57 @@ void main() {
       find.text('Соединение: подключение или восстановление выполняется'),
       findsOneWidget,
     );
-    expect(find.text('Direct-путь: подтверждён'), findsNothing);
     expect(client.connects, 0);
+  });
+
+  testWidgets('main panel keeps ready status with peers on different paths', (
+    tester,
+  ) async {
+    final client = fixture.ConnectivityFixture();
+    client.value
+      ..serviceState = api.ServiceState.SERVICE_STATE_CONNECTED
+      ..controlState = api.ControlState.CONTROL_STATE_READY
+      ..connectionPhase = api.ConnectionPhase.CONNECTION_PHASE_CONNECTED
+      ..peerCount = 3;
+    client.value.peerTransports.addAll([
+      api.PeerTransportStatus(peerId: 'phone'),
+      api.PeerTransportStatus(peerId: 'server'),
+      api.PeerTransportStatus(peerId: 'laptop'),
+    ]);
+    final c = fixture.controller(client);
+    addTearDown(c.dispose);
+    await c.bind(fixture.profile());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: BrandTheme.dark(),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ConnectivityPanel(controller: c, simple: true),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Туннель готов'), findsOneWidget);
+    expect(find.text('Нет подтверждённого пути'), findsNWidgets(3));
+
+    client.value.peerTransports[0].selectedPath = api.PathKind.PATH_KIND_DIRECT;
+    client.value.peerTransports[1].selectedPath = api.PathKind.PATH_KIND_RELAY;
+    await c.refresh();
+    await tester.pumpAndSettle();
+    expect(find.text('Туннель готов'), findsOneWidget);
+    expect(find.text('Устройство: phone'), findsOneWidget);
+    expect(find.text('Устройство: server'), findsOneWidget);
+    expect(find.text('Устройство: laptop'), findsOneWidget);
+    expect(find.text('Путь: Direct'), findsOneWidget);
+    expect(find.text('Путь: Relay'), findsOneWidget);
+    expect(find.text('Нет подтверждённого пути'), findsOneWidget);
+
+    client.value.peerTransports[0].clearSelectedPath();
+    client.value.peerTransports[1].clearSelectedPath();
+    await c.refresh();
+    await tester.pumpAndSettle();
+    expect(find.text('Туннель готов'), findsOneWidget);
+    expect(find.text('Нет подтверждённого пути'), findsNWidgets(3));
   });
 
   for (final entry in {
@@ -73,7 +121,8 @@ void main() {
         'Проверьте адрес сервера и установленную версию',
     'client.connection.credential_expired':
         'проверит возможность продления для того же устройства',
-    'client.connection.deadline': 'бюджет 30 секунд исчерпан',
+    'client.connection.deadline':
+        'Время подключения или восстановления истекло',
     'client.connection.registration_revoked': 'Регистрация устройства отозвана',
   }.entries) {
     testWidgets('recovery reason ${entry.key} has a safe next action', (
@@ -166,17 +215,23 @@ void main() {
         find.text('Соединение: подключение или восстановление выполняется'),
         findsOneWidget,
       );
-      expect(find.text('Direct-путь: не подтверждён'), findsOneWidget);
       client.value.serviceState = api.ServiceState.SERVICE_STATE_CONNECTED;
+      client.value.controlState = api.ControlState.CONTROL_STATE_READY;
       client.value.connectionPhase =
           api.ConnectionPhase.CONNECTION_PHASE_CONNECTED;
+      client.value.peerTransports.add(
+        api.PeerTransportStatus(
+          peerId: 'peer-a',
+          selectedPath: api.PathKind.PATH_KIND_DIRECT,
+        ),
+      );
       client.value.agent = api.AgentStatus(directPathCount: 1)
         ..mapRevision = api.AgentStatus().mapRevision + 8;
       await c.refresh();
       await tester.pumpAndSettle();
-      expect(find.text('Соединение: подключено'), findsOneWidget);
+      expect(find.text('Туннель готов'), findsOneWidget);
       expect(find.text('Локальное применение: подтверждено'), findsOneWidget);
-      expect(find.text('Direct-путь: подтверждён'), findsOneWidget);
+      expect(find.text('Путь: Direct'), findsOneWidget);
       expect(
         find.text(
           'Работа приложения второго устройства проверяется отдельно от сетевого пути.',
@@ -223,7 +278,6 @@ void main() {
         find.textContaining('Новые соединения запрещены.'),
         findsOneWidget,
       );
-      expect(find.text('Direct-путь: не подтверждён'), findsOneWidget);
       client.value.credential = api.CredentialStatus(
         state: api.CredentialState.CREDENTIAL_STATE_EXPIRED,
       );
@@ -265,7 +319,6 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Локальное применение: неизвестно'), findsOneWidget);
-      expect(find.text('Direct-путь: не подтверждён'), findsOneWidget);
       final connect = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, 'Подключить'),
       );
@@ -285,6 +338,7 @@ void main() {
     testWidgets('Relay stays available while ${entry.key}', (tester) async {
       final client = fixture.ConnectivityFixture();
       client.value.serviceState = api.ServiceState.SERVICE_STATE_CONNECTED;
+      client.value.controlState = api.ControlState.CONTROL_STATE_READY;
       client.value.connectionPhase =
           api.ConnectionPhase.CONNECTION_PHASE_CONNECTED;
       client.value.peerTransports.add(
@@ -311,7 +365,7 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Соединение: подключено'), findsOneWidget);
+      expect(find.text('Туннель готов'), findsOneWidget);
       expect(find.text('Путь: Relay'), findsOneWidget);
       expect(find.text(entry.value), findsOneWidget);
       expect(
@@ -319,7 +373,6 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('synthetic-private-diagnostic'), findsNothing);
-      expect(find.text('Direct-путь: подтверждён'), findsNothing);
       client.readFailure = StateError('IPC unavailable');
       await c.refresh();
       await tester.pumpAndSettle();

@@ -20,13 +20,16 @@ class SessionLoginPanel extends StatelessWidget {
       if (!c.registered) return const SizedBox.shrink();
       final a = c.attempt;
       final url = c.browserAction;
+      final sessionState = c.sessionActive
+          ? 'Сессия пользователя действует.'
+          : c.sessionExpired
+          ? 'Срок текущей сессии истёк. Нажмите «Подключить», чтобы проверить автоматическое продление.'
+          : 'Текущая сессия пользователя не подтверждена.';
       final state = switch (a?.phase) {
         api.SessionLoginPhase.SESSION_LOGIN_PHASE_PREPARING =>
           'Подготовка входа…',
         api.SessionLoginPhase.SESSION_LOGIN_PHASE_AWAITING_CONFIRMATION =>
           'Подтвердите вход тем же пользователем в браузере.',
-        api.SessionLoginPhase.SESSION_LOGIN_PHASE_SUCCEEDED =>
-          'Вход подтверждён. Состояние соединения показано отдельно.',
         api.SessionLoginPhase.SESSION_LOGIN_PHASE_DENIED => 'Вход отклонён. Используйте пользователя, зарегистрировавшего устройство.',
         api.SessionLoginPhase.SESSION_LOGIN_PHASE_EXPIRED =>
           'Время подтверждения входа истекло.',
@@ -34,10 +37,7 @@ class SessionLoginPanel extends StatelessWidget {
           'Не удалось завершить вход. Регистрация устройства сохранена.',
         api.SessionLoginPhase.SESSION_LOGIN_PHASE_UNCERTAIN =>
           'Исход входа пока неизвестен. Сохранённый запрос не заменён.',
-        _ =>
-          c.sessionActive
-              ? 'Сессия пользователя действует.'
-              : 'Для продолжения может потребоваться повторный вход.',
+        _ => sessionState,
       };
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
