@@ -89,3 +89,7 @@ UI потребляет SDK producer Client по существующему immu
 копирует схемы; consent/отображение requested/effective/local state не дают UI
 права управлять туннелем в обход Client и OS caller authority. Секретные ключи и
 session renewal grants не экспортируются UI.
+
+Go-инструменты проверяет отдельный workflow `go-ci.yml` на push в `main`.
+Он выполняет `go test -short`, `govulncheck` и `golangci-lint`. Flutter CI и
+выпуск desktop используют свой workflow.
