@@ -13,6 +13,7 @@ import 'package:endlessnet_client_ui/client/contract_identity.dart';
 import 'package:endlessnet_client_ui/client/enrollment_client.dart';
 import 'package:endlessnet_client_ui/client/connectivity_client.dart';
 import 'package:endlessnet_client_ui/client/call_failure.dart';
+import 'package:endlessnet_client_ui/client/recent_logs_client.dart';
 import 'package:endlessnet_client_ui/client/session_login_client.dart';
 import 'package:endlessnet_client_ui/client/session_login_correlation.dart';
 import 'package:grpc/grpc.dart' as grpc;
@@ -73,6 +74,41 @@ class InstalledClient extends fixture.FakeClient {
       ),
     );
     return runtime;
+  }
+}
+
+final class InstalledLogsClient extends InstalledClient
+    implements RecentLogsClient {
+  InstalledLogsClient(super.instance);
+
+  final requests = <api.ListRecentLogsRequest>[];
+  bool unavailable = false;
+
+  @override
+  Future<api.ListRecentLogsResponse> recentLogs(
+    api.ListRecentLogsRequest request,
+    Duration timeout,
+  ) async {
+    requests.add(request);
+    if (unavailable) {
+      throw ClientCallFailure.fromGrpc(
+        const grpc.GrpcError.unavailable('raw-service-failure'),
+        4096,
+      );
+    }
+    final first = request.page.pageToken.isEmpty;
+    return api.ListRecentLogsResponse(
+      logs: [
+        api.LogEntry(
+          message: first ? 'Служба запущена' : 'Попытка подключения запущена',
+          timestamp: Timestamp.fromDateTime(DateTime.utc(2026, 11, 22)),
+        ),
+      ],
+      page: api.PageResponse(
+        metadata: api.SnapshotMetadata(instanceId: instance),
+        nextPageToken: first ? 'second-page' : '',
+      ),
+    );
   }
 }
 
@@ -315,24 +351,100 @@ void main() {
     await reopened.close();
   });
 
-  testWidgets(
-    'MCP button opens the access dialog',
-    (tester) async {
-      await tester.pumpWidget(MainApp(platform: TestPlatform()));
-      await tester.pumpAndSettle();
+  testWidgets('MCP button opens the access dialog', (tester) async {
+    await tester.pumpWidget(MainApp(platform: TestPlatform()));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('MCP'));
-      await tester.pumpAndSettle();
-      expect(find.text('Доступ по MCP'), findsOneWidget);
-      expect(find.text('Разрешить'), findsOneWidget);
+    await tester.tap(find.text('MCP'));
+    await tester.pumpAndSettle();
+    expect(find.text('Доступ по MCP'), findsOneWidget);
+    expect(find.text('Разрешить'), findsOneWidget);
 
-      await tester.tap(find.text('Закрыть'));
-      await tester.pumpAndSettle();
-      expect(find.text('Доступ по MCP'), findsNothing);
-      await tester.pumpWidget(const SizedBox());
-    },
-    skip: !Platform.isWindows,
-  );
+    await tester.tap(find.text('Закрыть'));
+    await tester.pumpAndSettle();
+    expect(find.text('Доступ по MCP'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  }, skip: !Platform.isWindows);
+
+  testWidgets('logs button opens both journals and pages Client entries', (
+    tester,
+  ) async {
+    final client = InstalledLogsClient(
+      config_fixture.launchValues()['instance_id'] as String,
+    );
+    final platform = TestPlatform(client: client);
+    await tester.pumpWidget(MainApp(platform: platform));
+    await tester.pumpAndSettle();
+
+    final logsButton = find.text('Журналы');
+    if (Platform.isWindows) {
+      final mcp = find.text('MCP');
+      expect(tester.getCenter(logsButton).dy, tester.getCenter(mcp).dy);
+    }
+    await tester.tap(logsButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Служба запущена'), findsOneWidget);
+    expect(
+      client.requests.single.profile.profileId,
+      platform.config.profile.id,
+    );
+
+    await tester.tap(find.text('Показать ещё'));
+    await tester.pumpAndSettle();
+    expect(find.text('Служба запущена'), findsOneWidget);
+    expect(find.text('Попытка подключения запущена'), findsOneWidget);
+    expect(find.text('Показать ещё'), findsNothing);
+    expect(client.requests.last.page.pageToken, 'second-page');
+    expect(
+      client.requests.last.page.pageSize,
+      client.requests.first.page.pageSize,
+    );
+
+    client.unavailable = true;
+    await tester.tap(find.text('Обновить'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Не удалось прочитать журнал службы Client.'),
+      findsOneWidget,
+    );
+    expect(find.text('raw-service-failure'), findsNothing);
+
+    await tester.tap(find.text('Интерфейс'));
+    await tester.pumpAndSettle();
+    expect(find.text('app · sessionInitialized'), findsOneWidget);
+
+    client.unavailable = false;
+    await tester.tap(find.text('Служба Client'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Обновить'));
+    await tester.pumpAndSettle();
+    expect(find.text('Показать ещё'), findsOneWidget);
+    expect(find.text('Попытка подключения запущена'), findsNothing);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('EndlessNet'), findsOneWidget);
+    expect(platform.connectivity.connects, 0);
+    expect(platform.connectivity.disconnects, 0);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('UI journal opens when the Client session cannot start', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MainApp(platform: TestPlatform()..failConfig = true),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Журналы'));
+    await tester.pumpAndSettle();
+    expect(find.text('Служба Client недоступна.'), findsOneWidget);
+
+    await tester.tap(find.text('Интерфейс'));
+    await tester.pumpAndSettle();
+    expect(find.text('app · sessionUnavailable'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets(
     'exit during explicit reconnect waits for old resources and cannot start a new connection',

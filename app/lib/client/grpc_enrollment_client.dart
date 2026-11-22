@@ -4,6 +4,7 @@ import 'package:grpc/grpc.dart' as grpc;
 import 'call_failure.dart';
 import 'connectivity_client.dart';
 import 'enrollment_client.dart';
+import 'recent_logs_client.dart';
 import 'revocation_client.dart';
 import 'session_login_client.dart';
 
@@ -14,6 +15,7 @@ final class GrpcEnrollmentClient
         EnrollmentClient,
         ConnectivityClient,
         RevocationClient,
+        RecentLogsClient,
         SessionLoginClient {
   GrpcEnrollmentClient(this._client, {required this.maxFailureBytes}) {
     if (maxFailureBytes <= 0 || maxFailureBytes > 65536) {
@@ -113,6 +115,14 @@ final class GrpcEnrollmentClient
     }
     return api.NodeRevocationResult.fromBuffer(r.result.writeToBuffer());
   }
+
+  @override
+  Future<api.ListRecentLogsResponse> recentLogs(
+    api.ListRecentLogsRequest request,
+    Duration timeout,
+  ) => _invoke(
+    () => _client.listRecentLogs(request, options: _options(timeout)),
+  );
 
   grpc.CallOptions _options(Duration timeout) {
     if (timeout <= Duration.zero || timeout > const Duration(seconds: 30)) {

@@ -3,10 +3,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' show AppExitResponse;
 
+import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:endlessnet_ui/endlessnet_ui.dart';
 
+import '../client/call_failure.dart';
 import '../client/correlation_journal.dart';
 import '../client/windows_pipe_config.dart';
 import '../enrollment/panel.dart';
@@ -17,6 +19,7 @@ import '../update/panel.dart';
 import '../mcp/protocol.dart';
 import '../mcp/windows_mcp.dart';
 import 'launch_config.dart';
+import 'logs_screen.dart';
 import 'session.dart';
 
 class MainApp extends StatefulWidget {
@@ -226,6 +229,29 @@ class _MainAppState extends State<MainApp> {
   void _observeUpdates() =>
       _diagnostics.record('updates', _updates!.status.name);
 
+  Future<api.ListRecentLogsResponse?> _readServiceLogs(String pageToken) async {
+    final session = _session;
+    if (session == null ||
+        session.closed ||
+        !_sessionInitialized ||
+        _reconnecting ||
+        _closing) {
+      return null;
+    }
+    final page = await session.recentClientLogs(
+      pageToken: pageToken,
+      limit: 50,
+    );
+    if (!mounted || _closing || _session != session || session.closed) {
+      return null;
+    }
+    if (page != null &&
+        page.page.metadata.instanceId != session.config.pipe.instanceId) {
+      throw ClientCallFailure.protocol();
+    }
+    return page;
+  }
+
   Future<Json> _invokeMcp(
     String name,
     Json arguments,
@@ -256,6 +282,38 @@ class _MainAppState extends State<MainApp> {
     }
     if (name == 'logs_read') return _diagnostics.read(arguments);
     if (!ready) return {'error': 'clientSessionUnavailable'};
+    if (name == 'client_logs_read') {
+      try {
+        final response = await session.recentClientLogs(
+          pageToken: arguments['pageToken'] as String? ?? '',
+          limit: arguments['limit'] as int? ?? 50,
+        );
+        if (!authorized() || _session != session || session.closed) {
+          return {'error': 'sessionChanged'};
+        }
+        if (response == null) return {'error': 'clientLogsUnavailable'};
+        if (response.page.metadata.instanceId !=
+            session.config.pipe.instanceId) {
+          return {'error': 'clientInstanceChanged'};
+        }
+        return {
+          'source': 'client_service',
+          'entries': [
+            for (final entry in response.logs)
+              {
+                'time': entry.timestamp.toDateTime().toUtc().toIso8601String(),
+                'message': entry.message,
+              },
+          ],
+          'nextPageToken': response.page.nextPageToken,
+        };
+      } on ClientCallFailure catch (failure) {
+        if (!authorized() || _session != session || session.closed) {
+          return {'error': 'sessionChanged'};
+        }
+        return {'error': failure.reasonKey};
+      }
+    }
     if (name == 'connectivity_refresh') {
       await session.connectivity.refresh();
       if (!authorized() || _session != session || session.closed) {
@@ -298,7 +356,7 @@ class _MainAppState extends State<MainApp> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    'Разрешение открывает чтение состояния и журнала, '
+                    'Разрешение открывает чтение состояния и журналов UI и службы Client, '
                     'обновление статуса службы, подключение и отключение. '
                     'Оно действует до отзыва, замены или выхода из приложения.',
                   ),
@@ -351,6 +409,21 @@ class _MainAppState extends State<MainApp> {
         ),
         title: const Text('EndlessNet'),
         actions: [
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: _closing
+                  ? null
+                  : () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => LogsScreen(
+                          diagnostics: _diagnostics,
+                          readServiceLogs: _readServiceLogs,
+                        ),
+                      ),
+                    ),
+              child: const Text('Журналы'),
+            ),
+          ),
           if (_mcp case final mcp?)
             ListenableBuilder(
               listenable: mcp,

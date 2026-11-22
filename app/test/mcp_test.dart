@@ -43,6 +43,7 @@ void main() {
       expect(tools.map((tool) => tool['name']), [
         'app_status',
         'logs_read',
+        'client_logs_read',
         'connectivity_refresh',
         'connectivity_connect',
         'connectivity_disconnect',
@@ -52,6 +53,8 @@ void main() {
         ('rpc_call', <String, Object?>{}),
         ('connectivity_connect', <String, Object?>{'profile': 'other'}),
         ('logs_read', <String, Object?>{'limit': 101}),
+        ('client_logs_read', <String, Object?>{'after': 1}),
+        ('client_logs_read', <String, Object?>{'pageToken': 1}),
       ]) {
         final response = await session.handle(
           request(
@@ -69,7 +72,18 @@ void main() {
       expect((refresh?['result'] as Json)['structuredContent'], {
         'fresh': true,
       });
-      expect(invoked, ['connectivity_refresh']);
+      final logs = await session.handle(
+        request(
+          'tools/call',
+          id: 6,
+          params: {
+            'name': 'client_logs_read',
+            'arguments': {'pageToken': 'cursor', 'limit': 20},
+          },
+        ),
+      );
+      expect((logs?['result'] as Json)['structuredContent'], {'fresh': true});
+      expect(invoked, ['connectivity_refresh', 'client_logs_read']);
     },
   );
 

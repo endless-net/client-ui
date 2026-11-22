@@ -4,6 +4,7 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 
 import '../client/enrollment_client.dart';
 import '../client/connectivity_client.dart';
+import '../client/recent_logs_client.dart';
 import '../connectivity/controller.dart';
 import '../revocation/controller.dart';
 import '../client/revocation_client.dart';
@@ -227,6 +228,21 @@ final class UiSession {
       if (!closed) await revocation?.bind(config.profile);
       if (!closed) await sessionLogin?.bind(config.profile);
     }();
+  }
+
+  Future<api.ListRecentLogsResponse?> recentClientLogs({
+    required String pageToken,
+    required int limit,
+  }) async {
+    final client = _connection.client;
+    if (closed || client is! RecentLogsClient) return null;
+    return (client as RecentLogsClient).recentLogs(
+      api.ListRecentLogsRequest(
+        profile: api.ProfileRef(profileId: config.profile.id),
+        page: api.PageRequest(pageSize: limit, pageToken: pageToken),
+      ),
+      config.rpcTimeout,
+    );
   }
 
   Future<bool> openBrowser(Uri url) async {
