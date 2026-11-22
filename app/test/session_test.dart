@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 import 'dart:ui' show AppExitResponse;
 
@@ -196,6 +197,25 @@ void main() {
     expect(p.connectivity.connects, 1);
     await reopened.close();
   });
+
+  testWidgets(
+    'MCP button opens the access dialog',
+    (tester) async {
+      await tester.pumpWidget(MainApp(platform: TestPlatform()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('MCP'));
+      await tester.pumpAndSettle();
+      expect(find.text('Доступ по MCP'), findsOneWidget);
+      expect(find.text('Разрешить'), findsOneWidget);
+
+      await tester.tap(find.text('Закрыть'));
+      await tester.pumpAndSettle();
+      expect(find.text('Доступ по MCP'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+    },
+    skip: !Platform.isWindows,
+  );
 
   testWidgets(
     'exit during explicit reconnect waits for old resources and cannot start a new connection',

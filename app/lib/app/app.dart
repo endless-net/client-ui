@@ -283,7 +283,7 @@ class _MainAppState extends State<MainApp> {
     };
   }
 
-  Future<void> _showMcp(WindowsMcp mcp) async {
+  Future<void> _showMcp(BuildContext context, WindowsMcp mcp) async {
     await showDialog<void>(
       context: context,
       builder: (context) => ListenableBuilder(
@@ -355,7 +355,7 @@ class _MainAppState extends State<MainApp> {
             ListenableBuilder(
               listenable: mcp,
               builder: (context, _) => TextButton(
-                onPressed: _closing ? null : () => _showMcp(mcp),
+                onPressed: _closing ? null : () => _showMcp(context, mcp),
                 child: Text(mcp.clientId == null ? 'MCP' : 'MCP включён'),
               ),
             ),
