@@ -3,6 +3,7 @@
 #include "security.h"
 #include <functional>
 #include <memory>
+#include <optional>
 
 namespace sd::mcp {
 struct Event {
@@ -20,11 +21,13 @@ class Broker {
   void Close(const std::string& channelId);
   void Acknowledge(const std::string& channelId);
   std::vector<Event> TakeEvents();
-  void WriteGrant(const std::string& clientId, int64_t version, const std::vector<uint8_t>& bytes);
-  void DeleteGrant(const std::string& clientId);
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };
+std::optional<Json> ReadGrant(const std::filesystem::path& userRoot);
+void WriteGrant(const std::filesystem::path& userRoot, const Json& grant);
+std::vector<uint8_t> UnprotectGrant(const std::vector<uint8_t>& cipher,
+                                    const std::string& purpose);
 int RunStdio(const std::string& clientId);
 }  // namespace sd::mcp

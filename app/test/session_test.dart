@@ -359,6 +359,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Доступ по MCP'), findsOneWidget);
     expect(find.text('Разрешить'), findsOneWidget);
+    expect(
+      find.textContaining('Разрешение сохраняется после перезапуска Windows'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Закрыть'));
     await tester.pumpAndSettle();

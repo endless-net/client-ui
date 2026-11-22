@@ -200,7 +200,7 @@ Broker::Broker(std::filesystem::path root, std::string epoch, std::function<void
   : impl_(std::make_unique<Impl>(std::move(root), std::move(epoch), std::move(notify))) {}
 Broker::~Broker() { try { Remove(); } catch (...) {} }
 void Broker::Publish() {
-  Remove(); auto& s = *impl_; SecureDirectory(s.root / L"mcp"); SecureDirectory(s.root / L"mcp" / L"clients"); ResetEvent(s.stop.get());
+  Remove(); auto& s = *impl_; SecureDirectory(s.root / L"mcp"); ResetEvent(s.stop.get());
   HANDLE first = INVALID_HANDLE_VALUE;
   for (int i = 0; i < 8 && first == INVALID_HANDLE_VALUE; ++i) { auto random = Utf8(Uuid()); random.erase(std::remove(random.begin(), random.end(), '-'), random.end());
     s.name = "\\\\.\\pipe\\EndlessNet.ClientUi.Mcp." + s.epoch + "." + random; first = s.Pipe(true); }
@@ -263,15 +263,6 @@ void Broker::Acknowledge(const std::string& id) {
   if (!CanonicalUuid(id)) InvalidJson(); auto& s = *impl_; std::lock_guard<std::mutex> lock(s.mutex);
   const auto it = s.channels.find(id); if (it != s.channels.end()) it->second->frames.Acknowledge();
 }
-void Broker::WriteGrant(const std::string& client, int64_t version, const std::vector<uint8_t>& bytes) {
-  if (!CanonicalUuid(client) || version < 1 || version > 9007199254740991LL || bytes.empty() || bytes.size() > 8192) InvalidJson();
-  auto& s = *impl_; SecureDirectory(s.root / L"mcp"); SecureDirectory(s.root / L"mcp" / L"clients");
-  AtomicJson(s.root / L"mcp" / L"clients" / (Wide(client) + L".grant"), Json::Object{{"version", 1}, {"clientId", client}, {"grantVersion", version}, {"protectedSecret", EncodeBase64(bytes.data(), bytes.size())}});
-}
-void Broker::DeleteGrant(const std::string& client) {
-  if (!CanonicalUuid(client)) InvalidJson(); const auto path = ExtendedPath(impl_->root / L"mcp" / L"clients" / (Wide(client) + L".grant")); RejectReparse(path);
-  if (!DeleteFileW(path.c_str()) && GetLastError() != ERROR_FILE_NOT_FOUND && GetLastError() != ERROR_PATH_NOT_FOUND) Fail();
-}
 namespace {
 std::string PrivateRead(const std::filesystem::path& input, size_t maximum) {
   const auto path = ExtendedPath(input); RejectReparse(path);
@@ -315,15 +306,50 @@ void PlainWrite(HANDLE handle, const std::string& text) {
     if (!WriteFile(handle, text.data() + offset, static_cast<DWORD>(text.size() - offset), &n, nullptr) || !n) Fail(); offset += n; }
 }
 }
+std::optional<Json> ReadGrant(const std::filesystem::path& userRoot) {
+  const auto path = ExtendedPath(userRoot / L"grant.json");
+  RejectReparse(path);
+  if (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES) {
+    if (GetLastError() == ERROR_FILE_NOT_FOUND) return std::nullopt;
+    Fail();
+  }
+  const auto grant = Decode(PrivateRead(path, 16384));
+  const auto& fields = grant.object();
+  const auto revoked = fields.find("revoked");
+  if (fields.size() == 2 && revoked != fields.end() &&
+      grant.at("version").integer() == 1 && revoked->second.integer() == 1) {
+    return std::nullopt;
+  }
+  return grant;
+}
+void WriteGrant(const std::filesystem::path& userRoot, const Json& grant) {
+  AtomicJson(userRoot / L"grant.json", grant);
+}
+std::vector<uint8_t> UnprotectGrant(const std::vector<uint8_t>& cipher,
+                                    const std::string& purpose) {
+  DATA_BLOB input{static_cast<DWORD>(cipher.size()), const_cast<BYTE*>(cipher.data())};
+  DATA_BLOB entropy{static_cast<DWORD>(purpose.size()), reinterpret_cast<BYTE*>(const_cast<char*>(purpose.data()))};
+  Secret secret;
+  if (!CryptUnprotectData(&input, nullptr, &entropy, nullptr, nullptr,
+                          CRYPTPROTECT_UI_FORBIDDEN, &secret.data)) Fail();
+  return std::vector<uint8_t>(secret.data.pbData, secret.data.pbData + secret.data.cbData);
+}
 int RunStdio(const std::string& clientId) {
   if (!CanonicalUuid(clientId)) return 2;
   int failure = 20;
   try {
-    const auto root = DataRoot(); std::unique_ptr<Handle> pipe;
+    const auto userRoot = UserDataRoot();
+    const auto sessionRoot = SessionDataRoot(userRoot);
+    std::unique_ptr<Handle> pipe;
     Handle stop(CreateEventW(nullptr, TRUE, FALSE, nullptr)); if (!stop.valid()) Fail(); Lines lines;
     BridgePorts ports;
     ports.userSid = [] { return Utf8(UserSid()); }; ports.logonSid = [] { return Utf8(LogonSid()); };
-    ports.readPrivate = [&](const std::string& relative, size_t maximum) { return PrivateRead(root / Wide(relative), maximum); };
+    ports.readOwner = [&] { return PrivateRead(sessionRoot / L"mcp" / L"owner.json", 16384); };
+    ports.readGrant = [&] {
+      const auto grant = ReadGrant(userRoot);
+      if (!grant) throw BoundaryFailure{22};
+      return *grant;
+    };
     ports.connect = [&](const OwnerDescriptor& owner) {
       if (!WaitNamedPipeW(Wide(owner.pipeName).c_str(), 1000)) Fail();
       pipe = std::make_unique<Handle>(CreateFileW(Wide(owner.pipeName).c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
@@ -331,12 +357,7 @@ int RunStdio(const std::string& clientId) {
       if (!pipe->valid()) Fail();
     };
     ports.verifyPeer = [&](const OwnerDescriptor& owner) { return PeerIdentity(pipe->get(), true, Wide(owner.userSid), Wide(owner.logonSid), owner.pid, owner.creation); };
-    ports.unprotect = [](const std::vector<uint8_t>& cipher, const std::string& purpose) {
-      DATA_BLOB input{static_cast<DWORD>(cipher.size()), const_cast<BYTE*>(cipher.data())};
-      DATA_BLOB entropy{static_cast<DWORD>(purpose.size()), reinterpret_cast<BYTE*>(const_cast<char*>(purpose.data()))}; Secret secret;
-      if (!CryptUnprotectData(&input, nullptr, &entropy, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &secret.data)) Fail();
-      return std::vector<uint8_t>(secret.data.pbData, secret.data.pbData + secret.data.cbData);
-    };
+    ports.unprotect = UnprotectGrant;
     ports.sendFrame = [&](const std::string& frame) { WriteLine(pipe->get(), stop.get(), frame); };
     ports.readFrame = [&] { return lines.Read(pipe->get(), stop.get(), 5000); };
     std::mutex inputMutex;

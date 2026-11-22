@@ -22,8 +22,15 @@ final class WindowsMcp extends ChangeNotifier {
       .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
         'en_mcp_enable',
       );
-  late final _disable = _dll.lookupFunction<Void Function(), void Function()>(
+  late final _restore = _dll
+      .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+        'en_mcp_restore',
+      );
+  late final _disable = _dll.lookupFunction<Int Function(), int Function()>(
     'en_mcp_disable',
+  );
+  late final _stop = _dll.lookupFunction<Void Function(), void Function()>(
+    'en_mcp_stop',
   );
   late final _active = _dll.lookupFunction<Int Function(), int Function()>(
     'en_mcp_active',
@@ -42,6 +49,7 @@ final class WindowsMcp extends ChangeNotifier {
   Timer? _timer;
   String? clientId;
   bool unavailable = false;
+  bool revokeFailed = false;
 
   String get configuration => const JsonEncoder.withIndent('  ').convert({
     'mcpServers': {
@@ -52,41 +60,60 @@ final class WindowsMcp extends ChangeNotifier {
     },
   });
 
-  void enable() {
-    disable(notify: false);
+  void restore() => _open(() => _restore());
+
+  void enable() => _open(() => _enable());
+
+  void _open(Pointer<Utf8> Function() open) {
+    _clearSessions();
+    unavailable = false;
+    revokeFailed = false;
     try {
-      // Resolve the whole interface before opening the transport.
-      final close = _disable;
       _active();
-      _readEvents();
-      final id = _enable();
-      if (id == nullptr) {
-        close();
-        throw StateError('MCP is unavailable');
+      final id = open();
+      if (id == nullptr) throw StateError('MCP is unavailable');
+      final value = id.toDartString();
+      if (value.isNotEmpty) {
+        clientId = value;
+        _timer = Timer.periodic(
+          const Duration(milliseconds: 40),
+          (_) => _poll(),
+        );
       }
-      clientId = id.toDartString();
-      unavailable = false;
-      _timer = Timer.periodic(const Duration(milliseconds: 40), (_) => _poll());
     } catch (_) {
       unavailable = true;
     }
     notifyListeners();
   }
 
-  void disable({bool notify = true}) {
+  void disable() {
+    try {
+      if (_disable() == 0) throw StateError('MCP revoke failed');
+      _clearSessions();
+      unavailable = false;
+      revokeFailed = false;
+    } catch (_) {
+      revokeFailed = true;
+    }
+    notifyListeners();
+  }
+
+  void stop() {
+    if (clientId != null) _stop();
+    _clearSessions();
+  }
+
+  void _clearSessions() {
     _timer?.cancel();
     _timer = null;
     _sessions.clear();
-    if (clientId != null) _disable();
     clientId = null;
-    unavailable = false;
-    if (notify) notifyListeners();
   }
 
   void _poll() {
     final events = _readEvents();
     if (events == nullptr) {
-      disable(notify: false);
+      stop();
       unavailable = true;
       notifyListeners();
       return;
@@ -130,7 +157,7 @@ final class WindowsMcp extends ChangeNotifier {
 
   @override
   void dispose() {
-    disable(notify: false);
+    stop();
     super.dispose();
   }
 }

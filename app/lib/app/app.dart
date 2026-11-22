@@ -51,7 +51,7 @@ class _MainAppState extends State<MainApp> {
   @override
   void initState() {
     super.initState();
-    if (Platform.isWindows) _mcp = WindowsMcp(_invokeMcp);
+    if (Platform.isWindows) _mcp = WindowsMcp(_invokeMcp)..restore();
     _diagnostics.record('app', 'started');
     _lifecycle = AppLifecycleListener(
       onExitRequested: _requestExit,
@@ -151,7 +151,7 @@ class _MainAppState extends State<MainApp> {
 
   Future<AppExitResponse> _shutdown() async {
     _closing = true;
-    _mcp?.disable();
+    _mcp?.stop();
     ++_epoch;
     if (mounted) setState(() {});
     try {
@@ -358,10 +358,13 @@ class _MainAppState extends State<MainApp> {
                   const Text(
                     'Разрешение открывает чтение состояния и журналов UI и службы Client, '
                     'обновление статуса службы, подключение и отключение. '
-                    'Оно действует до отзыва, замены или выхода из приложения.',
+                    'Разрешение сохраняется после перезапуска Windows и действует '
+                    'до отзыва или замены. Для работы MCP нужен открытый Client UI.',
                   ),
                   if (mcp.unavailable)
                     const Text('Не удалось открыть локальный MCP-канал.'),
+                  if (mcp.revokeFailed)
+                    const Text('Не удалось отозвать разрешение MCP.'),
                   if (mcp.clientId != null) SelectableText(mcp.configuration),
                 ],
               ),
@@ -372,17 +375,17 @@ class _MainAppState extends State<MainApp> {
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Закрыть'),
             ),
-            if (mcp.clientId != null) ...[
+            if (mcp.clientId != null || mcp.unavailable)
               TextButton(
-                onPressed: () => mcp.disable(),
+                onPressed: _closing ? null : mcp.disable,
                 child: const Text('Отозвать'),
               ),
+            if (mcp.clientId != null)
               TextButton(
                 onPressed: () =>
                     Clipboard.setData(ClipboardData(text: mcp.configuration)),
                 child: const Text('Копировать конфигурацию'),
               ),
-            ],
             FilledButton(
               onPressed: _closing ? null : mcp.enable,
               child: Text(
