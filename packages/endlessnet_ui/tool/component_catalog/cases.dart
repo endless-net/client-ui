@@ -194,6 +194,46 @@ const componentDefinitions = [
   ),
 ];
 
+class _PaletteExample extends StatelessWidget {
+  const _PaletteExample();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final colors = BrandColors.of(context);
+    final samples = [
+      ('Фон', colors.background, colors.text),
+      ('Панель', scheme.surfaceContainerLow, colors.text),
+      ('Поверхность', colors.surface, colors.text),
+      ('Поле', scheme.surfaceContainer, colors.text),
+      ('Поднятая поверхность', scheme.surfaceContainerHigh, colors.text),
+      ('Выбрано', scheme.primaryContainer, colors.text),
+      ('Основной акцент', colors.primary, colors.onPrimary),
+      ('Дополнительный акцент', scheme.secondary, scheme.onSecondary),
+      ('Успех', colors.surface, colors.success),
+      ('Ошибка', colors.surface, colors.error),
+      ('Предупреждение', colors.surface, colors.warning),
+    ];
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final (name, background, foreground) in samples)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: background,
+              border: Border.all(color: scheme.outlineVariant),
+              borderRadius: BorderRadius.circular(BrandTokens.controlRadius),
+            ),
+            child: Text(name, style: TextStyle(color: foreground)),
+          ),
+      ],
+    );
+  }
+}
+
 /// One synthetic owner; catalog and component tests use the production widgets.
 class ComponentExample extends StatefulWidget {
   const ComponentExample({
@@ -292,22 +332,7 @@ class _ComponentExampleState extends State<ComponentExample> {
           'motion' => Text(
             'Переход: ${BrandColors.of(context).motion.inMilliseconds} ms',
           ),
-          _ => Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final color in [
-                BrandTokens.cyan,
-                BrandTokens.blue,
-                BrandTokens.indigo,
-              ])
-                SizedBox(
-                  width: 64,
-                  height: 44,
-                  child: ColoredBox(color: color),
-                ),
-            ],
-          ),
+          _ => const _PaletteExample(),
         };
       case 'C02':
         final kind = EnButtonKind.values.firstWhere(
