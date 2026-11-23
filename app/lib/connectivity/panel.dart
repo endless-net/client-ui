@@ -15,7 +15,7 @@ class ConnectivityPanel extends StatelessWidget {
   final Future<void> Function()? reconnect;
   final bool simple;
 
-  String _state(ConnectivityController c, api.Status? s) {
+  static String statusLabel(ConnectivityController c, api.Status? s) {
     if (c.link == ConnectivityLink.mismatch) {
       return 'Соединение: несовместимый локальный клиент';
     }
@@ -209,7 +209,7 @@ class ConnectivityPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _state(c, s),
+                statusLabel(c, s),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               if (c.busy) const LinearProgressIndicator(),

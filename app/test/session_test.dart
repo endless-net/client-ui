@@ -6,6 +6,7 @@ import 'dart:ui' show AppExitResponse;
 
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:endlessnet_client_ui/app/app.dart';
+import 'package:endlessnet_client_ui/dashboard/board.dart';
 import 'package:endlessnet_client_ui/app/launch_config.dart';
 import 'package:endlessnet_client_ui/app/session.dart';
 import 'package:endlessnet_client_ui/app/windows_runtime_platform.dart';
@@ -352,12 +353,22 @@ void main() {
   });
 
   testWidgets('MCP button opens the access dialog', (tester) async {
-    await tester.pumpWidget(MainApp(platform: TestPlatform()));
+    await tester.pumpWidget(
+      MainApp(dashboardStore: const BoardStore(null), platform: TestPlatform()),
+    );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('MCP'));
+    await tester.tap(find.byTooltip('Настройки приложения'));
     await tester.pumpAndSettle();
-    expect(find.text('Доступ по MCP'), findsOneWidget);
+    await tester.tap(find.text('Доступ по MCP'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Доступ по MCP'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Разрешить'), findsOneWidget);
     expect(
       find.textContaining('Разрешение сохраняется после перезапуска Windows'),
@@ -366,7 +377,7 @@ void main() {
 
     await tester.tap(find.text('Закрыть'));
     await tester.pumpAndSettle();
-    expect(find.text('Доступ по MCP'), findsNothing);
+    expect(find.text('Разрешить'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   }, skip: !Platform.isWindows);
 
@@ -377,15 +388,14 @@ void main() {
       config_fixture.launchValues()['instance_id'] as String,
     );
     final platform = TestPlatform(client: client);
-    await tester.pumpWidget(MainApp(platform: platform));
+    await tester.pumpWidget(
+      MainApp(dashboardStore: const BoardStore(null), platform: platform),
+    );
     await tester.pumpAndSettle();
 
-    final logsButton = find.text('Журналы');
-    if (Platform.isWindows) {
-      final mcp = find.text('MCP');
-      expect(tester.getCenter(logsButton).dy, tester.getCenter(mcp).dy);
-    }
-    await tester.tap(logsButton);
+    await tester.tap(find.byTooltip('Настройки приложения'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Журналы'));
     await tester.pumpAndSettle();
     expect(find.text('Служба запущена'), findsOneWidget);
     expect(
@@ -437,8 +447,13 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MainApp(platform: TestPlatform()..failConfig = true),
+      MainApp(
+        dashboardStore: const BoardStore(null),
+        platform: TestPlatform()..failConfig = true,
+      ),
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Настройки приложения'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Журналы'));
     await tester.pumpAndSettle();
@@ -460,7 +475,11 @@ void main() {
         const grpc.GrpcError.unavailable('raw-secret'),
         16384,
       );
-      await tester.pumpWidget(MainApp(platform: p));
+      await tester.pumpWidget(
+        MainApp(dashboardStore: const BoardStore(null), platform: p),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Учётная запись'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Переподключиться к локальному клиенту'));
       await tester.pump();
@@ -490,7 +509,11 @@ void main() {
         const grpc.GrpcError.unavailable('raw-secret'),
         16384,
       );
-      await tester.pumpWidget(MainApp(platform: p));
+      await tester.pumpWidget(
+        MainApp(dashboardStore: const BoardStore(null), platform: p),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Учётная запись'));
       await tester.pumpAndSettle();
       expect(
         find.text('Переподключиться к локальному клиенту'),
@@ -682,7 +705,11 @@ void main() {
     'shell shows safe startup error, retries same platform and renders real enrollment panel',
     (tester) async {
       final p = TestPlatform()..failConfig = true;
-      await tester.pumpWidget(MainApp(platform: p));
+      await tester.pumpWidget(
+        MainApp(dashboardStore: const BoardStore(null), platform: p),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Учётная запись'));
       await tester.pumpAndSettle();
       expect(find.textContaining('raw-secret'), findsNothing);
       expect(find.text('Повторить подключение'), findsOneWidget);
@@ -714,9 +741,11 @@ void main() {
         connectionPhase: api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED,
       );
 
-      await tester.pumpWidget(MainApp(platform: platform));
+      await tester.pumpWidget(
+        MainApp(dashboardStore: const BoardStore(null), platform: platform),
+      );
       await tester.pumpAndSettle();
-      expect(find.text('Соединение: отключено'), findsOneWidget);
+      expect(find.text('отключено'), findsOneWidget);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
@@ -727,7 +756,7 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Соединение: подключение'), findsOneWidget);
+      expect(find.textContaining('подключение выполняется'), findsOneWidget);
       expect(platform.events, ['config', 'connect', 'storage']);
       expect(platform.connectivity.connects, 0);
       expect(platform.connectivity.disconnects, 0);
@@ -739,7 +768,9 @@ void main() {
     'OS exit waits for session storage; repeated exit requests share cleanup',
     (tester) async {
       final p = TestPlatform()..closeWait = Completer<void>();
-      await tester.pumpWidget(MainApp(platform: p));
+      await tester.pumpWidget(
+        MainApp(dashboardStore: const BoardStore(null), platform: p),
+      );
       await tester.pumpAndSettle();
       var returned = false;
       final exited = tester.binding.handleRequestAppExit().then((r) {
@@ -764,7 +795,9 @@ void main() {
     'exit during acquisition waits and closes late connection without opening storage',
     (tester) async {
       final p = TestPlatform()..connectWait = Completer<void>();
-      await tester.pumpWidget(MainApp(platform: p));
+      await tester.pumpWidget(
+        MainApp(dashboardStore: const BoardStore(null), platform: p),
+      );
       await tester.pump();
       expect(p.events.last, 'connect');
       final exited = tester.binding.handleRequestAppExit();
@@ -782,7 +815,9 @@ void main() {
     'cleanup failure cancels normal OS exit, releases remaining storage and hides diagnostics',
     (tester) async {
       final p = TestPlatform()..failConnectionClose = true;
-      await tester.pumpWidget(MainApp(platform: p));
+      await tester.pumpWidget(
+        MainApp(dashboardStore: const BoardStore(null), platform: p),
+      );
       await tester.pumpAndSettle();
       final exited = tester.binding.handleRequestAppExit();
       await tester.pumpAndSettle();

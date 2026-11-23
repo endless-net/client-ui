@@ -60,6 +60,9 @@ final class SessionLoginController extends ChangeNotifier {
       _session?.state == api.SessionState.SESSION_STATE_ACTIVE &&
       _session!.hasExpiresAt() &&
       _now().isBefore(_session!.expiresAt.toDateTime());
+  DateTime? get activeUntil =>
+      sessionActive ? _session!.expiresAt.toDateTime() : null;
+
   bool get sessionExpired =>
       _ready &&
       (_session?.state == api.SessionState.SESSION_STATE_EXPIRED ||

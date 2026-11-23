@@ -3,6 +3,7 @@ import 'package:grpc/grpc.dart' as grpc;
 
 import 'call_failure.dart';
 import 'connectivity_client.dart';
+import 'dashboard_client.dart';
 import 'enrollment_client.dart';
 import 'recent_logs_client.dart';
 import 'revocation_client.dart';
@@ -16,7 +17,8 @@ final class GrpcEnrollmentClient
         ConnectivityClient,
         RevocationClient,
         RecentLogsClient,
-        SessionLoginClient {
+        SessionLoginClient,
+        DashboardClient {
   GrpcEnrollmentClient(this._client, {required this.maxFailureBytes}) {
     if (maxFailureBytes <= 0 || maxFailureBytes > 65536) {
       throw ArgumentError('failure budget');
@@ -24,6 +26,38 @@ final class GrpcEnrollmentClient
   }
   final api.ClientServiceClient _client;
   final int maxFailureBytes;
+
+  @override
+  Future<api.ListDashboardSpacesResponse> dashboardSpaces(
+    api.ListDashboardSpacesRequest request,
+    Duration timeout,
+  ) => _invoke(
+    () => _client.listDashboardSpaces(request, options: _options(timeout)),
+  );
+
+  @override
+  Future<api.DashboardBoard> dashboardBoard(
+    api.GetDashboardBoardRequest request,
+    Duration timeout,
+  ) async {
+    final response = await _invoke(
+      () => _client.getDashboardBoard(request, options: _options(timeout)),
+    );
+    if (!response.hasBoard()) throw ClientCallFailure.protocol();
+    return response.board;
+  }
+
+  @override
+  Future<api.DashboardBoard> replaceDashboardBoard(
+    api.ReplaceDashboardBoardRequest request,
+    Duration timeout,
+  ) async {
+    final response = await _invoke(
+      () => _client.replaceDashboardBoard(request, options: _options(timeout)),
+    );
+    if (!response.hasBoard()) throw ClientCallFailure.protocol();
+    return response.board;
+  }
 
   @override
   Future<api.GetSessionResponse> session(
