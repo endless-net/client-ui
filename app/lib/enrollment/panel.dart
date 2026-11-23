@@ -171,6 +171,7 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
       final c = widget.controller;
       final profile = c.profile;
       final attempt = c.currentAttempt;
+      final browserAction = c.browserAction;
       final owner =
           c.failure?.actionOwner ??
           attempt?.restriction.actionOwner ??
@@ -292,18 +293,18 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
                   onConfirmed: c.refresh,
                 ),
             ],
-            if (c.browserAction != null)
-              SelectableText(c.browserAction.toString()),
-            if (c.browserAction != null)
+            if (browserAction != null) ...[
+              SelectableText(browserAction.toString()),
               OutlinedButton(
                 onPressed: !_opening && widget.openBrowser != null
                     ? _open
                     : null,
                 child: const Text('Открыть вход в браузере'),
               ),
+            ],
             if (_browserFailed &&
                 _browserFailureProfile == profile?.id &&
-                _browserFailureUrl == c.browserAction)
+                _browserFailureUrl == browserAction)
               const Text(
                 'Не удалось открыть браузер. Повторите открытие страницы входа.',
               ),

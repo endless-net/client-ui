@@ -5,9 +5,10 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/foundation.dart';
 import 'package:grpc/grpc.dart' show StatusCode;
 
-import '../client/enrollment_client.dart';
+import '../client/browser_consent.dart';
 import '../client/call_failure.dart';
 import '../client/correlation_journal.dart';
+import '../client/enrollment_client.dart';
 
 enum EnrollmentLinkState { detached, loading, available, unavailable, mismatch }
 
@@ -174,19 +175,7 @@ final class EnrollmentController extends ChangeNotifier {
         !_now().isBefore(_waitingDeadline!)) {
       return null;
     }
-    final url = Uri.tryParse(a.browserAction.verificationUrl);
-    if (url == null ||
-        url.scheme != 'https' ||
-        url.userInfo.isNotEmpty ||
-        url.hasFragment ||
-        url.hasQuery ||
-        url.origin !=
-            (p.controlOrigin == "https://api.endlessnet.ru"
-                ? "https://admin.endlessnet.ru"
-                : p.controlOrigin)) {
-      return null;
-    }
-    return url;
+    return browserConsentUri(a.browserAction.verificationUrl, p.controlOrigin);
   }
 
   Future<T> _call<T>(Future<T> call) => call.timeout(_timeout);
