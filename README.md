@@ -266,11 +266,10 @@ opt-in Client test `TestWindowsUIAgainstActualOwnerChain`, передавая т
 
 Общий брендбук и библиотека компонентов Admin + Client UI находятся в
 [packages/endlessnet_ui](packages/endlessnet_ui/README.md). Это единый producer;
-оба приложения подключают exact опубликованный Git source
-`acc88b52f96ddac996a88c6c3638edfb4b0bd119`, path `packages/endlessnet_ui`.
-App использует общую light/dark тему, BrandMark и C02 в панели подключения;
-Client SDK/IPC/controllers не меняются. Consumer adoption остаётся локальным
-до отдельного запроса публикации приложений.
+Client UI закрепляет опубликованный Git revision библиотеки в
+[app/pubspec.lock](app/pubspec.lock), path `packages/endlessnet_ui`.
+Начиная с v0.10.3, приложение использует палитру «Фирменная» в светлом и
+тёмном режимах. Admin закрепляет версию библиотеки в собственном репозитории.
 Functional и component design tests библиотеки запускаются раздельно:
 `python3 -B scripts/check_ui_library.py` и
 `python3 -B scripts/check_ui_library.py --design`.
