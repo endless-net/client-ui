@@ -138,6 +138,8 @@ void main() {
     expect(c.fresh, isFalse);
     expect(c.canConnect, isFalse);
     expect(c.link, ConnectivityLink.unavailable);
+    expect(c.readFailure?.problem, ConnectivityReadProblem.unknown);
+    expect(c.readFailure?.stage, ConnectivityReadStage.status);
     expect(client.connects, 1);
   });
   test('resume invalidates the old snapshot until a fresh read and sends no command', () async {
@@ -308,9 +310,11 @@ void main() {
     await c.refresh();
     expect(c.fresh, isFalse);
     expect(c.canConnect, isFalse);
+    expect(c.readFailure?.problem, ConnectivityReadProblem.staleRevision);
     client.runtime.instanceId = 'other-instance';
     await c.refresh();
     expect(c.link, ConnectivityLink.mismatch);
+    expect(c.readFailure?.problem, ConnectivityReadProblem.runtimeMismatch);
     expect(c.snapshot, isNull);
     await c.connect();
     expect(client.connects, 0);

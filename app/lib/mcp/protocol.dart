@@ -1,12 +1,15 @@
 import 'dart:collection';
 import 'dart:convert';
 
+import 'recovery_log.dart';
+
 typedef Json = Map<String, Object?>;
 typedef InvokeTool = Future<Json> Function(String name, Json arguments);
 
 const _tools = {
   'app_status': 'Read the current state of the open EndlessNet app.',
-  'logs_read': 'Read recent structured diagnostic events from the open app.',
+  'logs_read':
+      'Read recent UI diagnostics or the saved local recovery history.',
   'client_logs_read':
       'Read recent redacted logs from the local Client service.',
   'connectivity_refresh': 'Refresh status through the app’s local Client API.',
@@ -17,6 +20,10 @@ const _tools = {
 const _logArguments = {
   'after': {'type': 'integer', 'minimum': 0},
   'limit': {'type': 'integer', 'minimum': 1, 'maximum': 100},
+  'source': {
+    'type': 'string',
+    'enum': ['recovery'],
+  },
 };
 
 const _clientLogArguments = {
@@ -25,10 +32,13 @@ const _clientLogArguments = {
 };
 
 final class UiDiagnostics {
+  final recovery = RecoveryLog();
   final _entries = ListQueue<Json>();
   int _sequence = 0;
 
-  List<Json> snapshot() => List.unmodifiable(_entries);
+  List<Json> snapshot() =>
+      [..._entries, ...recovery.snapshot()]
+        ..sort((a, b) => (a['time'] as String).compareTo(b['time'] as String));
 
   void record(String component, String event, [Json? state]) {
     if (_entries.length == 256) _entries.removeFirst();
@@ -44,6 +54,7 @@ final class UiDiagnostics {
   Json read(Json arguments) {
     final after = arguments['after'] as int? ?? 0;
     final limit = arguments['limit'] as int? ?? 50;
+    if (arguments['source'] == 'recovery') return recovery.read(after, limit);
     final entries = _entries
         .where((entry) => (entry['sequence'] as int) > after)
         .take(limit)
@@ -182,6 +193,7 @@ final class UiMcpSession {
         ('after', final int number) => name == 'logs_read' && number >= 0,
         ('pageToken', final String token) =>
           name == 'client_logs_read' && token.length <= 512,
+        ('source', 'recovery') => name == 'logs_read',
         ('limit', final int number) => number >= 1 && number <= 100,
         _ => false,
       },

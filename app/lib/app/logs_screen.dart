@@ -136,6 +136,12 @@ class _LogsScreenState extends State<LogsScreen> {
       _refreshBar(
         () => setState(() => _uiLogs = widget.diagnostics.snapshot()),
       ),
+      if (widget.diagnostics.recovery.storageUnavailable)
+        const ListTile(
+          title: Text('Сохранённый журнал восстановления недоступен.'),
+        ),
+      if (widget.diagnostics.recovery.historyGap)
+        const ListTile(title: Text('Часть истории восстановления недоступна.')),
       Expanded(
         child: _uiLogs.isEmpty
             ? const Center(child: Text('Событий интерфейса пока нет.'))

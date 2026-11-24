@@ -67,6 +67,7 @@ final class WindowsEnrollmentConnection {
   final GrpcEnrollmentClient client;
   final grpc.ClientTransportConnectorChannel _channel;
   final WindowsPipeConnector _connector;
+  WindowsPipeProblem? get pipeProblem => _connector.failure?.problem;
   Future<void> close() async {
     _connector.shutdown();
     await _channel.terminate();
@@ -225,6 +226,9 @@ final class _Pipe {
   void _finish() {
     if (_closed) return;
     _closed = true;
+    if (!_stopping) {
+      _failure ??= const WindowsPipeFailure(WindowsPipeProblem.closed);
+    }
     if (!_ready.isCompleted) {
       _ready.completeError(
         _failure ?? const WindowsPipeFailure(WindowsPipeProblem.closed),

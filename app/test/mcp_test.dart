@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:endlessnet_client_ui/mcp/protocol.dart';
+import 'package:endlessnet_client_ui/mcp/recovery_log.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Json request(String method, {Object? id, Json? params}) => {
@@ -9,6 +12,60 @@ Json request(String method, {Object? id, Json? params}) => {
 };
 
 void main() {
+  test('saved recovery is independent of ordinary logs and survives rotation and reopening', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'endlessnet-recovery-test',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final path = File('${directory.path}${Platform.pathSeparator}recovery.bin');
+    Future<(File, void Function())> acquire() async => (path, () {});
+    final first = UiDiagnostics();
+    await first.recovery.open(acquire);
+    for (var i = 0; i < 258; i++) {
+      first.recovery.record(
+        RecoveryEvent.readFailed,
+        stage: RecoveryStage.status,
+        cause: RecoveryCause.timeout,
+      );
+      first.record('updates', 'checking');
+    }
+    first.recovery.record(RecoveryEvent.recovered);
+    for (var i = 0; i < 260; i++) {
+      first.record('updates', 'checking');
+    }
+    await first.recovery.close();
+    expect(await path.length(), 256 * 512);
+
+    final reopened = UiDiagnostics();
+    await reopened.recovery.open(acquire);
+    final page = reopened.read({'source': 'recovery', 'limit': 1});
+    expect(page['historyGap'], true);
+    expect(page['nextCursor'], 4);
+    expect(page['storageUnavailable'], false);
+    expect((page['entries'] as List<Json>).single['state'], {
+      'stage': 'status',
+      'cause': 'timeout',
+    });
+    final tail = reopened.read({'source': 'recovery', 'after': 258});
+    expect(tail['hasMore'], false);
+    expect((tail['entries'] as List<Json>).single['event'], 'recovered');
+    expect(reopened.read({})['entries'], isEmpty);
+    await reopened.recovery.close();
+  });
+
+  test('storage failure leaves safe recovery events readable', () async {
+    final diagnostics = UiDiagnostics();
+    await diagnostics.recovery.open(
+      () async => throw const FileSystemException('raw path'),
+    );
+    diagnostics.recovery.record(RecoveryEvent.recovered);
+    final page = diagnostics.read({'source': 'recovery'});
+    expect(page['storageUnavailable'], true);
+    expect((page['entries'] as List<Json>).single['event'], 'recovered');
+    expect(page.toString(), isNot(contains('raw path')));
+    await diagnostics.recovery.close();
+  });
+
   test(
     'binds initialization and the closed tool set to each session',
     () async {
@@ -53,6 +110,7 @@ void main() {
         ('rpc_call', <String, Object?>{}),
         ('connectivity_connect', <String, Object?>{'profile': 'other'}),
         ('logs_read', <String, Object?>{'limit': 101}),
+        ('logs_read', <String, Object?>{'source': 'other'}),
         ('client_logs_read', <String, Object?>{'after': 1}),
         ('client_logs_read', <String, Object?>{'pageToken': 1}),
       ]) {
@@ -83,7 +141,24 @@ void main() {
         ),
       );
       expect((logs?['result'] as Json)['structuredContent'], {'fresh': true});
-      expect(invoked, ['connectivity_refresh', 'client_logs_read']);
+      final recovery = await session.handle(
+        request(
+          'tools/call',
+          id: 7,
+          params: {
+            'name': 'logs_read',
+            'arguments': {'source': 'recovery', 'after': 1},
+          },
+        ),
+      );
+      expect((recovery?['result'] as Json)['structuredContent'], {
+        'fresh': true,
+      });
+      expect(invoked, [
+        'connectivity_refresh',
+        'client_logs_read',
+        'logs_read',
+      ]);
     },
   );
 

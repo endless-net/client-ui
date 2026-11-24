@@ -19,7 +19,10 @@ final class WindowsUserStateDirectory {
   final DynamicLibrary _library;
   Pointer<Void> _guard;
 
-  static Future<WindowsUserStateDirectory> open(String libraryPath) async {
+  static Future<WindowsUserStateDirectory> open(
+    String libraryPath, {
+    bool recoveryLog = false,
+  }) async {
     if (!Platform.isWindows ||
         Abi.current() != Abi.windowsX64 ||
         !isWindowsPipeLibraryPath(libraryPath)) {
@@ -33,7 +36,7 @@ final class WindowsUserStateDirectory {
         );
       }
       final (path, address, created) = await Isolate.run(
-        () => _openState(libraryPath),
+        () => _openState(libraryPath, recoveryLog),
       );
       return WindowsUserStateDirectory._(
         File(path),
@@ -58,7 +61,7 @@ final class WindowsUserStateDirectory {
   }
 }
 
-(String, int, bool) _openState(String libraryPath) {
+(String, int, bool) _openState(String libraryPath, bool recoveryLog) {
   final library = DynamicLibrary.open(libraryPath);
   final open = library
       .lookupFunction<
@@ -76,7 +79,7 @@ final class WindowsUserStateDirectory {
           Pointer<Int32>,
           Pointer<Uint32>,
         )
-      >('en_ui_open_private_state');
+      >(recoveryLog ? 'en_ui_open_recovery_log' : 'en_ui_open_private_state');
   final path = calloc<Uint16>(32768).cast<Utf16>();
   final guard = calloc<Pointer<Void>>();
   final error = calloc<Uint32>();

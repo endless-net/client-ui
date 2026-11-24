@@ -9,10 +9,12 @@ import 'update/windows_installer.dart';
 
 void main(List<String> arguments) {
   WidgetsFlutterBinding.ensureInitialized();
+  final platform = WindowsUiRuntimePlatform(arguments);
   runApp(
     MainApp(
-      platform: WindowsUiRuntimePlatform(arguments),
+      platform: platform,
       openUpdates: Platform.isWindows ? openWindowsUpdates : null,
+      openRecoveryLog: Platform.isWindows ? platform.openRecoveryLog : null,
     ),
   );
 }

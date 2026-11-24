@@ -8,6 +8,26 @@ import '../client/connectivity_client.dart';
 
 enum ConnectivityLink { detached, loading, available, unavailable, mismatch }
 
+enum ConnectivityReadStage { runtimeInfo, status }
+
+enum ConnectivityReadProblem {
+  timeout,
+  rpc,
+  runtimeMismatch,
+  missingMetadata,
+  wrongInstance,
+  invalidRevision,
+  staleRevision,
+  wrongProfile,
+  unknown,
+}
+
+typedef ConnectivityReadFailure = ({
+  ConnectivityReadStage stage,
+  ConnectivityReadProblem problem,
+  int? rpcCode,
+});
+
 final class ConnectivityController extends ChangeNotifier {
   ConnectivityController({
     required this._client,
@@ -49,8 +69,10 @@ final class ConnectivityController extends ChangeNotifier {
   var _uncertain = false;
   var _hadDeviceContext = false;
   var _link = ConnectivityLink.detached;
+  ConnectivityReadFailure? _readFailure;
 
   ConnectivityLink get link => _link;
+  ConnectivityReadFailure? get readFailure => _readFailure;
   bool get busy => _mutating || _link == ConnectivityLink.loading;
   bool get fresh => _fresh && !_mutating;
   bool get uncertain => _uncertain;
@@ -125,6 +147,7 @@ final class ConnectivityController extends ChangeNotifier {
     _runtime = null;
     _snapshot = null;
     _failure = null;
+    _readFailure = null;
     _fresh = false;
     _uncertain = false;
     _mutating = false;
@@ -162,6 +185,7 @@ final class ConnectivityController extends ChangeNotifier {
   }
 
   Future<void> _fetch(int epoch, int version) async {
+    var stage = ConnectivityReadStage.runtimeInfo;
     try {
       final runtime = await _client.runtimeInfo(_timeout).timeout(_timeout);
       if (!_currentRead(epoch, version)) return;
@@ -170,34 +194,57 @@ final class ConnectivityController extends ChangeNotifier {
           runtime.protocol != 'endlessnet-client-ipc' ||
           runtime.ipcVersion != 0) {
         _link = ConnectivityLink.mismatch;
+        _readFailure = (
+          stage: stage,
+          problem: ConnectivityReadProblem.runtimeMismatch,
+          rpcCode: null,
+        );
         _runtime = null;
         _snapshot = null;
         _fresh = false;
         return;
       }
+      stage = ConnectivityReadStage.status;
       final value = await _client.status(_timeout).timeout(_timeout);
       if (!_currentRead(epoch, version)) return;
       final revision = BigInt.parse(value.metadata.revision.toStringUnsigned());
       final previous = _snapshot?.metadata;
-      if (!value.hasMetadata() ||
-          value.metadata.instanceId != _instance ||
-          revision == BigInt.zero ||
-          previous != null &&
-              revision < BigInt.parse(previous.revision.toStringUnsigned()) ||
-          value.activeProfileId.isNotEmpty &&
-              value.activeProfileId != _profile!.id) {
-        throw ClientCallFailure.protocol();
+      if (!value.hasMetadata()) throw ConnectivityReadProblem.missingMetadata;
+      if (value.metadata.instanceId != _instance) {
+        throw ConnectivityReadProblem.wrongInstance;
+      }
+      if (revision == BigInt.zero) {
+        throw ConnectivityReadProblem.invalidRevision;
+      }
+      if (previous != null &&
+          revision < BigInt.parse(previous.revision.toStringUnsigned())) {
+        throw ConnectivityReadProblem.staleRevision;
+      }
+      if (value.activeProfileId.isNotEmpty &&
+          value.activeProfileId != _profile!.id) {
+        throw ConnectivityReadProblem.wrongProfile;
       }
       _runtime = api.RuntimeInfo.fromBuffer(runtime.writeToBuffer());
       _snapshot = api.Status.fromBuffer(value.writeToBuffer());
       _hadDeviceContext = _hadDeviceContext || value.nodeId.isNotEmpty;
       _fresh = true;
       _link = ConnectivityLink.available;
+      _readFailure = null;
       _uncertain = false;
-    } catch (_) {
+    } catch (error) {
       if (_currentRead(epoch, version)) {
         _fresh = false;
         _link = ConnectivityLink.unavailable;
+        _readFailure = (
+          stage: stage,
+          problem: switch (error) {
+            TimeoutException() => ConnectivityReadProblem.timeout,
+            ClientCallFailure() => ConnectivityReadProblem.rpc,
+            ConnectivityReadProblem() => error,
+            _ => ConnectivityReadProblem.unknown,
+          },
+          rpcCode: error is ClientCallFailure ? error.transportCode : null,
+        );
       }
     } finally {
       if (_currentRead(epoch, version)) _emit();

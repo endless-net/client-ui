@@ -16,6 +16,14 @@ final class WindowsUiRuntimePlatform implements UiRuntimePlatform {
   final List<String> _arguments;
   final String _libraryPath;
 
+  Future<(File, void Function())> openRecoveryLog() async {
+    final directory = await WindowsUserStateDirectory.open(
+      _libraryPath,
+      recoveryLog: true,
+    );
+    return (directory.file, directory.close);
+  }
+
   @override
   Future<UiLaunchConfig> readConfig() async {
     if (!Platform.isWindows) {
@@ -59,6 +67,7 @@ final class WindowsUiRuntimePlatform implements UiRuntimePlatform {
       connection.client,
       connection.close,
       connectivity: connection.client,
+      pipeProblem: () => connection.pipeProblem,
     );
   }
 

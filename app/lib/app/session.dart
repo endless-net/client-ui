@@ -4,6 +4,7 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 
 import '../client/enrollment_client.dart';
 import '../client/connectivity_client.dart';
+import '../client/windows_pipe_config.dart';
 import '../client/dashboard_client.dart';
 import '../dashboard/server_board.dart';
 import '../client/recent_logs_client.dart';
@@ -21,10 +22,16 @@ import 'launch_config.dart';
 // Own UI resource boundaries; production uses the verified Windows adapters.
 // Test implementations do not participate in main's platform selection.
 final class UiClientConnection {
-  UiClientConnection(this.client, this.close, {required this.connectivity});
+  UiClientConnection(
+    this.client,
+    this.close, {
+    required this.connectivity,
+    this.pipeProblem,
+  });
   final EnrollmentClient client;
   final ConnectivityClient connectivity;
   final Future<void> Function() close;
+  final WindowsPipeProblem? Function()? pipeProblem;
 }
 
 final class UiCorrelationStorage {
@@ -174,6 +181,7 @@ final class UiSession {
   Future<void>? _initialization;
   Future<void>? _closing;
   bool get closed => _closing != null;
+  WindowsPipeProblem? get pipeProblem => _connection.pipeProblem?.call();
   bool _connectAfterEnrollment = false;
 
   Future<void> startEnrollment(String hostname, api.EnrollmentMode mode) async {
