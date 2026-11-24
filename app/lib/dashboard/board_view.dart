@@ -287,6 +287,7 @@ class _WidgetCatalogState extends State<WidgetCatalog> {
                 SizedBox(
                   key: ValueKey(kind),
                   width: width,
+                  height: 360,
                   child: _CatalogTile(
                     kind: kind,
                     data: widget.data,
@@ -336,43 +337,61 @@ class _CatalogTileState extends State<_CatalogTile> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  tileIcon(kind),
-                  color: theme.colorScheme.primary,
-                  size: 19,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(kind.title, style: theme.textTheme.titleMedium),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(kind.description),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final size in kind.sizes)
-                  ChoiceChip(
-                    label: Text(size.label),
-                    selected: size == _size,
-                    onSelected: (_) => setState(() => _size = size),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Container(
-              height: 128,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              padding: const EdgeInsets.all(10),
+            Expanded(
               child: SingleChildScrollView(
-                child: TileContents(kind: kind, size: _size, data: widget.data),
+                primary: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          tileIcon(kind),
+                          color: theme.colorScheme.primary,
+                          size: 19,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            kind.title,
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(kind.description),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final size in kind.sizes)
+                          ChoiceChip(
+                            label: Text(size.label),
+                            selected: size == _size,
+                            onSelected: (_) => setState(() => _size = size),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 128,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.all(10),
+                      child: SingleChildScrollView(
+                        primary: false,
+                        child: TileContents(
+                          kind: kind,
+                          size: _size,
+                          data: widget.data,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 10),

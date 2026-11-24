@@ -200,6 +200,31 @@ void main() {
     expect(find.text('Настроить доску'), findsNothing);
     expect(tester.getTopLeft(find.text('Работа')).dy, spaceNameTop);
 
+    await tester.tap(find.widgetWithText(ListTile, 'Каталог виджетов'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Добавлять виджеты может владелец пространства.'),
+      findsOneWidget,
+    );
+    final add = find.widgetWithText(
+      OutlinedButton,
+      'Добавить в это пространство',
+    );
+    expect(tester.widget<OutlinedButton>(add.first).onPressed, isNull);
+    expect(remote.writeCalls, 0);
+
+    await tester.tap(find.byTooltip('Личное'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, 'Каталог виджетов'));
+    await tester.pumpAndSettle();
+    final tunnel = find.byKey(const ValueKey(TileKind.tunnel));
+    final addTunnel = find.descendant(of: tunnel, matching: add);
+    expect(tester.widget<OutlinedButton>(addTunnel).onPressed, isNotNull);
+    await tester.ensureVisible(addTunnel);
+    await tester.tap(addTunnel);
+    await tester.pumpAndSettle();
+    expect(remote.writeCalls, 1);
+    expect(board.document.active.tiles.last.kind, TileKind.tunnel);
     board.sessionLost();
     await tester.pumpAndSettle();
     expect(
@@ -380,6 +405,10 @@ void main() {
 
       await tester.tap(find.text('Добавить первый виджет'));
       await tester.pumpAndSettle();
+      final networkCard = find.byKey(const ValueKey(TileKind.network));
+      final diskCard = find.byKey(const ValueKey(TileKind.disk));
+      final cardSize = tester.getSize(networkCard);
+      expect(tester.getSize(diskCard), cardSize);
       await tester.enterText(
         find.widgetWithText(TextField, 'Поиск виджетов'),
         'приём',
@@ -387,6 +416,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.widgetWithText(ChoiceChip, '1 × 1'));
       await tester.tap(find.widgetWithText(ChoiceChip, '1 × 1'));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(networkCard), cardSize);
       await tester.ensureVisible(find.text('Добавить в это пространство'));
       await tester.tap(find.text('Добавить в это пространство'));
       await tester.pumpAndSettle();

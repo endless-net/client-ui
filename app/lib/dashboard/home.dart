@@ -487,6 +487,12 @@ class _DashboardHomeState extends State<DashboardHome> {
   Widget _workspace(BuildContext context, BoardSpace space) {
     final theme = Theme.of(context);
     final editing = _editing && _board.canChange;
+    final readOnly =
+        _board.serverBacked &&
+        !_board.canChange &&
+        !_board.loading &&
+        !_board.saving &&
+        !_board.readFailed;
     final controller = widget.connectivity;
     final data = TileData(
       host: widget.host,
@@ -531,12 +537,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                         icon: const Icon(Icons.add),
                         label: const Text('Добавить виджет'),
                       ),
-                    if (_board.serverBacked &&
-                        !_board.canChange &&
-                        !_board.loading &&
-                        !_board.saving &&
-                        !_board.readFailed)
-                      const Chip(label: Text('Только просмотр')),
+                    if (readOnly) const Chip(label: Text('Только просмотр')),
                     if (!_board.serverBacked || _board.canChange)
                       FilledButton.tonalIcon(
                         onPressed: _board.canChange
@@ -560,6 +561,10 @@ class _DashboardHomeState extends State<DashboardHome> {
                 onPressed: _board.load,
                 child: const Text('Повторить'),
               ),
+            ),
+          if (readOnly && _section == _Section.catalog)
+            const ListTile(
+              title: Text('Добавлять виджеты может владелец пространства.'),
             ),
           if (_board.writeFailed)
             ListTile(
