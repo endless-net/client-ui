@@ -858,7 +858,7 @@ void main() {
   );
 
   testWidgets(
-    'hiding and restoring the window keeps its session and refreshes status',
+    'showing a hidden window refreshes status, while focus alone keeps it',
     (tester) async {
       final values = config_fixture.launchValues();
       final client = InstalledClient(values['instance_id'] as String);
@@ -879,19 +879,24 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('отключено'), findsOneWidget);
 
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      await tester.pump();
       client.snapshot.connectionPhase =
           api.ConnectionPhase.CONNECTION_PHASE_CONNECTING;
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('отключено'), findsOneWidget);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('подключение выполняется'), findsOneWidget);
       expect(platform.events, ['config', 'connect', 'storage']);
       expect(platform.connectivity.connects, 0);
       expect(platform.connectivity.disconnects, 0);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpWidget(const SizedBox());
     },
   );

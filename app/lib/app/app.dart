@@ -74,7 +74,8 @@ class _MainAppState extends State<MainApp> {
     _diagnostics.record('app', 'started');
     _lifecycle = AppLifecycleListener(
       onExitRequested: _requestExit,
-      onResume: () => unawaited(_session?.connectivity.resume()),
+      // Returning focus to a visible window does not invalidate its status.
+      onShow: () => unawaited(_session?.connectivity.resume()),
     );
     _begin();
     unawaited(_openUpdates());

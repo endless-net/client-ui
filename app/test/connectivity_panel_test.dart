@@ -63,6 +63,15 @@ void main() {
       find.text('Соединение: подключение или восстановление выполняется'),
       findsOneWidget,
     );
+
+    client.value.connectionPhase =
+        api.ConnectionPhase.CONNECTION_PHASE_UNSPECIFIED;
+    await c.refresh();
+    await tester.pump();
+    expect(
+      find.text('Соединение: служба восстанавливает состояние'),
+      findsOneWidget,
+    );
     expect(client.connects, 0);
   });
 

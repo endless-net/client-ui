@@ -50,6 +50,9 @@ class ConnectivityPanel extends StatelessWidget {
       return 'Туннель готов';
     }
     return switch (s?.connectionPhase) {
+      api.ConnectionPhase.CONNECTION_PHASE_UNSPECIFIED
+          when s?.serviceState == api.ServiceState.SERVICE_STATE_RECOVERING =>
+        'Соединение: служба восстанавливает состояние',
       api.ConnectionPhase.CONNECTION_PHASE_CONNECTING =>
         'Соединение: подключение выполняется',
       api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTING =>
