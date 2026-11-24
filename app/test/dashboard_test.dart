@@ -193,10 +193,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('ATLAS-PC'), findsOneWidget);
     expect(find.text('Настроить доску'), findsOneWidget);
+    final spaceNameTop = tester.getTopLeft(find.text('Личное')).dy;
     await tester.tap(find.byTooltip('Работа'));
     await tester.pumpAndSettle();
     expect(find.text('Только просмотр'), findsOneWidget);
     expect(find.text('Настроить доску'), findsNothing);
+    expect(tester.getTopLeft(find.text('Работа')).dy, spaceNameTop);
+
+    board.sessionLost();
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Войдите в учётную запись, чтобы открыть пространства.'),
+      findsOneWidget,
+    );
+    expect(tester.getTopLeft(find.text('Личное')).dy, spaceNameTop);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

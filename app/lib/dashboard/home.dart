@@ -662,6 +662,8 @@ class _DashboardHomeState extends State<DashboardHome> {
                               Expanded(
                                 child: LayoutBuilder(
                                   builder: (context, constraints) => Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       _sidebar(
                                         context,
