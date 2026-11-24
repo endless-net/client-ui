@@ -66,6 +66,39 @@ void main() {
     expect(client.connects, 0);
   });
 
+  testWidgets('distinguishes scheduled retries from required login', (
+    tester,
+  ) async {
+    final client = fixture.ConnectivityFixture();
+    client.value
+      ..serviceState = api.ServiceState.SERVICE_STATE_ERROR
+      ..connectionPhase = api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED
+      ..failures.add(
+        api.Failure(reasonKey: 'client.connection.retry_scheduled'),
+      );
+    final c = fixture.controller(client);
+    addTearDown(c.dispose);
+    await c.bind(fixture.profile());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: BrandTheme.dark(),
+        home: Scaffold(body: ConnectivityPanel(controller: c, simple: true)),
+      ),
+    );
+    expect(
+      find.text('Соединение: повтор подключения запланирован'),
+      findsOneWidget,
+    );
+    client.value.failures
+      ..clear()
+      ..add(api.Failure(reasonKey: 'client.connection.login_required'));
+    await c.refresh();
+    await tester.pump();
+    expect(find.text('Соединение: требуется вход'), findsOneWidget);
+    expect(c.canConnect, isFalse);
+    expect(client.connects, 0);
+  });
+
   testWidgets('main panel keeps ready status with peers on different paths', (
     tester,
   ) async {

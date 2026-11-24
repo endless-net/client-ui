@@ -5,6 +5,8 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import '../client/enrollment_client.dart';
 import '../client/connectivity_client.dart';
 import '../client/windows_pipe_config.dart';
+import '../client/dashboard_client.dart';
+import '../dashboard/server_board.dart';
 import '../client/recent_logs_client.dart';
 import '../connectivity/controller.dart';
 import '../revocation/controller.dart';
@@ -88,6 +90,13 @@ final class UiSession {
               now: DateTime.now,
             )
           : null,
+      dashboard = _connection.client is DashboardClient
+          ? ServerBoardController(
+              _connection.client as DashboardClient,
+              api.ProfileRef(profileId: config.profile.id),
+              config.rpcTimeout,
+            )
+          : null,
       revocation =
           _connection.client is RevocationClient &&
               _storage.store is RevocationCorrelationStore
@@ -113,12 +122,16 @@ final class UiSession {
   final ConnectivityController connectivity;
   final RevocationController? revocation;
   final SessionLoginController? sessionLogin;
+  final ServerBoardController? dashboard;
+  bool _dashboardLoggedIn = false;
+  Timer? _dashboardExpiry;
   String _sessionLoginPhase = '';
   bool _controlReady = false;
   bool _sessionRefreshPending = false;
 
   void _observeConnectivity() {
     if (!connectivity.fresh) return;
+    sessionLogin?.observeConnectionLoginRequired(connectivity.loginRequired);
     final ready =
         connectivity.snapshot?.controlState ==
         api.ControlState.CONTROL_STATE_READY;
@@ -137,6 +150,23 @@ final class UiSession {
 
   void _observeSession() {
     final a = sessionLogin?.attempt;
+    final expires = sessionLogin?.activeUntil;
+    final signedIn = expires != null;
+    _dashboardExpiry?.cancel();
+    if (expires != null) {
+      _dashboardExpiry = Timer(expires.difference(DateTime.now()), () {
+        _dashboardLoggedIn = false;
+        dashboard?.sessionLost();
+      });
+    }
+    if (_dashboardLoggedIn != signedIn) {
+      _dashboardLoggedIn = signedIn;
+      if (signedIn) {
+        unawaited(dashboard?.load());
+      } else {
+        dashboard?.sessionLost();
+      }
+    }
     final phase = '${a?.attemptId}:${a?.phase}';
     if (_sessionLoginPhase != phase) {
       _sessionLoginPhase = phase;
@@ -234,6 +264,7 @@ final class UiSession {
       if (!closed) await connectivity.bind(config.profile);
       if (!closed) await revocation?.bind(config.profile);
       if (!closed) await sessionLogin?.bind(config.profile);
+      if (!closed && !_dashboardLoggedIn) await dashboard?.load();
     }();
   }
 
@@ -270,6 +301,8 @@ final class UiSession {
     connectivity.removeListener(_observeConnectivity);
     connectivity.dispose();
     revocation?.dispose();
+    _dashboardExpiry?.cancel();
+    dashboard?.dispose();
     sessionLogin?.removeListener(_observeSession);
     sessionLogin?.dispose();
     return _closing = () async {

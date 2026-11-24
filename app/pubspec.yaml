@@ -1,7 +1,7 @@
 name: endlessnet_client_ui
 description: "Интерфейс установленной службы EndlessNet Client."
 publish_to: 'none'
-version: 0.9.1+1
+version: 0.11.0+1
 
 environment:
   sdk: ^3.13.5
@@ -12,7 +12,7 @@ dependencies:
   endlessnet_ui:
     git:
       url: https://github.com/endless-net/client-ui.git
-      ref: acc88b52f96ddac996a88c6c3638edfb4b0bd119
+      ref: 3ed642208795a967c1699d829dd5528b9294dd06
       path: packages/endlessnet_ui
   crypto: 3.0.8
   ffi: 2.2.0
@@ -22,7 +22,7 @@ dependencies:
   endlessnet_client_api:
     git:
       url: https://github.com/endless-net/client.git
-      ref: acc543b5d2515655378fbcf8d64557c9dd546614 # api/v0.7.0
+      ref: a50e997641466d504a216083cf7ddd9aeab6a755 # api/v0.8.0
       path: api/dart
 
 dev_dependencies:
@@ -32,3 +32,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/spaces/

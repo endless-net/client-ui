@@ -266,11 +266,10 @@ opt-in Client test `TestWindowsUIAgainstActualOwnerChain`, передавая т
 
 Общий брендбук и библиотека компонентов Admin + Client UI находятся в
 [packages/endlessnet_ui](packages/endlessnet_ui/README.md). Это единый producer;
-оба приложения подключают exact опубликованный Git source
-`acc88b52f96ddac996a88c6c3638edfb4b0bd119`, path `packages/endlessnet_ui`.
-App использует общую light/dark тему, BrandMark и C02 в панели подключения;
-Client SDK/IPC/controllers не меняются. Consumer adoption остаётся локальным
-до отдельного запроса публикации приложений.
+Client UI закрепляет опубликованный Git revision библиотеки в
+[app/pubspec.lock](app/pubspec.lock), path `packages/endlessnet_ui`.
+Начиная с v0.10.3, приложение использует палитру «Фирменная» в светлом и
+тёмном режимах. Admin закрепляет версию библиотеки в собственном репозитории.
 Functional и component design tests библиотеки запускаются раздельно:
 `go run ./scripts/ci library` и
 `go run ./scripts/ci library --design`.
@@ -344,6 +343,9 @@ Codex запускает тот же EXE в режиме stdio. Оставьте
 передайте `nextPageToken` как `pageToken` и сохраните `limit` от 1 до 100
 (по умолчанию 50). Пустой `nextPageToken` означает конец среза.
 История службы хранится в памяти текущего процесса.
+
+Пункт **Журналы** в настройках приложения открывает журналы службы Client и интерфейса.
+Вкладки можно обновить, а у журнала службы есть постраничная загрузка.
 
 Доступ выключен по умолчанию. Выданное разрешение действует до отзыва или
 замены. При запуске Client UI под тем же пользователем Windows восстанавливается

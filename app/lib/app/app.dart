@@ -11,6 +11,8 @@ import 'package:endlessnet_ui/endlessnet_ui.dart';
 import '../client/call_failure.dart';
 import '../client/correlation_journal.dart';
 import '../client/windows_pipe_config.dart';
+import '../dashboard/board.dart';
+import '../dashboard/home.dart';
 import '../enrollment/panel.dart';
 import '../connectivity/controller.dart';
 import '../connectivity/panel.dart';
@@ -30,8 +32,10 @@ class MainApp extends StatefulWidget {
     required this.platform,
     this.openUpdates,
     this.openRecoveryLog,
+    this.dashboardStore,
   });
   final UiRuntimePlatform platform;
+  final BoardStore? dashboardStore;
   final Future<UpdateController> Function()? openUpdates;
   final Future<(File, void Function())> Function()? openRecoveryLog;
   @override
@@ -496,120 +500,138 @@ class _MainAppState extends State<MainApp> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'EndlessNet',
-    debugShowCheckedModeBanner: false,
-    theme: BrandTheme.light(),
-    darkTheme: BrandTheme.dark(),
-    home: Scaffold(
-      appBar: AppBar(
-        leading: const Padding(
-          padding: EdgeInsets.all(8),
-          child: BrandMark(size: 32),
+  Widget _startupProblem() {
+    final problem = _problem;
+    if (problem == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(problem, textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: _cleanupFailed ? null : _reconnect,
+              child: const Text('Повторить подключение'),
+            ),
+          ],
         ),
-        title: const Text('EndlessNet'),
-        actions: [
-          Builder(
-            builder: (context) => TextButton(
-              onPressed: _closing
-                  ? null
-                  : () => Navigator.of(context).push<void>(
-                      MaterialPageRoute(
-                        builder: (_) => LogsScreen(
-                          diagnostics: _diagnostics,
-                          readServiceLogs: _readServiceLogs,
-                        ),
-                      ),
-                    ),
-              child: const Text('Журналы'),
+      ),
+    );
+  }
+
+  Widget _account(UiSession? session, String host) {
+    if (session == null) return _startupProblem();
+    return EnrollmentPanel(
+      controller: session.enrollment,
+      simple: true,
+      hostname: host,
+      onStart: session.startEnrollment,
+      serverTrust: session.trust,
+      now: DateTime.now,
+      openBrowser: session.openBrowser,
+      reconnect: _reconnect,
+      connectivityPanel: switch (session.sessionLogin) {
+        final login? => SessionLoginPanel(
+          controller: login,
+          openBrowser: session.openSessionBrowser,
+        ),
+        null => null,
+      },
+    );
+  }
+
+  Widget _settings() => Builder(
+    builder: (context) => ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      children: [
+        Text('Обновления', style: Theme.of(context).textTheme.titleMedium),
+        if (_updates case final updates?)
+          UpdatePanel(controller: updates)
+        else
+          ListTile(
+            title: Text(
+              _updatesUnavailable
+                  ? 'Проверка обновлений недоступна'
+                  : 'Проверка обновлений в этом запуске не настроена',
             ),
           ),
-          if (_mcp case final mcp?)
-            ListenableBuilder(
-              listenable: mcp,
-              builder: (context, _) => TextButton(
-                onPressed: _closing ? null : () => _showMcp(context, mcp),
-                child: Text(mcp.clientId == null ? 'MCP' : 'MCP включён'),
+        const Divider(),
+        ListTile(
+          leading: const Icon(Icons.article_outlined),
+          title: const Text('Журналы'),
+          onTap: () => Navigator.of(context).push<void>(
+            MaterialPageRoute(
+              builder: (_) => LogsScreen(
+                diagnostics: _diagnostics,
+                readServiceLogs: _readServiceLogs,
               ),
             ),
-        ],
-      ),
-      bottomNavigationBar: _updates != null
-          ? UpdatePanel(controller: _updates!)
-          : _updatesUnavailable
-          ? const ListTile(
+          ),
+        ),
+        if (_mcp case final mcp?)
+          ListenableBuilder(
+            listenable: mcp,
+            builder: (context, _) => ListTile(
+              leading: const Icon(Icons.extension_outlined),
               title: Text(
-                'Проверка обновлений недоступна. Проверьте установленную версию UI.',
+                mcp.clientId == null ? 'Доступ по MCP' : 'MCP включён',
               ),
-            )
-          : null,
-      body: Stack(
-        children: [
-          // Keep lifecycle observers mounted throughout Flutter's asynchronous
-          // exit dispatch. Removing TextField here disposes an observer that may
-          // still belong to the dispatch's captured observer list.
-          TickerMode(
-            enabled: !_closing && !_reconnecting,
-            child: AbsorbPointer(
-              absorbing: _closing || _reconnecting,
-              child: _session != null
-                  ? EnrollmentPanel(
-                      controller: _session!.enrollment,
-                      simple: true,
-                      hostname: Platform.localHostname,
-                      onStart: _session!.startEnrollment,
-                      serverTrust: _session!.trust,
-                      now: DateTime.now,
-                      openBrowser: _session!.openBrowser,
-                      reconnect: _reconnect,
-                      connectivityPanel: Column(
-                        children: [
-                          if (_session!.sessionLogin != null)
-                            SessionLoginPanel(
-                              controller: _session!.sessionLogin!,
-                              openBrowser: _session!.openSessionBrowser,
-                            ),
-                          ConnectivityPanel(
-                            controller: _session!.connectivity,
-                            reconnect: _reconnect,
-                            simple: true,
-                          ),
-                        ],
-                      ),
-                    )
-                  : Center(
-                      child: _problem == null
-                          ? const CircularProgressIndicator()
-                          : Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(_problem!, textAlign: TextAlign.center),
-                                FilledButton(
-                                  onPressed: _cleanupFailed ? null : _reconnect,
-                                  child: const Text('Повторить подключение'),
-                                ),
-                              ],
-                            ),
-                    ),
+              onTap: () => _showMcp(context, mcp),
             ),
           ),
-          if (_closing || _reconnecting)
-            Positioned.fill(
-              child: ColoredBox(
-                color: Theme.of(context).colorScheme.surface,
-                child: Center(
-                  child: Text(
-                    _problem ??
-                        (_closing ? 'Завершение работы…' : 'Переподключение…'),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+      ],
     ),
   );
+
+  @override
+  Widget build(BuildContext context) {
+    final session = _session;
+    final host = Platform.localHostname;
+    return MaterialApp(
+      title: 'EndlessNet',
+      debugShowCheckedModeBanner: false,
+      theme: BrandTheme.light(),
+      darkTheme: BrandTheme.dark(),
+      home: DashboardHome(
+        host: host,
+        boardStore: widget.dashboardStore,
+        serverBoard: _closing || _reconnecting ? null : session?.dashboard,
+        connectivity: _closing || _reconnecting ? null : session?.connectivity,
+        updates: _updates,
+        account: _account(session, host),
+        tunnelDetails: _closing || _reconnecting
+            ? const SizedBox.shrink()
+            : session == null
+            ? _startupProblem()
+            : ListenableBuilder(
+                listenable: session.connectivity,
+                builder: (context, _) => ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    if (session.connectivity.hasDeviceContext)
+                      ConnectivityPanel(
+                        controller: session.connectivity,
+                        reconnect: _reconnect,
+                        simple: true,
+                      )
+                    else
+                      const Text(
+                        'Сведения о туннеле пока недоступны. Регистрация и проверка службы доступны в учётной записи.',
+                      ),
+                  ],
+                ),
+              ),
+        settings: _settings(),
+        blockingMessage: _closing || _reconnecting
+            ? _problem ?? (_closing ? 'Завершение работы…' : 'Переподключение…')
+            : null,
+      ),
+    );
+  }
 }
 
 (RecoveryStage, RecoveryCause, int?) _openingFailure(Object error) =>

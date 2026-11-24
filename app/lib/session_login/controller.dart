@@ -5,6 +5,7 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/foundation.dart';
 import 'package:grpc/grpc.dart' as grpc;
 
+import '../client/browser_consent.dart';
 import '../client/call_failure.dart';
 import '../client/session_login_client.dart';
 import '../client/session_login_correlation.dart';
@@ -59,16 +60,28 @@ final class SessionLoginController extends ChangeNotifier {
       _session?.state == api.SessionState.SESSION_STATE_ACTIVE &&
       _session!.hasExpiresAt() &&
       _now().isBefore(_session!.expiresAt.toDateTime());
+  DateTime? get activeUntil =>
+      sessionActive ? _session!.expiresAt.toDateTime() : null;
+
   bool get sessionExpired =>
       _ready &&
       (_session?.state == api.SessionState.SESSION_STATE_EXPIRED ||
           _session?.state == api.SessionState.SESSION_STATE_ACTIVE &&
               _session!.hasExpiresAt() &&
               !_now().isBefore(_session!.expiresAt.toDateTime()));
+  bool _connectionLoginRequired = false;
+  bool get connectionLoginRequired => _connectionLoginRequired;
+
+  void observeConnectionLoginRequired(bool required) {
+    if (_connectionLoginRequired == required) return;
+    _connectionLoginRequired = required;
+    _emit();
+  }
+
   bool get canStart =>
       _ready &&
       !_busy &&
-      !sessionActive &&
+      (!sessionActive || connectionLoginRequired) &&
       (_correlation == null ||
           _attempt != null &&
               !_now().isBefore(_attempt!.deadline.toDateTime()));
@@ -94,20 +107,11 @@ final class SessionLoginController extends ChangeNotifier {
         !_now().isBefore(a.browserAction.expiresAt.toDateTime())) {
       return null;
     }
-    final url = Uri.tryParse(a.browserAction.verificationUrl);
-    final origin = _profile!.controlOrigin == 'https://api.endlessnet.ru'
-        ? 'https://admin.endlessnet.ru'
-        : _profile!.controlOrigin;
-    if (url == null ||
-        url.scheme != 'https' ||
-        url.userInfo.isNotEmpty ||
-        url.hasQuery ||
-        url.hasFragment ||
-        url.origin != origin ||
-        url.toString().length > 8192) {
-      return null;
-    }
-    return url;
+    final url = browserConsentUri(
+      a.browserAction.verificationUrl,
+      _profile!.controlOrigin,
+    );
+    return url != null && url.toString().length <= 8192 ? url : null;
   }
 
   Future<void> bind(api.Profile profile) async {
@@ -305,7 +309,7 @@ final class SessionLoginController extends ChangeNotifier {
       await _readContext(epoch);
       if (!_current(epoch)) return;
       if (!retryOriginal &&
-          (sessionActive ||
+          ((sessionActive && !connectionLoginRequired) ||
               _correlation != null &&
                   (_attempt == null ||
                       _now().isBefore(_attempt!.deadline.toDateTime())))) {

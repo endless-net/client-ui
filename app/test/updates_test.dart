@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:endlessnet_client_ui/app/app.dart';
+import 'package:endlessnet_client_ui/dashboard/board.dart';
 import 'package:endlessnet_client_ui/app/launch_config.dart';
 import 'package:endlessnet_client_ui/app/session.dart';
 import 'package:endlessnet_client_ui/update/controller.dart';
@@ -207,16 +208,21 @@ void main() {
       );
       await tester.pumpWidget(
         MainApp(
+          dashboardStore: const BoardStore(null),
           platform: UnavailableClient(),
           openUpdates: () async => controller,
         ),
       );
       await tester.pumpAndSettle();
+      await tester.tap(
+        find.byTooltip('Настройки приложения. Доступно обновление'),
+      );
+      await tester.pumpAndSettle();
       expect(find.text('Скачать и обновить'), findsOneWidget);
       expect(source.checks, 1);
-      await tester.pump(const Duration(seconds: 59));
+      await tester.pump(const Duration(seconds: 58));
       expect(source.checks, 1);
-      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 2));
       await tester.pump();
       expect(source.checks, 2);
       await tester.pumpWidget(const SizedBox());
