@@ -3,26 +3,37 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' show AppExitResponse;
 
+import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:endlessnet_ui/endlessnet_ui.dart';
 
+import '../client/call_failure.dart';
 import '../client/correlation_journal.dart';
 import '../client/windows_pipe_config.dart';
 import '../enrollment/panel.dart';
+import '../connectivity/controller.dart';
 import '../connectivity/panel.dart';
 import '../session_login/panel.dart';
 import '../update/controller.dart';
 import '../update/panel.dart';
 import '../mcp/protocol.dart';
+import '../mcp/recovery_log.dart';
 import '../mcp/windows_mcp.dart';
 import 'launch_config.dart';
+import 'logs_screen.dart';
 import 'session.dart';
 
 class MainApp extends StatefulWidget {
-  const MainApp({super.key, required this.platform, this.openUpdates});
+  const MainApp({
+    super.key,
+    required this.platform,
+    this.openUpdates,
+    this.openRecoveryLog,
+  });
   final UiRuntimePlatform platform;
   final Future<UpdateController> Function()? openUpdates;
+  final Future<(File, void Function())> Function()? openRecoveryLog;
   @override
   State<MainApp> createState() => _MainAppState();
 }
@@ -36,6 +47,10 @@ class _MainAppState extends State<MainApp> {
   bool _closing = false;
   bool _cleanupFailed = false;
   bool _reconnecting = false;
+  Timer? _retryTimer;
+  int _retryDelaySeconds = 1;
+  bool _recoveringLocalClient = false;
+  (ConnectivityReadFailure, WindowsPipeProblem?)? _lastReadFailure;
   int _epoch = 0;
   UpdateController? _updates;
   bool _updatesUnavailable = false;
@@ -48,7 +63,10 @@ class _MainAppState extends State<MainApp> {
   @override
   void initState() {
     super.initState();
-    if (Platform.isWindows) _mcp = WindowsMcp(_invokeMcp);
+    if (Platform.isWindows) _mcp = WindowsMcp(_invokeMcp)..restore();
+    if (widget.openRecoveryLog case final open?) {
+      unawaited(_diagnostics.recovery.open(open));
+    }
     _diagnostics.record('app', 'started');
     _lifecycle = AppLifecycleListener(
       onExitRequested: _requestExit,
@@ -105,6 +123,7 @@ class _MainAppState extends State<MainApp> {
       if (mounted && !_closing && epoch == _epoch) {
         _sessionInitialized = true;
         _diagnostics.record('app', 'sessionInitialized');
+        _observeConnectivity();
       }
     } on UiStartupCancelled {
       // The acquisition path closed its own partial resources.
@@ -112,15 +131,47 @@ class _MainAppState extends State<MainApp> {
       if (error is UiCleanupFailure) _cleanupFailed = true;
       if (mounted && !_closing && epoch == _epoch) {
         _diagnostics.record('app', 'sessionUnavailable');
+        final (stage, cause, rpcCode) = _openingFailure(error);
+        _diagnostics.recovery.record(
+          RecoveryEvent.openingFailed,
+          stage: stage,
+          cause: cause,
+          rpcCode: rpcCode,
+        );
         setState(() => _problem = _safeProblem(error));
+        if (_canRetrySession(error)) _scheduleReconnect();
       }
     }
   }
 
   Future<AppExitResponse> _requestExit() => _exit ??= _shutdown();
 
+  void _scheduleReconnect() {
+    if (_closing || _cleanupFailed || _retryTimer != null) return;
+    final delay = Duration(seconds: _retryDelaySeconds);
+    _recoveringLocalClient = true;
+    _diagnostics.recovery.record(
+      RecoveryEvent.scheduled,
+      delaySeconds: delay.inSeconds,
+    );
+    _retryDelaySeconds = (_retryDelaySeconds * 2).clamp(1, 30);
+    _retryTimer = Timer(delay, () {
+      _retryTimer = null;
+      unawaited(_reconnect());
+    });
+  }
+
   Future<void> _reconnect() async {
-    if (_closing || _reconnecting || _opening != null || _session == null) {
+    if (_closing || _cleanupFailed || _reconnecting || _opening != null) {
+      return;
+    }
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _recoveringLocalClient = true;
+    _diagnostics.recovery.record(RecoveryEvent.reconnecting);
+    final session = _session;
+    if (session == null) {
+      setState(_begin);
       return;
     }
     _reconnecting = true;
@@ -128,7 +179,7 @@ class _MainAppState extends State<MainApp> {
     ++_epoch;
     setState(() {});
     try {
-      await _session!.close();
+      await session.close();
       if (!mounted || _closing) return;
       setState(() {
         _session = null;
@@ -137,6 +188,11 @@ class _MainAppState extends State<MainApp> {
       });
     } catch (_) {
       _cleanupFailed = true;
+      _diagnostics.recovery.record(
+        RecoveryEvent.openingFailed,
+        stage: RecoveryStage.cleanup,
+        cause: RecoveryCause.unknown,
+      );
       if (mounted && !_closing) {
         setState(
           () =>
@@ -148,13 +204,18 @@ class _MainAppState extends State<MainApp> {
 
   Future<AppExitResponse> _shutdown() async {
     _closing = true;
-    _mcp?.disable();
+    _retryTimer?.cancel();
+    _mcp?.stop();
     ++_epoch;
     if (mounted) setState(() {});
     try {
       // Dispose controllers/cancel pipe immediately, including an active bind.
       final closed = _session?.close();
-      await Future.wait<void>([?closed, ?_opening]);
+      await Future.wait<void>([
+        ?closed,
+        ?_opening,
+        _diagnostics.recovery.close(),
+      ]);
       if (_cleanupFailed) throw const UiCleanupFailure();
       return AppExitResponse.exit;
     } catch (_) {
@@ -172,9 +233,11 @@ class _MainAppState extends State<MainApp> {
   void dispose() {
     ++_epoch;
     _closing = true;
+    _retryTimer?.cancel();
     _lifecycle.dispose();
     _mcp?.dispose();
     _updates?.dispose();
+    unawaited(_diagnostics.recovery.close());
     // Detachment is not a cancellable OS exit. Still release all resources and
     // consume safe close errors; normal WM_CLOSE awaits _requestExit above.
     unawaited(_session?.close().catchError((Object _) {}));
@@ -208,7 +271,45 @@ class _MainAppState extends State<MainApp> {
   };
 
   void _observeConnectivity() {
-    final state = _connectivityState(_session!)..remove('revision');
+    final session = _session!;
+    final controller = session.connectivity;
+    final failure = controller.readFailure;
+    final pipeProblem = session.pipeProblem;
+    final readFailure = failure == null ? null : (failure, pipeProblem);
+    if (failure != null && readFailure != _lastReadFailure) {
+      _diagnostics.recovery.record(
+        RecoveryEvent.readFailed,
+        stage: pipeProblem == null
+            ? RecoveryStage.values.byName(failure.stage.name)
+            : RecoveryStage.channel,
+        cause: RecoveryCause.values.byName(
+          pipeProblem?.name ?? failure.problem.name,
+        ),
+        rpcCode: failure.rpcCode,
+      );
+    }
+    _lastReadFailure = readFailure;
+    if (_sessionInitialized && !_reconnecting && !_closing) {
+      if (controller.fresh) {
+        _retryTimer?.cancel();
+        _retryTimer = null;
+        _retryDelaySeconds = 1;
+        if (_recoveringLocalClient) {
+          _recoveringLocalClient = false;
+          _diagnostics.recovery.record(RecoveryEvent.recovered);
+        }
+      } else if (controller.link == ConnectivityLink.unavailable ||
+          controller.link == ConnectivityLink.mismatch) {
+        if (ClientCallFailure.isAccessDenied(failure?.rpcCode) ||
+            pipeProblem == WindowsPipeProblem.authentication) {
+          _retryTimer?.cancel();
+          _retryTimer = null;
+        } else {
+          _scheduleReconnect();
+        }
+      }
+    }
+    final state = _connectivityState(session)..remove('revision');
     final signature = jsonEncode(state);
     if (_lastConnectivity == signature) return;
     _lastConnectivity = signature;
@@ -225,6 +326,29 @@ class _MainAppState extends State<MainApp> {
 
   void _observeUpdates() =>
       _diagnostics.record('updates', _updates!.status.name);
+
+  Future<api.ListRecentLogsResponse?> _readServiceLogs(String pageToken) async {
+    final session = _session;
+    if (session == null ||
+        session.closed ||
+        !_sessionInitialized ||
+        _reconnecting ||
+        _closing) {
+      return null;
+    }
+    final page = await session.recentClientLogs(
+      pageToken: pageToken,
+      limit: 50,
+    );
+    if (!mounted || _closing || _session != session || session.closed) {
+      return null;
+    }
+    if (page != null &&
+        page.page.metadata.instanceId != session.config.pipe.instanceId) {
+      throw ClientCallFailure.protocol();
+    }
+    return page;
+  }
 
   Future<Json> _invokeMcp(
     String name,
@@ -256,6 +380,38 @@ class _MainAppState extends State<MainApp> {
     }
     if (name == 'logs_read') return _diagnostics.read(arguments);
     if (!ready) return {'error': 'clientSessionUnavailable'};
+    if (name == 'client_logs_read') {
+      try {
+        final response = await session.recentClientLogs(
+          pageToken: arguments['pageToken'] as String? ?? '',
+          limit: arguments['limit'] as int? ?? 50,
+        );
+        if (!authorized() || _session != session || session.closed) {
+          return {'error': 'sessionChanged'};
+        }
+        if (response == null) return {'error': 'clientLogsUnavailable'};
+        if (response.page.metadata.instanceId !=
+            session.config.pipe.instanceId) {
+          return {'error': 'clientInstanceChanged'};
+        }
+        return {
+          'source': 'client_service',
+          'entries': [
+            for (final entry in response.logs)
+              {
+                'time': entry.timestamp.toDateTime().toUtc().toIso8601String(),
+                'message': entry.message,
+              },
+          ],
+          'nextPageToken': response.page.nextPageToken,
+        };
+      } on ClientCallFailure catch (failure) {
+        if (!authorized() || _session != session || session.closed) {
+          return {'error': 'sessionChanged'};
+        }
+        return {'error': failure.reasonKey};
+      }
+    }
     if (name == 'connectivity_refresh') {
       await session.connectivity.refresh();
       if (!authorized() || _session != session || session.closed) {
@@ -298,12 +454,15 @@ class _MainAppState extends State<MainApp> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    'Разрешение открывает чтение состояния и журнала, '
+                    'Разрешение открывает чтение состояния и журналов UI и службы Client, '
                     'обновление статуса службы, подключение и отключение. '
-                    'Оно действует до выхода из приложения, максимум 8 часов.',
+                    'Разрешение сохраняется после перезапуска Windows и действует '
+                    'до отзыва или замены. Для работы MCP нужен открытый Client UI.',
                   ),
                   if (mcp.unavailable)
                     const Text('Не удалось открыть локальный MCP-канал.'),
+                  if (mcp.revokeFailed)
+                    const Text('Не удалось отозвать разрешение MCP.'),
                   if (mcp.clientId != null) SelectableText(mcp.configuration),
                 ],
               ),
@@ -314,17 +473,17 @@ class _MainAppState extends State<MainApp> {
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Закрыть'),
             ),
-            if (mcp.clientId != null) ...[
+            if (mcp.clientId != null || mcp.unavailable)
               TextButton(
-                onPressed: () => mcp.disable(),
+                onPressed: _closing ? null : mcp.disable,
                 child: const Text('Отозвать'),
               ),
+            if (mcp.clientId != null)
               TextButton(
                 onPressed: () =>
                     Clipboard.setData(ClipboardData(text: mcp.configuration)),
                 child: const Text('Копировать конфигурацию'),
               ),
-            ],
             FilledButton(
               onPressed: _closing ? null : mcp.enable,
               child: Text(
@@ -351,6 +510,21 @@ class _MainAppState extends State<MainApp> {
         ),
         title: const Text('EndlessNet'),
         actions: [
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: _closing
+                  ? null
+                  : () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => LogsScreen(
+                          diagnostics: _diagnostics,
+                          readServiceLogs: _readServiceLogs,
+                        ),
+                      ),
+                    ),
+              child: const Text('Журналы'),
+            ),
+          ),
           if (_mcp case final mcp?)
             ListenableBuilder(
               listenable: mcp,
@@ -412,9 +586,7 @@ class _MainAppState extends State<MainApp> {
                               children: [
                                 Text(_problem!, textAlign: TextAlign.center),
                                 FilledButton(
-                                  onPressed: _cleanupFailed
-                                      ? null
-                                      : () => setState(_begin),
+                                  onPressed: _cleanupFailed ? null : _reconnect,
                                   child: const Text('Повторить подключение'),
                                 ),
                               ],
@@ -439,6 +611,49 @@ class _MainAppState extends State<MainApp> {
     ),
   );
 }
+
+(RecoveryStage, RecoveryCause, int?) _openingFailure(Object error) =>
+    switch (error) {
+      UiConfigurationFailure(:final problem) => (
+        RecoveryStage.configuration,
+        RecoveryCause.values.byName(problem.name),
+        null,
+      ),
+      WindowsPipeFailure(:final problem) => (
+        RecoveryStage.channel,
+        RecoveryCause.values.byName(problem.name),
+        null,
+      ),
+      CorrelationStoreFailure() => (
+        RecoveryStage.storage,
+        RecoveryCause.unavailable,
+        null,
+      ),
+      UiCleanupFailure() => (
+        RecoveryStage.cleanup,
+        RecoveryCause.unknown,
+        null,
+      ),
+      ClientCallFailure(:final transportCode) => (
+        RecoveryStage.runtimeInfo,
+        RecoveryCause.rpc,
+        transportCode,
+      ),
+      _ => (RecoveryStage.initialization, RecoveryCause.unknown, null),
+    };
+
+bool _canRetrySession(Object error) => switch (error) {
+  UiConfigurationFailure(
+    problem: UiConfigurationProblem.untrusted ||
+        UiConfigurationProblem.unsupportedPlatform,
+  ) ||
+  UiCleanupFailure() ||
+  WindowsPipeFailure(problem: WindowsPipeProblem.authentication) => false,
+  ClientCallFailure(:final transportCode) => !ClientCallFailure.isAccessDenied(
+    transportCode,
+  ),
+  _ => true,
+};
 
 String _safeProblem(Object error) => switch (error) {
   UiConfigurationFailure(:final problem) => switch (problem) {

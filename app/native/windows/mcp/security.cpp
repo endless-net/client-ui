@@ -128,13 +128,16 @@ void SecureFileHandle(HANDLE file) {
   LocalFree(descriptor);
   if (result != ERROR_SUCCESS) { SetLastError(result); Fail(); }
 }
-std::filesystem::path DataRoot() {
+std::filesystem::path UserDataRoot() {
   PWSTR folder = nullptr;
   if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &folder))) Fail();
   auto result = std::filesystem::path(folder) / L"EndlessNet.ClientUi.Mcp";
   CoTaskMemFree(folder);
   SecureDirectory(result);
-  result /= LogonSid();
+  return result;
+}
+std::filesystem::path SessionDataRoot(const std::filesystem::path& userRoot) {
+  const auto result = userRoot / LogonSid();
   SecureDirectory(result);
   return result;
 }

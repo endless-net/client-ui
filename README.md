@@ -4,8 +4,8 @@
 [packages/endlessnet_ui](packages/endlessnet_ui/README.md). Это единый producer;
 подключение приложений по опубликованному exact Git source выполняется отдельно.
 Functional и component design tests библиотеки запускаются раздельно:
-`python3 -B scripts/check_ui_library.py` и
-`python3 -B scripts/check_ui_library.py --design`.
+`go run ./scripts/ci library` и
+`go run ./scripts/ci library --design`.
 
 Windows11 x64: установите единый MSI и запустите EndlessNet из меню «Пуск».
 Он содержит Flutter UI, Client как фоновую службу, CLI и необходимые библиотеки.
@@ -54,7 +54,7 @@ package path `api/dart`. Manifest и lockfile закрепляют remote Git so
 принадлежит producer и не заменяет независимый API tag.
 
 ```bash
-python3 -B scripts/ci.py check
+go run ./scripts/ci check
 ```
 
 Команда проверяет pin SDK, locked dependencies, Dart format и Flutter analyze.
@@ -68,10 +68,10 @@ publisher fixtures — границы выпуска/архивов. Испол�
 Каждая команда выполняется на соответствующей ОС:
 
 ```bash
-python3 -B scripts/ci.py build --target linux-amd64
-python -B scripts/ci.py build --target windows-amd64
-python3 -B scripts/ci.py build --target darwin-amd64
-python3 -B scripts/ci.py build --target darwin-arm64
+go run ./scripts/ci build --target linux-amd64
+go run ./scripts/ci build --target windows-amd64
+go run ./scripts/ci build --target darwin-amd64
+go run ./scripts/ci build --target darwin-arm64
 ```
 
 Linux baseline — Ubuntu 26.04 с clang, cmake, ninja, pkg-config, GTK3 и C++ headers.
@@ -272,8 +272,8 @@ App использует общую light/dark тему, BrandMark и C02 в п�
 Client SDK/IPC/controllers не меняются. Consumer adoption остаётся локальным
 до отдельного запроса публикации приложений.
 Functional и component design tests библиотеки запускаются раздельно:
-`python3 -B scripts/check_ui_library.py` и
-`python3 -B scripts/check_ui_library.py --design`.
+`go run ./scripts/ci library` и
+`go run ./scripts/ci library --design`.
 
 Обычный Windows release включает готовый `EndlessNet-v0.MINOR.PATCH-windows-amd64.msi`.
 В нём уже задан `https://endlessnet.ru`; ServiceProfile/UiPolicy пользователь
@@ -282,7 +282,7 @@ Functional и component design tests библиотеки запускаются
 на целевой Windows. Для endpoint используется существующая модель Client с одним
 активным default IPv4 интерфейсом; NAT discovery этим не объявляется.
 
-Для ручной сборки того же пакета (WiX7, CMake, Visual Studio C++ и Flutter):
+Для ручной сборки того же пакета (WiX 7, CMake, Visual Studio C++, Go 1.27.4 и Flutter):
 
 ```powershell
 ./scripts/build-windows-installer.ps1 -UIBundle <flutter-release-bundle> -ClientBundle <client-runtime-bundle> -Version 0.5.0 -OutputDir <output>
@@ -334,11 +334,23 @@ codex mcp add endlessnet-client-ui -- 'C:\путь\endlessnet_client_ui.exe' --m
 
 Codex запускает тот же EXE в режиме stdio. Оставьте EndlessNet запущенным.
 
-Доступны `app_status`, `logs_read`, `connectivity_refresh`,
+Доступны `app_status`, `logs_read`, `client_logs_read`, `connectivity_refresh`,
 `connectivity_connect` и `connectivity_disconnect`. Ответ `acknowledged`
 означает, что локальная служба приняла вызов. Фактическое состояние
 показывается в поле `connectivity` и может обновляться после ответа.
 
-Доступ выключен по умолчанию. Разрешение действует до выхода из приложения,
-максимум восемь часов. Кнопка **Отозвать** завершает доступ, а **Заменить разрешение**
-выдаёт новый `clientId`. После замены обновите аргументы MCP-сервера.
+`logs_read` читает события открытого UI. `client_logs_read` запрашивает
+журнал службы Client с правами владельца установки. Для следующей страницы
+передайте `nextPageToken` как `pageToken` и сохраните `limit` от 1 до 100
+(по умолчанию 50). Пустой `nextPageToken` означает конец среза.
+История службы хранится в памяти текущего процесса.
+
+Доступ выключен по умолчанию. Выданное разрешение действует до отзыва или
+замены. При запуске Client UI под тем же пользователем Windows восстанавливается
+прежний `clientId`, включая запуск после перезагрузки. После обновления с
+процессного разрешения один раз нажмите **Разрешить** и обновите конфигурацию
+Codex. Кнопка **Отозвать** закрывает доступ, а **Заменить разрешение**
+выдаёт новый `clientId`. После замены обновите аргументы MCP-сервера. Через пять
+минут простоя без ожидающих запросов мост освобождает канал. Следующий запрос
+восстанавливает канал с действующим разрешением. Мост продолжает принимать
+запросы с уникальными ID без общего лимита за время работы.

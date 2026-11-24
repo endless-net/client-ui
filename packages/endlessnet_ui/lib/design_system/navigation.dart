@@ -252,6 +252,16 @@ class _EnTabsState extends State<EnTabs> {
                 Semantics(
                   selected: widget.selected == item.id,
                   child: TextButton(
+                    style: widget.selected == item.id
+                        ? TextButton.styleFrom(
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .primaryContainer,
+                            foregroundColor: Theme.of(context)
+                                .colorScheme
+                                .onPrimaryContainer,
+                          )
+                        : null,
                     focusNode: _nodes.putIfAbsent(
                       item.id,
                       () => FocusNode(debugLabel: item.id),
@@ -259,7 +269,18 @@ class _EnTabsState extends State<EnTabs> {
                     onPressed: item.enabled
                         ? () => widget.onSelect(item.id)
                         : null,
-                    child: Text(item.label),
+                    child: Text(
+                      item.label,
+                      style: widget.selected == item.id
+                          ? TextStyle(
+                              decoration: TextDecoration.underline,
+                              decorationColor: Theme.of(context)
+                                  .colorScheme
+                                  .primary,
+                              decorationThickness: 2,
+                            )
+                          : null,
+                    ),
                   ),
                 ),
             ],
@@ -290,6 +311,14 @@ class EnShell extends StatelessWidget {
         ListTile(
           title: Text(item.label),
           selected: item.id == selected,
+          shape: item.id == selected
+              ? Border(
+                  left: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  ),
+                )
+              : null,
           enabled: item.enabled,
           onTap: !item.enabled
               ? null

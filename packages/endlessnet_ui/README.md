@@ -16,8 +16,8 @@ Fonts и картинки используют package-qualified names и пос
 Из корня Client UI:
 
 ```bash
-python3 -B scripts/check_ui_library.py
-python3 -B scripts/check_ui_library.py --design
+go run ./scripts/ci library
+go run ./scripts/ci library --design
 ```
 
 Первая команда выполняет только functional unit tests и guard. Вторая — только

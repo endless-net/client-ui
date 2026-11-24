@@ -10,6 +10,7 @@ import 'package:endlessnet_client_ui/client/enrollment_client.dart';
 import 'package:endlessnet_client_ui/enrollment/controller.dart';
 
 const requestId = '00000000-0000-4000-8000-000000000001';
+const consentPath = '/native-login/3d8bdf1c-b741-438e-b908-471e4e2a60da';
 final now = DateTime.utc(2026, 10, 30, 12);
 api.Profile profile([String id = 'profile-A']) =>
     api.Profile(id: id, controlOrigin: 'https://control.example');
@@ -30,8 +31,7 @@ api.EnrollmentAttempt makeAttempt({
   certainty: api.EnrollmentCertainty.ENROLLMENT_CERTAINTY_KNOWN,
   pollAfterSeconds: 1,
   browserAction: api.EnrollmentBrowserAction(
-    verificationUrl:
-        'https://control.example/api/v1/auth/native-login/transaction',
+    verificationUrl: 'https://control.example$consentPath',
     expiresAt: Timestamp.fromDateTime(now.add(const Duration(minutes: 10))),
   ),
 );
@@ -229,7 +229,7 @@ void main() {
     client.value.hostname = 'installed-PC';
     client.value.mode = api.EnrollmentMode.ENROLLMENT_MODE_WORKSTATION;
     client.value.browserAction.verificationUrl =
-        'https://admin.endlessnet.ru/api/v1/auth/native-login/transaction';
+        'https://admin.endlessnet.ru$consentPath';
     final store = MemoryCorrelation();
     final c = EnrollmentController(
       client: client,
@@ -247,10 +247,13 @@ void main() {
     );
     expect(client.lookup!.current, isTrue);
     expect(c.correlation!.requestId, requestId);
-    expect(c.browserAction!.host, 'admin.endlessnet.ru');
+    expect(
+      c.browserAction.toString(),
+      'https://admin.endlessnet.ru$consentPath',
+    );
     expect(client.enrolls, 0);
     client.value.browserAction.verificationUrl =
-        'https://foreign.invalid/api/v1/auth/native-login/transaction';
+        'https://foreign.invalid$consentPath';
     await c.refresh();
     expect(c.browserAction, isNull);
   });

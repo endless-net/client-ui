@@ -59,8 +59,8 @@ Service Kit или приватного workspace, их credentials, код, wor
 брендбука/tokens/fonts/widgets для Client UI и Admin. Он не импортирует domain
 SDK/IPC и не зависит от приватного Service Kit. Consumers закрепляют опубликованный
 Git SHA/path; local replace/соседние checkout не заменяют publication.
-Его functional unit checks: `python3 -B scripts/check_ui_library.py`.
-Component design tests отдельно: `python3 -B scripts/check_ui_library.py --design`;
+Его functional unit checks: `go run ./scripts/ci library`.
+Component design tests отдельно: `go run ./scripts/ci library --design`;
 они не входят в обычный CI unit gate. Catalog: из package
 `flutter run -d chrome -t tool/component_catalog/main.dart`.
 Дизайн полных feature screens, screenshots/goldens/geometry/overflow и их
@@ -69,7 +69,7 @@ Library widgets/theme/catalog меняются в общем package и пров
 consumers не копируют общую design suite.
 
 Собственный Flutter package — `app/`, версия SDK закреплена в `.flutter-version`.
-В Ubuntu 26.04 выполнять `python3 -B scripts/ci.py check`: locked dependencies,
+В Ubuntu 26.04 выполнять `go run ./scripts/ci check`: locked dependencies,
 format/analyze, объявленные unit entrypoints и meaningful unit fixtures publisher.
 Отсутствие применимых unit/widget-сценариев сообщается явно, не получает pass
 как покрытие и не требует бессодержательного теста.
@@ -78,8 +78,7 @@ Integration/E2E и транспортные suites в базовый конту�
 
 Native build выполнять на соответствующей ОС по [README](README.md): только
 Windows amd64, Linux amd64, macOS amd64/arm64, без web/mobile. Production codesigning
-и notarization этим validation build не подтверждаются. Go-модуля здесь нет;
-проверки Go неприменимы. Для документации проверить ссылки и `git diff --check`.
+и notarization этим validation build не подтверждаются. Go 1.27.4 используется для CI и подготовки MSI. Flutter-приложение собирается своим SDK. Для документации проверить ссылки и `git diff --check`.
 
 Новая v0-линейка не поддерживает обратную совместимость даже между patch:
 hard cutover без shims/fallback/dual APIs. Runtime/API имеют независимые exact
@@ -89,3 +88,7 @@ UI потребляет SDK producer Client по существующему immu
 копирует схемы; consent/отображение requested/effective/local state не дают UI
 права управлять туннелем в обход Client и OS caller authority. Секретные ключи и
 session renewal grants не экспортируются UI.
+
+Go-инструменты проверяет отдельный workflow `go-ci.yml` на push в `main`.
+Он выполняет `go test -short`, `govulncheck` и `golangci-lint`. Flutter-проверки
+и desktop-выпуск идут по собственному workflow.

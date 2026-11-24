@@ -13,6 +13,9 @@ import 'package:endlessnet_client_ui/client/contract_identity.dart';
 import 'package:endlessnet_client_ui/client/enrollment_client.dart';
 import 'package:endlessnet_client_ui/client/connectivity_client.dart';
 import 'package:endlessnet_client_ui/client/call_failure.dart';
+import 'package:endlessnet_client_ui/client/recent_logs_client.dart';
+import 'package:endlessnet_client_ui/client/session_login_client.dart';
+import 'package:endlessnet_client_ui/client/session_login_correlation.dart';
 import 'package:grpc/grpc.dart' as grpc;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,16 +24,27 @@ import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 import 'enrollment_controller_test.dart' as fixture;
 import 'launch_config_test.dart' as config_fixture;
 import 'server_trust_controller_test.dart' as trust_fixture;
+import 'session_login_test.dart' as login_fixture;
 
 final class SessionConnectivity implements ConnectivityClient {
   SessionConnectivity(this.client);
   final EnrollmentClient client;
   int connects = 0, disconnects = 0;
+  bool failStatus = false;
   @override
   Future<api.RuntimeInfo> runtimeInfo(Duration timeout) =>
       client.runtimeInfo(timeout);
   @override
-  Future<api.Status> status(Duration timeout) => client.status(timeout);
+  Future<api.Status> status(Duration timeout) async {
+    if (failStatus) {
+      throw ClientCallFailure.fromGrpc(
+        const grpc.GrpcError.unavailable('raw-status-failure'),
+        4096,
+      );
+    }
+    return client.status(timeout);
+  }
+
   @override
   Future<void> connect(api.ConnectRequest request, Duration timeout) async {
     connects++;
@@ -47,7 +61,7 @@ final class SessionConnectivity implements ConnectivityClient {
 
 class InstalledClient extends fixture.FakeClient {
   InstalledClient(this.instance);
-  final String instance;
+  String instance;
   @override
   Future<api.EnrollmentAttempt> enroll(
     api.EnrollRequest request,
@@ -73,27 +87,131 @@ class InstalledClient extends fixture.FakeClient {
   }
 }
 
+final class InstalledLogsClient extends InstalledClient
+    implements RecentLogsClient {
+  InstalledLogsClient(super.instance);
+
+  final requests = <api.ListRecentLogsRequest>[];
+  bool unavailable = false;
+
+  @override
+  Future<api.ListRecentLogsResponse> recentLogs(
+    api.ListRecentLogsRequest request,
+    Duration timeout,
+  ) async {
+    requests.add(request);
+    if (unavailable) {
+      throw ClientCallFailure.fromGrpc(
+        const grpc.GrpcError.unavailable('raw-service-failure'),
+        4096,
+      );
+    }
+    final first = request.page.pageToken.isEmpty;
+    return api.ListRecentLogsResponse(
+      logs: [
+        api.LogEntry(
+          message: first
+              ? '{"time":"2026-11-22T00:00:00Z","level":"INFO",'
+                    '"msg":"client.request","operation":"server_key",'
+                    '"outcome":"success","code":"2xx","trace_id":"fixture-trace"}'
+              : 'Попытка подключения запущена',
+          timestamp: Timestamp.fromDateTime(DateTime.utc(2026, 11, 22)),
+        ),
+      ],
+      page: api.PageResponse(
+        metadata: api.SnapshotMetadata(instanceId: instance),
+        nextPageToken: first ? 'second-page' : '',
+      ),
+    );
+  }
+}
+
+final class InstalledSessionClient extends InstalledClient
+    implements SessionLoginClient {
+  InstalledSessionClient(super.instance);
+
+  int sessionReads = 0;
+  late api.Session userSession;
+  Completer<void>? sessionReadWait;
+
+  @override
+  Future<api.RuntimeInfo> runtimeInfo(Duration timeout) async {
+    final runtime = await super.runtimeInfo(timeout);
+    runtime.capabilities.add(
+      api.CapabilityStatus(
+        capability: api.Capability.CAPABILITY_SESSION_LOGIN,
+        restriction: api.Restriction(
+          availability: api.Availability.AVAILABILITY_AVAILABLE,
+        ),
+      ),
+    );
+    return runtime;
+  }
+
+  @override
+  Future<api.GetSessionResponse> session(
+    api.GetSessionRequest request,
+    Duration timeout,
+  ) async {
+    sessionReads++;
+    final result = api.GetSessionResponse(
+      session: userSession,
+      metadata: snapshot.metadata,
+    );
+    await sessionReadWait?.future;
+    return result;
+  }
+
+  @override
+  Future<api.SessionLoginAttempt> sessionLogin(
+    api.GetSessionLoginRequest request,
+    Duration timeout,
+  ) async => throw StateError('unexpected login attempt lookup');
+
+  @override
+  Future<api.SessionLoginAttempt> startSessionLogin(
+    api.StartSessionLoginRequest request,
+    Duration timeout,
+  ) async => throw StateError('unexpected login mutation');
+}
+
+final class SessionCorrelation extends fixture.MemoryCorrelation
+    implements SessionLoginCorrelationStore {
+  final _sessionStore = login_fixture.Store();
+
+  @override
+  Future<SessionLoginCorrelation?> readSessionLogin(String id, String origin) =>
+      _sessionStore.readSessionLogin(id, origin);
+
+  @override
+  Future<void> saveSessionLogin(SessionLoginCorrelation correlation) =>
+      _sessionStore.saveSessionLogin(correlation);
+}
+
 final class TestPlatform implements UiRuntimePlatform {
-  TestPlatform({fixture.FakeClient? client})
-    : client = client ?? fixture.FakeClient() {
+  TestPlatform({fixture.FakeClient? client, fixture.MemoryCorrelation? store})
+    : client = client ?? fixture.FakeClient(),
+      store = store ?? fixture.MemoryCorrelation() {
     this.client.digest = clientContractSha256;
   }
-  final config = UiLaunchConfig.decode(
+  var config = UiLaunchConfig.decode(
     Uint8List.fromList(utf8.encode(jsonEncode(config_fixture.launchValues()))),
     nativeLibraryPath: r'C:\bundle\endlessnet_windows_pipe.dll',
   );
   late final connectivity = SessionConnectivity(client);
   final fixture.FakeClient client;
-  final store = fixture.MemoryCorrelation();
+  final fixture.MemoryCorrelation store;
   final events = <String>[];
   Completer<void>? configWait, connectWait, storageWait, closeWait;
   bool failConfig = false, failStorage = false, failConnectionClose = false;
+  UiConfigurationFailure? configurationFailure;
   int browserCalls = 0;
 
   @override
   Future<UiLaunchConfig> readConfig() async {
     events.add('config');
     await configWait?.future;
+    if (configurationFailure case final failure?) throw failure;
     if (failConfig) throw StateError('raw-secret-path-diagnostic');
     return config;
   }
@@ -147,6 +265,161 @@ Future<void> turns() async {
 }
 
 void main() {
+  testWidgets(
+    'startup retries failed discovery indefinitely with a bounded delay',
+    (tester) async {
+      final platform = TestPlatform()..failConfig = true;
+      await tester.pumpWidget(MainApp(platform: platform));
+      await tester.pump();
+      expect(platform.events, ['config']);
+      await tester.pump(const Duration(seconds: 1));
+      expect(platform.events, ['config', 'config']);
+      await tester.pump(const Duration(seconds: 1));
+      expect(platform.events, ['config', 'config']);
+      await tester.pump(const Duration(seconds: 1));
+      expect(platform.events, ['config', 'config', 'config']);
+      for (final delay in [4, 8, 16, 30, 30, 30]) {
+        final attempts = platform.events.length;
+        await tester.pump(Duration(seconds: delay));
+        expect(platform.events.length, attempts + 1);
+      }
+      platform.failConfig = false;
+      await tester.tap(find.text('Повторить подключение'));
+      await tester.pump();
+      expect(platform.events.sublist(platform.events.length - 3), [
+        'config',
+        'connect',
+        'storage',
+      ]);
+      expect(platform.connectivity.connects, 0);
+      expect(platform.connectivity.disconnects, 0);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('untrusted discovery waits for explicit retry', (tester) async {
+    final platform = TestPlatform()
+      ..configurationFailure = const UiConfigurationFailure(
+        UiConfigurationProblem.untrusted,
+      );
+    await tester.pumpWidget(MainApp(platform: platform));
+    await tester.pump(const Duration(minutes: 1));
+    expect(platform.events, ['config']);
+    platform.configurationFailure = null;
+    await tester.tap(find.text('Повторить подключение'));
+    await tester.pump();
+    expect(platform.events, ['config', 'config', 'connect', 'storage']);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'a dead status channel is reopened and exit cancels later retries',
+    (tester) async {
+      final seed = TestPlatform();
+      final platform = TestPlatform(
+        client: InstalledClient(seed.config.pipe.instanceId),
+      );
+      platform.client.snapshot.metadata.instanceId =
+          platform.config.pipe.instanceId;
+      await tester.pumpWidget(MainApp(platform: platform));
+      await tester.pump();
+      platform.connectivity.failStatus = true;
+      await tester.pump(platform.config.pollInterval);
+      expect(platform.events.where((event) => event == 'connect').length, 1);
+      platform.connectivity.failStatus = false;
+      await tester.pump(const Duration(seconds: 1));
+      expect(platform.events.where((event) => event == 'connect').length, 2);
+      platform.connectivity.failStatus = true;
+      await tester.pump(platform.config.pollInterval);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(minutes: 1));
+      expect(platform.events.where((event) => event == 'connect').length, 2);
+      expect(platform.connectivity.connects, 0);
+      expect(platform.connectivity.disconnects, 0);
+    },
+  );
+
+  testWidgets('automatic recovery discovers a new service instance', (
+    tester,
+  ) async {
+    final initial = config_fixture.launchValues()['instance_id'] as String;
+    final client = InstalledClient(initial);
+    final platform = TestPlatform(client: client);
+    client.snapshot.metadata.instanceId = initial;
+    await tester.pumpWidget(MainApp(platform: platform));
+    await tester.pump();
+    const next = 'a0000000-0000-4000-8000-000000000001';
+    client.instance = next;
+    client.snapshot.metadata.instanceId = next;
+    platform.config = UiLaunchConfig.decode(
+      Uint8List.fromList(
+        utf8.encode(
+          jsonEncode(config_fixture.launchValues()..['instance_id'] = next),
+        ),
+      ),
+      nativeLibraryPath: r'C:\bundle\endlessnet_windows_pipe.dll',
+    );
+    await tester.pump(platform.config.pollInterval);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(minutes: 1));
+    expect(platform.events.where((event) => event == 'config').length, 2);
+    expect(platform.events.where((event) => event == 'connect').length, 2);
+    expect(platform.connectivity.connects, 0);
+    expect(platform.connectivity.disconnects, 0);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  test(
+    'ready control refreshes an expired session after an older read',
+    () async {
+      final values = config_fixture.launchValues();
+      final client = InstalledSessionClient(values['instance_id'] as String);
+      final p = TestPlatform(client: client, store: SessionCorrelation());
+      client.snapshot = api.Status(
+        metadata: fixture.metadata()..instanceId = client.instance,
+        activeProfileId: p.config.profile.id,
+        nodeId: 'same-node',
+        controlState: api.ControlState.CONTROL_STATE_REGISTERED,
+      );
+      client.userSession = api.Session(
+        state: api.SessionState.SESSION_STATE_EXPIRED,
+      );
+      final s = await UiSession.open(p, cancelled: () => false);
+      addTearDown(s.close);
+      await s.initialize();
+      final login = s.sessionLogin!;
+      expect(login.sessionExpired, isTrue);
+      expect(login.canStart, isTrue);
+
+      final previousRead = Completer<void>();
+      client.sessionReadWait = previousRead;
+      final refresh = login.refresh();
+      await turns();
+      expect(client.sessionReads, 2);
+
+      client.sessionReadWait = null;
+      client.userSession = api.Session(
+        state: api.SessionState.SESSION_STATE_ACTIVE,
+        expiresAt: Timestamp.fromDateTime(
+          DateTime.now().add(const Duration(hours: 1)),
+        ),
+      );
+      client.snapshot
+        ..controlState = api.ControlState.CONTROL_STATE_READY
+        ..connectionPhase = api.ConnectionPhase.CONNECTION_PHASE_LOCAL_READY;
+      await s.connectivity.refresh();
+      previousRead.complete();
+      await refresh;
+      await turns();
+
+      expect(login.sessionActive, isTrue);
+      expect(login.canStart, isFalse);
+      await s.connectivity.refresh();
+      expect(client.sessionReads, 3);
+      expect(p.browserCalls, 0);
+    },
+  );
+
   test('explicit login connects once after registration, reopen never auto-connects', () async {
     final values = config_fixture.launchValues();
     final client = InstalledClient(values['instance_id'] as String);
@@ -198,24 +471,112 @@ void main() {
     await reopened.close();
   });
 
-  testWidgets(
-    'MCP button opens the access dialog',
-    (tester) async {
-      await tester.pumpWidget(MainApp(platform: TestPlatform()));
-      await tester.pumpAndSettle();
+  testWidgets('MCP button opens the access dialog', (tester) async {
+    await tester.pumpWidget(MainApp(platform: TestPlatform()));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('MCP'));
-      await tester.pumpAndSettle();
-      expect(find.text('Доступ по MCP'), findsOneWidget);
-      expect(find.text('Разрешить'), findsOneWidget);
+    await tester.tap(find.text('MCP'));
+    await tester.pumpAndSettle();
+    expect(find.text('Доступ по MCP'), findsOneWidget);
+    expect(find.text('Разрешить'), findsOneWidget);
+    expect(
+      find.textContaining('Разрешение сохраняется после перезапуска Windows'),
+      findsOneWidget,
+    );
 
-      await tester.tap(find.text('Закрыть'));
-      await tester.pumpAndSettle();
-      expect(find.text('Доступ по MCP'), findsNothing);
-      await tester.pumpWidget(const SizedBox());
-    },
-    skip: !Platform.isWindows,
-  );
+    await tester.tap(find.text('Закрыть'));
+    await tester.pumpAndSettle();
+    expect(find.text('Доступ по MCP'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  }, skip: !Platform.isWindows);
+
+  testWidgets('logs button opens both journals and pages Client entries', (
+    tester,
+  ) async {
+    final client = InstalledLogsClient(
+      config_fixture.launchValues()['instance_id'] as String,
+    );
+    final platform = TestPlatform(client: client);
+    await tester.pumpWidget(MainApp(platform: platform));
+    await tester.pumpAndSettle();
+
+    final logsButton = find.text('Журналы');
+    if (Platform.isWindows) {
+      final mcp = find.text('MCP');
+      expect(tester.getCenter(logsButton).dy, tester.getCenter(mcp).dy);
+    }
+    await tester.tap(logsButton);
+    await tester.pumpAndSettle();
+    expect(find.text('server_key'), findsOneWidget);
+    expect(find.textContaining('INFO · success · 2xx'), findsOneWidget);
+    expect(find.text('trace_id: fixture-trace'), findsNothing);
+    await tester.tap(find.text('server_key'));
+    await tester.pumpAndSettle();
+    expect(find.text('msg: client.request'), findsOneWidget);
+    expect(find.text('trace_id: fixture-trace'), findsOneWidget);
+    await tester.tap(find.text('server_key'));
+    await tester.pumpAndSettle();
+    expect(
+      client.requests.single.profile.profileId,
+      platform.config.profile.id,
+    );
+
+    await tester.tap(find.text('Показать ещё'));
+    await tester.pumpAndSettle();
+    expect(find.text('server_key'), findsOneWidget);
+    expect(find.text('Попытка подключения запущена'), findsOneWidget);
+    expect(find.text('Показать ещё'), findsNothing);
+    expect(client.requests.last.page.pageToken, 'second-page');
+    expect(
+      client.requests.last.page.pageSize,
+      client.requests.first.page.pageSize,
+    );
+
+    client.unavailable = true;
+    await tester.tap(find.text('Обновить'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Не удалось прочитать журнал службы Client.'),
+      findsOneWidget,
+    );
+    expect(find.text('raw-service-failure'), findsNothing);
+
+    await tester.tap(find.text('Интерфейс'));
+    await tester.pumpAndSettle();
+    expect(find.text('app · sessionInitialized'), findsOneWidget);
+
+    client.unavailable = false;
+    await tester.tap(find.text('Служба Client'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Обновить'));
+    await tester.pumpAndSettle();
+    expect(find.text('Показать ещё'), findsOneWidget);
+    expect(find.text('Попытка подключения запущена'), findsNothing);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('EndlessNet'), findsOneWidget);
+    expect(platform.connectivity.connects, 0);
+    expect(platform.connectivity.disconnects, 0);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('UI journal opens when the Client session cannot start', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MainApp(platform: TestPlatform()..failConfig = true),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Журналы'));
+    await tester.pumpAndSettle();
+    expect(find.text('Служба Client недоступна.'), findsOneWidget);
+
+    await tester.tap(find.text('Интерфейс'));
+    await tester.pumpAndSettle();
+    expect(find.text('app · sessionUnavailable'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets(
     'exit during explicit reconnect waits for old resources and cannot start a new connection',

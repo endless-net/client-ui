@@ -6,7 +6,25 @@ import 'package:endlessnet_client_ui/client/enrollment_client.dart';
 import 'package:endlessnet_client_ui/client/windows_correlation_store.dart';
 import 'package:endlessnet_client_ui/client/correlation_journal.dart';
 import 'package:endlessnet_client_ui/app/windows_user_services.dart';
+import 'package:endlessnet_client_ui/mcp/recovery_log.dart';
 import 'package:ffi/ffi.dart';
+
+typedef OpenFixtureNative = Int32 Function(
+  Pointer<Utf16>,
+  Pointer<Utf16>,
+  Uint32,
+  Pointer<Pointer<Void>>,
+  Pointer<Int32>,
+  Pointer<Uint32>,
+);
+typedef OpenFixture = int Function(
+  Pointer<Utf16>,
+  Pointer<Utf16>,
+  int,
+  Pointer<Pointer<Void>>,
+  Pointer<Int32>,
+  Pointer<Uint32>,
+);
 
 void require(bool value) {
   if (!value) throw StateError('private user state fixture failed');
@@ -44,25 +62,12 @@ Future<void> main(List<String> args) async {
       calloc.free(code);
     }
   }
-  final open = library
-      .lookupFunction<
-        Int32 Function(
-          Pointer<Utf16>,
-          Pointer<Utf16>,
-          Uint32,
-          Pointer<Pointer<Void>>,
-          Pointer<Int32>,
-          Pointer<Uint32>,
-        ),
-        int Function(
-          Pointer<Utf16>,
-          Pointer<Utf16>,
-          int,
-          Pointer<Pointer<Void>>,
-          Pointer<Int32>,
-          Pointer<Uint32>,
-        )
-      >('en_ui_open_private_state_fixture');
+  final open = library.lookupFunction<OpenFixtureNative, OpenFixture>(
+    'en_ui_open_private_state_fixture',
+  );
+  final openRecovery = library.lookupFunction<OpenFixtureNative, OpenFixture>(
+    'en_ui_open_recovery_log_fixture',
+  );
   final close = library
       .lookupFunction<
         Void Function(Pointer<Void>),
@@ -135,6 +140,34 @@ Future<void> main(List<String> args) async {
     await store.close();
     close(guard.value);
     guard.value = nullptr;
+    Future<(File, void Function())> acquireRecovery() async {
+      require(openRecovery(name, path, 32768, guard, created, error) != 0);
+      final recoveryPath = path.toDartString();
+      require(recoveryPath == '${File(statePath).parent.path}\\recovery.bin');
+      return (
+        File(recoveryPath),
+        () {
+          close(guard.value);
+          guard.value = nullptr;
+        },
+      );
+    }
+
+    final recovery = RecoveryLog();
+    await recovery.open(acquireRecovery);
+    recovery.record(
+      RecoveryEvent.readFailed,
+      stage: RecoveryStage.channel,
+      cause: RecoveryCause.closed,
+    );
+    await recovery.close();
+    require(!recovery.storageUnavailable);
+    final reopened = RecoveryLog();
+    await reopened.open(acquireRecovery);
+    require(reopened.snapshot().single['event'] == 'readFailed');
+    require(!reopened.storageUnavailable);
+    await reopened.close();
+    stdout.writeln('WINDOWS_PRIVATE_RECOVERY_LOG_REOPEN_PASS');
     // Widen only the fixture file ACL. Reopen must fail instead of silently
     // repairing it. No user LocalAppData or Client service files are touched.
     final changed = await Process.run(

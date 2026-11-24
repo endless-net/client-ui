@@ -92,18 +92,20 @@ class IdleBridge {
     const auto payload = Decode(envelope).at("payload");
     const auto& object = payload.object();
     const auto request = Request(object);
-    if (request && seen_.count(*request)) {
+    if (request && (recentIds_.count(*request) || pending_.count(*request))) {
       ports_.output(Encode(Json::Object{{"jsonrpc","2.0"},{"id",object.at("id")},
         {"error",Json::Object{{"code",-32600},{"message","INVALID_REQUEST"}}}})); return;
-    }
-    if (request && seen_.size() >= 10000) {
-      ports_.output(Encode(Json::Object{{"jsonrpc","2.0"},{"id",object.at("id")},
-        {"error",Json::Object{{"code",-32000},{"message","SESSION_LIMIT"}}}})); throw BoundaryFailure{23};
     }
     if (!connected_) Resume();
     if (request) {
       if (pending_.size() >= 16) throw BoundaryFailure{23};
-      seen_.insert(*request); pending_.insert(*request);
+      if (recentOrder_.size() == kRecentRequestIds) {
+        recentIds_.erase(recentOrder_.front());
+        recentOrder_.pop_front();
+      }
+      recentOrder_.push_back(*request);
+      recentIds_.insert(*request);
+      pending_.insert(*request);
       if (object.at("method").string() == "initialize") {
         if (envelope.size() + 1 > kFrameBytes - initializationBytes_) throw BoundaryFailure{23};
         initializationRequests_[*request] = envelope; initializationBytes_ += envelope.size() + 1;
@@ -139,7 +141,9 @@ class IdleBridge {
   bool connected_ = false, initialized_ = false;
   uint64_t lastActivity_ = 0;
   int64_t grantVersion_ = 0;
-  std::set<std::string> seen_, pending_;
+  static constexpr size_t kRecentRequestIds = 10000;
+  std::deque<std::string> recentOrder_;
+  std::set<std::string> recentIds_, pending_;
   std::map<std::string, std::string> initializationRequests_;
   size_t initializationBytes_ = 0;
   std::string initialization_, signature_;

@@ -9,25 +9,14 @@ namespace {
 using sd::mcp::Broker;
 using sd::mcp::Json;
 
-constexpr uint64_t kGrantLifetimeMs = 8ULL * 60 * 60 * 1000;
-
-int64_t ExpirationUnixMs() {
-  FILETIME time{};
-  GetSystemTimeAsFileTime(&time);
-  const auto ticks = (static_cast<uint64_t>(time.dwHighDateTime) << 32) |
-      time.dwLowDateTime;
-  return static_cast<int64_t>(ticks / 10000 - 11644473600000ULL + kGrantLifetimeMs);
-}
-
 struct Owner {
-  std::filesystem::path root = sd::DataRoot();
-  sd::Handle lock{CreateFileW((root / L"owner.lock").c_str(),
+  std::filesystem::path root = sd::UserDataRoot();
+  sd::Handle lock{CreateFileW(sd::ExtendedPath(root / L"grant.lock").c_str(),
       GENERIC_READ | GENERIC_WRITE | WRITE_DAC | READ_CONTROL, 0, nullptr,
       OPEN_ALWAYS, FILE_FLAG_OPEN_REPARSE_POINT, nullptr)};
-  std::string id = sd::Utf8(sd::Uuid());
+  std::string id;
+  int64_t grantVersion = 0;
   std::string secret;
-  uint64_t deadline = GetTickCount64() + kGrantLifetimeMs;
-  int64_t expires_at = ExpirationUnixMs();
   std::unique_ptr<Broker> broker;
 
   Owner() {
@@ -38,7 +27,21 @@ struct Owner {
       throw std::runtime_error("MCP_OWNER_UNAVAILABLE");
     }
     sd::SecureFileHandle(lock.get());
-    broker = std::make_unique<Broker>(root, sd::Utf8(sd::Uuid()), [] {});
+  }
+
+  bool Restore() {
+    const auto grant = sd::mcp::ReadGrant(root);
+    if (!grant) return false;
+    const auto& client = grant->at("clientId").string();
+    const auto version = sd::mcp::ValidateGrant(*grant, client);
+    const auto cipher = sd::mcp::DecodeBase64(grant->at("protectedSecret").string(), 8192);
+    struct Cleartext {
+      std::vector<uint8_t> bytes;
+      ~Cleartext() { sd::mcp::Wipe(bytes); }
+    } clear{sd::mcp::UnprotectGrant(cipher, sd::mcp::GrantPurpose(client))};
+    if (clear.bytes.size() != 32) sd::mcp::InvalidJson();
+    Start(client, version, clear.bytes.data(), clear.bytes.size());
+    return true;
   }
 
   void Enable() {
@@ -51,7 +54,8 @@ struct Owner {
                         BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) {
       throw std::runtime_error("MCP_GRANT_UNAVAILABLE");
     }
-    auto purpose = "mcp-grant.v1:" + id;
+    const auto client = sd::Utf8(sd::Uuid());
+    auto purpose = sd::mcp::GrantPurpose(client);
     DATA_BLOB input{static_cast<DWORD>(random.bytes.size()), random.bytes.data()};
     DATA_BLOB entropy{static_cast<DWORD>(purpose.size()),
                       reinterpret_cast<BYTE*>(purpose.data())};
@@ -63,16 +67,31 @@ struct Owner {
                           CRYPTPROTECT_UI_FORBIDDEN, &encrypted.value)) {
       throw std::runtime_error("MCP_GRANT_UNAVAILABLE");
     }
-    secret = sd::mcp::EncodeBase64(random.bytes.data(), random.bytes.size(), true);
-    const auto* bytes = encrypted.value.pbData;
-    broker->WriteGrant(id, 1, {bytes, bytes + encrypted.value.cbData});
+    sd::mcp::WriteGrant(root, Json::Object{
+        {"version", 1}, {"clientId", client}, {"grantVersion", 1},
+        {"protectedSecret", sd::mcp::EncodeBase64(encrypted.value.pbData, encrypted.value.cbData)}});
+    Start(client, 1, random.bytes.data(), random.bytes.size());
+  }
+
+  void Revoke() {
+    sd::mcp::WriteGrant(root, Json::Object{{"version", 1}, {"revoked", 1}});
+  }
+
+  void Start(const std::string& client, int64_t version,
+             const uint8_t* bytes, size_t size) {
+    broker.reset();
+    sd::mcp::Wipe(secret);
+    secret = sd::mcp::EncodeBase64(bytes, size, true);
+    id = client;
+    grantVersion = version;
+    broker = std::make_unique<Broker>(sd::SessionDataRoot(root), sd::Utf8(sd::Uuid()), [] {});
     broker->Publish();
   }
 
   bool Authorize(const Json& frame) const {
     const auto& input = frame.at("secret").string();
     if (frame.at("clientId").string() != id ||
-        frame.at("grantVersion").integer() != 1 || input.size() != secret.size()) {
+        frame.at("grantVersion").integer() != grantVersion || input.size() != secret.size()) {
       return false;
     }
     unsigned char diff = 0;
@@ -82,12 +101,7 @@ struct Owner {
     return diff == 0;
   }
 
-  ~Owner() {
-    if (!secret.empty()) SecureZeroMemory(secret.data(), secret.size());
-    if (!broker) return;
-    try { broker->Remove(); } catch (...) {}
-    try { broker->DeleteGrant(id); } catch (...) {}
-  }
+  ~Owner() { sd::mcp::Wipe(secret); }
 };
 
 // Only the Flutter platform isolate calls these owner functions. The bridge
@@ -101,16 +115,16 @@ extern "C" __declspec(dllexport) int en_mcp_stdio(const char* client_id) {
   return sd::mcp::RunStdio(client_id);
 }
 
-extern "C" __declspec(dllexport) void en_mcp_disable() {
+extern "C" __declspec(dllexport) void en_mcp_stop() {
   delete owner;
   owner = nullptr;
 }
 
-extern "C" __declspec(dllexport) const char* en_mcp_enable() {
+extern "C" __declspec(dllexport) const char* en_mcp_restore() {
   try {
-    en_mcp_disable();
+    if (owner) return owner->id.c_str();
     auto next = std::make_unique<Owner>();
-    next->Enable();
+    if (!next->Restore()) return "";
     owner = next.release();
     return owner->id.c_str();
   } catch (...) {
@@ -118,8 +132,39 @@ extern "C" __declspec(dllexport) const char* en_mcp_enable() {
   }
 }
 
+extern "C" __declspec(dllexport) int en_mcp_disable() {
+  try {
+    if (owner) {
+      owner->Revoke();
+      en_mcp_stop();
+    } else {
+      Owner inactive;
+      inactive.Revoke();
+    }
+    return 1;
+  } catch (...) {
+    return 0;
+  }
+}
+
+extern "C" __declspec(dllexport) const char* en_mcp_enable() {
+  try {
+    if (owner) {
+      owner->Enable();
+    } else {
+      auto next = std::make_unique<Owner>();
+      next->Enable();
+      owner = next.release();
+    }
+    return owner->id.c_str();
+  } catch (...) {
+    en_mcp_stop();
+    return nullptr;
+  }
+}
+
 extern "C" __declspec(dllexport) int en_mcp_active() {
-  return owner && GetTickCount64() < owner->deadline;
+  return owner != nullptr;
 }
 
 extern "C" __declspec(dllexport) const char* en_mcp_events() {
@@ -137,8 +182,7 @@ extern "C" __declspec(dllexport) const char* en_mcp_events() {
           if (frame.at("kind").string() == "auth") {
             if (owner->Authorize(frame)) {
               owner->broker->Send(event.channelId, sd::mcp::Encode(Json::Object{
-                  {"kind", "authorized"}, {"version", 1}, {"grantVersion", 1},
-                  {"expiresAt", owner->expires_at}}));
+                  {"kind", "authorized"}, {"version", 1}, {"grantVersion", owner->grantVersion}}));
             } else {
               owner->broker->Close(event.channelId);
             }

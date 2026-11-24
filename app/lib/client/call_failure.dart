@@ -48,6 +48,9 @@ final class ClientCallFailure implements Exception {
   factory ClientCallFailure.protocol() =>
       ClientCallFailure._(grpc.StatusCode.dataLoss, null);
   final int transportCode;
+  static bool isAccessDenied(int? transportCode) =>
+      transportCode == grpc.StatusCode.permissionDenied ||
+      transportCode == grpc.StatusCode.unauthenticated;
   final api.Failure? _failure;
   api.Failure? get failure => _failure == null
       ? null

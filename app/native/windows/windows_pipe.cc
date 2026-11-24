@@ -245,7 +245,7 @@ bool UserContainer(HANDLE handle, PSID user) {
   return valid;
 }
 
-BOOL OpenPrivateState(const wchar_t* folder, wchar_t* output, DWORD capacity, void** guard, BOOL* created, DWORD* error) {
+BOOL OpenPrivateState(const wchar_t* folder, const wchar_t* filename, wchar_t* output, DWORD capacity, void** guard, BOOL* created, DWORD* error) {
   *guard = nullptr;
   *created = FALSE;
   *error = ERROR_ACCESS_DENIED;
@@ -282,7 +282,8 @@ BOOL OpenPrivateState(const wchar_t* folder, wchar_t* output, DWORD capacity, vo
   }
   LocalFree(descriptor);
   if (!valid) return FALSE;
-  base += L"\\correlation.bin";
+  base += L"\\";
+  base += filename;
   // Pin even a newly created file before Dart opens it. The created flag only
   // authorizes first initialization; an already empty file is never repaired.
   const HANDLE existing = CreateFileW(base.c_str(), FILE_READ_DATA | READ_CONTROL | FILE_READ_ATTRIBUTES,
@@ -298,26 +299,40 @@ BOOL OpenPrivateState(const wchar_t* folder, wchar_t* output, DWORD capacity, vo
   return TRUE;
 }
 
-}  // namespace
-
-extern "C" __declspec(dllexport) BOOL en_ui_open_private_state(
-    wchar_t* output, DWORD capacity, void** guard, BOOL* created, DWORD* error) {
+BOOL OpenInstalledPrivateState(const wchar_t* filename, wchar_t* output, DWORD capacity,
+                               void** guard, BOOL* created, DWORD* error) {
   PWSTR folder = nullptr;
   const HRESULT known = SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &folder);
   BOOL result = FALSE;
   *guard = nullptr;
   *created = FALSE;
   *error = ERROR_ACCESS_DENIED;
-  if (SUCCEEDED(known)) result = OpenPrivateState(folder, output, capacity, guard, created, error);
+  if (SUCCEEDED(known)) result = OpenPrivateState(folder, filename, output, capacity, guard, created, error);
   CoTaskMemFree(folder);
   return result;
+}
+
+}  // namespace
+
+extern "C" __declspec(dllexport) BOOL en_ui_open_private_state(
+    wchar_t* output, DWORD capacity, void** guard, BOOL* created, DWORD* error) {
+  return OpenInstalledPrivateState(L"correlation.bin", output, capacity, guard, created, error);
+}
+
+extern "C" __declspec(dllexport) BOOL en_ui_open_recovery_log(
+    wchar_t* output, DWORD capacity, void** guard, BOOL* created, DWORD* error) {
+  return OpenInstalledPrivateState(L"recovery.bin", output, capacity, guard, created, error);
 }
 
 #ifdef ENDLESSNET_NATIVE_FIXTURE
 // Fixture-only export is absent from the installed production DLL.
 extern "C" __declspec(dllexport) BOOL en_ui_open_private_state_fixture(
     const wchar_t* root, wchar_t* output, DWORD capacity, void** guard, BOOL* created, DWORD* error) {
-  return OpenPrivateState(root, output, capacity, guard, created, error);
+  return OpenPrivateState(root, L"correlation.bin", output, capacity, guard, created, error);
+}
+extern "C" __declspec(dllexport) BOOL en_ui_open_recovery_log_fixture(
+    const wchar_t* root, wchar_t* output, DWORD capacity, void** guard, BOOL* created, DWORD* error) {
+  return OpenPrivateState(root, L"recovery.bin", output, capacity, guard, created, error);
 }
 #endif
 

@@ -20,6 +20,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.4'
+          cache: false
       - name: Install pinned Flutter
         shell: bash
         run: |
@@ -31,10 +35,10 @@ jobs:
           . /etc/os-release
           test "$ID" = ubuntu
           test "$VERSION_ID" = 26.04
-      - name: Static and tooling unit checks
-        run: python3 -B scripts/ci.py check
+      - name: Flutter application checks
+        run: go run ./scripts/ci check
       - name: Shared Flutter library unit checks
-        run: python3 -B scripts/check_ui_library.py
+        run: go run ./scripts/ci library
 
   build:
     needs: checks
@@ -54,6 +58,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.4'
+          cache: false
       - name: Linux native prerequisites
         if: runner.os == 'Linux'
         run: |
@@ -79,7 +87,7 @@ jobs:
         env:
           BUILD_TARGET: ${{ matrix.target }}
           GH_TOKEN: ${{ github.token }}
-        run: python -B scripts/ci.py build --target "$BUILD_TARGET"
+        run: go run ./scripts/ci build --target "$BUILD_TARGET"
       - uses: actions/upload-artifact@v4
         with:
           name: client-ui-${{ matrix.target }}
@@ -99,6 +107,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.4'
+          cache: false
       - name: Verify release source is on main
         shell: bash
         run: |
@@ -119,4 +131,4 @@ jobs:
       - name: Publish exact checked tag
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python -B scripts/ci.py publish
+        run: go run ./scripts/ci publish

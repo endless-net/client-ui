@@ -4,6 +4,8 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 
 import '../client/enrollment_client.dart';
 import '../client/connectivity_client.dart';
+import '../client/windows_pipe_config.dart';
+import '../client/recent_logs_client.dart';
 import '../connectivity/controller.dart';
 import '../revocation/controller.dart';
 import '../client/revocation_client.dart';
@@ -18,10 +20,16 @@ import 'launch_config.dart';
 // Own UI resource boundaries; production uses the verified Windows adapters.
 // Test implementations do not participate in main's platform selection.
 final class UiClientConnection {
-  UiClientConnection(this.client, this.close, {required this.connectivity});
+  UiClientConnection(
+    this.client,
+    this.close, {
+    required this.connectivity,
+    this.pipeProblem,
+  });
   final EnrollmentClient client;
   final ConnectivityClient connectivity;
   final Future<void> Function() close;
+  final WindowsPipeProblem? Function()? pipeProblem;
 }
 
 final class UiCorrelationStorage {
@@ -92,6 +100,7 @@ final class UiSession {
             )
           : null {
     enrollment.addListener(_observeEnrollment);
+    connectivity.addListener(_observeConnectivity);
     sessionLogin?.addListener(_observeSession);
   }
 
@@ -105,6 +114,27 @@ final class UiSession {
   final RevocationController? revocation;
   final SessionLoginController? sessionLogin;
   String _sessionLoginPhase = '';
+  bool _controlReady = false;
+  bool _sessionRefreshPending = false;
+
+  void _observeConnectivity() {
+    if (!connectivity.fresh) return;
+    final ready =
+        connectivity.snapshot?.controlState ==
+        api.ControlState.CONTROL_STATE_READY;
+    if (ready == _controlReady) return;
+    _controlReady = ready;
+    _sessionRefreshPending = ready;
+    _refreshRecoveredSession();
+  }
+
+  void _refreshRecoveredSession() {
+    final login = sessionLogin;
+    if (!_sessionRefreshPending || login == null || login.busy) return;
+    _sessionRefreshPending = false;
+    if (login.registered && !login.sessionActive) unawaited(login.refresh());
+  }
+
   void _observeSession() {
     final a = sessionLogin?.attempt;
     final phase = '${a?.attemptId}:${a?.phase}';
@@ -114,12 +144,14 @@ final class UiSession {
         unawaited(connectivity.refresh());
       }
     }
+    _refreshRecoveredSession();
   }
 
   String _revocationNodeContext = '';
   Future<void>? _initialization;
   Future<void>? _closing;
   bool get closed => _closing != null;
+  WindowsPipeProblem? get pipeProblem => _connection.pipeProblem?.call();
   bool _connectAfterEnrollment = false;
 
   Future<void> startEnrollment(String hostname, api.EnrollmentMode mode) async {
@@ -205,6 +237,21 @@ final class UiSession {
     }();
   }
 
+  Future<api.ListRecentLogsResponse?> recentClientLogs({
+    required String pageToken,
+    required int limit,
+  }) async {
+    final client = _connection.client;
+    if (closed || client is! RecentLogsClient) return null;
+    return (client as RecentLogsClient).recentLogs(
+      api.ListRecentLogsRequest(
+        profile: api.ProfileRef(profileId: config.profile.id),
+        page: api.PageRequest(pageSize: limit, pageToken: pageToken),
+      ),
+      config.rpcTimeout,
+    );
+  }
+
   Future<bool> openBrowser(Uri url) async {
     if (closed || url != enrollment.browserAction) return false;
     return _platform.openBrowser(url);
@@ -220,6 +267,7 @@ final class UiSession {
     enrollment.removeListener(_observeEnrollment);
     enrollment.dispose();
     trust.dispose();
+    connectivity.removeListener(_observeConnectivity);
     connectivity.dispose();
     revocation?.dispose();
     sessionLogin?.removeListener(_observeSession);

@@ -33,7 +33,7 @@ try {
     $endpoint = '192.0.2.1:' + $defaults.ENDLESSNET_CLIENT_CONNECTION_LISTEN_PORT
     $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
     $data = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'EndlessNet\Client'
-    & python -B (Join-Path $PSScriptRoot 'install_configuration.py') --defaults $defaultsPath --server $Server --endpoint $endpoint --sid $sid --state-directory (Join-Path $data 'state') --output $work
+    & go -C $repo run ./scripts/installer configure --policy --defaults $defaultsPath --server $Server --endpoint $endpoint --sid $sid --state-directory (Join-Path $data 'state') --output $work
     if ($LASTEXITCODE) { throw 'Cannot prepare installation configuration' }
     $ServiceProfile = Join-Path $work 'service.json'
     $UiPolicy = Join-Path $work 'policy.json'
@@ -107,7 +107,7 @@ try {
         $signature = Set-AuthenticodeSignature -LiteralPath (Join-Path $bundle 'install-update.ps1') -Certificate $certificate -HashAlgorithm SHA256
         if ($signature.Status -ne 'Valid') { throw 'Update script publisher signing failed' }
     }
-    & python -B (Join-Path $PSScriptRoot 'windows_installer.py') --ui $bundle --client $ClientBundle --service-profile $ServiceProfile --ui-policy $UiPolicy --actions $actions --version $Version --output $work
+    & go -C $repo run ./scripts/installer render --ui $bundle --bundle $ClientBundle --icon (Join-Path $repo 'app/windows/runner/resources/app_icon.ico') --service-profile $ServiceProfile --ui-policy $UiPolicy --actions $actions --version $Version --output $work
     if ($LASTEXITCODE) { throw 'MSI source generation failed' }
     $releaseVersion = 'v' + $Version.TrimStart('v')
     $msi = Join-Path $output "EndlessNet-$releaseVersion-windows-amd64.msi"

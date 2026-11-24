@@ -92,25 +92,34 @@ inline bool PrivateMetadataPolicy(const std::string& expectedUser, const std::st
 }
 struct BridgePorts {
   std::function<std::string()> userSid, logonSid;
-  std::function<std::string(const std::string&, size_t)> readPrivate;
+  std::function<std::string()> readOwner;
+  std::function<Json()> readGrant;
   std::function<void(const OwnerDescriptor&)> connect;
   std::function<bool(const OwnerDescriptor&)> verifyPeer;
   std::function<std::vector<uint8_t>(const std::vector<uint8_t>&, const std::string&)> unprotect;
   std::function<void(const std::string&)> sendFrame;
   std::function<std::string()> readFrame;
 };
-struct BridgeAuthorization { int64_t version = 0, expiresAt = 0; };
-inline BridgeAuthorization AuthenticateBridge(BridgePorts& ports, const std::string& client) {
+inline std::string GrantPurpose(const std::string& client) {
+  return "mcp-grant.v1:" + client;
+}
+inline int64_t ValidateGrant(const Json& grant, const std::string& client) {
+  const auto version = grant.at("grantVersion").integer();
+  if (grant.at("version").integer() != 1 || grant.at("clientId").string() != client ||
+      !CanonicalUuid(client) || version < 1 || version > 9007199254740991LL) InvalidJson();
+  return version;
+}
+inline int64_t AuthenticateBridge(BridgePorts& ports, const std::string& client) {
   int failure = 20; std::vector<uint8_t> cipher, secret; std::string auth;
   try {
     if (!CanonicalUuid(client)) throw BoundaryFailure{2};
-    const auto owner = ReadOwner(ports.readPrivate("mcp/owner.json", 16384), ports.userSid(), ports.logonSid());
+    const auto owner = ReadOwner(ports.readOwner(), ports.userSid(), ports.logonSid());
     ports.connect(owner); failure = 21;
     if (!ports.verifyPeer(owner)) throw BoundaryFailure{21};
     failure = 22;
-    const auto grant = Decode(ports.readPrivate("mcp/clients/" + client + ".grant", 16384)); const auto version = grant.at("grantVersion").integer();
-    if (grant.at("version").integer() != 1 || grant.at("clientId").string() != client || version < 1 || version > 9007199254740991LL) InvalidJson();
-    cipher = DecodeBase64(grant.at("protectedSecret").string(), 8192); secret = ports.unprotect(cipher, "mcp-grant.v1:" + client); Wipe(cipher);
+    const auto grant = ports.readGrant();
+    const auto version = ValidateGrant(grant, client);
+    cipher = DecodeBase64(grant.at("protectedSecret").string(), 8192); secret = ports.unprotect(cipher, GrantPurpose(client)); Wipe(cipher);
     if (secret.size() != 32) InvalidJson();
     Json::Object frame{{"kind", "auth"}, {"version", 1}, {"ownerEpoch", owner.epoch}, {"clientId", client}, {"grantVersion", version}, {"secret", EncodeBase64(secret.data(), secret.size(), true)}};
     auth = Encode(frame); Wipe(std::get<std::string>(frame.at("secret").value)); Wipe(secret);
@@ -122,12 +131,11 @@ inline BridgeAuthorization AuthenticateBridge(BridgePorts& ports, const std::str
       try { ports.sendFrame(Encode(Json::Object{{"kind","authDeniedAcknowledged"},{"version",1}})); } catch (...) {}
       throw BoundaryFailure{22};
     }
-    if (accepted.object().size() != 4 || accepted.at("kind").string() != "authorized" || accepted.at("version").integer() != 1) InvalidJson();
+    if (accepted.object().size() != 3 || accepted.at("kind").string() != "authorized" || accepted.at("version").integer() != 1) InvalidJson();
     const auto acceptedVersion = accepted.at("grantVersion").integer();
-    const auto expiresAt = accepted.at("expiresAt").integer();
-    if (acceptedVersion < 1 || acceptedVersion > 9007199254740991LL || expiresAt < 1 || expiresAt > 9007199254740991LL) InvalidJson();
+    if (acceptedVersion < 1 || acceptedVersion > 9007199254740991LL) InvalidJson();
     if (acceptedVersion != version) throw BoundaryFailure{22};
-    return {version, expiresAt};
+    return version;
   } catch (const BoundaryFailure&) { Wipe(cipher); Wipe(secret); Wipe(auth); throw; }
   catch (...) { Wipe(cipher); Wipe(secret); Wipe(auth); throw BoundaryFailure{failure}; }
 }

@@ -20,14 +20,14 @@ class _ComponentCatalogState extends State<ComponentCatalog> {
   String get _activeState => _state ?? _states.first;
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'EndlessNet — компоненты010',
+    title: 'Компоненты EndlessNet',
     debugShowCheckedModeBanner: false,
     theme: _dark
         ? BrandTheme.dark(reducedMotion: _reduced)
         : BrandTheme.light(reducedMotion: _reduced),
     themeAnimationDuration: _reduced ? Duration.zero : BrandTokens.duration,
     home: Scaffold(
-      appBar: AppBar(title: const Text('Компоненты010')),
+      appBar: AppBar(title: const Text('Компоненты EndlessNet')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -93,11 +93,19 @@ class _ComponentCatalogState extends State<ComponentCatalog> {
               ],
             ),
             const SizedBox(height: 16),
-            ComponentExample(
-              key: ValueKey('${_definition.id}/$_activeVariant/$_activeState'),
-              id: _definition.id,
-              variant: _variant ?? _definition.variants.first,
-              state: _activeState,
+            Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: ComponentExample(
+                  key: ValueKey(
+                    '${_definition.id}/$_activeVariant/$_activeState',
+                  ),
+                  id: _definition.id,
+                  variant: _activeVariant,
+                  state: _activeState,
+                ),
+              ),
             ),
           ],
         ),

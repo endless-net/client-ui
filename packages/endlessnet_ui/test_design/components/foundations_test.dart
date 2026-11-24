@@ -28,6 +28,66 @@ void main() {
       expect(BrandTokens.target, 44);
       for (final theme in [BrandTheme.dark(), BrandTheme.light()]) {
         final colors = theme.extension<BrandColors>()!;
+        final scheme = theme.colorScheme;
+        final dark = theme.brightness == Brightness.dark;
+        expect(
+          [
+            colors.background,
+            scheme.surfaceContainerLow,
+            colors.surface,
+            scheme.surfaceContainer,
+            scheme.surfaceContainerHigh,
+            scheme.primaryContainer,
+            colors.text,
+            colors.secondary,
+            colors.primary,
+            colors.onPrimary,
+            scheme.secondary,
+            scheme.outlineVariant,
+            scheme.outline,
+            colors.success,
+            colors.error,
+            colors.warning,
+          ],
+          (dark
+                  ? [
+                      0xFF07111D,
+                      0xFF0E1F32,
+                      0xFF142A41,
+                      0xFF0F2134,
+                      0xFF283D54,
+                      0xFF154D64,
+                      0xFFF8FAFF,
+                      0xFFC6D2E0,
+                      0xFF19D8F2,
+                      0xFF111923,
+                      0xFFA8B2FF,
+                      0xFF3D5065,
+                      0xFF829BB2,
+                      0xFFB1F1D0,
+                      0xFFFF8A80,
+                      0xFFFCD34D,
+                    ]
+                  : [
+                      0xFFE6F3FD,
+                      0xFFF4FAFE,
+                      0xFFF9FCFE,
+                      0xFFF1F8FE,
+                      0xFFE8F4FD,
+                      0xFFE3F2FD,
+                      0xFF0F1720,
+                      0xFF3B4856,
+                      0xFF007783,
+                      0xFFFFFFFF,
+                      0xFF434DB0,
+                      0xFFA5B8C8,
+                      0xFF718597,
+                      0xFF216A42,
+                      0xFFB42318,
+                      0xFF854D0E,
+                    ])
+              .map(Color.new),
+        );
         final roles = [
           theme.textTheme.labelSmall!,
           theme.textTheme.bodyMedium!,
@@ -55,6 +115,26 @@ void main() {
           contrast(colors.onPrimary, colors.primary),
           greaterThanOrEqualTo(4.5),
         );
+        expect(
+          contrast(scheme.onSecondary, scheme.secondary),
+          greaterThanOrEqualTo(4.5),
+        );
+        for (final surface in [
+          colors.background,
+          colors.surface,
+          scheme.surfaceContainerLow,
+          scheme.surfaceContainer,
+          scheme.surfaceContainerHigh,
+          scheme.primaryContainer,
+        ]) {
+          expect(contrast(colors.text, surface), greaterThanOrEqualTo(4.5));
+          expect(
+            contrast(colors.secondary, surface),
+            greaterThanOrEqualTo(4.5),
+          );
+          expect(contrast(colors.primary, surface), greaterThanOrEqualTo(3));
+          expect(contrast(scheme.outline, surface), greaterThanOrEqualTo(3));
+        }
         expect(
           contrast(colors.primary, colors.surface),
           greaterThanOrEqualTo(3),
