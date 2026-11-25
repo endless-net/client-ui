@@ -140,6 +140,28 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
     'client.server_identity.changed' => 'Требуется проверка и подтверждение текущего объявления сервера администратором устройства.',
     'client.server_identity.unavailable' =>
       'Не удалось получить текущее объявление сервера.',
+    'client.registration.control_unavailable' ||
+    'client.default_target.control_unavailable' ||
+    'client.approval.control_unavailable' =>
+      'Сервер управления временно недоступен. Служба повторит запрос.',
+    'client.registration.trust_required' ||
+    'client.default_target.trust_required' ||
+    'client.approval.trust_required' =>
+      'Не удалось проверить доверие к серверу.',
+    'client.registration.checkpoint_unavailable' ||
+    'client.default_target.checkpoint_unavailable' ||
+    'client.approval.checkpoint_unavailable' => 'Не удалось прочитать или сохранить доверенную версию bootstrap на устройстве.',
+    'client.registration.bootstrap_protocol' ||
+    'client.default_target.bootstrap_protocol' ||
+    'client.approval.bootstrap_protocol' =>
+      'Сервер управления сообщил об ошибке протокола или конфигурации.',
+    'client.registration.access_denied' ||
+    'client.default_target.access_denied' ||
+    'client.approval.access_denied' =>
+      'Сервер отклонил запрос из-за отсутствия доступа.',
+    'client.registration.request_rejected' ||
+    'client.default_target.request_rejected' ||
+    'client.approval.request_rejected' => 'Сервер отклонил параметры запроса.',
     'ui.invalid_argument' => 'Проверьте введённые данные.',
     'ui.unsupported' => 'Установленный клиент не поддерживает эту команду.',
     '' => '',

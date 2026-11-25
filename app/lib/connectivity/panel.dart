@@ -36,10 +36,19 @@ class ConnectivityPanel extends StatelessWidget {
         s?.connectionPhase == api.ConnectionPhase.CONNECTION_PHASE_CONNECTING) {
       return 'Соединение: подключение или восстановление выполняется';
     }
+    final endpointUnconfirmed =
+        s?.controlState == api.ControlState.CONTROL_STATE_DEGRADED &&
+        (s?.failures.any(
+              (f) =>
+                  f.reasonKey ==
+                  'client.connection.endpoint_refresh_unconfirmed',
+            ) ??
+            false);
     if (s?.serviceState == api.ServiceState.SERVICE_STATE_LOCAL_READY &&
         s?.connectionPhase ==
             api.ConnectionPhase.CONNECTION_PHASE_LOCAL_READY &&
-        s?.controlState == api.ControlState.CONTROL_STATE_READY &&
+        (s?.controlState == api.ControlState.CONTROL_STATE_READY ||
+            endpointUnconfirmed) &&
         s?.peerCount == 0 &&
         (s?.mapRevision.toStringUnsigned() ?? '0') != '0' &&
         (s?.overlayAddresses.isNotEmpty ?? false) &&
@@ -59,7 +68,8 @@ class ConnectivityPanel extends StatelessWidget {
         'Соединение: отключение выполняется',
       api.ConnectionPhase.CONNECTION_PHASE_CONNECTED =>
         s?.serviceState == api.ServiceState.SERVICE_STATE_CONNECTED &&
-                s?.controlState == api.ControlState.CONTROL_STATE_READY
+                (s?.controlState == api.ControlState.CONTROL_STATE_READY ||
+                    endpointUnconfirmed)
             ? 'Туннель готов'
             : 'Соединение: ограничено',
       api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED =>
@@ -77,6 +87,24 @@ class ConnectivityPanel extends StatelessWidget {
     }
     if (f.reasonKey == 'client.connection.trust_required') {
       return 'Не удалось подтвердить подпись сервера. Проверьте адрес сервера и установленную версию EndlessNet; повтор подключения не принимает новый ключ.';
+    }
+    if (f.reasonKey == 'client.connection.checkpoint_unavailable') {
+      return 'Не удалось прочитать или сохранить доверенную версию bootstrap на устройстве.';
+    }
+    if (f.reasonKey == 'client.connection.protocol_rejected') {
+      return 'Сервер управления сообщил об ошибке протокола или конфигурации.';
+    }
+    if (f.reasonKey == 'client.connection.map_rejected') {
+      return 'Карта сети отклонена при проверке.';
+    }
+    if (f.reasonKey == 'client.connection.configuration_invalid') {
+      return 'Конфигурация подключения на устройстве некорректна.';
+    }
+    if (f.reasonKey == 'client.connection.endpoint_refresh_unconfirmed') {
+      return 'Сервер не подтвердил обновление сетевого адреса устройства. Служба повторит запрос.';
+    }
+    if (f.reasonKey == 'client.connection.credential_rejected') {
+      return 'Не удалось проверить учётные данные устройства.';
     }
     if (f.reasonKey == 'client.connection.credential_expired') {
       return 'Право устройства истекло или его срок неизвестен. Нажмите «Подключить»: служба проверит возможность продления для того же устройства. Если срок запроса истёк, повтор не гарантирует продление; требуется восстановить авторизованный вход.';
@@ -202,9 +230,11 @@ class ConnectivityPanel extends StatelessWidget {
           c.fresh &&
           s?.connectionPhase ==
               api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED;
-      final failures = <api.Failure>[...?s?.failures, ?c.failure].where(
-        (failure) => failure.reasonKey != 'client.connection.retry_scheduled',
-      );
+      final failures = <api.Failure>[if (c.fresh) ...?s?.failures, ?c.failure]
+          .where(
+            (failure) =>
+                failure.reasonKey != 'client.connection.retry_scheduled',
+          );
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -256,6 +286,12 @@ class ConnectivityPanel extends StatelessWidget {
                   s?.session.state == api.SessionState.SESSION_STATE_EXPIRED)
                 const Text(
                   'Сеанс пользователя истёк. Для действий учётной записи войдите снова; это не продлевает право устройства.',
+                ),
+              if (c.link == ConnectivityLink.unavailable)
+                Text(
+                  c.readFailure?.problem == ConnectivityReadProblem.timeout
+                      ? 'Истекло время чтения состояния локальной службы.'
+                      : 'Не удалось прочитать состояние локальной службы.',
                 ),
               if (c.uncertain)
                 const Text(

@@ -7,6 +7,74 @@ import 'package:flutter_test/flutter_test.dart';
 import 'connectivity_controller_test.dart' as fixture;
 
 void main() {
+  testWidgets('failed IPC read hides failures from the previous snapshot', (
+    tester,
+  ) async {
+    final client = fixture.ConnectivityFixture();
+    client.value.failures.add(
+      api.Failure(reasonKey: 'client.connection.trust_required'),
+    );
+    final c = fixture.controller(client);
+    addTearDown(c.dispose);
+    await c.bind(fixture.profile());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: BrandTheme.dark(),
+        home: Scaffold(body: ConnectivityPanel(controller: c, simple: true)),
+      ),
+    );
+    final trustMessage = find.textContaining('Не удалось подтвердить подпись');
+    expect(trustMessage, findsOneWidget);
+
+    client.readFailure = StateError('private transport diagnostic');
+    await c.refresh();
+    await tester.pump();
+    expect(trustMessage, findsNothing);
+    expect(
+      find.text('Не удалось прочитать состояние локальной службы.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('private transport diagnostic'), findsNothing);
+
+    client.readFailure = null;
+    client.value.failures
+      ..clear()
+      ..add(api.Failure(reasonKey: 'client.connection.map_rejected'));
+    await c.refresh();
+    await tester.pump();
+    expect(trustMessage, findsNothing);
+    expect(find.text('Карта сети отклонена при проверке.'), findsOneWidget);
+  });
+
+  testWidgets('endpoint refresh degradation does not hide a ready tunnel', (
+    tester,
+  ) async {
+    final client = fixture.ConnectivityFixture();
+    client.value
+      ..serviceState = api.ServiceState.SERVICE_STATE_CONNECTED
+      ..connectionPhase = api.ConnectionPhase.CONNECTION_PHASE_CONNECTED
+      ..controlState = api.ControlState.CONTROL_STATE_DEGRADED
+      ..failures.add(
+        api.Failure(
+          reasonKey: 'client.connection.endpoint_refresh_unconfirmed',
+        ),
+      );
+    final c = fixture.controller(client);
+    addTearDown(c.dispose);
+    await c.bind(fixture.profile());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: BrandTheme.dark(),
+        home: Scaffold(body: ConnectivityPanel(controller: c, simple: true)),
+      ),
+    );
+    expect(find.text('Туннель готов'), findsOneWidget);
+    expect(
+      find.textContaining('Сервер не подтвердил обновление'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'sole-node local ready is explicit and never claims a peer path',
     (tester) async {
