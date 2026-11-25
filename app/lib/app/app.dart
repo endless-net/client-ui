@@ -602,6 +602,8 @@ class _MainAppState extends State<MainApp> {
         boardStore: widget.dashboardStore,
         serverBoard: _closing || _reconnecting ? null : session?.dashboard,
         connectivity: _closing || _reconnecting ? null : session?.connectivity,
+        peers: _closing || _reconnecting ? null : session?.peers,
+        peerTimeout: session?.config.rpcTimeout,
         updates: _updates,
         account: _account(session, host),
         tunnelDetails: _closing || _reconnecting

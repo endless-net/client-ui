@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:endlessnet_client_ui/client/call_failure.dart';
 import 'package:endlessnet_client_ui/client/dashboard_client.dart';
+import 'package:endlessnet_client_ui/client/connectivity_client.dart';
 
 import 'package:endlessnet_client_ui/dashboard/board.dart';
 import 'package:endlessnet_client_ui/dashboard/home.dart';
+import 'package:endlessnet_client_ui/dashboard/peer_list.dart';
 import 'package:endlessnet_client_ui/dashboard/server_board.dart';
 import 'package:endlessnet_client_ui/dashboard/telemetry.dart';
 import 'package:endlessnet_ui/endlessnet_ui.dart';
@@ -121,7 +123,70 @@ class _SharedBoards implements DashboardClient {
   );
 }
 
+class _NetworkPeers implements PeerClient {
+  final calls = <String>[];
+  final metadata = api.SnapshotMetadata(instanceId: 'client-instance');
+
+  @override
+  Future<api.ListPeersResponse> listPeers(
+    api.ListPeersRequest request,
+    Duration timeout,
+  ) async {
+    expect(request.profile.profileId, 'active-profile');
+    final token = request.page.pageToken;
+    calls.add(token);
+    return api.ListPeersResponse(
+      snapshotState: api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_CURRENT,
+      mapRevision: api.Status().mapRevision + 8,
+      peers: [
+        if (token.isEmpty)
+          api.Peer(
+            id: 'one',
+            hostname: 'Ноутбук',
+            overlayAddresses: ['100.64.0.8'],
+          )
+        else
+          api.Peer(id: 'two', hostname: 'Станция'),
+      ],
+      page: api.PageResponse(
+        metadata: metadata,
+        nextPageToken: token.isEmpty ? 'second-page' : '',
+      ),
+    );
+  }
+}
+
 void main() {
+  testWidgets('devices load peer names, addresses and subsequent pages', (
+    tester,
+  ) async {
+    final client = _NetworkPeers();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: NetworkPeerList(
+            client: client,
+            timeout: const Duration(seconds: 1),
+            status: api.Status(
+              metadata: client.metadata,
+              activeProfileId: 'active-profile',
+              agent: api.AgentStatus(mapRevision: api.Status().mapRevision + 8),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Ноутбук'), findsOneWidget);
+    expect(find.text('100.64.0.8'), findsOneWidget);
+    expect(find.text('Станция'), findsNothing);
+    await tester.tap(find.text('Показать ещё'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ноутбук'), findsOneWidget);
+    expect(find.text('Станция'), findsOneWidget);
+    expect(client.calls, ['', 'second-page']);
+  });
+
   test(
     'shared board re-reads on a conflict and ignores an older space reply',
     () async {

@@ -6,11 +6,13 @@ import 'package:endlessnet_client_api/client_api.dart' as api;
 import 'package:endlessnet_ui/endlessnet_ui.dart';
 import 'package:flutter/material.dart';
 
+import '../client/connectivity_client.dart';
 import '../connectivity/controller.dart';
 import '../connectivity/panel.dart';
 import '../update/controller.dart';
 import 'board.dart';
 import 'board_view.dart';
+import 'peer_list.dart';
 import 'server_board.dart';
 import 'telemetry.dart';
 import 'tiles.dart';
@@ -42,6 +44,8 @@ class DashboardHome extends StatefulWidget {
     required this.tunnelDetails,
     required this.settings,
     this.connectivity,
+    this.peers,
+    this.peerTimeout,
     this.updates,
     this.blockingMessage,
     this.boardStore,
@@ -50,6 +54,8 @@ class DashboardHome extends StatefulWidget {
   final String host;
   final Widget account, tunnelDetails, settings;
   final ConnectivityController? connectivity;
+  final PeerClient? peers;
+  final Duration? peerTimeout;
   final UpdateController? updates;
   final String? blockingMessage;
   final BoardStore? boardStore;
@@ -481,8 +487,50 @@ class _DashboardHomeState extends State<DashboardHome> {
           ),
         ),
       ],
+      const SizedBox(height: 20),
+      _networkDevices(),
     ],
   );
+
+  Widget _networkDevices() {
+    final controller = widget.connectivity;
+    final client = widget.peers;
+    final timeout = widget.peerTimeout;
+    if (controller == null ||
+        !controller.fresh ||
+        client == null ||
+        timeout == null) {
+      return const Text('Устройства сети EndlessNet сейчас недоступны.');
+    }
+    final snapshot = controller.snapshot;
+    if (snapshot == null ||
+        snapshot.connectionPhase ==
+            api.ConnectionPhase.CONNECTION_PHASE_DISCONNECTED) {
+      return const Text(
+        'Подключитесь к EndlessNet, чтобы увидеть устройства сети.',
+      );
+    }
+    if (snapshot.agent.snapshotState !=
+        api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_CURRENT) {
+      return const Text('Актуальный список устройств сети пока недоступен.');
+    }
+    return NetworkPeerList(
+      key: ValueKey((
+        client,
+        snapshot.metadata.instanceId,
+        snapshot.activeProfileId,
+        snapshot.nodeId,
+        snapshot.network.id,
+        snapshot.agent.mapRevision,
+        snapshot.agent.generatedAt.seconds,
+        snapshot.agent.generatedAt.nanos,
+        snapshot.agent.targetMapRevision,
+      )),
+      client: client,
+      timeout: timeout,
+      status: snapshot,
+    );
+  }
 
   Widget _workspace(BuildContext context, BoardSpace space) {
     final theme = Theme.of(context);

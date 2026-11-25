@@ -8,3 +8,10 @@ abstract interface class ConnectivityClient {
   Future<void> connect(api.ConnectRequest request, Duration timeout);
   Future<void> disconnect(api.DisconnectRequest request, Duration timeout);
 }
+
+abstract interface class PeerClient {
+  Future<api.ListPeersResponse> listPeers(
+    api.ListPeersRequest request,
+    Duration timeout,
+  );
+}

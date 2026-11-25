@@ -123,6 +123,11 @@ final class UiSession {
   final RevocationController? revocation;
   final SessionLoginController? sessionLogin;
   final ServerBoardController? dashboard;
+  PeerClient? get peers {
+    final client = _connection.connectivity;
+    return client is PeerClient ? client as PeerClient : null;
+  }
+
   bool _dashboardLoggedIn = false;
   Timer? _dashboardExpiry;
   String _sessionLoginPhase = '';
