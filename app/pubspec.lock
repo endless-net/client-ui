@@ -53,8 +53,8 @@ packages:
     dependency: "direct main"
     description:
       path: "api/dart"
-      ref: a50e997641466d504a216083cf7ddd9aeab6a755
-      resolved-ref: a50e997641466d504a216083cf7ddd9aeab6a755
+      ref: "3f488061215e0035cda11419d027c8f41bd1ae97"
+      resolved-ref: "3f488061215e0035cda11419d027c8f41bd1ae97"
       url: "https://github.com/endless-net/client.git"
     source: git
     version: "0.0.0"

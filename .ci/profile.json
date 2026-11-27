@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "component": "client-ui",
-  "installer": {"name": "EndlessNet-{tag}-windows-amd64.msi", "client_tag": "v0.19.2", "client_commit": "a7284b8bebf26a1c17ca1b37a3e6d0641938ada2"},
+  "installer": {"name": "EndlessNet-{tag}-windows-amd64.msi", "client_tag": "v0.20.1", "client_commit": "bd27e7000e3e82f26e59585fc49af00b2a510644"},
   "modules": [{"path": "app", "kind": "flutter", "unit": ["test/enrollment_controller_test.dart", "test/grpc_enrollment_client_test.dart", "test/enrollment_panel_test.dart", "test/correlation_journal_test.dart", "test/server_trust_controller_test.dart", "test/server_trust_panel_test.dart", "test/launch_config_test.dart", "test/session_test.dart", "test/connectivity_controller_test.dart", "test/connectivity_panel_test.dart", "test/revocation_test.dart", "test/updates_test.dart", "test/session_login_test.dart", "test/mcp_test.dart", "test/dashboard_test.dart"]}, {"path": ".", "kind": "go"}],
   "artifacts": [
     {"release": "runtime", "kind": "flutter-desktop", "name": "client-ui-windows-amd64", "module": "app", "target": {"os": "windows", "arch": "amd64"}},

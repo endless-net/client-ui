@@ -22,7 +22,7 @@ dependencies:
   endlessnet_client_api:
     git:
       url: https://github.com/endless-net/client.git
-      ref: a50e997641466d504a216083cf7ddd9aeab6a755 # api/v0.8.0
+      ref: 3f488061215e0035cda11419d027c8f41bd1ae97 # api/v0.10.0
       path: api/dart
 
 dev_dependencies:

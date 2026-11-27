@@ -37,7 +37,7 @@ try {
     if ($LASTEXITCODE) { throw 'Cannot prepare installation configuration' }
     $ServiceProfile = Join-Path $work 'service.json'
     $UiPolicy = Join-Path $work 'policy.json'
-    foreach ($file in (Join-Path $ClientBundle 'client.exe'), (Join-Path $ClientBundle 'wintun.dll'), (Join-Path $UIBundle 'endlessnet_client_ui.exe')) {
+    foreach ($file in (Join-Path $ClientBundle 'client.exe'), (Join-Path $ClientBundle 'wintun.dll'), (Join-Path $ClientBundle 'wireguard.dll'), (Join-Path $UIBundle 'endlessnet_client_ui.exe')) {
         $stream = [IO.File]::OpenRead($file)
         try {
             $reader = [IO.BinaryReader]::new($stream)

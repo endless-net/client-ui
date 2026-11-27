@@ -1,5 +1,5 @@
 // Consumer metadata pin, verified against the exact resolved producer descriptor
 // by scripts/ci. No API schema or generated model is copied into the UI.
-const clientApiRevision = 'a50e997641466d504a216083cf7ddd9aeab6a755';
+const clientApiRevision = '3f488061215e0035cda11419d027c8f41bd1ae97';
 const clientContractSha256 =
-    '6ecbb4474e7b5734d0561e2d6861fc05a0681d193667cb9449859e4a8edf873f';
+    'ea9131e97cc16e629a4e88009a7ed51fc0f20229b5320f9d6f8617f14793f738';
