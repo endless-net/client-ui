@@ -13,6 +13,7 @@ import '../update/controller.dart';
 import 'board.dart';
 import 'board_view.dart';
 import 'peer_list.dart';
+import 'resource_list.dart';
 import 'server_board.dart';
 import 'telemetry.dart';
 import 'tiles.dart';
@@ -514,21 +515,35 @@ class _DashboardHomeState extends State<DashboardHome> {
         api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_CURRENT) {
       return const Text('Актуальный список устройств сети пока недоступен.');
     }
-    return NetworkPeerList(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       key: ValueKey((
         client,
         snapshot.metadata.instanceId,
         snapshot.activeProfileId,
         snapshot.nodeId,
         snapshot.network.id,
-        snapshot.agent.mapRevision,
-        snapshot.agent.generatedAt.seconds,
-        snapshot.agent.generatedAt.nanos,
-        snapshot.agent.targetMapRevision,
+        snapshot.accountId,
       )),
-      client: client,
-      timeout: timeout,
-      status: snapshot,
+      children: [
+        NetworkPeerList(
+          key: ValueKey((
+            snapshot.agent.mapRevision,
+            snapshot.agent.generatedAt.seconds,
+            snapshot.agent.generatedAt.nanos,
+            snapshot.agent.targetMapRevision,
+          )),
+          client: client,
+          timeout: timeout,
+          status: snapshot,
+        ),
+        if (client is ResourceClient)
+          NetworkResourceList(
+            client: client as ResourceClient,
+            timeout: timeout,
+            status: snapshot,
+          ),
+      ],
     );
   }
 

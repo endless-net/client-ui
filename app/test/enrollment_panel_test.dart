@@ -228,6 +228,22 @@ void main() {
         expect(find.text('unrecognized-raw-diagnostic'), findsNothing);
         expect(find.text('Устройство зарегистрировано'), findsNothing);
       }
+      client.value =
+          fixture.makeAttempt(
+              phase: api.EnrollmentPhase.ENROLLMENT_PHASE_DENIED,
+            )
+            ..restriction = api.Restriction(
+              reasonKey: 'client.registration.quota_exhausted',
+            );
+      await c.refresh();
+      await tester.pump();
+      expect(find.text('Регистрация отклонена'), findsOneWidget);
+      expect(
+        find.text(
+          'Квота устройств исчерпана. После освобождения места начните новую регистрацию.',
+        ),
+        findsOneWidget,
+      );
       client.value = fixture.makeAttempt()
         ..certainty = api.EnrollmentCertainty.ENROLLMENT_CERTAINTY_UNCERTAIN;
       await c.refresh();

@@ -15,3 +15,10 @@ abstract interface class PeerClient {
     Duration timeout,
   );
 }
+
+abstract interface class ResourceClient {
+  Future<api.ListResourcesResponse> listResources(
+    api.ListResourcesRequest request,
+    Duration timeout,
+  );
+}

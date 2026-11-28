@@ -159,6 +159,8 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
     'client.default_target.access_denied' ||
     'client.approval.access_denied' =>
       'Сервер отклонил запрос из-за отсутствия доступа.',
+    'client.registration.quota_exhausted' =>
+      'Квота устройств исчерпана. После освобождения места начните новую регистрацию.',
     'client.registration.request_rejected' ||
     'client.default_target.request_rejected' ||
     'client.approval.request_rejected' => 'Сервер отклонил параметры запроса.',

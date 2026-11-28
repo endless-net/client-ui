@@ -16,6 +16,7 @@ final class GrpcEnrollmentClient
         EnrollmentClient,
         ConnectivityClient,
         PeerClient,
+        ResourceClient,
         RevocationClient,
         RecentLogsClient,
         SessionLoginClient,
@@ -27,6 +28,13 @@ final class GrpcEnrollmentClient
   }
   final api.ClientServiceClient _client;
   final int maxFailureBytes;
+
+  @override
+  Future<api.ListResourcesResponse> listResources(
+    api.ListResourcesRequest request,
+    Duration timeout,
+  ) =>
+      _invoke(() => _client.listResources(request, options: _options(timeout)));
 
   @override
   Future<api.ListPeersResponse> listPeers(
