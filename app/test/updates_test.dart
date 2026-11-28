@@ -288,6 +288,18 @@ void main() {
     await pending;
   });
 
+  test('external installation between check and click requires reopening UI', () async {
+    var disk = ReleaseVersion('0.3.0');
+    final controller = UpdateController(disk, Source(), (_) async => fail('duplicate MSI request'),
+      installedVersion: () async => disk);
+    addTearDown(controller.dispose);
+    await controller.check();
+    expect(controller.status, UpdateStatus.available);
+    disk = ReleaseVersion('0.4.0');
+    await controller.update();
+    expect(controller.status, UpdateStatus.completed);
+  });
+
   test('bounded HTTPS fetch rejects errors, oversized metadata and foreign redirect', () async {
     for (final response in [
       Response(Stream.value([]), statusCode: 403),

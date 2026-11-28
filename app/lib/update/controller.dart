@@ -15,7 +15,13 @@ enum UpdateStatus {
 }
 
 final class UpdateController extends ChangeNotifier {
-  UpdateController(this.current, this.source, this.install);
+  UpdateController(
+    this.current,
+    this.source,
+    this.install, {
+    this.installedVersion,
+  });
+  final Future<ReleaseVersion> Function()? installedVersion;
   final ReleaseVersion current;
   final ReleaseSource source;
   final Future<int> Function(WindowsRelease) install;
@@ -51,6 +57,12 @@ final class UpdateController extends ChangeNotifier {
     try {
       final latest = await source.latest();
       if (_disposed) return;
+      if (latest.version.compareTo(current) > 0 &&
+          await _alreadyInstalled(latest)) {
+        release = null;
+        _show(UpdateStatus.completed);
+        return;
+      }
       release = latest.version.compareTo(current) > 0 ? latest : null;
       _show(release == null ? UpdateStatus.current : UpdateStatus.available);
     } catch (_) {
@@ -59,6 +71,11 @@ final class UpdateController extends ChangeNotifier {
     } finally {
       _busy = false;
     }
+  }
+
+  Future<bool> _alreadyInstalled(WindowsRelease selected) async {
+    final read = installedVersion;
+    return read != null && (await read()).compareTo(selected.version) >= 0;
   }
 
   Future<void> update() async {
@@ -72,11 +89,19 @@ final class UpdateController extends ChangeNotifier {
     final selected = release!;
     _show(UpdateStatus.installing);
     try {
+      if (await _alreadyInstalled(selected)) {
+        _show(UpdateStatus.completed);
+        return;
+      }
+      if (_disposed) return;
       final code = await install(selected);
       _show(switch (code) {
         0 => UpdateStatus.completed,
         3010 || 1641 => UpdateStatus.restart,
-        _ => UpdateStatus.failed,
+        _ =>
+          await _alreadyInstalled(selected)
+              ? UpdateStatus.completed
+              : UpdateStatus.failed,
       });
     } catch (_) {
       _show(UpdateStatus.failed);

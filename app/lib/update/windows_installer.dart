@@ -10,14 +10,18 @@ Future<UpdateController> openWindowsUpdates() async {
   final powershell =
       '${Platform.environment['SystemRoot']}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
   const prefix = ['-NoLogo', '-NoProfile', '-NonInteractive', '-File'];
-  final info = await Process.run(powershell, [
-    ...prefix,
-    script,
-    '-Mode',
-    'Info',
-  ]).timeout(const Duration(seconds: 30));
-  if (info.exitCode != 0) throw const UpdateFailure();
-  final version = ReleaseVersion((info.stdout as String).trim());
+  Future<ReleaseVersion> installedVersion() async {
+    final info = await Process.run(powershell, [
+      ...prefix,
+      script,
+      '-Mode',
+      'Info',
+    ]).timeout(const Duration(seconds: 30));
+    if (info.exitCode != 0) throw const UpdateFailure();
+    return ReleaseVersion((info.stdout as String).trim());
+  }
+
+  final version = await installedVersion();
   return UpdateController(version, GitHubReleases(), (release) async {
     final result = await Process.run(powershell, [
       ...prefix,
@@ -28,5 +32,5 @@ Future<UpdateController> openWindowsUpdates() async {
       release.version.text,
     ]);
     return result.exitCode;
-  });
+  }, installedVersion: installedVersion);
 }

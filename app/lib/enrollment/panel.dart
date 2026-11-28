@@ -150,8 +150,7 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
       'Не удалось проверить доверие к серверу.',
     'client.registration.checkpoint_unavailable' ||
     'client.default_target.checkpoint_unavailable' ||
-    'client.approval.checkpoint_unavailable' =>
-      'Не удалось прочитать или сохранить доверенную версию bootstrap на устройстве.',
+    'client.approval.checkpoint_unavailable' => 'Не удалось прочитать или сохранить доверенную версию bootstrap на устройстве.',
     'client.registration.bootstrap_protocol' ||
     'client.default_target.bootstrap_protocol' ||
     'client.approval.bootstrap_protocol' =>
@@ -160,12 +159,10 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
     'client.default_target.access_denied' ||
     'client.approval.access_denied' =>
       'Сервер отклонил запрос из-за отсутствия доступа.',
-    'client.registration.quota_exhausted' =>
-      'Квота устройств исчерпана. После освобождения места начните новую регистрацию.',
+    'client.registration.quota_exhausted' => 'Квота устройств исчерпана. После освобождения места начните новую регистрацию.',
     'client.registration.request_rejected' ||
     'client.default_target.request_rejected' ||
-    'client.approval.request_rejected' =>
-      'Сервер отклонил параметры запроса.',
+    'client.approval.request_rejected' => 'Сервер отклонил параметры запроса.',
     'ui.invalid_argument' => 'Проверьте введённые данные.',
     'ui.unsupported' => 'Установленный клиент не поддерживает эту команду.',
     '' => '',
