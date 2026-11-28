@@ -97,6 +97,9 @@ class ConnectivityPanel extends StatelessWidget {
     if (agent.snapshotState ==
             api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_PREVIOUS &&
         !agent.mapRevision.isZero) {
+      if (agent.mapRevision == agent.targetMapRevision) {
+        return 'Карта ревизии $target применялась ранее. Служба пока не подтвердила её применение для текущего подключения.';
+      }
       return 'Получена карта ревизии $target. Последнее подтверждение на устройстве относится к предыдущей карте ревизии $applied.';
     }
     return 'Получена карта ревизии $target. Применение на этом устройстве пока не подтверждено.';
@@ -133,6 +136,30 @@ class ConnectivityPanel extends StatelessWidget {
   }
 
   String _reason(api.Failure f) {
+    final operation = switch (f.reasonKey) {
+      'client.connection.map_revision_rollback' =>
+        'Получена карта с ревизией ниже уже подтверждённой.',
+      'client.connection.map_issue_time_rollback' => 'Время выпуска полученной карты раньше времени выпуска уже подтверждённой карты.',
+      'client.connection.map_content_conflict' => 'Для одной ревизии и времени выпуска получены карты с разным содержимым.',
+      'client.connection.control_conflict' => 'Сервер управления отклонил запрос из-за конфликта состояния (ABORTED).',
+      'client.connection.session_create_failed' =>
+        'Служба не смогла создать локальный сеанс туннеля.',
+      'client.connection.session_connect_failed' =>
+        'Сеанс создан, но служба не смогла завершить настройку туннеля.',
+      'client.connection.session_interrupted' =>
+        'После подключения рабочий цикл туннеля завершился с ошибкой.',
+      'client.connection.endpoint_announcement_failed' =>
+        'Не удалось завершить публикацию сетевого адреса устройства.',
+      'client.connection.map_queue_full' => 'Очередь карт сети заполнена. Служба остановила туннель, чтобы не пропустить смену сетевого состояния.',
+      'client.connection.state_capacity' =>
+        'Достигнут предел размера локального состояния клиента.',
+      'client.connection.state_unavailable' => 'Локальное состояние клиента отсутствует, повреждено или недоступно для чтения.',
+      'client.connection.state_write_unconfirmed' =>
+        'Служба не смогла подтвердить запись локального состояния клиента.',
+      'client.connection.failed' => 'Туннель остановлен. Служба не сообщила, какая операция завершилась ошибкой (client.connection.failed).',
+      _ => null,
+    };
+    if (operation != null) return operation;
     if (f.reasonKey == 'client.connection.node_renewal_unresolved') {
       return 'Не подтверждён результат обновления доступа устройства. Вход пользователя не заменяет этот результат; требуется проверка владельцем сервиса.';
     }

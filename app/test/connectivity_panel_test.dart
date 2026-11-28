@@ -107,7 +107,7 @@ void main() {
     await c.refresh();
     await tester.pump();
     expect(
-      find.textContaining('предыдущей карте ревизии 9007199254740993.'),
+      find.textContaining('Карта ревизии 9007199254740993 применялась ранее.'),
       findsOneWidget,
     );
     agent.snapshotState = api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_CURRENT;
@@ -405,6 +405,26 @@ void main() {
   });
 
   for (final entry in {
+    'client.connection.map_revision_rollback':
+        'Получена карта с ревизией ниже уже подтверждённой.',
+    'client.connection.map_issue_time_rollback': 'Время выпуска полученной карты раньше времени выпуска уже подтверждённой карты.',
+    'client.connection.map_content_conflict': 'Для одной ревизии и времени выпуска получены карты с разным содержимым.',
+    'client.connection.control_conflict': 'Сервер управления отклонил запрос из-за конфликта состояния (ABORTED).',
+    'client.connection.session_create_failed':
+        'Служба не смогла создать локальный сеанс туннеля',
+    'client.connection.session_connect_failed':
+        'Сеанс создан, но служба не смогла завершить настройку туннеля',
+    'client.connection.session_interrupted':
+        'После подключения рабочий цикл туннеля завершился с ошибкой',
+    'client.connection.endpoint_announcement_failed':
+        'Не удалось завершить публикацию сетевого адреса устройства',
+    'client.connection.map_queue_full': 'Очередь карт сети заполнена',
+    'client.connection.state_capacity':
+        'Достигнут предел размера локального состояния клиента',
+    'client.connection.state_unavailable': 'Локальное состояние клиента отсутствует, повреждено или недоступно для чтения',
+    'client.connection.state_write_unconfirmed':
+        'Служба не смогла подтвердить запись локального состояния клиента',
+    'client.connection.failed': 'Служба не сообщила, какая операция',
     'client.connection.trust_required':
         'Проверьте адрес сервера и установленную версию',
     'client.connection.credential_expired':
