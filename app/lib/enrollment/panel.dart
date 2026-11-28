@@ -150,7 +150,8 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
       'Не удалось проверить доверие к серверу.',
     'client.registration.checkpoint_unavailable' ||
     'client.default_target.checkpoint_unavailable' ||
-    'client.approval.checkpoint_unavailable' => 'Не удалось прочитать или сохранить доверенную версию bootstrap на устройстве.',
+    'client.approval.checkpoint_unavailable' =>
+      'Не удалось прочитать или сохранить доверенную версию bootstrap на устройстве.',
     'client.registration.bootstrap_protocol' ||
     'client.default_target.bootstrap_protocol' ||
     'client.approval.bootstrap_protocol' =>
@@ -159,10 +160,12 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
     'client.default_target.access_denied' ||
     'client.approval.access_denied' =>
       'Сервер отклонил запрос из-за отсутствия доступа.',
-    'client.registration.quota_exhausted' => 'Квота устройств исчерпана. После освобождения места начните новую регистрацию.',
+    'client.registration.quota_exhausted' =>
+      'Квота устройств исчерпана. После освобождения места начните новую регистрацию.',
     'client.registration.request_rejected' ||
     'client.default_target.request_rejected' ||
-    'client.approval.request_rejected' => 'Сервер отклонил параметры запроса.',
+    'client.approval.request_rejected' =>
+      'Сервер отклонил параметры запроса.',
     'ui.invalid_argument' => 'Проверьте введённые данные.',
     'ui.unsupported' => 'Установленный клиент не поддерживает эту команду.',
     '' => '',
@@ -271,8 +274,8 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
                 Text('Аккаунт: ${attempt.accountId}'),
               if (!widget.simple && attempt.networkId.isNotEmpty)
                 Text('Сеть: ${attempt.networkId}'),
-              if (c.registeredConfirmed) ...[
-                if (!widget.simple) Text('Устройство: ${attempt.nodeId}'),
+              if (c.registeredConfirmed && !widget.simple) ...[
+                Text('Устройство: ${attempt.nodeId}'),
                 const Text(
                   'Регистрация подтверждена. Доступность сетевых ресурсов проверяется отдельно.',
                 ),
@@ -368,12 +371,13 @@ class _EnrollmentPanelState extends State<EnrollmentPanel> {
                   child: const Text('Следующая страница'),
                 ),
             ],
-            if (c.correlation != null)
+            if (!c.registeredConfirmed && c.correlation != null)
               OutlinedButton(
                 onPressed: c.busy ? null : c.refresh,
                 child: const Text('Проверить исходную попытку'),
               ),
-            if (c.correlation == null)
+            if (c.correlation == null &&
+                (!c.registeredConfirmed || widget.connectivityPanel == null))
               OutlinedButton(
                 onPressed: c.busy ? null : c.refresh,
                 child: const Text('Перечитать состояние клиента'),

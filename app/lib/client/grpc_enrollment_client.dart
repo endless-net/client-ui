@@ -17,6 +17,7 @@ final class GrpcEnrollmentClient
         ConnectivityClient,
         PeerClient,
         ResourceClient,
+        DiagnosticsClient,
         RevocationClient,
         RecentLogsClient,
         SessionLoginClient,
@@ -198,6 +199,23 @@ final class GrpcEnrollmentClient
     );
     if (!response.hasRuntime()) throw ClientCallFailure.protocol();
     return api.RuntimeInfo.fromBuffer(response.runtime.writeToBuffer());
+  }
+
+  @override
+  Future<api.Diagnostics> diagnostics(
+    String profileId,
+    Duration timeout,
+  ) async {
+    final response = await _invoke(
+      () => _client.getDiagnostics(
+        api.GetDiagnosticsRequest(
+          profile: api.ProfileRef(profileId: profileId),
+        ),
+        options: _options(timeout),
+      ),
+    );
+    if (!response.hasDiagnostics()) throw ClientCallFailure.protocol();
+    return response.diagnostics;
   }
 
   @override

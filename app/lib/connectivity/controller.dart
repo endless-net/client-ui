@@ -93,6 +93,100 @@ final class ConnectivityController extends ChangeNotifier {
     );
   }
 
+  var _dnsRead = 0;
+  bool dnsLoading = false;
+  bool dnsUnavailable = false;
+  api.DnsDiagnostics? _dns;
+  api.DnsDiagnostics? get dns => _dns == null
+      ? null
+      : api.DnsDiagnostics.fromBuffer(_dns!.writeToBuffer());
+  bool get canReadDNS =>
+      fresh &&
+      _client is DiagnosticsClient &&
+      _runtime?.callerAccess == api.Access.ACCESS_OWNER &&
+      _snapshot?.activeProfileId == _profile?.id &&
+      (_snapshot?.accountId.isNotEmpty ?? false) &&
+      (_snapshot?.network.id.isNotEmpty ?? false) &&
+      (_snapshot?.nodeId.isNotEmpty ?? false);
+
+  void _clearDNS() {
+    _dnsRead++;
+    dnsLoading = false;
+    dnsUnavailable = false;
+    _dns = null;
+  }
+
+  bool _validDNSResult(api.DnsApplication result, api.Status current) {
+    if (result.nodeId != current.nodeId ||
+        result.accountId != current.accountId ||
+        result.networkId != current.network.id) {
+      return false;
+    }
+    final target = BigInt.parse(result.targetMapRevision.toStringUnsigned());
+    final applied = BigInt.parse(
+      result.lastAppliedMapRevision.toStringUnsigned(),
+    );
+    if (target == BigInt.zero ||
+        (result.hasLastAppliedMapRevision() &&
+            (applied == BigInt.zero || applied > target))) {
+      return false;
+    }
+    final failed = result.state == api.DnsApplyState.DNS_APPLY_STATE_FAILED;
+    if (failed !=
+        (result.failure != api.DnsApplyFailure.DNS_APPLY_FAILURE_UNSPECIFIED)) {
+      return false;
+    }
+    return switch (result.state) {
+      api.DnsApplyState.DNS_APPLY_STATE_APPLIED =>
+        result.hasLastAppliedMapRevision() && applied == target,
+      api.DnsApplyState.DNS_APPLY_STATE_WITHDRAWN =>
+        !result.hasLastAppliedMapRevision(),
+      api.DnsApplyState.DNS_APPLY_STATE_PENDING ||
+      api.DnsApplyState.DNS_APPLY_STATE_FAILED => true,
+      _ => false,
+    };
+  }
+
+  Future<void> readDNS() async {
+    if (!canReadDNS || dnsLoading) return;
+    final token = ++_dnsRead;
+    final profile = _profile!.id;
+    dnsLoading = true;
+    dnsUnavailable = false;
+    _dns = null;
+    _emit();
+    try {
+      final reply = await (_client as DiagnosticsClient)
+          .diagnostics(profile, _timeout)
+          .timeout(_timeout);
+      if (_disposed || token != _dnsRead || !canReadDNS) return;
+      final current = _snapshot!;
+      final observed = reply.status;
+      final application = reply.dns.application;
+      if (!reply.hasMetadata() ||
+          reply.metadata.instanceId != _instance ||
+          observed.metadata != reply.metadata ||
+          BigInt.parse(reply.metadata.revision.toStringUnsigned()) <
+              BigInt.parse(current.metadata.revision.toStringUnsigned()) ||
+          observed.activeProfileId != profile ||
+          observed.nodeId != current.nodeId ||
+          observed.network.id != current.network.id ||
+          observed.accountId != current.accountId ||
+          (reply.dns.hasApplication() &&
+              !_validDNSResult(application, current))) {
+        throw ConnectivityReadProblem.wrongProfile;
+      }
+      _dns = api.DnsDiagnostics.fromBuffer(reply.dns.writeToBuffer());
+    } catch (_) {
+      if (!_disposed && token == _dnsRead) dnsUnavailable = true;
+    } finally {
+      if (!_disposed && token == _dnsRead) {
+        dnsLoading = false;
+        _emit();
+      }
+    }
+  }
+
   bool get supported => restriction != null;
   bool get _eligible =>
       !_disposed &&
@@ -139,6 +233,7 @@ final class ConnectivityController extends ChangeNotifier {
 
   Future<void> bind(api.Profile profile) async {
     if (_disposed) return;
+    _clearDNS();
     final epoch = ++_epoch;
     ++_readVersion;
     _timer?.cancel();
@@ -193,6 +288,7 @@ final class ConnectivityController extends ChangeNotifier {
           runtime.contractSha256 != _digest ||
           runtime.protocol != 'endlessnet-client-ipc' ||
           runtime.ipcVersion != 0) {
+        _clearDNS();
         _link = ConnectivityLink.mismatch;
         _readFailure = (
           stage: stage,
@@ -224,6 +320,16 @@ final class ConnectivityController extends ChangeNotifier {
           value.activeProfileId != _profile!.id) {
         throw ConnectivityReadProblem.wrongProfile;
       }
+      final old = _snapshot;
+      if (runtime.callerAccess != api.Access.ACCESS_OWNER ||
+          old?.metadata.revision != value.metadata.revision ||
+          old?.mapRevision != value.mapRevision ||
+          old?.connectionPhase != value.connectionPhase ||
+          old?.accountId != value.accountId ||
+          old?.nodeId != value.nodeId ||
+          old?.network.id != value.network.id) {
+        _clearDNS();
+      }
       _runtime = api.RuntimeInfo.fromBuffer(runtime.writeToBuffer());
       _snapshot = api.Status.fromBuffer(value.writeToBuffer());
       _hadDeviceContext = _hadDeviceContext || value.nodeId.isNotEmpty;
@@ -234,6 +340,7 @@ final class ConnectivityController extends ChangeNotifier {
     } catch (error) {
       if (_currentRead(epoch, version)) {
         _fresh = false;
+        _clearDNS();
         _link = ConnectivityLink.unavailable;
         _readFailure = (
           stage: stage,

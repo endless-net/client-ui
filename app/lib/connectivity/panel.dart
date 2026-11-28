@@ -78,6 +78,60 @@ class ConnectivityPanel extends StatelessWidget {
     };
   }
 
+  String? _mapReport(api.Status s) {
+    final agent = s.agent;
+    if (s.nodeId.isEmpty ||
+        agent.nodeId != s.nodeId ||
+        s.network.id.isEmpty ||
+        agent.networkId != s.network.id ||
+        agent.targetMapRevision.isZero) {
+      return null;
+    }
+    final target = agent.targetMapRevision.toStringUnsigned();
+    final applied = agent.mapRevision.toStringUnsigned();
+    if (agent.snapshotState ==
+            api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_CURRENT &&
+        agent.mapRevision == agent.targetMapRevision) {
+      return 'На этом устройстве применена карта ревизии $target.';
+    }
+    if (agent.snapshotState ==
+            api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_PREVIOUS &&
+        !agent.mapRevision.isZero) {
+      return 'Получена карта ревизии $target. Последнее подтверждение на устройстве относится к предыдущей карте ревизии $applied.';
+    }
+    return 'Получена карта ревизии $target. Применение на этом устройстве пока не подтверждено.';
+  }
+
+  String _dnsReport(api.DnsDiagnostics dns) {
+    if (!dns.hasApplication()) {
+      return 'Служба ещё не сообщила результат применения DNS.';
+    }
+    final a = dns.application;
+    final target = a.targetMapRevision.toStringUnsigned();
+    return switch (a.state) {
+      api.DnsApplyState.DNS_APPLY_STATE_PENDING =>
+        'Применяются настройки DNS ревизии $target.',
+      api.DnsApplyState.DNS_APPLY_STATE_APPLIED =>
+        'Настройки DNS ревизии $target применены.',
+      api.DnsApplyState.DNS_APPLY_STATE_WITHDRAWN =>
+        'Настройки DNS ревизии $target сняты.',
+      api.DnsApplyState.DNS_APPLY_STATE_FAILED => [
+        switch (a.failure) {
+          api.DnsApplyFailure.DNS_APPLY_FAILURE_INVALID_ASSIGNMENT =>
+            'Ошибка в назначении DNS ревизии $target.',
+          api.DnsApplyFailure.DNS_APPLY_FAILURE_OS_CLEANUP =>
+            'Не удалось снять настройки DNS ревизии $target.',
+          api.DnsApplyFailure.DNS_APPLY_FAILURE_UNSUPPORTED =>
+            'Служба не поддерживает назначение DNS ревизии $target.',
+          _ => 'Не удалось применить настройки DNS ревизии $target.',
+        },
+        if (a.hasLastAppliedMapRevision())
+          'Последняя подтверждённая ревизия — ${a.lastAppliedMapRevision.toStringUnsigned()}.',
+      ].join(' '),
+      _ => 'Результат применения DNS неизвестен.',
+    };
+  }
+
   String _reason(api.Failure f) {
     if (f.reasonKey == 'client.connection.node_renewal_unresolved') {
       return 'Не подтверждён результат обновления доступа устройства. Вход пользователя не заменяет этот результат; требуется проверка владельцем сервиса.';
@@ -93,6 +147,12 @@ class ConnectivityPanel extends StatelessWidget {
     }
     if (f.reasonKey == 'client.connection.protocol_rejected') {
       return 'Сервер управления сообщил об ошибке протокола или конфигурации.';
+    }
+    if (f.reasonKey == 'client.connection.dns_assignment_invalid') {
+      return 'В назначении DNS есть ошибка. Проверьте настройки DNS этой сети.';
+    }
+    if (f.reasonKey == 'client.connection.dns_unsupported') {
+      return 'Эта версия службы не поддерживает назначенные настройки DNS.';
     }
     if (f.reasonKey == 'client.connection.map_rejected') {
       return 'Карта сети отклонена при проверке.';
@@ -137,7 +197,7 @@ class ConnectivityPanel extends StatelessWidget {
       api.ErrorCode.ERROR_CODE_PERMISSION_REQUIRED =>
         'Недостаточно локальных разрешений.',
       api.ErrorCode.ERROR_CODE_RESOURCE_CONFLICT =>
-        'Обнаружен конфликт сетевых ресурсов.',
+        'Сетевая настройка конфликтует с настройками ОС на этом устройстве.',
       api.ErrorCode.ERROR_CODE_APPLY_FAILED =>
         'Применение или очистка сетевых настроек не завершены.',
       api.ErrorCode.ERROR_CODE_DEADLINE_EXCEEDED =>
@@ -221,11 +281,14 @@ class ConnectivityPanel extends StatelessWidget {
       final c = controller;
       if (!c.hasDeviceContext) return const SizedBox.shrink();
       final s = c.snapshot;
+      final mapReport = c.fresh && s != null ? _mapReport(s) : null;
       final applied =
           c.fresh &&
           s != null &&
-          s.hasAgent() &&
-          s.agent.mapRevision.toStringUnsigned() != '0';
+          mapReport != null &&
+          s.agent.snapshotState ==
+              api.AgentSnapshotState.AGENT_SNAPSHOT_STATE_CURRENT &&
+          s.agent.mapRevision == s.agent.targetMapRevision;
       final disconnected =
           c.fresh &&
           s?.connectionPhase ==
@@ -245,6 +308,15 @@ class ConnectivityPanel extends StatelessWidget {
                 statusLabel(c, s),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
+              if (c.canReadDNS) ...[
+                TextButton(
+                  onPressed: c.dnsLoading ? null : c.readDNS,
+                  child: Text(c.dnsLoading ? 'Чтение DNS…' : 'Проверить DNS'),
+                ),
+                if (c.dns case final dns?) Text(_dnsReport(dns)),
+                if (c.dnsUnavailable)
+                  const Text('Не удалось прочитать диагностику DNS.'),
+              ],
               if (c.busy) const LinearProgressIndicator(),
               if (!simple)
                 Text(
@@ -254,13 +326,11 @@ class ConnectivityPanel extends StatelessWidget {
                     _ => 'неизвестно',
                   }}',
                 ),
-              if (!simple)
+              if (mapReport != null)
+                Text(mapReport)
+              else if (!simple)
                 Text(
-                  'Локальное применение: ${applied
-                      ? 'подтверждено'
-                      : disconnected
-                      ? 'отключено'
-                      : 'неизвестно'}',
+                  'Локальное применение: ${disconnected ? 'отключено' : 'неизвестно'}',
                 ),
               for (final peer
                   in s?.peerTransports ?? <api.PeerTransportStatus>[])

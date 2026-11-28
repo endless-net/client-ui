@@ -293,6 +293,7 @@ void main() {
     expect(find.text('Аккаунт: account-A'), findsOneWidget);
     expect(find.text('Сеть: network-A'), findsOneWidget);
     expect(find.text('Отменить ожидание'), findsNothing);
+    expect(find.text('Проверить исходную попытку'), findsNothing);
     expect(
       find.textContaining('Доступность сетевых ресурсов проверяется отдельно.'),
       findsOneWidget,

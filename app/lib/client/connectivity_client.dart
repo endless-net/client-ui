@@ -9,6 +9,10 @@ abstract interface class ConnectivityClient {
   Future<void> disconnect(api.DisconnectRequest request, Duration timeout);
 }
 
+abstract interface class DiagnosticsClient {
+  Future<api.Diagnostics> diagnostics(String profileId, Duration timeout);
+}
+
 abstract interface class PeerClient {
   Future<api.ListPeersResponse> listPeers(
     api.ListPeersRequest request,
